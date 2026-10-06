@@ -1,0 +1,25 @@
+.root {
+  margin-top: var(--spacingVerticalL);
+}
+.root h3 {
+  margin: 0 0 var(--spacingVerticalS);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+}
+.root ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--spacingVerticalS);
+}
+.root li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalL);
+}
+.root li span,
+.root small {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}

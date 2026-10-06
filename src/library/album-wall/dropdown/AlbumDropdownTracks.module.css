@@ -1,0 +1,139 @@
+/* 每一首落在哪一格由组件逐项给（先排满左栏再排右栏）。栏数、露出的行数与行高由组件经 --columns、
+   --lines、--row 给，与下拉面板的高按同一套几何算；行数超过露出的那几行时曲目区自己滚动。 */
+.tracks {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  grid-auto-rows: var(--row);
+  column-gap: var(--spacingHorizontalXXL);
+  height: calc(var(--lines) * var(--row));
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  outline: none;
+}
+
+.track {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  padding: 0 var(--spacingHorizontalS);
+  border-radius: var(--radius-control);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  cursor: default;
+  user-select: none;
+}
+
+.track:hover {
+  background: var(--bg-hover);
+}
+
+.track[aria-selected='true'] {
+  background: var(--bg-selected);
+}
+
+.tracks:focus-visible .track[data-focused] {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+.number,
+.duration {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 序号格：序号（或正在播放的记号）与播放键叠在同一格里，指针停在行上时换成播放键。 */
+.number {
+  display: grid;
+  align-items: center;
+  justify-items: start;
+}
+
+.number > * {
+  grid-area: 1 / 1;
+}
+
+.numberText {
+  display: flex;
+  align-items: center;
+}
+
+.playKey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  visibility: hidden;
+}
+
+.track[data-playing] .playKey {
+  color: var(--playing);
+}
+
+.track:hover .numberText {
+  visibility: hidden;
+}
+
+.track:hover .playKey {
+  visibility: visible;
+}
+
+.duration {
+  text-align: end;
+}
+
+/* 行尾一格：时长与评分叠在同一格里互斥显示，平时是时长，指针停在行上时换成星。两者都一直占着位置，
+   格宽取两者里宽的那个，换的时候标题不跟着伸缩。 */
+.end {
+  display: grid;
+  align-items: center;
+  justify-items: end;
+}
+
+.end > * {
+  grid-area: 1 / 1;
+}
+
+.rating {
+  display: flex;
+  visibility: hidden;
+}
+
+.track:hover .rating {
+  visibility: visible;
+}
+
+.track:hover .end[data-ratable] .duration {
+  visibility: hidden;
+}
+
+.title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.credit {
+  margin-inline-start: var(--spacingHorizontalS);
+  color: var(--text-secondary);
+}
+
+.track[data-playing] .title {
+  color: var(--playing);
+}
+
+.bar {
+  grid-column: 1 / -1;
+}
+
+.failed {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}

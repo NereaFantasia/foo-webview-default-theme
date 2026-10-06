@@ -1,0 +1,15 @@
+/* 两侧键 --side、中键 --play，两端对齐排在 --width 里；三个量由组件按 `size` 或 `scale` 写在根上。 */
+.transport {
+  width: var(--width);
+  height: var(--play);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+/* 控件层藏起时淡出，且不接指针。 */
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+}

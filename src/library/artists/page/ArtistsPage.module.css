@@ -1,0 +1,62 @@
+.root {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--colorNeutralForeground1);
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+.toolbar {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+}
+.browser {
+  display: flex;
+  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.detail {
+  container: artist-detail / inline-size;
+  overflow-anchor: none;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXL);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL);
+  padding-bottom: calc(var(--spacingVerticalXXL) + var(--player-inset, 0px));
+}
+.detail > * {
+  flex-shrink: 0;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  color: var(--colorNeutralForeground2);
+}
+.empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--colorNeutralForeground3);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
+}
+@media (max-width: 600px) {
+  .detail {
+    padding-top: var(--spacingVerticalM);
+    padding-inline: var(--spacingHorizontalM);
+  }
+}

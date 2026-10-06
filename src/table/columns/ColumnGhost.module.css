@@ -1,0 +1,21 @@
+.ghost {
+  position: fixed;
+  z-index: 1;
+  max-width: 180px;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorNeutralBackground1);
+  box-shadow: var(--shadow8);
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.ghost[data-leaving] {
+  opacity: 0;
+}

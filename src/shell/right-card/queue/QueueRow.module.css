@@ -1,0 +1,215 @@
+/* 一行 48 高：左槽的序号与手柄互斥、封面 36、标题两行、右槽 36，槽与槽之间 8，左右各留 8。 */
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    max(20px, var(--queue-number-width, 2ch))
+    36px minmax(0, 1fr) minmax(36px, max-content);
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  height: 48px;
+  padding: 0 var(--spacingHorizontalS);
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: default;
+  user-select: none;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.row[data-selected] {
+  background: var(--bg-selected);
+}
+
+.row:focus-visible {
+  box-shadow: inset 0 0 0 var(--strokeWidthThick) var(--colorStrokeFocus2);
+}
+
+/* 拖着的那几行原位变淡，提起的副本跟着指针另画。 */
+.row[data-lifted] {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+
+.lead {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+}
+
+.number,
+.handle {
+  grid-area: 1 / 1;
+}
+
+.number {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.handle {
+  display: grid;
+  visibility: hidden;
+  color: var(--text-secondary);
+  cursor: grab;
+}
+
+.row[data-kind='queued']:hover .number {
+  visibility: hidden;
+}
+
+.row[data-kind='queued']:hover .handle,
+.row[data-preview] .handle {
+  visibility: visible;
+}
+
+.row[data-preview] .handle {
+  color: var(--accent);
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 封面上的播放键：悬停时压暗、出播放键。两种颜色都不随主题反色。 */
+.play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: var(--colorBackgroundOverlay);
+  color: var(--colorNeutralForegroundStaticInverted);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.row:hover .play {
+  opacity: 1;
+}
+
+.identity {
+  display: grid;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}
+
+.title,
+.subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+/* 五颗星只在悬停或焦点在行里时出；占标题行右端，标题在它前面截断。 */
+.rating {
+  display: none;
+  flex: none;
+}
+
+.row:hover .rating,
+.row:focus-within .rating {
+  display: inline-flex;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.tail {
+  display: grid;
+  place-items: center;
+}
+
+.length {
+  white-space: nowrap;
+}
+
+.length,
+.more {
+  grid-area: 1 / 1;
+}
+
+.length {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.more:hover {
+  background: var(--bg-hover);
+}
+
+.row:hover .length {
+  visibility: hidden;
+}
+
+.row:hover .more {
+  display: grid;
+}

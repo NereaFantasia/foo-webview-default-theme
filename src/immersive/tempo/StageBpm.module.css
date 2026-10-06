@@ -1,0 +1,96 @@
+/* 零尺寸的定位锚：各件按舞台坐标绝对定位。 */
+.bpm {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--fontFamilyMonospace);
+}
+
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+.base,
+.beat-key {
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+.base {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+}
+
+.key {
+  left: 1140px;
+  top: 306px;
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+}
+
+.value {
+  left: 1140px;
+  top: 403px;
+  font-size: 30px;
+}
+
+.value.missing {
+  color: var(--colorNeutralForeground3);
+}
+
+/* 条与左边的相关条同一行；值写在条下，落在条底与附行之间的正中。框线画在盒内，刻度与摆锤按 136 × 20 的盒子量。 */
+.track {
+  position: absolute;
+  left: 1140px;
+  top: 344px;
+  width: 136px;
+  height: 20px;
+  box-shadow: inset 0 0 0 1px var(--paper-ring);
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 3%, transparent);
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--paper-ring);
+}
+
+/* 停在正中的样子；动起来以后位置与粗细由脚本逐帧写在行内样式上。 */
+.marker {
+  position: absolute;
+  left: 66px;
+  top: -3px;
+  bottom: -3px;
+  width: 4px;
+  background: var(--paper-hot);
+}
+
+/* 附行：小标 13 隔 8 接四个 6 × 6 的点，点与点之间隔 6，点底边压在基线上方 1。 */
+.beat {
+  left: 1140px;
+  top: 431px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.beat-key {
+  margin-right: var(--spacingHorizontalS);
+  font-size: 13px;
+  color: var(--colorNeutralForeground3);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  translate: 0 -1px;
+  background: var(--paper-grid);
+}
+
+.dot + .dot {
+  margin-left: var(--spacingHorizontalSNudge);
+}
+
+.dot[data-lit] {
+  background: var(--paper-hot);
+}

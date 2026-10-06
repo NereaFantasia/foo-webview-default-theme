@@ -1,0 +1,32 @@
+/* 整条缝都是命中区，占网格的中间一列；握柄居中，平时透明，悬停、键盘聚焦、拖动时显出。 */
+.splitter {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.grip {
+  width: 2px;
+  height: 48px;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorCompoundBrandForeground1);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--curveEasyEase);
+}
+
+.splitter:hover .grip,
+.splitter[data-dragging] .grip {
+  opacity: 1;
+}
+
+.splitter:focus-visible {
+  border-radius: var(--borderRadiusMedium);
+  box-shadow: inset 0 0 0 var(--strokeWidthThick) var(--colorStrokeFocus2);
+}
+
+.splitter:focus-visible .grip {
+  opacity: 1;
+}

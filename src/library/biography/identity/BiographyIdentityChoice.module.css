@@ -1,0 +1,45 @@
+.root {
+  margin-top: var(--spacingVerticalM);
+}
+
+.heading {
+  margin: 0 0 var(--spacingVerticalXS);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: var(--fontWeightSemibold);
+}
+
+.meta,
+.note {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground2);
+}
+
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  margin: var(--spacingVerticalM) 0 0;
+}

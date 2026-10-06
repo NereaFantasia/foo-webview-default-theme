@@ -1,0 +1,90 @@
+/* 段首横线下留 6、表头下 3、行间 4：前两个量没有同时适用的 spacing token，写成本件的几何变量。 */
+.lyric-log {
+  --head-lead: 6px;
+  --rows-lead: 3px;
+  height: 100%;
+  padding-top: var(--head-lead);
+  border-top: 1px solid var(--paper-cross);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+}
+
+.key,
+.time,
+.plain {
+  font-family: var(--fontFamilyMonospace);
+}
+
+.key {
+  font-size: 11px;
+  line-height: 13px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.source {
+  font-size: 10px;
+}
+
+.plain {
+  margin: var(--head-lead) 0 0;
+  font-size: 11px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 行距与字号照图纸：邻行 17 高、当前行 20 高；方块 6、时间码 60 宽，正文从左边 86 起。 */
+.rows {
+  margin: var(--rows-lead) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  position: relative;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalMNudge);
+  padding-left: var(--spacingHorizontalL);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+}
+
+.row + .row {
+  margin-top: var(--spacingVerticalXS);
+}
+
+.row[data-slot='current'] {
+  height: 20px;
+  font-size: 14px;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 20px;
+  color: var(--paper-hot);
+}
+
+.hot-square {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  translate: 0 -50%;
+  background: var(--paper-hot);
+}
+
+.time {
+  flex: none;
+  width: 60px;
+  font-size: 9px;
+  font-weight: var(--fontWeightRegular);
+}
+
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

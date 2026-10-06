@@ -1,0 +1,64 @@
+.mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 1em;
+  height: 1em;
+  color: var(--colorBrandForeground1);
+}
+
+/* 竖条从中线往上下两头伸缩，静止时是一高一低交错的样子。 */
+.bar {
+  width: 12%;
+  height: 100%;
+  border-radius: var(--borderRadiusSmall);
+  background-color: currentColor;
+  transform: scaleY(var(--bar-rest));
+}
+
+.bar:nth-child(1) {
+  --bar-rest: 0.45;
+  --bar-delay: calc(var(--durationUltraSlow) * -0.6);
+}
+
+.bar:nth-child(2) {
+  --bar-rest: 0.9;
+  --bar-delay: calc(var(--durationUltraSlow) * -1.4);
+}
+
+.bar:nth-child(3) {
+  --bar-rest: 0.6;
+  --bar-delay: calc(var(--durationUltraSlow) * -0.2);
+}
+
+.bar:nth-child(4) {
+  --bar-rest: 0.75;
+  --bar-delay: calc(var(--durationUltraSlow) * -1);
+}
+
+/* 每根竖条在自己的静止高度与满高、低点之间来回，起点错开，看起来此起彼伏。 */
+.mark[data-active] .bar {
+  animation: bounce calc(var(--durationUltraSlow) * 2) var(--curveEasyEase) var(--bar-delay)
+    infinite alternate;
+}
+
+@keyframes bounce {
+  0% {
+    transform: scaleY(0.25);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+
+  100% {
+    transform: scaleY(var(--bar-rest));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark[data-active] .bar {
+    animation: none;
+  }
+}

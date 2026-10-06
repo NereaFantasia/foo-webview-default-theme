@@ -1,0 +1,8 @@
+/* 三键贴着窗口右上角、铺满标题栏的整条高，退出标题栏的拖动区。 */
+.root {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

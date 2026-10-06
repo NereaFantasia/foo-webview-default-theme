@@ -1,0 +1,116 @@
+/* 两行上下排，行间隔 2。浮层里整块在高度有限时让设备列表先缩。 */
+.root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  row-gap: var(--spacingVerticalXXS);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 两行同一套列：图标列、内容列、行尾列。面板里图标列 16、列间 8、行高 18，左右由面板的内边距给；浮层里图标列
+   24、列间 6、行高 40、左 8 右 12：图标 16 居中，离左缘 12，内容从 38 起。 */
+.row {
+  display: grid;
+  flex: none;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  column-gap: var(--spacingHorizontalS);
+  align-items: center;
+  min-width: 0;
+  height: 18px;
+}
+
+.root[data-variant='flyout'] .row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  column-gap: var(--spacingHorizontalSNudge);
+  height: 40px;
+  padding: 0 var(--spacingHorizontalM) 0 var(--spacingHorizontalS);
+}
+
+.divider {
+  flex: none;
+  height: var(--strokeWidthThin);
+  background: var(--line);
+}
+
+/* 设备行是一只键：去掉原生按钮的底与边，字体跟着外面。 */
+.device {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.root[data-variant='flyout'] .device {
+  border-radius: var(--radius-control);
+}
+
+.root[data-variant='flyout'] .device:hover,
+.root[data-variant='flyout'] .device[aria-expanded='true'] {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.root[data-variant='panel'] .device:hover .name {
+  text-decoration: underline;
+}
+
+.device:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+.icon {
+  grid-column: 1;
+  justify-self: center;
+  color: var(--text-secondary);
+}
+
+/* 设备名放不下先截断，输出模块留着。 */
+.label {
+  display: flex;
+  grid-column: 2;
+  align-items: baseline;
+  gap: var(--spacingHorizontalSNudge);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: 16px;
+  text-overflow: ellipsis;
+}
+
+.root[data-variant='flyout'] .name {
+  font-size: 13px;
+  font-weight: var(--fontWeightRegular);
+  line-height: 20px;
+}
+
+.module {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* 面板里 12、淡色；浮层里 14、次要色。 */
+.chevron {
+  grid-column: 3;
+  color: var(--text-muted);
+}
+
+.root[data-variant='flyout'] .chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary);
+}

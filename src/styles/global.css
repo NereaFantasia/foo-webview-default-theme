@@ -1,0 +1,36 @@
+/* 全局只放与 token 无关的基础样式；Fluent 变量在 FluentProvider 之下才有定义。 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* 主窗不整页滚动。提示、菜单挂在 body 下，被推到贴住窗口边缘后，Fluent 再把坐标取整到设备像素，
+   可能越出边缘零点几像素；不裁掉，整页就会出滚动条。 */
+html {
+  overflow: hidden;
+}
+
+body {
+  /* Mica 由宿主窗口提供，页面根层保持透明才能透出来。 */
+  background: transparent;
+  /* 界面文字默认不能选：Ctrl+A、拖动都不会把整页选中。要让人复制的文字单独写 user-select: text。 */
+  user-select: none;
+}
+
+/* 输入框里的文字照常能选、能 Ctrl+A。 */
+input,
+textarea,
+[contenteditable='true'] {
+  user-select: text;
+}
+
+/* 主题根（FluentProvider）靠网格拉伸铺满窗口，而不是自己写 height: 100%：
+   它的类会被抄到浮层的挂载节点上，那个节点带上整页高度就会盖住窗口、吞掉点击。
+   行列都写成 minmax(0, 1fr)：缺省的 auto 轨道会随内容长高，内容一多整页就撑出窗口，
+   页面里自己滚动的区域（封面墙、侧边栏的播放列表节）也就滚不起来。 */
+#root {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}

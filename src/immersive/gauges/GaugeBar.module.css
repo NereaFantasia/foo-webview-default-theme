@@ -1,0 +1,81 @@
+/* 轨的定位、离上一行的距离，刻度的长度，刻度字的字号与基线，都由放量表的外框经 --gauge-* 给。 */
+.track {
+  position: var(--gauge-track-place);
+  top: var(--gauge-track-top);
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-top: var(--gauge-track-gap);
+  background: var(--paper-cross);
+}
+
+/* 值条比轨上下各出 1 px。时长与曲线按 data-phase 取。 */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 4px;
+  background: var(--paper-hot);
+  transition: clip-path var(--bar-duration) var(--bar-curve);
+}
+
+/* 头一次长出是直接进场；升快落慢是读数的阻尼；缩回是轻退场。 */
+.bar[data-phase='enter'] {
+  --bar-duration: var(--motion-slow);
+  --bar-curve: var(--curveDecelerateMid);
+}
+
+.bar[data-phase='rise'] {
+  --bar-duration: var(--motion-faster);
+  --bar-curve: var(--curveDecelerateMid);
+}
+
+.bar[data-phase='fall'] {
+  --bar-duration: var(--motion-slow);
+  --bar-curve: var(--curveDecelerateMid);
+}
+
+.bar[data-phase='exit'] {
+  --bar-duration: var(--motion-fast);
+  --bar-curve: var(--curveAccelerateMid);
+}
+
+/* 刻度从轨下沿往下挂，字按基线落位：字盒底边裁到字母基线，`top` 写的就是基线（相对轨顶）。 */
+.tick {
+  position: absolute;
+  top: 100%;
+  width: 1px;
+  height: var(--gauge-tick-length);
+  translate: -50% 0;
+  background: var(--paper-ring);
+}
+
+.scale-label {
+  position: absolute;
+  top: var(--gauge-scale-baseline);
+  translate: -50% -100%;
+  font-size: var(--gauge-scale-font);
+  line-height: 1;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+/* 参照线比值条上下各多出 3 px，压在值条上面；每次出现都直接进场淡入。 */
+.marker {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 10px;
+  translate: -50% 0;
+  background: var(--paper-ink);
+  animation: marker-in var(--motion-slow) var(--curveDecelerateMid);
+}
+
+@keyframes marker-in {
+  from {
+    opacity: 0;
+  }
+}

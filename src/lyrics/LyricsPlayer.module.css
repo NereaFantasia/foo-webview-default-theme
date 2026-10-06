@@ -1,0 +1,34 @@
+/* AMLL 的样式表按自己的 CSS 变量取色；这里把它们接到 Fluent token 上，字号由组件按档位写进来。 */
+.root {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  --amll-lp-color: var(--colorNeutralForeground1);
+  --amll-lp-hover-bg-color: var(--colorSubtleBackgroundHover);
+}
+
+/* AMLL 用 plus-lighter 叠在深色底上；浅色底上它会把深色的字提亮到看不见。 */
+.root[data-scheme='light'] :global(.amll-lyric-player) {
+  mix-blend-mode: normal;
+}
+
+/*
+ * 关弹簧时 AMLL 改用 CSS 过渡移动行。保留透明度与逐字遮罩的过渡，避免行离开视口或唱完时骤隐；
+ * 移动的时长与曲线取当前档位。类名带构建时的哈希前缀，按 `lyricLine` 识别。
+ */
+.root[data-spring='off'] :global(.amll-lyric-player) > *,
+.root[data-spring='off'] :global(.amll-lyric-player) [class*='lyricLine'] {
+  transition:
+    opacity 0.4s,
+    filter 0.25s,
+    transform var(--lyrics-transition-duration) var(--lyrics-transition-curve),
+    background-color 0.25s,
+    box-shadow 0.25s,
+    --bright-mask-alpha var(--mask-alpha-duration, 0.45s) ease-out,
+    --dark-mask-alpha var(--mask-alpha-duration, 0.45s) ease-out;
+}
+
+.root[data-reduced-motion] :global(.amll-lyric-player) > *,
+.root[data-reduced-motion] :global(.amll-lyric-player) [class*='lyricLine'] {
+  transition: none;
+}

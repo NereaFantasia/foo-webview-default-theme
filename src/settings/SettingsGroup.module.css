@@ -1,0 +1,20 @@
+/* 卡与卡之间隔 4；标题到第一张卡隔 8。 */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 var(--spacingVerticalXS);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+}
+
+/* 焦点是点目录时程序给的，不画焦点环；键盘走不到这里。 */
+.title:focus {
+  outline: none;
+}

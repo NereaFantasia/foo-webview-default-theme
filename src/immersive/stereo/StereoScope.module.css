@@ -1,0 +1,56 @@
+.scope {
+  position: relative;
+  flex: none;
+}
+
+.scope > svg,
+.trace {
+  position: absolute;
+  inset: 0;
+}
+
+.trace {
+  width: 100%;
+  height: 100%;
+}
+
+/* 框底与相关条、摆锤条同一层淡底，三件仪表读成一组。 */
+.frame {
+  fill: color-mix(in srgb, var(--colorNeutralForeground1) 3%, transparent);
+  stroke: var(--paper-ring);
+}
+
+.ring {
+  fill: none;
+  stroke: var(--paper-grid);
+}
+
+.ring.half {
+  stroke-dasharray: 2 3;
+}
+
+.axis {
+  stroke: var(--paper-grid);
+}
+
+.tick {
+  fill: none;
+  stroke: var(--paper-ring);
+}
+
+/* 角标字号随所在的格子，由格子上的 `--scope-corner-font` 给。 */
+.corner {
+  position: absolute;
+  top: 2px;
+  font-size: var(--scope-corner-font);
+  line-height: 10px;
+  color: var(--colorNeutralForeground3);
+}
+
+.corner.left {
+  left: 2px;
+}
+
+.corner.right {
+  right: 3px;
+}

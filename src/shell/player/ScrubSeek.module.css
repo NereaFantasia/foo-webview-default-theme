@@ -1,0 +1,60 @@
+/* 平时是贴底那条细线加它的命中区；悬停态撑满这一块（封面除外），线落在正中。`--scrub-drop` 是平时那条线的
+   中心比悬停态的正中低多少，进出悬停态时线从那里挪上来、挪回去。 */
+.root {
+  position: absolute;
+}
+
+.root[data-scrub='on'] {
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+}
+
+/* 已在场元素的移动：点到点 250 ms；收回是轻退场 167 ms。减弱动效时时长变量自动缩到 1 ms。 */
+.root[data-scrub='on'] > * {
+  animation: scrub-rise var(--motion-normal) var(--motion-curve-point-to-point);
+}
+
+.root[data-scrub='off'] > * {
+  animation: scrub-drop var(--motion-fast) var(--curveAccelerateMid);
+}
+
+@keyframes scrub-rise {
+  from {
+    translate: 0 var(--scrub-drop);
+  }
+}
+
+@keyframes scrub-drop {
+  from {
+    translate: 0 calc(-1 * var(--scrub-drop));
+  }
+}
+
+/* 正在播放条：放在曲目信息那一栏里（高 44、左右留 12）。线离下沿 2，命中区往上 2、往下 8，所以整块往下放 6。 */
+.root[data-form='lcd'] {
+  --scrub-drop: 18.5px;
+
+  right: var(--spacingHorizontalM);
+  bottom: calc(var(--spacingVerticalXXS) - var(--spacingVerticalS));
+  left: var(--spacingHorizontalM);
+}
+
+.root[data-form='lcd'][data-scrub='on'] {
+  bottom: 0;
+}
+
+/* 胶囊：定位从描边内侧量起，各扣掉描边。平时线离外缘左 64、右 32、下 3，命中区往上 8、往下 2；悬停态从封面右边
+   12 起、到键组的右缘止。 */
+.root[data-form='capsule'] {
+  --scrub-drop: 28px;
+
+  right: calc(var(--spacingHorizontalXXXL) - var(--strokeWidthThin));
+  bottom: 0;
+  left: calc(2 * var(--spacingHorizontalS) + 48px - var(--strokeWidthThin));
+}
+
+.root[data-form='capsule'][data-scrub='on'] {
+  right: calc(var(--spacingHorizontalM) + var(--spacingHorizontalXXS) - var(--strokeWidthThin));
+  left: calc(var(--spacingHorizontalS) + 48px + var(--spacingHorizontalM) - var(--strokeWidthThin));
+}

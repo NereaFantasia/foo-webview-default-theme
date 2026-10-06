@@ -1,0 +1,65 @@
+.root {
+  position: fixed;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusLarge);
+  background: var(--colorNeutralBackground1);
+  box-shadow: var(--shadow16);
+}
+.input {
+  flex: none;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+}
+.scroller {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground3);
+}
+.history {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+.word {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+  cursor: pointer;
+}
+.word:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.word[data-selected] {
+  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.footer {
+  flex: none;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+.notice {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  color: var(--colorNeutralForeground3);
+}

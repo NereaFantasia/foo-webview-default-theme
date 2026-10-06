@@ -1,0 +1,18 @@
+export const miniPlayerEn = {
+  'mini.windowControls': 'Window controls',
+  'mini.restore': 'Return to full window',
+  'mini.close': 'Close mini player',
+  'mini.pin': 'Keep on top',
+  'mini.unpin': 'Stop keeping on top',
+  'mini.expandCover': 'Expand album cover',
+  'mini.collapseCover': 'Collapse album cover',
+  'mini.back': 'Back',
+  'mini.goToAlbum': 'Go to album',
+  'mini.radio': 'Internet radio',
+  'mini.live': 'Live',
+  'mini.failure.enter': 'Could not switch to the mini player.',
+  'mini.failure.restore': 'Could not restore the full window. Try again.',
+  'mini.failure.resize': 'Could not resize the player.',
+  'mini.failure.pin': 'Could not change the window pin setting.',
+  'mini.failure.save': 'Could not save the window restore information.',
+};

@@ -1,0 +1,52 @@
+/* 选中竖条：每项自带一根，平时透明，选中时显出。移动动画的缩放以上沿为原点，原点不在动画里换
+   （selectionIndicator.ts）。 */
+.indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  height: 16px;
+  margin-block: auto;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorCompoundBrandForeground1);
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 50% 0;
+}
+
+.shown {
+  opacity: 1;
+}
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行尾：播放列表是曲目数，数字等宽，增减时不左右晃。 */
+.end {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--colorNeutralForeground3);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightRegular);
+  line-height: var(--lineHeightBase200);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图标右上角的小圆点，6 见方，压在图标的角上。 */
+.dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorCompoundBrandForeground1);
+}

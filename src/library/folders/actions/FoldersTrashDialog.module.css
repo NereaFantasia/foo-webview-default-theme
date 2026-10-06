@@ -1,0 +1,23 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+.content p {
+  margin: 0;
+}
+.files {
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  margin: 0;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+}
+.files li {
+  padding-block: var(--spacingVerticalXS);
+}
+.path {
+  display: block;
+  overflow-wrap: anywhere;
+}

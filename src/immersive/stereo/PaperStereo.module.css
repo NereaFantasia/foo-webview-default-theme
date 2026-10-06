@@ -1,0 +1,121 @@
+/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给。
+   小标下 5 的空没有等值的 spacing token，写成本件的几何变量。 */
+.stereo {
+  --scope-corner-font: 9px;
+  --body-lead: 5px;
+  font-family: var(--fontFamilyMonospace);
+}
+
+.key {
+  display: block;
+  font-size: 11px;
+  line-height: 13px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.body {
+  margin-top: var(--body-lead);
+  display: flex;
+  gap: var(--spacingHorizontalL);
+}
+
+/* 读数区是一张 112 × 96 的小图：各件的位置照图纸，都相对读数区左上角。 */
+.readouts {
+  position: relative;
+  flex: none;
+  width: 112px;
+  height: 96px;
+}
+
+.readouts > * {
+  position: absolute;
+}
+
+.readouts .key {
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.correlation-key {
+  top: 0;
+  left: 0;
+}
+
+/* 刻度轨高 14：中间一条 2 px 的轨线，零点一根 10 px 的短刻，游标竖贯整条。 */
+.scale {
+  top: 16px;
+  left: 0;
+  width: 112px;
+  height: 14px;
+  background:
+    linear-gradient(var(--paper-cross), var(--paper-cross)) 0 6px / 100% 2px no-repeat,
+    linear-gradient(var(--paper-cross), var(--paper-cross)) 56px 2px / 1px 10px no-repeat;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 14px;
+  translate: -1px 0;
+  background: var(--paper-hot);
+}
+
+.cursor.negative {
+  background: var(--colorPaletteRedForeground1);
+}
+
+.scale-labels {
+  top: 32px;
+  left: 0;
+  width: 112px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  line-height: 10px;
+  color: var(--colorNeutralForeground3);
+}
+
+.correlation {
+  top: 48px;
+  left: 0;
+  font-size: 20px;
+  line-height: 23px;
+}
+
+.negative {
+  color: var(--colorPaletteRedForeground1);
+}
+
+.width-key {
+  top: 50px;
+  left: 64px;
+}
+
+.width {
+  top: 62px;
+  left: 64px;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.balance-key {
+  top: 78px;
+  left: 0;
+}
+
+.balance {
+  top: 78px;
+  left: 64px;
+  font-size: 10px;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.note {
+  margin: var(--spacingVerticalXS) 0 0;
+  font-size: 9px;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+}

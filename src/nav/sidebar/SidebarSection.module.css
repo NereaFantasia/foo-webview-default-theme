@@ -1,0 +1,87 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.head {
+  position: relative;
+  flex: none;
+}
+
+/* 与导航项同高，字与项的图标左缘对齐；字号小一档、加粗，读成分节标题而不是一项。不能开合时同样的字，
+   只是不能点。 */
+.toggle,
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--spacingHorizontalM) 0 var(--spacingHorizontalMNudge);
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground2);
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
+  cursor: default;
+}
+
+.title {
+  box-sizing: border-box;
+}
+
+.toggle:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.toggle:active {
+  background: var(--colorSubtleBackgroundPressed);
+}
+
+.toggle:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  transition: transform var(--motion-fast) var(--curveDecelerateMid);
+}
+
+.toggle[aria-expanded='false'] .chevron {
+  transform: rotate(-90deg);
+}
+
+/* 叠在开合键右端，给箭头（16）与右内边距（12）让出位置，再隔 4。 */
+.tools {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(16px + var(--spacingHorizontalM) + var(--spacingHorizontalXS));
+  display: flex;
+  align-items: center;
+}
+
+/* 不能开合时没有箭头，工具键贴着右内边距。 */
+.bare {
+  right: var(--spacingHorizontalXS);
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-height: 0;
+}

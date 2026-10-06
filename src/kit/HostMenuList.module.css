@@ -1,0 +1,5 @@
+/* makeStyles 的类型里没有 app-region，这一条只能写在这里。 */
+.surface {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

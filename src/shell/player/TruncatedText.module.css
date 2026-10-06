@@ -1,0 +1,25 @@
+/* 一行放不下时截断，不加省略号，右缘 24 像素渐隐。渐隐只在真的截断时才有：遮罩挂在一段以自己的横向滚动为
+   时间线的动画上，字放得下时这条时间线没有可滚的量、动画不生效，字盒与字一样宽时末尾几个字就不会被淡掉。
+   遮罩只看不透明度，实色一段取哪种不透明的颜色都一样。定时滚动时由 `marquee.ts` 的遮罩接管，宽度同为 24。 */
+.clip {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: fade-when-truncated linear both;
+  animation-timeline: scroll(self inline);
+}
+
+/* 字本身：定时滚动时整行一起位移（`useMarquee`），位移只对行内块生效。 */
+.text {
+  display: inline-block;
+}
+
+@keyframes fade-when-truncated {
+  from,
+  to {
+    mask-image: linear-gradient(
+      to right,
+      var(--colorNeutralForeground1) calc(100% - 24px),
+      transparent
+    );
+  }
+}

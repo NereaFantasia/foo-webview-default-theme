@@ -1,0 +1,21 @@
+.root {
+  position: relative;
+  flex: 0 0 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.root::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--colorNeutralStroke2);
+}
+.root:hover::after {
+  background: var(--colorNeutralStroke1Hover);
+}
+.root:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}

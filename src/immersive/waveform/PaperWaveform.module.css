@@ -1,0 +1,135 @@
+/* 纵向自上而下：时间轴字与短刻、波形带（底线压在带的下沿）、贯穿两者的播放头竖线，胶囊挂在竖线顶端。
+   位置与字号都是 CSS 变量，由放波形的外框按档给全；舞台上时间轴字按基线落位（`--wave-trim` 把字盒底边
+   裁到字母基线），胶囊居中顶在竖线上。 */
+.waveform {
+  position: relative;
+  height: 100%;
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--wave-font);
+  color: var(--colorNeutralForeground3);
+  user-select: none;
+}
+
+.times {
+  position: relative;
+  top: var(--wave-times-top);
+  height: 12px;
+  font-size: var(--wave-times-font);
+  line-height: 12px;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  translate: var(--wave-tick-shift);
+  white-space: nowrap;
+  text-box-trim: var(--wave-trim);
+  text-box-edge: text alphabetic;
+}
+
+.tick::after {
+  content: '';
+  position: absolute;
+  left: var(--wave-mark-left);
+  top: var(--wave-mark-top);
+  width: 1px;
+  height: 4px;
+  background: var(--paper-cross);
+}
+
+.tick.first {
+  translate: var(--wave-tick-first-shift);
+}
+
+.tick.first::after {
+  left: var(--wave-mark-first-left);
+}
+
+/* 最后一个刻度右对齐到带的右端，不伸出外框。 */
+.tick.last {
+  translate: var(--wave-tick-last-shift);
+}
+
+.tick.last::after {
+  left: var(--wave-mark-last-left);
+  right: var(--wave-mark-last-right);
+}
+
+.band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--wave-band-top);
+  height: var(--wave-band-height);
+  border-bottom: 1px solid var(--paper-cross);
+  touch-action: none;
+}
+
+.seekable .band {
+  cursor: pointer;
+}
+
+.columns {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.message {
+  position: absolute;
+  inset: var(--wave-message-inset);
+}
+
+/* 分道名挂在带左侧的垫纸边距里，与频谱纵轴刻度同一种挂法；一直挂着，分道画出来时淡入、换走时淡出。
+   不接指针：落在它上面的按下不该当成 seek。 */
+.lane-name {
+  position: absolute;
+  left: var(--wave-lane-left);
+  right: var(--wave-lane-right);
+  translate: 0 -50%;
+  font-size: var(--wave-lane-font);
+  line-height: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.lane-name[data-shown] {
+  opacity: 1;
+}
+
+/* `left` 由帧回调逐帧写。 */
+.playhead {
+  position: absolute;
+  top: var(--wave-playhead-top);
+  width: 2px;
+  height: var(--wave-playhead-height);
+  background: var(--paper-hot);
+  pointer-events: none;
+}
+
+/* 胶囊两侧各留 3 px，没有等值的 spacing token，写成本件的几何变量。 */
+.clock {
+  --clock-pad: 3px;
+  position: absolute;
+  top: var(--wave-clock-top);
+  left: var(--wave-clock-left);
+  translate: var(--wave-clock-shift);
+  min-width: var(--wave-clock-width);
+  height: var(--wave-clock-height);
+  padding: 0 var(--clock-pad);
+  box-sizing: border-box;
+  line-height: var(--wave-clock-height);
+  text-align: center;
+  white-space: nowrap;
+  background: var(--paper-hot);
+  color: var(--paper-tint);
+}
+
+/* 靠近波形右端、右侧放不下时挂到竖线左侧。 */
+.clock[data-flipped] {
+  left: var(--wave-clock-flip-left);
+  right: var(--wave-clock-flip-right);
+}

@@ -1,0 +1,26 @@
+/* 贴在队列页底部、随内容区滚动时留在原处；没有提示时不占地方。 */
+.root {
+  position: sticky;
+  bottom: 0;
+  padding: 0 var(--spacingHorizontalS) var(--spacingVerticalS);
+}
+
+.root:empty {
+  padding: 0;
+}
+
+/* 浮在列表上面的一条：上层取不透明的中性底与阴影。 */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  min-height: 48px;
+  padding: 0 var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow8);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase200);
+}

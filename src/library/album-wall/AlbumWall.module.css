@@ -1,0 +1,53 @@
+/* 滚动容器与覆盖其上的骨架、空态叠在同一个网格格子里；在页面里占满页头以下的高度。 */
+.root {
+  position: relative;
+  flex: 1 1 auto;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 滚动条的位置一直留着：出没滚动条时内容宽不变，列数不会因此来回跳。 */
+.scroller {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0 var(--spacingHorizontalXXL) var(--spacingVerticalL);
+  outline: none;
+}
+
+.rows {
+  position: relative;
+  width: 100%;
+}
+
+.header,
+.line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/* 图块行的占位只为读屏存在：零高，图块另摊在同一层。 */
+.line {
+  height: 0;
+}
+
+/* 下拉开合时，排在前 n 条下拉之后的元素按第 n 组平移：条目流里的位置在第 0 帧已到终值，平移量把它们
+   从旧位置逐帧送到新位置，由开合的时钟写进 --fold-shift-n（≤ 0）。用独立的 translate 属性，
+   不碰图块自己定位用的 transform，也不碰换列时叠在 transform 上的那段位移。 */
+.rows [data-fold='1'] {
+  translate: 0 var(--fold-shift-1, 0);
+}
+
+.rows [data-fold='2'] {
+  translate: 0 var(--fold-shift-2, 0);
+}
+
+.rows [data-fold='3'] {
+  translate: 0 var(--fold-shift-3, 0);
+}

@@ -1,0 +1,42 @@
+/* 播放列表页：上面一块页头、条件行与横幅不跟着滚，下面的曲目表在自己的滚动区里滚。它是定位元素，打字即跳
+   的提示按它摆。 */
+.root {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+/* 打字即跳的提示浮在页面右下，不跟着滚；让开窄窗的播放栏胶囊。提示自己按这一块的右上角摆。 */
+.badge {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--spacingVerticalXXXL) + var(--player-inset, 0px));
+  width: 100%;
+  height: var(--spacingVerticalXXXL);
+  pointer-events: none;
+}
+/* 上面一块按内容高，余下的高都给表格；底部给窄窗的播放栏胶囊让位，行不会滚到胶囊底下。 */
+.body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL)
+    calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+}
+.top {
+  min-width: 0;
+}
+/* 表格撑满这一格，行在表格自己的滚动区里滚。 */
+.table {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+.notice {
+  margin-bottom: var(--spacingVerticalM);
+}
+.empty {
+  padding: var(--spacingVerticalXXL) var(--spacingHorizontalS);
+  color: var(--text-secondary);
+}

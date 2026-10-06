@@ -1,0 +1,16 @@
+/* 落在拖窗条（高 48，标题栏的常规高度）下方 8、左边 16。四行等宽字按列对齐，空格原样保留。 */
+.overlay {
+  position: absolute;
+  top: 56px;
+  left: 16px;
+  padding: var(--spacingVerticalSNudge) var(--spacingHorizontalMNudge);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackgroundAlpha);
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  pointer-events: none;
+}

@@ -1,0 +1,82 @@
+/* 最高 384，超出在列表里滚动；放进高度有限的浮层时跟着缩。 */
+.root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 384px;
+  overflow-y: auto;
+}
+
+/* 组名：11 / 600、淡色，上 8 下 4、左右 12。 */
+.group {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM) var(--spacingVerticalXS);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 16px;
+}
+
+/* 一行 32 高、左右 12：勾 14、隔 10、名字 13。当前设备铺选中底、勾取主色，别的行勾不显示但占着位子。 */
+.device {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalMNudge);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--spacingHorizontalM);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.device:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.device[aria-current] {
+  background: var(--bg-hover);
+}
+
+.device:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+.check {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  visibility: hidden;
+}
+
+.device[aria-current] .check {
+  visibility: visible;
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice,
+.error {
+  margin: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}
+
+.error {
+  color: var(--error);
+}

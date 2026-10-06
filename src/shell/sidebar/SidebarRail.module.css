@@ -1,0 +1,12 @@
+/* 「播放列表」图标外面包一层，浮层贴着它弹出，拖放悬停也按它认。 */
+.anchor {
+  display: flex;
+  flex: none;
+}
+
+/* 设置钉在底部。 */
+.footer {
+  display: flex;
+  flex: none;
+  margin-top: auto;
+}

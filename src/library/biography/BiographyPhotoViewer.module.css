@@ -1,0 +1,146 @@
+.viewer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: color(from var(--colorBackgroundOverlay) srgb r g b / 95%);
+  color: var(--colorNeutralForegroundStaticInverted);
+}
+
+.content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--spacingVerticalM);
+  height: 100%;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+}
+
+.header h2 {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  overflow-wrap: anywhere;
+  max-height: 3lh;
+  overflow: auto;
+}
+.space {
+  flex: 1;
+}
+.keys {
+  position: absolute;
+  left: var(--spacingHorizontalL);
+  bottom: var(--spacingVerticalM);
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForegroundInvertedDisabled);
+  pointer-events: none;
+}
+
+.header > span {
+  white-space: nowrap;
+  font-size: var(--fontSizeBase200);
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  min-height: 0;
+}
+
+.image {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 100%;
+}
+
+.image img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  min-width: 0;
+  min-height: 0;
+}
+
+.footer {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacingVerticalM);
+  min-width: 0;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  overflow-wrap: anywhere;
+}
+
+.thumbnails {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+  max-width: 100%;
+  overflow: auto;
+}
+
+.thumbnails button {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--borderRadiusSmall);
+  padding: 0;
+  background: var(--colorNeutralBackgroundStatic);
+  color: var(--colorNeutralForegroundStaticInverted);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.thumbnails img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnails [aria-current='true'],
+.thumbnails button:focus-visible,
+.stage:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorBrandForeground1);
+  outline-offset: -2px;
+}
+
+.guard {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  }
+
+  .stage {
+    gap: var(--spacingHorizontalXS);
+  }
+
+  .thumbnails {
+    display: none;
+  }
+  .keys {
+    display: none;
+  }
+}

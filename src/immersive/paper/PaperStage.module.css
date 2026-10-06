@@ -1,0 +1,123 @@
+.stage {
+  position: absolute;
+  transform-origin: 0 0;
+  color: var(--colorNeutralForeground1);
+}
+
+.slot {
+  position: absolute;
+  left: 760px;
+  width: 1020px;
+}
+
+/* 柱区 497–681；Hz 刻度字基线 487、左缘在刻度左边 14，短刻 491–497；纵轴刻度字左缘 x 724、基线在格线下 4；
+   轴说明与 Hz 刻度字同一行，从 x 800 起。柱区的高决定下面三块的位置：量表值条到垫纸底边要留出与垫纸
+   其余三边相当的空，而垫纸底边不能再往下，下面紧挨着两行歌词卡。 */
+.spectrum {
+  top: 457px;
+  height: 224px;
+  --spectrum-font: 13px;
+  --spectrum-trim: trim-end;
+  --spectrum-hz-font: 14px;
+  --spectrum-hz-top: 30px;
+  --spectrum-hz-shift: -14px -100%;
+  --spectrum-mark-left: 14px;
+  --spectrum-mark-top: calc(100% + 4px);
+  --spectrum-plot-inset: 40px 0 0;
+  --spectrum-caption-font: 13px;
+  --spectrum-caption-shift: 0 -100%;
+  --spectrum-axis-left: -36px;
+  --spectrum-axis-right: auto;
+  --spectrum-axis-shift: 0 calc(-100% + 4px);
+  --spectrum-empty-inset: 6px 6px auto auto;
+}
+
+/* 波形带 733–797；时间刻度字基线 725、左缘在刻度左边 10，短刻 729–733，最后一个右对齐到带的右端，
+   不伸出右栏；播放头竖线 728–802，胶囊 46 × 20 居中顶在竖线上（705–725），两端不收进带内；
+   画法按钮在带右下角内侧 6。 */
+.waveform {
+  top: 705px;
+  height: 100px;
+  --wave-font: 13px;
+  --wave-trim: trim-end;
+  --wave-times-font: 14px;
+  --wave-times-top: 20px;
+  --wave-tick-shift: -10px -100%;
+  --wave-tick-first-shift: -10px -100%;
+  --wave-tick-last-shift: -100% -100%;
+  --wave-mark-top: calc(100% + 4px);
+  --wave-mark-left: 10px;
+  --wave-mark-first-left: 10px;
+  --wave-mark-last-left: auto;
+  --wave-mark-last-right: 0;
+  --wave-band-top: 28px;
+  --wave-band-height: 64px;
+  --wave-message-inset: 4px 6px auto auto;
+  --wave-lane-left: -36px;
+  --wave-lane-right: auto;
+  --wave-lane-font: 13px;
+  --wave-playhead-top: 23px;
+  --wave-playhead-height: 74px;
+  --wave-clock-top: -23px;
+  --wave-clock-left: 50%;
+  --wave-clock-shift: -50% 0;
+  --wave-clock-width: 46px;
+  --wave-clock-height: 20px;
+  --wave-clock-flip-left: 50%;
+  --wave-clock-flip-right: auto;
+  --wave-mode-inset: auto 6px 6px auto;
+  --wave-chip-height: 20px;
+  --wave-chip-pad: 0 7px;
+  --wave-chip-font: 13px;
+  --wave-chip-line: 18px;
+  --wave-swatch: 8px;
+}
+
+/* 两块各宽 250、间隔 32：小标基线 843，大数字左缘在块左 16、基线 889，单位跟在数字后隔 8、同一基线，
+   轨在 927，值条下沿 930，离垫纸底边 956 留 26；轨下刻度长 5，刻度字 13、基线 947（与相关条的刻度字同号）。 */
+.gauges {
+  top: 828px;
+  width: 532px;
+  --gauge-width: 250px;
+  --gauge-gap: 32px;
+  --gauge-height: 100px;
+  --gauge-place: absolute;
+  --gauge-lift: 0 -100%;
+  --gauge-trim: trim-end;
+  --gauge-key-top: 15px;
+  --gauge-key-font: 15px;
+  --gauge-value-left: 16px;
+  --gauge-value-top: 61px;
+  --gauge-value-indent: 0;
+  --gauge-value-font: 34px;
+  --gauge-reading-height: auto;
+  --gauge-reading-gap: 0;
+  --gauge-unit-gap: 8px;
+  --gauge-unit-font: 15px;
+  --gauge-track-place: absolute;
+  --gauge-track-top: 99px;
+  --gauge-track-gap: 0;
+  --gauge-tick-length: 5px;
+  --gauge-scale-font: 13px;
+  --gauge-scale-baseline: 20px;
+}
+
+/* x 1360–1780，三列各宽 140：小标基线 843 / 901，值基线 867 / 925、最宽 128。 */
+.file-info {
+  left: 1360px;
+  top: 828px;
+  width: 420px;
+  --info-columns: repeat(3, 140px);
+  --info-gap: 0;
+  --info-row: 58px;
+  --info-place: absolute;
+  --info-lift: 0 -100%;
+  --info-trim: trim-end;
+  --info-key-top: 15px;
+  --info-key-font: 13px;
+  --info-value-top: 39px;
+  --info-value-font: 18px;
+  --info-value-width: 128px;
+  --info-value-wrap: nowrap;
+  --info-value-margin: 0;
+}

@@ -1,0 +1,15 @@
+/* 有的空态整块不接指针（盖在网格上，让网格照样能拿焦点），按钮这一块自己接。 */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacingVerticalXS);
+  padding-top: var(--spacingVerticalM);
+  pointer-events: auto;
+}
+
+.error {
+  color: var(--error);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}

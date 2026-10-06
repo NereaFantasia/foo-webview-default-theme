@@ -1,0 +1,42 @@
+/* 离卡片上缘 12、左右各 24，行高 36；页头与它之间的 16 由页头自己的上内边距给。 */
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  height: 36px;
+  min-width: 0;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalXXL) 0;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+/* 高 36、圆角 18，描边画在盒子里面，键离描边内侧四周都是 2、彼此隔 2：两个 40 的键，整条 88 宽；后退前进
+   之间多一道 1 宽的竖线，那一条 91 宽。 */
+.capsule {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  height: 36px;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXXS);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusCircular);
+}
+
+/* 侧边栏键：36 × 36 的描边圆，键离描边内侧四周 2。 */
+.ring {
+  box-sizing: border-box;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusCircular);
+}

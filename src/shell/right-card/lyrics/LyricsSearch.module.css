@@ -1,0 +1,46 @@
+.root {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.form {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+}
+
+.heading,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.results {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.results p {
+  padding: 0 var(--spacingHorizontalM);
+}
+
+.candidate {
+  display: grid;
+  gap: var(--spacingVerticalXXS);
+  overflow-wrap: anywhere;
+}
+
+.candidate > span {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+}
+
+.actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}

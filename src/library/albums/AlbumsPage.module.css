@@ -1,0 +1,7 @@
+/* 页头、筛选条与横幅按内容高，余下的高度全给封面墙或列表形态，它们自己滚动。 */
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}

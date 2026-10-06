@@ -1,0 +1,70 @@
+/* 图标 20 一列、文字占余量、控件按内容宽；没有说明行时也是 58 高，各张卡齐平。 */
+.root {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+  min-height: 58px;
+  padding: var(--spacingVerticalMNudge) var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-surface);
+}
+
+/* 控件换到标题下面，与文字左对齐、占满一行。 */
+.stacked {
+  grid-template-columns: 20px minmax(0, 1fr);
+  row-gap: var(--spacingVerticalMNudge);
+  padding-bottom: var(--spacingVerticalM);
+}
+
+.icon {
+  display: inline-flex;
+  color: var(--text-secondary);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* 读屏的播报区：绝对定位，不占网格的格子；裁成看不见，但仍在无障碍树里。 */
+.announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.stacked .control {
+  grid-column: 2;
+  justify-content: stretch;
+}

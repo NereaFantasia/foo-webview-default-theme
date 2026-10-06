@@ -1,0 +1,37 @@
+/* 格子里的文字：一行放不下时截断出省略号，完整的写在 title 里。 */
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 标题比其余各列大一号。 */
+.title {
+  font-size: var(--fontSizeBase300);
+}
+
+/* 艺术家、专辑这类次要的列退一档颜色；正在播放那一行由表格统一改成品牌色。 */
+.secondary {
+  color: var(--colorNeutralForeground2);
+}
+
+/* 链接格：去掉按钮的外观，与旁边的字同样大小、同样截断；悬停时才出下划线。 */
+.link {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.link:hover {
+  text-decoration: underline;
+}
+
+/* 多个艺人链接共用一行截断，并继承整行的正在播放颜色。 */
+.artist-links > .link {
+  display: inline;
+  color: inherit;
+  vertical-align: baseline;
+}

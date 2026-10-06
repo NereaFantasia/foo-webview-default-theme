@@ -1,0 +1,30 @@
+.header {
+  display: flex;
+  min-width: 0;
+  contain: inline-size;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  padding: var(--spacingVerticalSNudge) var(--spacingHorizontalS);
+  border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  margin-bottom: var(--spacingVerticalXS);
+}
+
+.title,
+.subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.title {
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.subtitle {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground2);
+}

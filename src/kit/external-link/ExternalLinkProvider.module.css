@@ -1,0 +1,10 @@
+.url {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackground3);
+  color: var(--colorNeutralForeground1);
+  overflow-wrap: anywhere;
+  user-select: text;
+  max-height: 12em;
+  overflow: auto;
+}

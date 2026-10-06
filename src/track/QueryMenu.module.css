@@ -1,0 +1,81 @@
+/* 查询菜单：过滤框下面的弹出列表，宽 500，窗口窄时收到窗口以内，长了自己滚。 */
+.surface {
+  width: 500px;
+  max-width: calc(100vw - var(--spacingHorizontalXXL) * 2);
+  padding: var(--spacingVerticalXS) 0;
+}
+.list {
+  max-height: min(520px, 50vh);
+  overflow-y: auto;
+}
+
+/* 一节的标题：左边节名，右边是这一节的说明。 */
+.group {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM) var(--spacingVerticalXXS);
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}
+.note {
+  color: var(--colorNeutralForeground4);
+}
+
+/* 一行：勾选框、名字、查询、行尾的笔。查询用等宽字，名字放不下时让查询先截断。 */
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-height: 32px;
+  margin: 0 var(--spacingHorizontalXS);
+  padding: 0 var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+  cursor: pointer;
+}
+.option[aria-disabled='true'] {
+  color: var(--colorNeutralForegroundDisabled);
+  cursor: default;
+}
+.active {
+  background: var(--colorSubtleBackgroundHover);
+}
+.check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAccessible);
+  border-radius: var(--borderRadiusSmall);
+}
+.checked {
+  border-color: var(--colorCompoundBrandStroke);
+  background: var(--colorCompoundBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+}
+.name {
+  flex: 0 1 auto;
+  overflow-wrap: anywhere;
+}
+.query {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--colorNeutralForeground3);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 改写键平时不占眼：悬停或键盘落在这一行时才出。 */
+.edit {
+  flex: none;
+  visibility: hidden;
+}
+.option:hover .edit,
+.active .edit {
+  visibility: visible;
+}

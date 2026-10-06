@@ -1,0 +1,117 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  height: 28px;
+  padding: 0 var(--spacingHorizontalS);
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  text-align: start;
+  cursor: pointer;
+}
+.toggle:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.toggle[aria-expanded='true'] {
+  background: var(--bg-selected);
+  color: var(--text-primary);
+}
+.toggle:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+.count {
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+}
+/* 历史区：开着时上方留 8，底板高度是记录、箭头那一条（--queue-review-height）加上下各 4 的内边距；关着时
+   高 0。底板绝对定位，开合、拉开收拢的动画里能按交界裁切、伸出版式之外。右边让出队列滚动条那一截。 */
+.region {
+  position: relative;
+  height: 0;
+}
+.region[data-open] {
+  height: calc(var(--spacingVerticalS) + 2 * var(--spacingVerticalXS) + var(--queue-review-height));
+}
+/* 底色取前景色淡淡一层：深浅两档都和队列分得开，行的悬停底压在上面仍看得出。 */
+.panel {
+  position: absolute;
+  top: var(--spacingVerticalS);
+  left: 0;
+  right: var(--queue-gutter, 0px);
+  padding: var(--spacingVerticalXS) 0;
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--colorNeutralForeground1) 5%, transparent);
+}
+.list {
+  position: relative;
+}
+.records {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  overflow-anchor: none;
+}
+/* 记录超出视口内上限时底板底边的一条，高 24，正中是 40 × 20 的拉开键；拉开后箭头转向上，转的时长同
+   拉开（333 ms）、收回（167 ms）。 */
+.grow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+}
+.growKey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusCircular);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.growKey:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.growKey:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+.growIcon {
+  transition: rotate var(--motion-fast) var(--motion-curve-point-to-point);
+}
+.growKey[data-grown] .growIcon {
+  rotate: 180deg;
+  transition-duration: var(--motion-slow);
+}
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+.strip {
+  position: relative;
+  will-change: transform;
+}
+.row {
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+.moving {
+  min-width: 0;
+}
+.placeholder {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  height: 100%;
+  padding: 0 var(--spacingHorizontalS);
+  color: var(--text-muted);
+}

@@ -1,0 +1,21 @@
+/* 各层叠在同一个网格格子里；切换时的位移与缩放在这里裁掉，不撑出滚动条。 */
+.root {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.layer {
+  display: grid;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  /* 当前层盖在离场层上面：层的先后不随切换重排，接回来的旧层在 DOM 里可能排在前面。 */
+  z-index: 1;
+}
+
+.exiting {
+  z-index: 0;
+  pointer-events: none;
+}

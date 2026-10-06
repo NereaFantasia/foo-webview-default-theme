@@ -1,0 +1,16 @@
+.root {
+  min-width: 0;
+}
+
+.fields {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.fields .fields {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+}

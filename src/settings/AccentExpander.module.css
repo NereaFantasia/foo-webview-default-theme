@@ -1,0 +1,18 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* 卡头的色块：此刻的强调色，跟着封面与基础色变。 */
+.swatch {
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--accent);
+}

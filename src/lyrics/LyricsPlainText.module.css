@@ -1,0 +1,14 @@
+.root {
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
+  box-sizing: border-box;
+  color: var(--colorNeutralForeground1);
+  font-size: var(--lyrics-font-size);
+  line-height: 1.5;
+}
+
+.line {
+  margin: 0 0 var(--spacingVerticalS);
+  overflow-wrap: anywhere;
+}

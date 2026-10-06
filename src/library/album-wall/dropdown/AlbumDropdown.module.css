@@ -1,0 +1,154 @@
+/* 一条下拉：外框在行层里绝对定位，宽与图块行一样；面板从顶边往下按 --fold-visible 裁剪露出。
+   头、尾两段的高由组件经 --dropdown-head、--dropdown-foot 给，与面板总高按同一套几何算：
+   头 = 顶边留白 XXL + 专辑名一行 + 艺术家一行 + 到曲目的留白 M；尾 = 留白 M + 尾注一行 + 底边留白 XL。 */
+.slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* 箭头画在行间距里，指着被点的那一块；换一张时滑到新封面下，是已在场元素的移动。它跟着面板一起开合：
+   面板露出得不到箭头高时，箭头只露出那么高，收到 0 时一起消失，不会单独留下一个小三角。 */
+.caret {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: var(--spacingHorizontalL);
+  height: min(var(--spacingVerticalS), var(--fold-visible));
+  translate: calc(var(--caret-x) - var(--spacingHorizontalL) / 2) 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: var(--bg-elevated);
+  transition: translate var(--motion-normal) var(--motion-curve-point-to-point);
+}
+
+.panel {
+  position: relative;
+  height: max(var(--panel-height), var(--fold-visible));
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--bg-elevated);
+  clip-path: inset(0 0 calc(100% - var(--fold-visible)) 0 round var(--radius-card));
+}
+
+/* 内容从封面框右缘往回压一个留白起，叠在封面渐隐的那一段上。新旧两份内容叠在同一格里。 */
+.stack {
+  position: absolute;
+  inset: 0 0 0 calc(var(--cover-size) - var(--spacingHorizontalXXL));
+  display: grid;
+}
+
+/* 右边留出收起键的位置。 */
+.content {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-rows: var(--dropdown-head) 1fr var(--dropdown-foot);
+  min-width: 0;
+  padding-inline-end: calc(var(--spacingHorizontalXXXL) + var(--spacingHorizontalXXL));
+  transition: opacity var(--motion-fast) var(--curveLinear);
+}
+
+.content[data-dim] {
+  opacity: 0.5;
+}
+
+/* 同一行换一张：新内容直接进场 250 ms 配 83 ms 淡入，旧内容直接退场 167 ms 配淡出，朝相反方向滑。 */
+.content[data-enter] {
+  animation:
+    dropdown-slide-in var(--motion-normal) var(--curveDecelerateMid) both,
+    dropdown-fade-in var(--motion-faster) var(--curveLinear) both;
+}
+
+.content[data-enter='right'] {
+  --slide-from: calc(-1 * var(--spacingHorizontalM));
+}
+
+.content[data-enter='left'] {
+  --slide-from: var(--spacingHorizontalM);
+}
+
+.content[data-leave] {
+  pointer-events: none;
+  animation:
+    dropdown-slide-out var(--motion-fast) var(--curveDecelerateMid) both,
+    dropdown-fade-out var(--motion-faster) var(--curveLinear) both;
+}
+
+.content[data-leave='right'] {
+  --slide-to: calc(-1 * var(--spacingHorizontalM));
+}
+
+.content[data-leave='left'] {
+  --slide-to: var(--spacingHorizontalM);
+}
+
+@keyframes dropdown-slide-in {
+  from {
+    translate: var(--slide-from) 0;
+  }
+}
+
+@keyframes dropdown-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dropdown-slide-out {
+  to {
+    translate: var(--slide-to) 0;
+  }
+}
+
+@keyframes dropdown-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  padding-top: var(--spacingVerticalXXL);
+}
+
+.titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.artist,
+.foot {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.name {
+  font-size: var(--fontSizeBase500);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase500);
+}
+
+.artist {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.keys {
+  display: flex;
+  flex: none;
+  gap: var(--spacingHorizontalS);
+}
+
+.foot {
+  padding-top: var(--spacingVerticalM);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}

@@ -1,0 +1,113 @@
+/* 540 × 44、圆角 6 的一条；封面贴着左缘，⋯ 贴着右缘。进度线的命中区会伸出下沿，不裁。描边画在最上面一层，
+   封面照旧铺满 44 高，左边两角由封面自己圆。 */
+.root {
+  position: relative;
+  display: grid;
+  flex: none;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  width: 540px;
+  height: 44px;
+  border-radius: var(--borderRadiusLarge);
+  background: var(--bg-elevated);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.root::after {
+  position: absolute;
+  inset: 0;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+}
+
+/* 两行文字靠上排，上 5、左右 12，进度线贴底另放、与文字同宽（`ScrubSeek.module.css`）。 */
+.main {
+  position: relative;
+  display: grid;
+  align-content: start;
+  align-self: stretch;
+  min-width: 0;
+  padding: calc(var(--spacingVerticalXS) + var(--spacingVerticalXXS) / 2) var(--spacingHorizontalM)
+    0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+  height: 18px;
+}
+
+/* 截断与渐隐归 `TruncatedText`：只在真的放不下时才渐隐。 */
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 18px;
+}
+
+.title[data-idle] {
+  color: var(--text-secondary);
+}
+
+/* 第二行：艺人与专辑占满余宽，星贴右，右缘与上一行的格式标记对齐；字放不下时先截字，星不让位。 */
+.subRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+  height: 16px;
+}
+
+.byline {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: 16px;
+}
+
+.more {
+  display: flex;
+}
+
+/* 进度条悬停态（`ScrubSeek`）：封面以外的东西淡到 35% 并模糊，指针穿过去落到进度线上。淡入淡出 83 ms。 */
+.soft {
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    filter var(--motion-faster) var(--curveLinear);
+}
+
+.root[data-scrub='on'] .soft {
+  opacity: 0.35;
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.badge {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  font-size: var(--fontSizeBase100);
+  line-height: 14px;
+}
+
+.codec {
+  padding: 0 var(--spacingHorizontalXS);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusMedium);
+  color: var(--text-secondary);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.detail {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

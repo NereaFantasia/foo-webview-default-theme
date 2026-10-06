@@ -1,0 +1,147 @@
+/* 小节之间一条线；小节名与每行的文字都和卡头的标题左对齐。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacingVerticalS) 0 var(--spacingVerticalSNudge);
+}
+
+.section + .section,
+.note {
+  border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+/* 左边空出图标底那一列：28 的底加 8 的间隔，正好是卡头图标 20 加 16 的间隔。 */
+.heading {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--spacingHorizontalS);
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--spacingHorizontalL);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.heading::before {
+  content: '';
+}
+
+/* 一行：图标底、文字、许可、箭头；整行是一个按钮。 */
+.row {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalS);
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalL);
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.row:not(:disabled):hover {
+  background-color: var(--colorSubtleBackgroundHover);
+}
+
+.row:not(:disabled):active {
+  background-color: var(--colorSubtleBackgroundPressed);
+}
+
+.row:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(var(--strokeWidthThick) * -1);
+}
+
+.tile {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusLarge);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.tile svg {
+  width: 16px;
+  height: 16px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+.names {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--spacingHorizontalS);
+}
+
+.name {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.author {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.role {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.license {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--spacingHorizontalSNudge);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.arrow {
+  margin-inline-start: var(--spacingHorizontalXS);
+  color: var(--text-muted);
+}
+
+/* 脚注的文字同样让出图标那一列。 */
+.note {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--spacingHorizontalS);
+  margin: 0;
+  padding: var(--spacingVerticalMNudge) var(--spacingHorizontalL) var(--spacingVerticalM);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.note::before {
+  content: '';
+}

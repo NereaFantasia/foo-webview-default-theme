@@ -1,0 +1,43 @@
+/* 位置与字号都是 CSS 变量，由放文件信息的外框按档给全。舞台上每格定高、键名与值按格左上角绝对定位，
+   `top` 写基线（`--info-trim` 把字盒底边裁到字母基线），值限宽、超了省略。 */
+.file-info {
+  margin: 0;
+  display: grid;
+  grid-template-columns: var(--info-columns);
+  row-gap: var(--info-gap);
+  align-content: start;
+}
+
+.field {
+  position: relative;
+  height: var(--info-row);
+}
+
+.key,
+.value {
+  position: var(--info-place);
+  translate: var(--info-lift);
+  font-family: var(--fontFamilyMonospace);
+  text-box-trim: var(--info-trim);
+  text-box-edge: text alphabetic;
+}
+
+.key {
+  display: block;
+  top: var(--info-key-top);
+  font-size: var(--info-key-font);
+  line-height: 12px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.value {
+  top: var(--info-value-top);
+  max-width: var(--info-value-width);
+  margin: var(--info-value-margin);
+  font-size: var(--info-value-font);
+  line-height: 16px;
+  white-space: var(--info-value-wrap);
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}

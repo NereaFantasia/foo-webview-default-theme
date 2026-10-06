@@ -1,0 +1,221 @@
+/* 内容区四周留 8，行自己的左右内边距再给 8，序号离卡片左缘 16，与头对齐。最小高度多出前面那一段
+   （--queue-earlier），后面几段再短也滚得到它的下缘，它整段藏在视口上方。 */
+.root {
+  position: relative;
+  display: grid;
+  align-content: start;
+  min-height: calc(100% + var(--queue-earlier, 0px));
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS) 0;
+}
+
+/* 正在播的这一首前面那几行：DOM 在最后，排到最上面（见 `QueueEarlier`）；有内容时离当前曲目卡 8。 */
+.earlier {
+  order: -1;
+  min-width: 0;
+}
+
+.earlier[data-filled] {
+  padding-bottom: var(--spacingVerticalS);
+}
+
+.section + .section {
+  margin-top: var(--spacingVerticalS);
+}
+
+/* 节头 32 高：左边段名，右边放数量与清空，或来源链接。 */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  height: 32px;
+  padding: 0 var(--spacingHorizontalS);
+}
+
+.label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacingHorizontalS);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.count {
+  color: var(--text-muted);
+  font-weight: var(--fontWeightRegular);
+}
+
+.headActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+}
+
+.clear {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.clear:focus-visible,
+.nextRound:focus-visible {
+  border-radius: var(--radius-control);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+.nextRound {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--spacingHorizontalS);
+  border: none;
+  border-top: var(--strokeWidthThin) solid var(--line);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  text-align: start;
+  cursor: pointer;
+}
+
+.nextRound:hover {
+  background: var(--bg-hover);
+}
+
+.nextRound .count {
+  margin-left: auto;
+}
+
+/* 来源名放不下时截断；完整来源保留在提示和可访问名称里。 */
+.source {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.source:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.source:focus-visible {
+  border-radius: var(--borderRadiusSmall);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+/* 落点线按列表定位，副本另挂到浮层以免被滚动区裁剪。 */
+.list {
+  position: relative;
+}
+
+.virtualRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+.strip {
+  position: relative;
+  will-change: transform;
+}
+
+.placeholder {
+  display: grid;
+  grid-template-columns: max(20px, var(--queue-number-width, 2ch)) 36px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  height: 100%;
+  padding: 0 var(--spacingHorizontalS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+}
+
+.placeholderCover {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorNeutralBackgroundAlpha);
+}
+
+.placeholderText {
+  display: grid;
+  gap: var(--spacingVerticalSNudge);
+}
+
+.placeholderText span {
+  height: 10px;
+  width: 75%;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorNeutralBackgroundAlpha);
+}
+
+.placeholderText span + span {
+  width: 50%;
+}
+
+.dropLine {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--accent);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 宽度和抓取偏移沿用原行，描边不改变内部各槽的位置。 */
+.ghost {
+  position: fixed;
+  z-index: 2;
+  outline: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow16);
+  pointer-events: none;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--spacingVerticalS);
+  min-height: 240px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}
+
+.emptyIcon {
+  width: 36px;
+  height: 36px;
+  color: var(--text-muted);
+}

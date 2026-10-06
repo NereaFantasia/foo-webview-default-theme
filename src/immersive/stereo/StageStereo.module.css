@@ -1,0 +1,124 @@
+/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给。 */
+.stereo {
+  --scope-corner-font: 13px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  font-family: var(--fontFamilyMonospace);
+}
+
+/* 声场图贴格左上。 */
+.scope {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 155px;
+  height: 155px;
+}
+
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+.base > span,
+.scale-label {
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+.base {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+}
+
+/* 小标 16 与实时值 20 同一基线，中间隔 8。 */
+.correlation-line {
+  left: 172px;
+  top: 10px;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacingHorizontalS);
+}
+
+.key {
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+}
+
+.value {
+  font-size: 20px;
+}
+
+.negative {
+  color: var(--colorPaletteRedForeground1);
+}
+
+/* 相关条照相关刻度轨的画法：框线画在盒内，三根满高刻度；游标 4 宽、上下各出 3。 */
+.scale {
+  position: absolute;
+  left: 180px;
+  top: 48px;
+  width: 136px;
+  height: 20px;
+  box-shadow: inset 0 0 0 1px var(--paper-ring);
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 3%, transparent);
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--paper-ring);
+}
+
+.cursor {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 4px;
+  background: var(--paper-hot);
+}
+
+.cursor.negative {
+  background: var(--colorPaletteRedForeground1);
+}
+
+.scale-label {
+  top: 84px;
+  translate: -50% -100%;
+  font-size: 13px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 附行：小标 13（弱色）与值 16 同一基线，中间隔 8，两项之间隔 24。 */
+.sub {
+  left: 172px;
+  top: 135px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sub-key {
+  margin-right: var(--spacingHorizontalS);
+  font-size: 13px;
+  color: var(--colorNeutralForeground3);
+}
+
+.sub-value {
+  margin-right: var(--spacingHorizontalXXL);
+  font-size: 16px;
+}
+
+/* 说明居中写在空着的声场图里，左右各让 8。 */
+.note {
+  position: absolute;
+  left: 8px;
+  top: 77px;
+  width: 139px;
+  margin: 0;
+  translate: 0 -50%;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--colorNeutralForeground3);
+}

@@ -1,0 +1,107 @@
+.root {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+}
+.path-actions,
+.range,
+.setting,
+.crumbs,
+.crumb {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalXS);
+}
+.crumb > svg {
+  flex: none;
+}
+.path {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalXS);
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalS);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalXL);
+  min-width: 0;
+}
+.range,
+.setting {
+  gap: var(--spacingHorizontalS);
+}
+.display {
+  display: grid;
+  grid-template-columns: auto 128px auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+}
+.adjustment {
+  display: grid;
+  grid-template-columns: 128px;
+  align-items: center;
+}
+.segments {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXXS);
+  gap: var(--spacingHorizontalXXS);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackgroundAlpha);
+}
+.crumbs {
+  overflow: hidden;
+}
+.crumb {
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.crumb button {
+  border: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground2);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+}
+.crumb button:hover {
+  color: var(--colorBrandForegroundLinkHover);
+}
+.crumb button[aria-current='location'] {
+  color: var(--colorNeutralForeground1);
+  font-weight: var(--fontWeightSemibold);
+}
+.crumb button:focus-visible {
+  outline: 2px solid var(--colorStrokeFocus2);
+}
+@container folders (max-width: 879px) {
+  .label {
+    display: none;
+  }
+}
+@container folders (max-width: 759px) {
+  .controls {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--spacingVerticalS);
+  }
+  .range .segments {
+    flex: 1;
+  }
+  .display {
+    grid-template-columns: minmax(0, 1fr) 128px auto;
+    column-gap: var(--spacingHorizontalS);
+  }
+}

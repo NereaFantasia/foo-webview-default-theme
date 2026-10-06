@@ -1,0 +1,50 @@
+/* 歌曲页：上面一块页头、分面条、条件行与横幅不跟着滚，下面的曲目表在自己的滚动区里滚。 */
+.root {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+/* 上面一块按内容高，余下的高都给表格；胶囊所需的尾部空间留在表格滚动区里，不缩短视口。 */
+.body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL);
+}
+.top {
+  min-width: 0;
+}
+.table {
+  --table-bottom-inset: var(--player-inset, 0px);
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+.notice {
+  margin-bottom: var(--spacingVerticalM);
+}
+/* 空态在表格的可用区域里居中；低窗口允许滚动，按钮不会被挤出可达区域。 */
+.empty {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 176px;
+  height: 100%;
+  text-align: center;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalXXL) var(--spacingHorizontalS);
+}
+.emptyIcon {
+  flex-shrink: 0;
+  color: var(--colorNeutralForeground3);
+  margin-bottom: var(--spacingVerticalS);
+}
+.detail {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}

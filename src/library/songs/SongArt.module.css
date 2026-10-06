@@ -1,0 +1,22 @@
+/* 行里的缩略图：边长由表格按行高给，封面按比例裁满；还没有图、没有封面或曲目不属于哪张专辑时画占位。 */
+.art {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--bg-hover);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 50%;
+  height: 50%;
+  color: var(--text-muted);
+}

@@ -1,0 +1,37 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXL);
+  gap: var(--spacingVerticalM);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalM);
+}
+.header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fontSizeBase600);
+  font-weight: var(--fontWeightSemibold);
+  margin: 0;
+}
+.tools,
+.status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}
+.status {
+  color: var(--colorNeutralForeground2);
+}
+.table {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}

@@ -1,0 +1,43 @@
+.root {
+  display: inline-flex;
+  align-self: center;
+  position: relative;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.dot {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorStatusDangerForeground1);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.message {
+  padding-top: var(--spacingVerticalM);
+  padding-bottom: var(--spacingVerticalM);
+  border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+
+.detail {
+  margin-top: var(--spacingVerticalXS);
+  margin-bottom: var(--spacingVerticalS);
+  color: var(--colorNeutralForeground2);
+  overflow-wrap: anywhere;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.error {
+  color: var(--colorStatusDangerForeground1);
+}

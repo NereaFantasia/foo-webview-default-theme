@@ -1,0 +1,28 @@
+import type { searchEn } from './searchEn.ts';
+
+export const searchZhCN: Record<keyof typeof searchEn, string> = {
+  'search.view': '结果视图',
+  'search.grid': '网格视图',
+  'search.list': '列表视图',
+  'search.clear': '清空搜索',
+  'search.edit': '编辑搜索',
+  'search.recent': '最近搜索',
+  'search.clearHistory': '清空历史',
+  'search.removeHistory': '移除「{text}」',
+  'search.historyFailed': '搜索历史读取或保存失败',
+  'search.suggestions': '搜索建议',
+  'search.best': '最佳匹配',
+  'search.all': '全部',
+  'search.albums': '专辑',
+  'search.tracks': '曲目',
+  'search.viewAll': '查看全部结果',
+  'search.more': '加载更多',
+  'search.moreFailed': '继续加载失败',
+  'search.noMatch': '没有匹配结果',
+  'search.albumFailed': '专辑结果读取失败',
+  'search.trackFailed': '曲目结果读取失败',
+  'search.count': '{albums} 张专辑，{tracks} 首曲目',
+  'search.unknownCount': '未知',
+  'search.play': '播放「{title}」',
+  'search.limited': '仅显示前 {count} 项',
+};

@@ -1,0 +1,7 @@
+/* 过滤框外面包一层：查询菜单按它的宽与左缘摆。 */
+.box {
+  display: flex;
+  min-width: 0;
+  gap: var(--spacingHorizontalXS);
+  container: query-box / inline-size;
+}

@@ -1,0 +1,16 @@
+/* 图标与名字隔 4，艺人与专辑之间隔 12。行高由各形态的类给，图标按字号放大到 14 后在行里居中。 */
+.part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  vertical-align: top;
+}
+
+.part + .part {
+  margin-left: var(--spacingHorizontalM);
+}
+
+.icon {
+  flex: none;
+  font-size: var(--fontSizeBase300);
+}

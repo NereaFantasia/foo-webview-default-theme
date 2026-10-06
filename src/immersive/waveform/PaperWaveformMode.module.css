@@ -1,0 +1,60 @@
+/* 压在波形带右下角、底线之上：带的上沿是时间轴与播放头胶囊，下面紧贴着量表与文件信息两行标签。
+   位置与尺寸都是 CSS 变量，由放波形的外框按档给全。随控件层显隐，淡入淡出与控件层同一套。 */
+.mode {
+  position: absolute;
+  inset: var(--wave-mode-inset);
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.mode[data-hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 字与色块之间的 3 px、箭头前的 1 px 没有等值的 spacing token，写成本件的几何变量。 */
+.chip {
+  --chip-gap: 3px;
+  --chevron-lead: 1px;
+  display: flex;
+  align-items: center;
+  gap: var(--chip-gap);
+  height: var(--wave-chip-height);
+  padding: var(--wave-chip-pad);
+  box-sizing: border-box;
+  border: 1px solid var(--colorNeutralForeground3);
+  border-radius: var(--borderRadiusSmall);
+  background: var(--paper-tint);
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  font-size: var(--wave-chip-font);
+  line-height: var(--wave-chip-line);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--colorNeutralForeground1);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--colorStrokeFocus2);
+  outline-offset: 1px;
+}
+
+.swatch {
+  width: var(--wave-swatch);
+  height: var(--wave-swatch);
+  background: var(--paper-ink);
+}
+
+.swatch.shade {
+  opacity: 0.35;
+}
+
+.swatch.hot {
+  background: var(--paper-hot);
+}
+
+.chevron {
+  margin-left: var(--chevron-lead);
+}

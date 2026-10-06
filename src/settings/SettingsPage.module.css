@@ -1,0 +1,64 @@
+/* 页标题按内容高，余下的高度给目录与卡列；卡列自己滚动，目录不跟着滚。 */
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.header {
+  flex: none;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL) var(--spacingVerticalS);
+}
+
+/* 左边 168 的目录，右边是卡列。 */
+.body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 168px minmax(0, 1fr);
+  column-gap: var(--spacingHorizontalXXL);
+  min-width: 0;
+  min-height: 0;
+  padding-left: var(--spacingHorizontalXXL);
+}
+
+/* 页面窄：目录收成上面的一行，卡列占满宽。 */
+.narrow {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  padding-left: 0;
+}
+
+.nav {
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--spacingVerticalS);
+  overflow-y: auto;
+}
+
+.narrow .nav {
+  padding: 0 var(--spacingHorizontalXXL);
+  overflow-y: visible;
+}
+
+/* 滚动条贴着内容卡的右边；窄窗时底部让出浮在内容卡上的播放条盖住的那一截。 */
+.scroller {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalXXL)
+    calc(var(--spacingVerticalXXL) + var(--player-inset, 0px)) 0;
+  overflow-y: auto;
+}
+
+.narrow .scroller {
+  padding-top: var(--spacingVerticalL);
+  padding-left: var(--spacingHorizontalXXL);
+}
+
+/* 卡列最宽 760，再宽就在右边留白，不把卡片拉长。 */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXL);
+  max-width: 760px;
+}

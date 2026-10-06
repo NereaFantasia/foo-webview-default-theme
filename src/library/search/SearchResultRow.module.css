@@ -1,0 +1,93 @@
+.row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 56px;
+  min-width: 0;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  gap: var(--spacingHorizontalM);
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+.row:hover,
+.tile:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.row[data-selected],
+.tile[data-selected] {
+  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+}
+[role='listbox']:focus-visible .row[data-focused],
+[role='listbox']:focus-visible .tile[data-focused] {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.row:focus-visible,
+.tile:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.labels {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--spacingVerticalXXS);
+}
+.title,
+.subtitle {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.title {
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+.subtitle {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground3);
+  line-height: var(--lineHeightBase200);
+}
+.tail {
+  flex: none;
+  max-width: 80px;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+}
+.tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  height: 208px;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+.tile .labels {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .tail {
+    display: none;
+  }
+}

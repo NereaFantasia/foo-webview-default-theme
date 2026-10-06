@@ -1,0 +1,60 @@
+/* 内容卡与右侧卡同在一个网格里；列宽只在停靠时写在行内，其余时候只有内容卡一列。 */
+.dock {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 停靠：与内容卡同一种卡片，铺底、描边、圆角，放在拖拽条右边那一列。 */
+.card[data-form='docked'] {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--bg-pane);
+}
+
+/* 收起那一程：版式已经只剩内容卡一列，卡按收起前的宽贴着右缘浮在原位，播完卸下。 */
+.card[data-form='docked'][data-leaving] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+/* 浮层：上层取不透明的中性底，阴影把它和内容分开。上沿接导航行下缘，底边让出胶囊（64 高、离底 16）。 */
+.card[data-form='overlay'] {
+  position: absolute;
+  top: var(--spacingVerticalS);
+  right: var(--spacingHorizontalS);
+  bottom: var(--spacingVerticalS);
+  z-index: 1;
+  display: grid;
+  width: 320px;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-overlay);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow16);
+}
+
+.card[data-form='overlay'][data-nav-row] {
+  top: calc(var(--spacingVerticalM) + 36px + var(--spacingVerticalS));
+}
+
+.card[data-form='overlay'][data-capsule] {
+  bottom: calc(64px + var(--spacingVerticalL) + var(--spacingVerticalS));
+}
+
+.card[data-form='overlay'][data-compact] {
+  left: var(--spacingHorizontalXS);
+  right: var(--spacingHorizontalXS);
+  width: auto;
+}

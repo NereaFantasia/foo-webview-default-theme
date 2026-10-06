@@ -1,0 +1,45 @@
+/* 行的滚动区，列头在它上面、不跟着滚。列头那一层同样留出滚动条的槽，两边的栅格才一样宽。 */
+.scroller {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  outline: none;
+}
+
+/* 外部滚动时由页面留尾部空间；自己滚动时调用方可指定浮层遮住的高度。 */
+.scroller:not([data-page-scroll]) {
+  padding-bottom: var(--table-bottom-inset, 0px);
+}
+
+/* 贴住视口的一层与层里整条平移的行带：快速拖动滚动条时行不跟着容器走，不露白。 */
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+/* 行带自成一层：每帧改的只是这一层的平移，行不必跟着重画。 */
+.strip {
+  position: relative;
+  will-change: transform;
+}
+
+/* 空表时占满滚动区的那一行与那一格，调用方画的空态放在里面。 */
+.empty {
+  height: 100%;
+}
+
+/* 行跟着页面滚：这一层按内容高、不滚动，贴住视口的那一层就贴在页面的滚动元素上。这里不能是滚动容器，
+   overflow 取 hidden 或 auto 都会让 sticky 改认它。空态按内容高。 */
+.scroller[data-page-scroll] {
+  flex: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+
+.scroller[data-page-scroll] .empty {
+  height: auto;
+}

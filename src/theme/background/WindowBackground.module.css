@@ -1,0 +1,22 @@
+.root {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--colorNeutralBackground1);
+  filter: brightness(var(--background-brightness));
+}
+
+.art {
+  position: absolute;
+  inset: calc(-1 * var(--background-blur));
+  filter: blur(var(--background-blur));
+}
+
+.shade {
+  position: absolute;
+  inset: 0;
+  background: var(--colorNeutralBackground1);
+  opacity: var(--background-shade);
+}

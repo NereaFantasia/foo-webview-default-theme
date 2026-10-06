@@ -1,0 +1,23 @@
+/* 盖在网格上方，不接指针，不挡点击。 */
+.root {
+  position: absolute;
+  top: var(--spacingVerticalS);
+  right: var(--spacingHorizontalXXL);
+  z-index: 2;
+  max-width: 50%;
+  overflow: hidden;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalS);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow4);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.root[data-no-match] {
+  color: var(--text-secondary);
+}

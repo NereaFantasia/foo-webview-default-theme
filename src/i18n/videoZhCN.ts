@@ -1,0 +1,25 @@
+import type { videoEn } from './videoEn.ts';
+
+export const videoZhCN: Record<keyof typeof videoEn, string> = {
+  'place.video': '视频',
+  'video.loading': '正在加载画面',
+  'video.buffering': '正在缓冲',
+  'video.none': '此曲目没有视频',
+  'video.subsong': '暂不支持子曲目的视频',
+  'video.unsupported': '无法播放这种视频格式',
+  'video.failed': '视频播放失败',
+  'video.sourceFailed': '视频来源读取失败',
+  'video.retry': '重新加载',
+  'video.back': '后退 5 秒',
+  'video.forward': '前进 5 秒',
+  'video.fit': '画面适配',
+  'video.more': '视频选项',
+  'video.contain': '适应',
+  'video.cover': '填满',
+  'video.fill': '拉伸',
+  'video.original': '原始大小',
+  'video.expand': '全窗口',
+  'video.collapse': '退出全窗口',
+  'video.fullscreen': '全屏',
+  'video.fullscreenFailed': '切换全屏失败',
+};

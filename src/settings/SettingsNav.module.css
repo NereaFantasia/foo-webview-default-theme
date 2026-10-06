@@ -1,0 +1,40 @@
+/* 一行分类名，底下一条线；放不下时横向滚，不折行、不画滚动条。 */
+.strip {
+  display: flex;
+  flex: none;
+  gap: var(--spacingHorizontalXL);
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: var(--strokeWidthThin) solid var(--line);
+  scrollbar-width: none;
+}
+
+.tab {
+  flex: none;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fontSizeBase300);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tab:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(var(--strokeWidthThick) * -1);
+}
+
+/* 亮着的那一项：字加重，底边一条 3px 的强调色。 */
+.current {
+  color: var(--text-primary);
+  font-weight: var(--fontWeightSemibold);
+  box-shadow: inset 0 calc(var(--strokeWidthThicker) * -1) 0 var(--colorCompoundBrandForeground1);
+}

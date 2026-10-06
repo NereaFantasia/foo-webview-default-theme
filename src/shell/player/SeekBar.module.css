@@ -1,0 +1,133 @@
+/* 命中区比线上下各多出 8；放在标题栏里时也要退出拖动区，下沿那一截可能伸出所在的盒子。 */
+.hit {
+  padding: var(--spacingVerticalS) 0;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.hit[aria-disabled] {
+  cursor: default;
+}
+
+/* 正在播放条的线上面紧挨着一行字，往上只伸 2；胶囊的线下面就是外缘，往下只伸 2。 */
+.hit[data-reach='down'] {
+  padding-top: var(--spacingVerticalXXS);
+}
+
+.hit[data-reach='up'] {
+  padding-bottom: var(--spacingVerticalXXS);
+}
+
+/* 不能跳转时写在线的位置上的那句话。 */
+.note {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hit:focus-visible .track {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThick);
+}
+
+.passive {
+  pointer-events: none;
+}
+
+.track {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--line);
+}
+
+/* 已播的一段按比例横向缩放，不逐帧改宽。 */
+.fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+/* 滑块 12，中心落在播到的位置上；只是标记，指针照旧落在命中区上。 */
+.rail {
+  position: relative;
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--accent);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+/* 时间、线、总长一行；线占满余下的宽度，时间用等宽数字。 */
+.timed {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+}
+
+.timed > .hit,
+.timed > .passive {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 宽度在行内按总长的位数给；左边的贴着线右对齐。 */
+.clock {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock:first-child {
+  text-align: end;
+}
+
+/* 拖动中左边写的是拖到的位置，取主色。 */
+.timed[data-dragging] > .clock:first-child {
+  color: var(--accent);
+  font-weight: var(--fontWeightSemibold);
+}
+
+/* 悬停态之外的正在播放条与胶囊：时间不露出来，线占满。 */
+.timed[data-clock-hidden] > .clock {
+  display: none;
+}
+
+/* 悬停态：命中区撑满外面给的高度，线在正中；时间随之淡入。 */
+.timed[data-fill] {
+  height: 100%;
+}
+
+.timed[data-fill] > .hit {
+  display: grid;
+  align-content: center;
+  align-self: stretch;
+  padding: 0;
+}
+
+.timed[data-fill] > .clock {
+  animation: clock-in var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes clock-in {
+  from {
+    opacity: 0;
+  }
+}

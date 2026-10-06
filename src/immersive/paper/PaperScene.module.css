@@ -1,0 +1,52 @@
+/* 纸面变量：数据墨 ink、热色 hot、纸面染色 tint、右栏垫纸 pad，另有网格、圆环、十字与整轨波形未播段的色。
+   各件都从这里取，换封面 ramp 时一起换。 */
+.paper {
+  --paper-ink: var(--colorBrandForeground1);
+  --paper-hot: var(--colorBrandForeground2);
+  --paper-tint: color-mix(
+    in oklab,
+    var(--colorBrandForeground1) 12%,
+    var(--colorNeutralBackground2)
+  );
+  --paper-pad: color-mix(in srgb, var(--paper-tint) 74%, transparent);
+  --paper-grid: var(--colorNeutralStencil2Alpha);
+  --paper-ring: var(--colorNeutralStencil1Alpha);
+  --paper-cross: var(--colorNeutralStroke2);
+  --paper-waveform-idle: var(--colorNeutralForegroundDisabled);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--paper-tint);
+  color: var(--colorNeutralForeground1);
+  /* 主题根带的是正文排印的绝对行高；舞台上的字按基线落位、盒子高由字号定，行高要回到随字号走。 */
+  line-height: normal;
+}
+
+/* 场景里各件共用的基础：盒子的宽高含边框（环的直径、括号的臂长都按含线宽写），字距不往下继承
+   （要字距的元素自己写），图不能拖。零优先级，各件自己的声明总能盖过它。 */
+:where(.paper *) {
+  box-sizing: border-box;
+  letter-spacing: 0;
+}
+
+:where(.paper img) {
+  -webkit-user-drag: none;
+}
+
+/* 竖版三档：山脊图按横版的 1280 × 800 一块沉到底部、水平居中，两侧超出场景的部分被 .paper 裁掉。 */
+.paper .sunk {
+  inset: auto auto 0 50%;
+  width: 1280px;
+  height: 800px;
+  translate: -50% 0;
+}
+
+/* 深色档染得淡一点、垫纸盖得厚一点。 */
+.paper[data-dark] {
+  --paper-tint: color-mix(
+    in oklab,
+    var(--colorBrandForeground1) 8%,
+    var(--colorNeutralBackground2)
+  );
+  --paper-pad: color-mix(in srgb, var(--paper-tint) 78%, transparent);
+}

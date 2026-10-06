@@ -1,0 +1,70 @@
+/* 分面条：页头下面三栏等宽，各一列可勾的值，长了在栏里滚。 */
+.root {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(156px, 1fr));
+  gap: var(--spacingHorizontalM);
+  padding-bottom: var(--spacingVerticalL);
+  overflow-x: auto;
+}
+.column {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 24px;
+}
+.label {
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+}
+.checked {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* 列表框：描边圆角的一块，六行高，多了自己滚。 */
+.list {
+  box-sizing: border-box;
+  height: 208px;
+  max-height: 30vh;
+  padding: var(--spacingVerticalXS);
+  overflow-y: auto;
+  background: var(--colorNeutralBackground2);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+}
+.search {
+  width: 100%;
+  margin-bottom: var(--spacingVerticalXS);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  padding-right: var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+}
+.row:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.on {
+  background: var(--colorSubtleBackgroundSelected);
+}
+.on:hover {
+  background: var(--colorSubtleBackgroundPressed);
+}
+.count {
+  flex: none;
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground3);
+  font-variant-numeric: tabular-nums;
+}
+.empty {
+  padding: var(--spacingVerticalS);
+  color: var(--colorNeutralForeground3);
+}

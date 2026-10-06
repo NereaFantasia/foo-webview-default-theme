@@ -1,0 +1,98 @@
+/* 面板与浮层里根的排法由外面给（那一行的网格：图标列、滑条列、数值列），这里只定各件落在哪一列；
+   底部通栏里自成一排：36 的静音键、隔 6、96 宽的轨道。 */
+.root[data-variant='bar'] {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+  min-width: 0;
+}
+
+/* 命中区比轨道高，好按；轨道 4，滑块中心落在音量的位置上。面板里没有数值列，滑条一直伸到行尾，右缘与
+   设备行的箭头对齐。 */
+.hit {
+  position: relative;
+  display: grid;
+  grid-column: 2;
+  align-items: center;
+  min-width: 0;
+  height: 16px;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+
+.root[data-variant='panel'] .hit {
+  grid-column: 2 / -1;
+}
+
+.root[data-variant='bar'] .hit {
+  flex: none;
+  width: 96px;
+  height: 12px;
+}
+
+.hit[aria-disabled] {
+  cursor: default;
+}
+
+.rail {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--line);
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+/* 滑块是一圈描边的圆，中间一点主色：面板里 12 圈 6 点，浮层里 16 圈 8 点。圈底取中性底。 */
+.thumb {
+  position: absolute;
+  top: 50%;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-menu);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.thumb::after {
+  position: absolute;
+  inset: 2px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--accent);
+  content: '';
+}
+
+.root[data-variant='flyout'] .thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--bg-elevated);
+}
+
+.root[data-variant='flyout'] .thumb::after {
+  inset: 3px;
+}
+
+.hit:focus-visible .thumb,
+.root[data-variant='bar'] .hit:focus-visible .rail {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+.value {
+  grid-column: 3;
+  min-width: 3ch;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}

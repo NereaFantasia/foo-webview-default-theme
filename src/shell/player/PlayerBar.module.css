@@ -1,0 +1,91 @@
+/* 高 92：上下各 8、左右各 16，进度一行 16、隔 4、主行 56。与标题栏一样直接放在窗口材质上，不铺底。 */
+.root {
+  display: grid;
+  grid-template-rows: 16px 56px;
+  row-gap: var(--spacingVerticalXS);
+  min-width: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+}
+
+.progress {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 两侧等宽，控制组落在窗口正中；最窄一档控制组挪到右边，余下的都给文字。 */
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacingHorizontalL);
+  min-width: 0;
+}
+
+.root[data-tier='hidden'] .main {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.now {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+}
+
+.text {
+  display: grid;
+  row-gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+/* 曲名后面隔 8 跟着星；曲名放不下时先截它，星贴着截断处、不让位。 */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}
+
+/* 截断与渐隐归 `TruncatedText`：只在真的放不下时才渐隐。 */
+.title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+}
+
+.title[data-idle] {
+  color: var(--text-secondary);
+}
+
+.byline {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+}
+
+.tail {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}
+
+/* 36 的静音键、隔 6、96 宽的轨道，由音量件自己排。 */
+.volume {
+  display: flex;
+  flex: none;
+}
+
+/* 只为认出焦点在不在里面，不参与版式。 */
+.slot {
+  display: contents;
+}

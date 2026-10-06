@@ -1,0 +1,8 @@
+/* 条件行：页头下面、表格上面，条件多了折行。 */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  padding-bottom: var(--spacingVerticalM);
+}

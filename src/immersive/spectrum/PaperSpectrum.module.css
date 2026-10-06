@@ -1,0 +1,81 @@
+/* 纵向由上到下：Hz 刻度字与字下的短刻、轴说明压在柱区上沿上方、柱区。幅度刻度挂在柱区左外侧，
+   伸进垫纸的左边距；每格一条格线。刻度字与说明的位置、字号、柱区的内缩都是 `--spectrum-*` 变量，由放件的
+   外框按档给全，这里不写缺省。字按基线落位时 `--spectrum-trim: trim-end` 把字盒底边裁到字母基线，
+   `top` 写的就是基线。 */
+.spectrum {
+  position: relative;
+  height: 100%;
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--spectrum-font);
+  color: var(--colorNeutralForeground3);
+}
+
+.hz {
+  position: relative;
+  height: 30px;
+}
+
+.hz-tick,
+.caption,
+.amp-tick {
+  text-box-trim: var(--spectrum-trim);
+  text-box-edge: text alphabetic;
+}
+
+.hz-tick {
+  position: absolute;
+  top: var(--spectrum-hz-top);
+  translate: var(--spectrum-hz-shift);
+  font-size: var(--spectrum-hz-font);
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.hz-tick::after {
+  content: '';
+  position: absolute;
+  left: var(--spectrum-mark-left);
+  top: var(--spectrum-mark-top);
+  width: 1px;
+  height: 6px;
+  background: var(--paper-cross);
+}
+
+/* 格高 `--grid-step` 由件按刻度数给在行内样式上。 */
+.plot {
+  position: absolute;
+  inset: var(--spectrum-plot-inset);
+  border-bottom: 1px solid var(--paper-cross);
+  background: linear-gradient(var(--paper-grid) 1px, transparent 1px) 0 0 / 100% var(--grid-step);
+}
+
+.caption {
+  position: absolute;
+  top: -10px;
+  translate: var(--spectrum-caption-shift);
+  font-size: var(--spectrum-caption-font);
+  line-height: 10px;
+  white-space: nowrap;
+}
+
+.amp-tick {
+  position: absolute;
+  left: var(--spectrum-axis-left);
+  right: var(--spectrum-axis-right);
+  translate: var(--spectrum-axis-shift);
+  line-height: 12px;
+}
+
+.bars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.empty {
+  position: absolute;
+  inset: var(--spectrum-empty-inset);
+  line-height: 10px;
+}

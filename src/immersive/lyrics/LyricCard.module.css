@@ -1,0 +1,74 @@
+/* 舞台坐标：水平居中于 x 960，一行卡顶 1000、高 78，两行卡顶 964、高 114，底边都到 1078；两行卡顶在右栏
+   垫纸底边下方 8，卡不压右栏。卡宽由组件按字宽给。卡底是不透明的纸面色；不接指针，层位在右栏之上、传输键之下。 */
+.card {
+  position: absolute;
+  left: 960px;
+  top: 1000px;
+  height: 78px;
+  translate: -50% 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--paper-tint);
+}
+
+.card[data-two-line] {
+  top: 964px;
+  height: 114px;
+}
+
+/* 字按基线落位：字盒底边裁到字母基线，`top` 写的就是基线（相对卡顶）。 */
+.text {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+/* 正文限宽 1394，是卡宽上限减去左右内边距；字号由组件给。 */
+.main,
+.sub {
+  left: 46px;
+  max-width: 1394px;
+  font-family: var(--fontFamilyBase);
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+.main {
+  top: 51px;
+  color: var(--paper-hot);
+}
+
+.card[data-two-line] .main {
+  top: 47px;
+}
+
+.sub {
+  top: 84px;
+  color: var(--colorNeutralForeground3);
+}
+
+.sub[data-kind='translation'] {
+  color: var(--colorNeutralForeground2);
+}
+
+.plain {
+  left: 46px;
+  top: 51px;
+  font-family: var(--fontFamilyMonospace);
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 来源标右对齐在卡内右下：右边留 16、基线在卡底上方 12。 */
+.source {
+  right: 16px;
+  top: auto;
+  bottom: 12px;
+  translate: none;
+  font-family: var(--fontFamilyMonospace);
+  font-size: 13px;
+  color: var(--colorNeutralForeground3);
+}

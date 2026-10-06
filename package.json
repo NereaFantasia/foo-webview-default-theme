@@ -1,0 +1,52 @@
+{
+  "name": "foo-webview-default-theme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "foo_ui_webview2 的默认主题（React + Fluent UI React v9）",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "hostRequirements": {
+    "foo_ui_webview2": ">=2.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --config vite.boot.config.ts && vite build",
+    "preview": "vite preview --outDir dist",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@applemusic-like-lyrics/core": "0.6.0",
+    "@applemusic-like-lyrics/lyric": "1.1.0",
+    "@fluentui/react-components": "9.74.9",
+    "@fluentui/react-icons": "2.0.343",
+    "@material/material-color-utilities": "0.4.0",
+    "@tanstack/react-virtual": "3.14.13",
+    "foo-webview-sdk": "file:vendor/foo-webview-sdk.tgz",
+    "jotai": "3.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-utils": "4.10.1",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.10.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.5.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "8.3.0",
+    "vitest": "5.0.2"
+  },
+  "overrides": {
+    "@applemusic-like-lyrics/core": {
+      "vitest": "$vitest"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+.head {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}
+.toggle,
+.name {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+}
+.toggle[data-expanded] svg {
+  transition: transform var(--motion-fast) var(--curveDecelerateMid);
+}
+.toggle[data-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fontWeightSemibold);
+}
+.name:hover {
+  color: var(--colorBrandForegroundLinkHover);
+}
+.head > svg,
+.toggle,
+.count {
+  flex-shrink: 0;
+}
+.count {
+  margin-left: auto;
+  padding-right: var(--spacingHorizontalS);
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+}
+.cover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+}

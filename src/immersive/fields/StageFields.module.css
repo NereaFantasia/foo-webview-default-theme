@@ -1,0 +1,109 @@
+/* 铺满舞台的定位层：各件按舞台坐标绝对定位（右对齐的按舞台右缘量）。这一层没有可点的东西，不接指针，
+   免得盖住下面罗盘的传输键。 */
+.fields {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--fontFamilyMonospace);
+  color: var(--colorNeutralForeground1);
+}
+
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+.base {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+.key {
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 右栏左缘 x 760、From 行顶边 y 82，与 `paperStage.ts` 的 `STAGE_FIELDS` 一致。 */
+.hot-square {
+  position: absolute;
+  left: 760px;
+  top: 82px;
+  width: 8px;
+  height: 8px;
+  background: var(--paper-hot);
+}
+
+.from {
+  left: 782px;
+  top: 91px;
+  max-width: 934px;
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+/* 文字后隔 18 一段长 24 的热色短线：盒子宽 42，左边 18 透明。线是正文的一部分，文字放不下被省略时它也就不出。 */
+.from::after {
+  content: '';
+  display: inline-block;
+  width: 42px;
+  height: 1px;
+  vertical-align: 4px;
+  background: linear-gradient(to right, transparent 18px, var(--paper-hot) 18px);
+}
+
+/* 字盒下面垫 0.3em 给下伸部分：标题要横向滚动与擦除，裁切与遮罩都按这个盒子算。
+   76 是起始字号，放不下时 `useTitleScroll` 在行内样式上改写。 */
+.title {
+  left: 760px;
+  top: 184px;
+  padding-bottom: 0.3em;
+  translate: 0 calc(-100% + 0.3em);
+  font-family: var(--fontFamilyBase);
+  font-size: 76px;
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: -1px;
+  color: var(--paper-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title[data-rolling] {
+  text-overflow: clip;
+}
+
+/* 行内元素上 transform 不生效，滚动期间换成 inline-block。 */
+.title[data-rolling] .title-text {
+  display: inline-block;
+}
+
+.by-key {
+  left: 760px;
+  top: 222px;
+}
+
+.artist {
+  left: 760px;
+  top: 254px;
+  max-width: 640px;
+  font-family: var(--fontFamilyBase);
+  font-size: 28px;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+/* 右缘对齐到 x 1780（右栏右缘）。 */
+.quality-key,
+.quality {
+  right: 140px;
+}
+
+.quality-key {
+  top: 230px;
+}
+
+.quality {
+  top: 254px;
+  font-size: 16px;
+}

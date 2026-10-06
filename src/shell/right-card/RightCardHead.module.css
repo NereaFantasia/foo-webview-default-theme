@@ -1,0 +1,175 @@
+.current {
+  position: relative;
+}
+
+.collapsed,
+.details {
+  border-radius: var(--radius-control);
+}
+
+.current[data-playing] .collapsed,
+.current[data-playing] .details {
+  background: var(--bg-selected);
+}
+
+/* 横向外留 4、内留 4，缩小底色后封面仍与队列节头对齐。 */
+.collapsed {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-height: 64px;
+  margin: 0 var(--spacingHorizontalXS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+}
+
+/* 展开的那一块滑进滑出时露在头外面的部分裁掉；用 clip 不用 hidden，免得成了滚动容器。 */
+.fold {
+  overflow: clip;
+}
+
+/* 展开：封面保持 1:1，宽卡上不超过 288，给曲目与队列留出空间。 */
+.expanded {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS) var(--spacingVerticalM);
+}
+
+.expanded .title {
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+}
+
+.details {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+}
+
+.artist,
+.album,
+.technical {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.artist {
+  color: var(--text-secondary);
+}
+
+.album,
+.technical {
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+}
+
+.rowActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacingVerticalXXS);
+}
+
+.thumbButton,
+.bigCoverButton {
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  cursor: pointer;
+}
+
+.thumbButton:focus-visible,
+.bigCoverButton:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+.bigCoverButton {
+  justify-self: center;
+  width: min(100%, 288px);
+  margin-bottom: var(--spacingVerticalS);
+}
+
+.thumb,
+.bigCover {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+}
+
+.thumb {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+}
+
+.bigCover {
+  width: 100%;
+  aspect-ratio: 1;
+  font-size: 48px;
+}
+
+.thumb img,
+.bigCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+}
+
+.title,
+.subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+/* 专辑名：看着是正文，指针停上去出下划线。 */
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  border-radius: var(--borderRadiusSmall);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}

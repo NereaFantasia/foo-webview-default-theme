@@ -1,0 +1,38 @@
+/* 盖住整窗：浮层挂载节点都在同一层级，按创建先后叠放，这一层进页时才建，压在主窗与之前建的浮层之上；
+   视图里弹出的提示、菜单建得更晚，照样在它上面。 */
+.view {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--colorNeutralBackground2);
+  color: var(--colorNeutralForeground1);
+  outline: none;
+}
+
+.view[data-idle] {
+  cursor: none;
+}
+
+.content {
+  position: absolute;
+  inset: 0;
+}
+
+/* Tab 回绕的哨兵：只拿一下焦点就交出去，看不见、不占位。 */
+.guard {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* 拖窗条：视图盖住了标题栏，窗口靠这一条拖，高度取标题栏的常规高度。app-region 不看层级，这一条在 DOM 里
+   排在底下标题栏的后面，那一截以它为准。整层不能标 no-drag：WebView2 里祖先的 no-drag 会让这一条的 drag 失效。 */
+.drag {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 48px;
+  -webkit-app-region: drag;
+  app-region: drag;
+}

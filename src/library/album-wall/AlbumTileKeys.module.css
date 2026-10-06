@@ -1,0 +1,7 @@
+/* 外框与封面同位同大，只作两枚键的定位参照，本身不接指针。 */
+.root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}

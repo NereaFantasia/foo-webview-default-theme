@@ -1,0 +1,97 @@
+/* 高 64、圆角 32，离卡底 16、水平居中；宽窗 680、641–1007 宽 600，卡片窄到放不下时撑满卡宽、左右各留 16。
+   封面离外缘 8、键组离外缘 14（描边画在盒子里面，内边距扣掉它），三块之间隔 12。不透明的菜单底加描边与
+   阴影，压在页面内容上面。 */
+.root {
+  position: absolute;
+  bottom: var(--spacingVerticalL);
+  left: 50%;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  width: min(600px, calc(100% - 2 * var(--spacingHorizontalL)));
+  height: 64px;
+  padding: 0 calc(var(--spacingHorizontalM) + var(--spacingHorizontalXXS) - var(--strokeWidthThin))
+    0 calc(var(--spacingHorizontalS) - var(--strokeWidthThin));
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow8);
+  translate: -50% 0;
+}
+
+.root[data-tier='wide'] {
+  width: min(680px, calc(100% - 2 * var(--spacingHorizontalL)));
+}
+
+.root[data-tier='hidden'] {
+  width: calc(100% - 2 * var(--spacingHorizontalL));
+}
+
+.text {
+  display: grid;
+  row-gap: var(--spacingVerticalXXS);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 曲名后面隔 6 跟着星；曲名放不下时先截它，星贴着截断处、不让位。 */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+  min-width: 0;
+}
+
+/* 截断与渐隐归 `TruncatedText`：只在真的放不下时才渐隐。 */
+.title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 18px;
+}
+
+.title[data-idle] {
+  color: var(--text-secondary);
+}
+
+.byline {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: 16px;
+}
+
+/* 只为认出焦点在不在里面，不参与版式。 */
+.slot {
+  display: contents;
+}
+
+/* 播放控制组与「音量、⋯」之间隔 16。 */
+.tail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: calc(var(--spacingHorizontalL) - var(--spacingHorizontalM));
+}
+
+/* 播放控制组外面包的一层，只为悬停态时整组一起模糊。 */
+.controls {
+  display: flex;
+  flex: none;
+}
+
+/* 进度条悬停态（`ScrubSeek`）：封面以外的东西淡到 35% 并模糊，指针穿过去落到进度线上。淡入淡出 83 ms。
+   进度线的位置见 `ScrubSeek.module.css`。 */
+.soft {
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    filter var(--motion-faster) var(--curveLinear);
+}
+
+.root[data-scrub='on'] .soft {
+  opacity: 0.35;
+  filter: blur(4px);
+  pointer-events: none;
+}

@@ -1,0 +1,72 @@
+/* 标题栏与底部通栏按内容高，播放栏不在底部时最后一行是空的；侧边栏的列宽随形态变，写在行内；内容区右、
+   下各留 8，与侧边栏之间隔 8，分栏握柄就在这条缝里。 */
+.root {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+/* 换形态的动画里内容区会整个往右挪出窗口，窗格会往左滑出窗口，这里裁掉；用 clip 不用 hidden，免得它
+   成了能被聚焦滚动带着走的滚动容器。窄窗的浮层按它定位。 */
+.body {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+}
+
+/* 两列的位置写死：侧边栏不显示时第一列宽 0、侧边栏也不渲染，内容区照样落在第二列。收起与藏起来的动画里
+   窗格比第一列宽，照样画出来，由窗格自己的裁剪与平移收掉。 */
+.sidebar {
+  grid-column: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+.content {
+  position: relative;
+  grid-column: 2;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--spacingHorizontalS) var(--spacingVerticalS);
+}
+
+/* 导航行按内容高，余下的给页面。胶囊按卡片定位；卡片自成一层，胶囊的层级不越过窄窗的侧边栏浮层。
+   --player-inset 是胶囊盖住的高度（胶囊 64 加离底 16），页面的滚动区按它在底部让位；没有胶囊时为 0。 */
+.card {
+  --player-inset: 0px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--bg-pane);
+}
+
+/* 没有导航行（播放栏在底部）时整张卡给页面；页面自己的上内边距 16，再加 4，页头离卡片上缘 20。 */
+.card:not([data-with-nav-row]) {
+  grid-template-rows: minmax(0, 1fr);
+  padding-top: var(--spacingVerticalXS);
+}
+
+.card:not([data-with-nav-row]):has([data-cover-glow]) {
+  padding-top: 0;
+}
+
+.card[data-capsule] {
+  --player-inset: calc(64px + var(--spacingVerticalL));
+}

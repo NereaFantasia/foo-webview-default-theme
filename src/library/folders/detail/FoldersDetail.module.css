@@ -1,0 +1,36 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  padding-left: var(--spacingHorizontalM);
+}
+.scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: var(--player-inset, 0px);
+  scrollbar-gutter: stable;
+}
+.empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  color: var(--colorNeutralForeground3);
+}
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+  color: var(--colorNeutralForeground2);
+}
+@container folders (max-width: 879px) {
+  .root {
+    padding-left: 0;
+  }
+}

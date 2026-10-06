@@ -1,0 +1,23 @@
+/** 新人引导的英文文案，并进英文包；键都以 `onboarding.` 开头。 */
+export const onboardingEn = {
+  'onboarding.step': 'Step {current} of {total}',
+  'onboarding.titleLibrary': 'Media library',
+  'onboarding.titleAppearance': 'Appearance',
+  'onboarding.titleTray': 'Tray',
+  'onboarding.titleUpdate': 'Updates and online content',
+  'onboarding.skip': 'Skip setup',
+  'onboarding.back': 'Back',
+  'onboarding.next': 'Next',
+  'onboarding.done': 'Done',
+  'onboarding.addFolders': 'Add folders',
+  'onboarding.manageFolders': 'Manage folders',
+  'onboarding.libraryReading': 'Reading the media library',
+  'onboarding.libraryFailed': 'Could not read the media library status',
+  'onboarding.libraryNone': 'No folders added',
+  'onboarding.libraryNoTracks': 'No tracks found yet',
+  'onboarding.libraryTracksOne': '{count} track',
+  'onboarding.libraryTracks': '{count} tracks',
+  'onboarding.rootTracksOne': '{count} track',
+  'onboarding.rootTracks': '{count} tracks',
+  'onboarding.moreRoots': '{count} more',
+};

@@ -1,0 +1,15 @@
+/* 分组头横跨整行，不让开封面列：封面由调用方画在它下面。 */
+.group {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--borderRadiusMedium);
+  cursor: default;
+}
+
+/* 横跨全部列的那一格，铺满分组头，调用方的内容画在它里面。 */
+.cell {
+  height: 100%;
+}

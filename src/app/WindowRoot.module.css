@@ -1,0 +1,14 @@
+.full-window {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.failure {
+  position: fixed;
+  z-index: 1000;
+  right: var(--spacingHorizontalS);
+  bottom: var(--spacingVerticalS);
+  left: var(--spacingHorizontalS);
+  -webkit-app-region: no-drag;
+}

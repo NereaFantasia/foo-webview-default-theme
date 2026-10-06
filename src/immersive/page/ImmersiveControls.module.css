@@ -1,0 +1,39 @@
+/* 整层铺满视图，自己不接指针，只有键接：否则会把场景里的件（整轨波形的 seek）挡住。 */
+.controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.controls > * {
+  pointer-events: auto;
+}
+
+.controls[data-hidden] {
+  opacity: 0;
+}
+
+.controls[data-hidden] > * {
+  pointer-events: none;
+}
+
+/* 两颗键落在拖窗条里；app-region 不继承，每颗键自己退出拖动才点得到。 */
+.corner {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: var(--spacingHorizontalS);
+}
+
+.corner > * {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* 胶囊上只写 Esc，边框就是胶囊的边框；「退出沉浸」只给读屏与悬停提示。 */
+.key {
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+}

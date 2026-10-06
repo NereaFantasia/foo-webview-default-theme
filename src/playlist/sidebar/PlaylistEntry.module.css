@@ -1,0 +1,41 @@
+/* ⋯ 键的边长只在这里定一次：键本身与曲目数占的槽位都按它。 */
+.row {
+  position: relative;
+  --more-size: 24px;
+}
+
+/* 行尾的槽位：平时是曲目数，悬停、焦点在这一行或它的菜单开着时换成 ⋯。两者占同一个位置，槽位至少
+   与 ⋯ 同宽，曲目数只是隐去、仍占着位置，切换时名字的宽度不变。 */
+.count {
+  display: inline-block;
+  min-width: var(--more-size);
+  text-align: end;
+}
+
+.more {
+  position: absolute;
+  top: 0;
+  right: var(--spacingHorizontalXS);
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  visibility: hidden;
+}
+
+.row:hover .more,
+.row:focus-within .more,
+.row[data-menu-open] .more {
+  visibility: visible;
+}
+
+.row:hover .count,
+.row:focus-within .count,
+.row[data-menu-open] .count {
+  visibility: hidden;
+}
+
+/* 正在播放的记号 1em 见方，取 16 px，居中放在 20 见方的图标槽里：20 的图标四周自带留白，画出来的部分也
+   约 16 见方，两者看上去一样大。 */
+.playing {
+  font-size: var(--fontSizeBase400);
+}

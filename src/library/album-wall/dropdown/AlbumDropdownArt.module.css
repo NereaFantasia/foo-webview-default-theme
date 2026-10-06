@@ -1,0 +1,106 @@
+/* 下拉面板里的图：左边铺满面板高、右半渐隐的封面，与封面往右的延伸，最上面压一层给字垫底的渐变。
+   各层绝对定位在面板里，下拉给出封面框的宽 --cover-size；图画出第一帧才淡入（83 ms 线性）。 */
+.extend,
+.cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  pointer-events: none;
+}
+
+.extend[data-shown],
+.cover[data-shown] {
+  opacity: 1;
+}
+
+/* 延伸取的是封面自己的右缘：把图最右 3% 那一窄条左右翻过来，横向拉满整个面板再模糊。整张图模糊出的
+   颜色与封面右缘接不上，右缘的颜色接着往右铺开才像这张图往右长出去了一截；封面的渐隐落在这片延伸上，
+   两边颜色本来接得上，看不出接缝。延伸铺满整个面板，封面盖在它上面。 */
+.extend {
+  width: 100%;
+}
+
+/* 模糊的那一层四边各多出三倍模糊半径，边上不会被模糊成半透明、透出面板底。多出的上下两截由
+   .top、.bottom 两条窄带补上：把图的顶行、底行竖向拉开，相当于把边上那一行一直延续出去。 */
+.smear {
+  --smear-blur: 16px;
+  --bleed: calc(3 * var(--smear-blur));
+  position: absolute;
+  inset: calc(-1 * var(--bleed));
+  filter: blur(var(--smear-blur)) saturate(1.1);
+}
+
+/* 横向只取图最右 3%，拉满这一层的宽；翻过来以后图的右缘落在左边，压在封面底下，封面右缘处露出的
+   就是图右缘紧挨着的那几列。 */
+.band {
+  position: absolute;
+  top: var(--bleed);
+  right: 0;
+  bottom: var(--bleed);
+  left: 0;
+  background-image: var(--cover-image);
+  background-repeat: no-repeat;
+  background-position: right top;
+  background-size: calc(100% / 0.03) 100%;
+  transform: scaleX(-1);
+}
+
+/* 图的顶、底各 2% 竖向拉满多出的那一截。 */
+.top,
+.bottom {
+  height: var(--bleed);
+  background-size: calc(100% / 0.03) calc(var(--bleed) / 0.02);
+}
+
+.top {
+  top: 0;
+  bottom: auto;
+}
+
+.bottom {
+  top: auto;
+  bottom: 0;
+  background-position: right bottom;
+}
+
+/* 封面框贴着面板左边、铺满面板的高；宽由下拉给，面板窄时比高窄。右边四成渐隐进延伸里：锐利的封面慢慢
+   过渡到模糊的延伸，没有一道分界。蒙版只看不透明度，取任一不透明的 token 即可。 */
+.cover {
+  width: var(--cover-size);
+  mask-image: linear-gradient(to right, var(--colorNeutralForeground1) 60%, transparent);
+}
+
+/* 宿主按最长边缩图、不裁不补，框与图的比例不同时裁掉多出的一截。横向靠右对齐：面板窄、框比高窄时，
+   或者横图，裁的都是左边，框的右缘始终是图的右缘，与延伸接得上。 */
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right center;
+}
+
+/* 给右边的字垫底：从封面宽的六成处开始，经过封面右缘逐渐压上中性底，封面与延伸压的是同一道渐变，
+   两边的明暗接得上。 */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent calc(var(--cover-size) * 0.6),
+    color-mix(in srgb, var(--colorNeutralBackground1) 48%, transparent) var(--cover-size),
+    color-mix(in srgb, var(--colorNeutralBackground1) 64%, transparent)
+  );
+  pointer-events: none;
+}
+
+.placeholder {
+  position: absolute;
+  top: calc(50% - 24px);
+  left: calc(var(--cover-size) / 2 - 24px);
+  color: var(--text-muted);
+}

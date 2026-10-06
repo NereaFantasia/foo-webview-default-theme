@@ -1,0 +1,17 @@
+/* 十字 13 × 13，中心落在给的坐标上：盒子左上往回挪 7（奇数边长，中线在第 7 个像素）。 */
+.cross {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  translate: -7px -7px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--paper-cross), var(--paper-cross)) center / 13px 1px no-repeat,
+    linear-gradient(var(--paper-cross), var(--paper-cross)) center / 1px 13px no-repeat;
+}
+
+.pad {
+  position: absolute;
+  pointer-events: none;
+  background: var(--paper-pad);
+}

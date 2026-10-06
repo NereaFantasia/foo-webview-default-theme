@@ -1,0 +1,98 @@
+/* 身份与动作贴着封面底边，下面另留工具行。 */
+.head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--spacingHorizontalXXL) + var(--spacingHorizontalXS));
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalL);
+}
+
+.cover {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--bg-hover);
+  box-shadow: var(--shadow16);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 40%;
+  height: 40%;
+  color: var(--text-muted);
+}
+
+.identity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+}
+
+.name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.name {
+  width: 100%;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fontSizeHero900);
+  font-weight: var(--fontWeightBold);
+  line-height: var(--lineHeightHero900);
+}
+
+.name[data-size='title1'] {
+  font-size: var(--fontSizeHero800);
+  line-height: var(--lineHeightHero800);
+}
+
+.name[data-size='title2'] {
+  font-size: var(--fontSizeHero700);
+  line-height: var(--lineHeightHero700);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalSNudge);
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalL);
+  margin-top: var(--spacingVerticalL);
+}
+
+.group {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+}
+
+/* 窄时封面缩小、与身份上沿对齐。动作组允许换行，不挤压标题。 */
+.head[data-narrow] {
+  align-items: flex-start;
+  gap: var(--spacingHorizontalL);
+}
+
+.head[data-narrow] .keys {
+  margin-top: var(--spacingVerticalS);
+}

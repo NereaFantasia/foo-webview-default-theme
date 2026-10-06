@@ -1,0 +1,243 @@
+/* 各块高度是定值，插槽不随内容伸缩；位置与宽随档位写在行内。纵向位置照图纸：等宽字按图纸字号放大一成
+   （图纸用 Geist Mono，这里的等宽字体字面窄一成），行高取图纸文字框的高。
+
+   频谱、整轨波形、量表、文件信息与声场图角标的几何变量在这里按版心档给全：字按行盒排（不裁到基线），
+   量表与文件信息走流式排法。值在小标下 3、narrow 档频谱左缩 26 没有等值的 spacing token，写成本件的几何变量。 */
+.fields {
+  --value-lead: 3px;
+  --spectrum-axis-room: 26px;
+
+  --spectrum-font: 10px;
+  --spectrum-trim: none;
+  --spectrum-hz-font: 10px;
+  --spectrum-hz-top: 12px;
+  --spectrum-hz-shift: -50% 0;
+  --spectrum-mark-left: 50%;
+  --spectrum-mark-top: 12px;
+  --spectrum-plot-inset: 42px 0 10px;
+  --spectrum-caption-font: 9px;
+  --spectrum-caption-shift: 0 0;
+  --spectrum-axis-left: auto;
+  --spectrum-axis-right: calc(100% + 6px);
+  --spectrum-axis-shift: 0 -50%;
+  --spectrum-empty-inset: -10px 0 auto auto;
+
+  --wave-font: 10px;
+  --wave-trim: none;
+  --wave-times-font: 10px;
+  --wave-times-top: 8px;
+  --wave-tick-shift: -50% 0;
+  --wave-tick-first-shift: 0 0;
+  --wave-tick-last-shift: -100% 0;
+  --wave-mark-top: 12px;
+  --wave-mark-left: 50%;
+  --wave-mark-first-left: 0;
+  --wave-mark-last-left: auto;
+  --wave-mark-last-right: 0;
+  --wave-band-top: 24px;
+  --wave-band-height: 60px;
+  --wave-message-inset: 0 0 auto auto;
+  --wave-lane-left: auto;
+  --wave-lane-right: calc(100% + 6px);
+  --wave-lane-font: 9px;
+  --wave-playhead-top: 18px;
+  --wave-playhead-height: 72px;
+  --wave-clock-top: 0;
+  --wave-clock-left: 100%;
+  --wave-clock-shift: 0 0;
+  --wave-clock-width: 36px;
+  --wave-clock-height: 14px;
+  --wave-clock-flip-left: auto;
+  --wave-clock-flip-right: 100%;
+  --wave-mode-inset: auto 0 2px auto;
+  --wave-chip-height: 14px;
+  --wave-chip-pad: 0 5px;
+  --wave-chip-font: 9px;
+  --wave-chip-line: 12px;
+  --wave-swatch: 6px;
+
+  --gauge-width: 140px;
+  --gauge-gap: 16px;
+  --gauge-height: auto;
+  --gauge-place: static;
+  --gauge-lift: none;
+  --gauge-trim: none;
+  --gauge-key-top: 0;
+  --gauge-key-font: 11px;
+  --gauge-value-left: auto;
+  --gauge-value-top: auto;
+  --gauge-value-indent: 8px;
+  --gauge-value-font: 24px;
+  --gauge-reading-height: 31px;
+  --gauge-reading-gap: 5px;
+  --gauge-unit-gap: 6px;
+  --gauge-unit-font: 11px;
+  --gauge-track-place: relative;
+  --gauge-track-top: auto;
+  --gauge-track-gap: 9px;
+  --gauge-tick-length: 3px;
+  --gauge-scale-font: 9px;
+  --gauge-scale-baseline: 14px;
+
+  --info-columns: repeat(3, 1fr);
+  --info-gap: 14px;
+  --info-row: auto;
+  --info-place: static;
+  --info-lift: none;
+  --info-trim: none;
+  --info-key-top: auto;
+  --info-key-font: 10px;
+  --info-value-top: auto;
+  --info-value-font: 13px;
+  --info-value-width: none;
+  --info-value-wrap: normal;
+  --info-value-margin: 3px 0 0;
+
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  color: var(--colorNeutralForeground1);
+}
+
+.key,
+.from,
+.quality-value {
+  font-family: var(--fontFamilyMonospace);
+}
+
+.key {
+  display: block;
+  font-size: 11px;
+  line-height: 13px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.from {
+  height: 14px;
+  margin-bottom: var(--spacingVerticalMNudge);
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  font-size: 12px;
+  line-height: 14px;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+}
+
+/* 场景给每个元素都把字距清零，写在 .from 上传不到里面的字。 */
+.from > span {
+  letter-spacing: 1px;
+}
+
+.from-album {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hot-square {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--paper-hot);
+}
+
+.hot-line {
+  flex: none;
+  width: 24px;
+  height: 1px;
+  background: var(--paper-hot);
+}
+
+/* 48 是起始字号，放不下时 `useTitleScroll` 在行内样式上改写；行高定在 58，降字号不改版式。 */
+.title {
+  margin: 0;
+  height: 58px;
+  font-family: var(--fontFamilyBase);
+  font-size: 48px;
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: -1px;
+  line-height: 58px;
+  color: var(--paper-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title[data-rolling] {
+  text-overflow: clip;
+}
+
+/* 行内元素上 transform 不生效，滚动期间换成 inline-block；平时保持行内，省略号才截在字符上。 */
+.title[data-rolling] .title-text {
+  display: inline-block;
+}
+
+.byline {
+  height: 52px;
+  margin-top: var(--spacingVerticalS);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.artist {
+  margin-top: var(--value-lead);
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.quality {
+  text-align: right;
+}
+
+.quality-value {
+  margin-top: var(--value-lead);
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.rule {
+  flex: none;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--paper-cross);
+}
+
+.spectrum {
+  height: 172px;
+}
+
+.fields:not([data-paper-fields='full']) .spectrum {
+  height: 132px;
+}
+
+.fields[data-paper-fields='narrow'] .spectrum {
+  padding-left: var(--spectrum-axis-room);
+}
+
+.waveform {
+  height: 110px;
+}
+
+.row-file {
+  height: 80px;
+  display: grid;
+  grid-template-columns: 312px 1fr;
+}
+
+/* 框高 8、行高 10：字底压到下面歌词段的上沿线上，与图纸一致。 */
+.footnote {
+  margin: 0;
+  height: 8px;
+  line-height: 10px;
+  font-family: var(--fontFamilyMonospace);
+  font-size: 8px;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+}
+
+.lyrics {
+  flex: 1;
+}

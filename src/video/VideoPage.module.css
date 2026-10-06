@@ -1,0 +1,65 @@
+.stage {
+  position: absolute;
+  inset: 0;
+  container: video-stage / inline-size;
+  overflow: hidden;
+  background: var(--colorNeutralBackground4);
+  color: var(--colorNeutralForeground1);
+  outline: none;
+}
+.stage[data-expanded] {
+  position: fixed;
+  z-index: 100;
+}
+.stage:not([data-controls]) {
+  cursor: none;
+}
+.heading {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  min-height: 48px;
+  padding-left: var(--spacingHorizontalL);
+  background: var(--colorNeutralBackground1);
+}
+.heading span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.controls {
+  position: absolute;
+  inset: auto var(--spacingHorizontalL) calc(var(--player-inset, 0px) + var(--spacingVerticalL));
+}
+.stage[data-expanded] .controls {
+  bottom: var(--spacingVerticalL);
+}
+.heading,
+.controls {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    transform var(--motion-normal) var(--curveDecelerateMid),
+    visibility 0s;
+}
+.stage:not([data-controls]) .heading,
+.stage:not([data-controls]) .controls {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    transform var(--motion-fast) var(--curveDecelerateMid),
+    visibility 0s var(--motion-fast);
+}
+.stage:not([data-controls]) .heading {
+  transform: translateY(calc(-1 * var(--spacingVerticalM)));
+}
+.stage:not([data-controls]) .controls {
+  transform: translateY(var(--spacingVerticalM));
+}

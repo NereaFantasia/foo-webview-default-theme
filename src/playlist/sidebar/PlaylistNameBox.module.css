@@ -1,0 +1,23 @@
+/* 与导航项同高、同一套左右留白，图标落在同一处。 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  height: 32px;
+  padding: 0 var(--spacingHorizontalS) 0 var(--spacingHorizontalMNudge);
+}
+
+/* 行首的状态图标，与导航项的图标槽同样大小。 */
+.icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.icon svg {
+  width: 20px;
+  height: 20px;
+}

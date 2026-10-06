@@ -1,0 +1,89 @@
+/* 零尺寸的定位锚：各件按舞台坐标绝对定位，锚本身不挡右栏的指针。 */
+.dial {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--fontFamilyMonospace);
+}
+
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+.base {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+.ring {
+  position: absolute;
+  translate: -50% -50%;
+  border: 1px solid var(--paper-ring);
+  border-radius: 50%;
+}
+
+.tick {
+  translate: -50% -100%;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.hot-tick {
+  color: var(--paper-hot);
+}
+
+/* 封面上缘外 38 的专辑名：以环心为中线，最宽与封面同宽，超了省略。 */
+.album {
+  left: 150px;
+  top: 232px;
+  width: 460px;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+/* 封面下三格，写法同文件信息 3 × 2：列宽 160、第一格与封面左边对齐；小标基线 792、值基线 818。 */
+.cells {
+  position: absolute;
+  left: 150px;
+  top: 776px;
+  width: 480px;
+  height: 42px;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 160px);
+}
+
+.cell {
+  position: relative;
+}
+
+.cell-key {
+  top: 16px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.cell-value {
+  top: 42px;
+  max-width: 148px;
+  font-size: 18px;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+.cell-value.missing {
+  color: var(--colorNeutralForeground3);
+}
+
+/* 传输键压在歌词卡之上。 */
+.transport {
+  position: absolute;
+  z-index: 2;
+}

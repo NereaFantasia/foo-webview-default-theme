@@ -1,0 +1,37 @@
+.actions {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+}
+
+.control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5ch;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  width: 220px;
+  max-width: 100%;
+}
+
+/* 卡窄、滑块换到标题下面时占满一行。 */
+.fill {
+  width: 100%;
+}
+
+.value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 展开区里的小标题：与子行文字对齐，与上一行之间一条分隔线。 */
+.heading {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalXXS)
+    calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.heading:not(:first-child) {
+  border-top: var(--strokeWidthThin) solid var(--line);
+}

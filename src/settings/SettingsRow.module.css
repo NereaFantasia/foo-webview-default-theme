@@ -1,0 +1,61 @@
+/* 左边让出卡头的图标列，文字与卡头标题对齐；没有说明行时也是 52 高。图标宽取所在展开卡的 `--settings-icon-size`。 */
+.root {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+  min-height: 52px;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalS)
+    calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
+}
+
+.root:not(:first-child) {
+  border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+/* 控件换到标题下面，与文字左对齐、占满一行。 */
+.stacked {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--spacingVerticalSNudge);
+  padding-bottom: var(--spacingVerticalM);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.error {
+  color: var(--error);
+}
+
+.disabled .title,
+.disabled .description {
+  color: var(--colorNeutralForegroundDisabled);
+}
+
+.control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.stacked .control {
+  justify-content: stretch;
+}

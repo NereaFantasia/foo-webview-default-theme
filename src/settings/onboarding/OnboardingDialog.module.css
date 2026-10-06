@@ -1,0 +1,131 @@
+/* 页头、标题、正文、页脚四段。对话框高到顶时只有正文滚动，页头与页脚不动。 */
+.layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacingVerticalXL);
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalL);
+  min-height: 32px;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.segments {
+  display: flex;
+  gap: var(--spacingHorizontalXS);
+}
+
+/*
+ * 走到的那几段在底色上盖一层品牌色。前进时新的一段从左向右展开（167 ms 直接进场）；后退时退回的那段
+ * 先淡出，淡出完再收起，下次前进才从头展开。转场写在变化后的那个状态上，浏览器按它来播。
+ */
+.segment {
+  position: relative;
+  width: 20px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusSmall);
+  background-color: var(--line);
+}
+
+.segment::after {
+  position: absolute;
+  inset: 0;
+  background-color: var(--accent);
+  content: '';
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    transform 0s linear var(--motion-faster);
+}
+
+.segment[data-reached]::after {
+  opacity: 1;
+  transform: none;
+  transition: transform var(--motion-fast) var(--curveDecelerateMid);
+}
+
+/* 「2 / 4」换数时原位淡入；随步数换 key 重新挂上。 */
+.count {
+  animation: count-in var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes count-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.count,
+.languageLabel {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.language {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}
+
+.languageLabel {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 只给读屏的文字：裁成看不见，但仍在无障碍树里。 */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 每一步换掉的部分：标题与正文。换步时它整块横移进来。 */
+.page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacingVerticalXL);
+  min-height: 0;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  padding-top: var(--spacingVerticalS);
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+  margin-left: auto;
+}

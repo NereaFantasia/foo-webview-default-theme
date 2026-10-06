@@ -1,0 +1,6 @@
+/* 列头上的列名：放不下时截断出省略号。 */
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

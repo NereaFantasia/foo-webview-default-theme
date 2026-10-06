@@ -1,0 +1,12 @@
+/* 盖在网格格子上、居中；不接指针，网格照样能拿焦点。 */
+.root {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalXXL) var(--spacingHorizontalXXL);
+  text-align: center;
+  pointer-events: none;
+}

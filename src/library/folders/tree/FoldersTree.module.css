@@ -1,0 +1,76 @@
+.root {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  outline: none;
+}
+.space {
+  position: relative;
+  min-width: 100%;
+}
+.row {
+  position: absolute;
+  inset-inline: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  padding-inline-end: var(--spacingHorizontalS);
+  cursor: default;
+  border-radius: var(--borderRadiusMedium);
+  color: var(--colorNeutralForeground1);
+}
+.row:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.row > svg {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+.row[aria-selected='true'] {
+  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+}
+.root:focus-visible .row[data-focused='true'] {
+  outline: 2px solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.toggle {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--borderRadiusSmall);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.toggle:enabled:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.chevron {
+  transition: transform var(--motion-fast) var(--curveDecelerateMid);
+}
+.row[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.count {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}
+.empty {
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
+  color: var(--colorNeutralForeground3);
+}

@@ -1,0 +1,8 @@
+/* 页头下面一行，左右内边距与页头、网格对齐；放不下时标签折到下一行。 */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  padding: 0 var(--spacingHorizontalXXL) var(--spacingVerticalS);
+}

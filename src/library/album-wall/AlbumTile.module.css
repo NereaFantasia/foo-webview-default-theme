@@ -1,0 +1,109 @@
+/* 图块绝对定位在行层里，位置由 transform 给；边长与字行距由网格经 --tile-size、--tile-line 递下来，
+   两行字的总高要与网格算的行高对上，不能靠字体的 normal 行高。封面与两行字之间的留白是纵向的
+   spacingVerticalXXS（2 px），网格的 GRID_METRICS.textHeight 按它算，改了这里要一起改。
+   横坐标是行的起点加列号乘列距，取整到像素；起点与列距由网格经 --row-offset、--tile-pitch 给，列号与
+   上沿由图块自己经 --tile-column、--tile-y 给。窗口变宽变窄而列数不变时只有网格上的两个变量在变，图块本身不必
+   重新渲染。 */
+.tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(
+    round(calc(var(--row-offset) + var(--tile-column) * var(--tile-pitch)), 1px),
+    var(--tile-y)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  width: var(--tile-size);
+  cursor: default;
+  user-select: none;
+}
+
+/* 选中与焦点画在封面外圈而不是图上：深色封面会吃掉画在图上的记号。 */
+.art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 40%;
+  height: 40%;
+  color: var(--text-muted);
+}
+
+/* 正在播放的记号压在任意颜色的封面上，垫一块品牌底才看得清；记号本身取品牌色，在这里改成底上的前景色。
+   记号 1em 见方，边长跟着这里的字号。 */
+.playing {
+  position: absolute;
+  right: var(--spacingHorizontalXS);
+  bottom: var(--spacingVerticalXS);
+  display: flex;
+  padding: var(--spacingVerticalXS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--playing-fill);
+  font-size: var(--fontSizeBase200);
+}
+
+/* 两个类名叠着写，压过记号自己那一条取色的规则：两份 CSS Modules 的先后不定。 */
+.playing .playing-mark {
+  color: var(--text-on-accent);
+}
+
+.check {
+  position: absolute;
+  top: var(--spacingVerticalS);
+  left: var(--spacingHorizontalS);
+  display: flex;
+  padding: var(--spacingVerticalXS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorBrandBackground);
+  color: var(--text-on-accent);
+}
+
+/* 进详情页等曲目时的小转圈：压在封面正中，垫一块菜单底才在任意封面上看得清。 */
+.opening {
+  position: absolute;
+  display: flex;
+  padding: var(--spacingVerticalS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow4);
+}
+
+.name,
+.artist {
+  overflow: hidden;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--tile-line);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  color: var(--text-secondary);
+}
+
+.tile[aria-selected='true'] .art {
+  outline: var(--strokeWidthThick) solid var(--accent);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+/* 焦点环只在键盘操作时出现：网格拿着焦点且处于 :focus-visible。 */
+[role='grid']:focus-visible .tile[data-focused] .art {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}

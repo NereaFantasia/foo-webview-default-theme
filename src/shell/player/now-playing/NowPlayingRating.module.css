@@ -1,0 +1,11 @@
+.root {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/* 没评分时只在指针停在正在播放那一块上、或焦点在里面时出空星；位置一直占着，露不露都不挪别的字。用透明度藏，
+   星照样能用 Tab 走到、读屏照样念得到，焦点一进来就露出来。 */
+[data-rating-host]:not(:hover, :focus-within) .root[data-unrated] {
+  opacity: 0;
+}

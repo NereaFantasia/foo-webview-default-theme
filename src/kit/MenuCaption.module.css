@@ -1,0 +1,29 @@
+/* 菜单顶上的说明行：这一批是谁、共几首。它不是菜单项，指针移上去不出高亮。 */
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  padding: var(--spacingVerticalSNudge) var(--spacingHorizontalS);
+  cursor: default;
+}
+
+.title {
+  overflow: hidden;
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightRegular);
+  line-height: var(--lineHeightBase200);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

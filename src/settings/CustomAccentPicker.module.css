@@ -1,0 +1,42 @@
+.picker {
+  display: grid;
+  gap: var(--spacingVerticalM);
+  max-width: 240px;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
+  gap: var(--spacingHorizontalS);
+}
+.swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusCircular);
+  cursor: pointer;
+}
+.swatch[aria-pressed='true'],
+.swatch:focus-visible {
+  outline: 2px solid var(--colorNeutralForeground1);
+  outline-offset: 2px;
+}
+.preview {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--borderRadiusCircular);
+  border: 1px solid var(--colorNeutralStroke1);
+}
+.editor {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+.native {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackground1);
+  cursor: pointer;
+}

@@ -1,0 +1,71 @@
+/* 占位时是一块中性底加居中的音符。圆角按所在处，见组件的 `shape`。换图时几层叠在同一格里，外框裁掉
+   推进来、转进来时伸出去的部分。 */
+.root {
+  display: grid;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+}
+
+.root[data-shape='lcd'] {
+  border-radius: var(--borderRadiusLarge) 0 0 var(--borderRadiusLarge);
+}
+
+.root[data-shape='round'] {
+  border-radius: var(--borderRadiusCircular);
+}
+
+/* 每一层自带中性底：占位图标那一层盖上来时，底下的旧图也被盖住。 */
+.layer {
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-surface);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 20px;
+  height: 20px;
+}
+
+/* 正在播放条的擦除：遮罩的前沿停在 `--cover-wipe` 处，前沿后面带 12 的软边。动画只推这个量，从 0 走到
+   整块再加一个软边宽，两头都不露半截软边。遮罩只看不透明度，实色一段取哪种不透明的颜色都一样。 */
+@property --cover-wipe {
+  syntax: '<length-percentage>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.layer[data-wipe='left'] {
+  mask-image: linear-gradient(
+    to left,
+    var(--colorNeutralForeground1) calc(var(--cover-wipe) - 12px),
+    transparent var(--cover-wipe)
+  );
+}
+
+.layer[data-wipe='right'] {
+  mask-image: linear-gradient(
+    to right,
+    var(--colorNeutralForeground1) calc(var(--cover-wipe) - 12px),
+    transparent var(--cover-wipe)
+  );
+}
+
+.layer[data-wipe='down'] {
+  mask-image: linear-gradient(
+    to bottom,
+    var(--colorNeutralForeground1) calc(var(--cover-wipe) - 12px),
+    transparent var(--cover-wipe)
+  );
+}

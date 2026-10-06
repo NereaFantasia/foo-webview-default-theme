@@ -1,0 +1,6 @@
+/* 位置与尺寸写在行内。不接指针：这块 canvas 盖到了传输键与右栏的左缘，它们照常点得到。 */
+.orbit {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}

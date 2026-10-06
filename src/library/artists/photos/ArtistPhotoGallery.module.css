@@ -1,0 +1,44 @@
+.root {
+  margin-top: var(--spacingVerticalL);
+}
+.label {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  margin-bottom: var(--spacingVerticalS);
+}
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}
+.photo {
+  position: relative;
+  border: var(--strokeWidthThick) solid transparent;
+  border-radius: var(--borderRadiusMedium);
+  padding: 0;
+  background: var(--colorNeutralBackground3);
+  color: var(--colorNeutralForeground1);
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo[data-avatar],
+.photo:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorBrandForeground1);
+}
+.photo > span:last-child {
+  position: absolute;
+  bottom: var(--spacingVerticalXS);
+  left: var(--spacingHorizontalXS);
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXS);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorBackgroundOverlay);
+  color: var(--colorNeutralForegroundStaticInverted);
+  font-size: var(--fontSizeBase100);
+}

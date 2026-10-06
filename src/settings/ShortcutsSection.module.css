@@ -1,0 +1,81 @@
+/* 小节之间一条线。每行的文字与卡头的标题左对齐：空出图标那一列。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalSNudge);
+}
+
+.section + .section {
+  border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+.heading,
+.row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+}
+
+.heading {
+  min-height: 24px;
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.heading::before,
+.row::before {
+  content: '';
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  min-height: 32px;
+}
+
+.label {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.inputs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalXS);
+}
+
+.or {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+}
+
+/* 22 高的小方块，字等宽；单个字符的键也不窄于高度。 */
+.key-cap {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--spacingHorizontalSNudge);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  line-height: 1;
+  white-space: nowrap;
+}

@@ -1,0 +1,173 @@
+/* 第 1 步的根目录列表：与设置卡同底同边框，一行一个根目录，曲目数靠右。 */
+.roots {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-surface);
+  list-style: none;
+}
+
+.root,
+.more {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-height: 36px;
+}
+
+.rootIcon {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.rootPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rootCount,
+.more {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.style {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+
+.thumbnail {
+  display: block;
+  cursor: pointer;
+}
+
+/*
+ * 缩略图是一扇小窗：侧边栏、内容卡各一块，播放栏按形态放在底部通栏、标题栏里或内容卡底部的胶囊。
+ * 位置都按百分比，缩略图随列宽缩放。
+ */
+.window {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--bg-surface);
+}
+
+.style[data-selected] .window {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--strokeWidthThin) var(--accent);
+}
+
+.titlebar,
+.bar,
+.capsule {
+  display: none;
+}
+
+.sidebar,
+.card {
+  position: absolute;
+  top: 9%;
+  bottom: 9%;
+  border-radius: var(--borderRadiusSmall);
+}
+
+.sidebar {
+  left: 3%;
+  width: 18%;
+  background-color: var(--colorNeutralBackground3);
+}
+
+.card {
+  left: 24%;
+  right: 3%;
+  border: var(--strokeWidthThin) solid var(--line);
+  background-color: var(--bg-elevated);
+}
+
+.window[data-style='titlebar'] .sidebar,
+.window[data-style='titlebar'] .card {
+  top: 17%;
+}
+
+.window[data-style='bottom'] .sidebar,
+.window[data-style='bottom'] .card {
+  bottom: 18%;
+}
+
+/* 播放键的位置：播放栏、标题栏里的正在播放条与胶囊各画一个品牌色的点。 */
+.bar::after,
+.lcd::before,
+.capsule::after {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  aspect-ratio: 1;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--accent);
+  content: '';
+  translate: -50% -50%;
+}
+
+.window[data-style='bottom'] .bar {
+  position: absolute;
+  display: block;
+  inset: auto 0 0;
+  height: 12%;
+  background-color: var(--line);
+}
+
+.bar::after {
+  left: 50%;
+}
+
+.window[data-style='titlebar'] .titlebar {
+  position: absolute;
+  display: block;
+  inset: 0 0 auto;
+  height: 13%;
+}
+
+.lcd {
+  position: absolute;
+  top: 25%;
+  left: 32%;
+  width: 42%;
+  height: 55%;
+  border-radius: var(--borderRadiusSmall);
+  background-color: var(--line);
+}
+
+.lcd::before {
+  left: -12%;
+}
+
+.window[data-style='capsule'] .capsule {
+  position: absolute;
+  display: block;
+  left: 25%;
+  right: 25%;
+  bottom: 10%;
+  height: 13%;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--line);
+}
+
+.capsule::after {
+  left: 50%;
+}

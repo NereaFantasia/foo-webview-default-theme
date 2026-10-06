@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>foo-webview-default-theme</title>
+    <!-- 宿主窗口不显示页面图标；给个空图标，免得浏览器去取 /favicon.ico 报 404。 -->
+    <link rel="icon" href="data:," />
+    <style>
+      /* 启动等待层随第一帧画出，不等脚本；宿主等 #server-loading 不在了才显示窗口。偏好还没读到，
+         颜色固定取深色主题的值，引导页 src/boot/index.html 里是同一份。文字过 300ms 才淡入，
+         启动快时只看得到底色。 */
+      .startup-overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 16px;
+        background: #292929;
+        color: #d6d6d6;
+        font:
+          14px / 20px 'Segoe UI Variable',
+          'Segoe UI',
+          'Microsoft YaHei UI',
+          sans-serif;
+        transition: opacity 150ms ease-out;
+      }
+      .startup-overlay[hidden] {
+        display: none;
+      }
+      .startup-overlay[data-leaving] {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .startup-overlay > * {
+        margin: 0;
+        font: inherit;
+        animation: startup-appear 150ms ease-out 300ms both;
+      }
+      .startup-spinner {
+        box-sizing: border-box;
+        width: 32px;
+        height: 32px;
+        border: 3px solid #666666;
+        border-top-color: #78d7ce;
+        border-radius: 50%;
+        animation:
+          startup-appear 150ms ease-out 300ms both,
+          startup-spin 1s linear infinite;
+      }
+      @keyframes startup-appear {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes startup-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="server-loading" class="startup-overlay" role="status">
+      <div class="startup-spinner"></div>
+      <p class="startup-stage"></p>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

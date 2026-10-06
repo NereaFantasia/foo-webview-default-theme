@@ -1,0 +1,8 @@
+.root {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase400);
+}
+.root:not(:empty) {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalS);
+}

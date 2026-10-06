@@ -1,0 +1,37 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  min-width: 0;
+  gap: var(--spacingVerticalS);
+  padding-right: var(--spacingHorizontalM);
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--colorNeutralForeground2);
+}
+.header span {
+  flex: 1;
+}
+.pins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  padding-bottom: var(--spacingVerticalM);
+}
+.label,
+.hint {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  margin: 0;
+}
+.label,
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

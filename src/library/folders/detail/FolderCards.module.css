@@ -1,0 +1,51 @@
+.root {
+  display: grid;
+  gap: var(--spacingVerticalL) var(--spacingHorizontalL);
+  padding-bottom: var(--spacingVerticalL);
+}
+.card {
+  min-width: 0;
+}
+.open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacingVerticalS);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  cursor: pointer;
+  font: inherit;
+}
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  width: 100%;
+}
+.name span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name svg {
+  flex: none;
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}
+.open:hover {
+  color: var(--colorBrandForegroundLinkHover);
+}
+.open:focus-visible {
+  outline: 2px solid var(--colorStrokeFocus2);
+  border-radius: var(--borderRadiusMedium);
+}

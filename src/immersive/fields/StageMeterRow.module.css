@@ -1,0 +1,136 @@
+/* 铺满舞台的定位层；可点的只有下面罗盘的传输键，这一层不接指针。 */
+.meter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--fontFamilyMonospace);
+}
+
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+.base,
+.duration-cell > span,
+.remain > span {
+  text-box-trim: trim-end;
+  text-box-edge: text alphabetic;
+}
+
+.base {
+  position: absolute;
+  margin: 0;
+  translate: 0 -100%;
+  white-space: nowrap;
+}
+
+.key {
+  font-size: 16px;
+  color: var(--colorNeutralForeground3);
+}
+
+.sub-key {
+  font-size: 13px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 声场格右缘约 1092：小标加实时值与 W / B 附行是这一格里最宽的两行。 */
+.stereo-cell {
+  position: absolute;
+  left: 760px;
+  top: 296px;
+  width: 332px;
+  height: 155px;
+}
+
+.divider {
+  position: absolute;
+  top: 296px;
+  width: 1px;
+  height: 155px;
+  background: var(--paper-grid);
+}
+
+.divider.first {
+  left: 1110px;
+}
+
+/* 摆锤条右端（1276）再隔 30。 */
+.divider.second {
+  left: 1306px;
+}
+
+.genre-key {
+  left: 1336px;
+  top: 306px;
+}
+
+.genre {
+  left: 1336px;
+  top: 364px;
+  max-width: 299px;
+  font-family: var(--fontFamilyBase);
+  font-size: 25px;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+/* Album artist 照 Genre 上下排：值落在附行基线 431，与左右几格的附行对齐；小标只比值高一行小字，
+   离上面的 Genre 值远些，两组读得开。值与 Genre 同宽，超了省略。 */
+.album-artist-key {
+  left: 1336px;
+  top: 411px;
+}
+
+.album-artist {
+  left: 1336px;
+  top: 431px;
+  max-width: 299px;
+  font-size: 16px;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+/* 时长格右对齐到 x 1780，左边框就是与 Genre 格之间的分隔线。第一列是分隔线到字的 30，第二列至少 85 宽；
+   一小时以上的时长更宽，第二列随之变宽、分隔线左移。键名与值叠在第二列同一格里、各自按基线相对格顶下移，
+   列宽只取这两者；附行的剩余时间绝对定位，不把分隔线往左推。 */
+.duration-cell {
+  position: absolute;
+  right: 140px;
+  top: 296px;
+  height: 155px;
+  border-left: 1px solid var(--paper-grid);
+  display: grid;
+  grid-template-columns: 30px minmax(85px, max-content);
+  justify-items: end;
+  align-items: start;
+}
+
+.duration-cell > span {
+  grid-area: 1 / 2;
+  position: relative;
+  translate: 0 -100%;
+  white-space: nowrap;
+}
+
+.duration-key {
+  top: 10px;
+}
+
+.clock {
+  top: 68px;
+  font-size: 30px;
+}
+
+.remain {
+  position: absolute;
+  right: 0;
+  top: 135px;
+  translate: 0 -100%;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacingHorizontalS);
+  white-space: nowrap;
+}
+
+.remain-value {
+  font-size: 16px;
+  color: var(--paper-hot);
+}

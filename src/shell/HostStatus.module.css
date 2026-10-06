@@ -1,0 +1,8 @@
+/* 警告色的一行：图标加文字，放不下时文字截断。 */
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+  color: var(--colorStatusWarningForeground1);
+}

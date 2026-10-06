@@ -1,0 +1,30 @@
+.root {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  padding: var(--spacingVerticalXXL) var(--spacingHorizontalXXL);
+}
+
+.message {
+  width: 100%;
+  max-width: 560px;
+  color: var(--colorNeutralForeground1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.detail {
+  margin-top: var(--spacingVerticalM);
+  margin-bottom: var(--spacingVerticalL);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}

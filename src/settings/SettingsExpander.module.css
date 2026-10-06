@@ -1,0 +1,155 @@
+/* 外框与设置卡相同；圆角里的悬停底色靠这里裁掉。图标 20 宽，换行的控件与子行按它对齐到文字左缘。 */
+.root {
+  --settings-icon-size: 20px;
+  position: relative;
+  overflow: clip;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-surface);
+}
+
+/* 卡头：图标 20、文字占余量，控件、预览与箭头按内容宽排在右边；连外框 58 高，与设置卡齐平。 */
+.head {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+  row-gap: var(--spacingVerticalMNudge);
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.interactive:hover {
+  background-color: var(--colorSubtleBackgroundHover);
+}
+
+button.interactive:active {
+  background-color: var(--colorSubtleBackgroundPressed);
+}
+
+button.head:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(var(--strokeWidthThick) * -1);
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.described {
+  display: flex;
+  flex-direction: column;
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.error {
+  color: var(--error);
+}
+
+.control {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* 卡窄：控件换到下一行，与文字左对齐、占满一行；箭头留在首行右端。 */
+.stacked {
+  padding-bottom: var(--spacingVerticalM);
+}
+
+.stacked .control {
+  order: 1;
+  flex-basis: 100%;
+  box-sizing: border-box;
+  justify-content: stretch;
+  padding-left: calc(var(--settings-icon-size) + var(--spacingHorizontalL));
+}
+
+.preview {
+  display: inline-flex;
+  flex: none;
+}
+
+/* 有控件时的开合键：命中区 32，箭头与无控件卡头里的箭头对在同一条竖线上。 */
+.toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 0 calc(var(--spacingHorizontalS) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  background-color: transparent;
+  color: inherit;
+}
+
+.toggle:hover {
+  background-color: var(--colorSubtleBackgroundHover);
+}
+
+.toggle:active {
+  background-color: var(--colorSubtleBackgroundPressed);
+}
+
+.toggle:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+.chevron {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.flipped {
+  transform: rotate(180deg);
+}
+
+/* 展开区滑进滑出时超出的部分裁掉；展开区自己不裁，里面的焦点环画得全。 */
+.clip {
+  overflow: clip;
+  border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}

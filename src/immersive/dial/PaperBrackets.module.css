@@ -1,0 +1,39 @@
+.brackets {
+  position: absolute;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: var(--arm);
+  height: var(--arm);
+  border: 0 solid var(--paper-hot);
+}
+
+.tl {
+  left: 0;
+  top: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.tr {
+  right: 0;
+  top: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.bl {
+  left: 0;
+  bottom: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.br {
+  right: 0;
+  bottom: 0;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}

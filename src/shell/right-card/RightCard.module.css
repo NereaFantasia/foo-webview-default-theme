@@ -1,0 +1,63 @@
+/* 工具条、分页栏与播放历史按内容高；当前曲目与队列共用余下的滚动区。 */
+.root {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 工具条包含顶部 12 的留白，分页栏和内容区不随菜单开合移动。 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL) 0;
+}
+
+.following {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+}
+
+.followingIcon {
+  width: 12px;
+  height: 12px;
+  color: var(--accent);
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+/* 分页栏左右与头对齐，下面一道细线把它和内容区分开。 */
+.tabs {
+  padding: 0 var(--spacingHorizontalS);
+  border-bottom: var(--strokeWidthThin) solid var(--line);
+}
+
+/* 播放历史的插槽：左右与队列页的内容对齐。 */
+.history {
+  min-width: 0;
+  padding: 0 var(--spacingHorizontalS);
+}
+
+.content {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.content[data-page='info'],
+.content[data-page='lyrics'] {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

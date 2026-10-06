@@ -1,0 +1,56 @@
+.root {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 300px;
+  pointer-events: none;
+}
+
+.bloom {
+  width: 100%;
+  height: min(300px, 100%);
+  background: var(--accent);
+  filter: blur(128px);
+  opacity: 0.33;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: saturate(8) brightness(1.6);
+}
+
+.root[data-scheme='dark'] .bloom {
+  opacity: 1;
+}
+
+.root[data-scheme='dark'] .image {
+  filter: saturate(2.8) brightness(0.6);
+}
+
+/* 颗粒在模糊之后叠加，覆盖到光晕尾部；不参与逐帧动画。 */
+.grain {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100%;
+  background-image: url('/cover-grain.png');
+  opacity: 0.045;
+  mix-blend-mode: soft-light;
+  mask-image: linear-gradient(var(--colorNeutralForeground1), transparent);
+}
+
+.image[data-ready] {
+  opacity: 1;
+  animation: reveal var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

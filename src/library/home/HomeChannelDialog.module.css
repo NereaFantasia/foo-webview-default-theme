@@ -1,0 +1,28 @@
+.preview {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.preview-header,
+.preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+}
+.preview-row {
+  padding: var(--spacingVerticalXS) 0;
+}
+.metadata {
+  min-width: 0;
+}
+.metadata span,
+.metadata small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metadata small {
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+}

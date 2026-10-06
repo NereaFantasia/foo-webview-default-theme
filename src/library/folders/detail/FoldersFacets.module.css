@@ -1,0 +1,26 @@
+.root {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: var(--spacingHorizontalM);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+}
+.list {
+  overflow-y: auto;
+  height: 88px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  color: var(--colorNeutralForeground3);
+}

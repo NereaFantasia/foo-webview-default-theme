@@ -1,0 +1,47 @@
+/* 搜索框外面包一层，换形态时整个淡出淡入；框本身撑满这一层。 */
+.search {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  margin-bottom: var(--spacingVerticalSNudge);
+}
+
+.search-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  color: var(--colorNeutralForegroundDisabled);
+}
+
+/* 组里各项之间隔 2，分组之间隔 6。 */
+.group {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+}
+
+.group + .group,
+.playlists {
+  margin-top: var(--spacingVerticalSNudge);
+}
+
+/* 播放列表节占满中间的余量、自己滚动；设置钉在底部。外面这一层换形态时整个淡出淡入。 */
+.playlists {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.footer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--spacingVerticalSNudge);
+}

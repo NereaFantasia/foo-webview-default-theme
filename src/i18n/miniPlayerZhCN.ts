@@ -1,0 +1,18 @@
+export const miniPlayerZhCN = {
+  'mini.windowControls': '窗口控制',
+  'mini.restore': '返回完整界面',
+  'mini.close': '关闭迷你播放器',
+  'mini.pin': '置顶',
+  'mini.unpin': '取消置顶',
+  'mini.expandCover': '展开封面',
+  'mini.collapseCover': '收起封面',
+  'mini.back': '返回',
+  'mini.goToAlbum': '转到专辑',
+  'mini.radio': '网络广播',
+  'mini.live': '正在直播',
+  'mini.failure.enter': '无法切换到迷你播放器。',
+  'mini.failure.restore': '未能恢复完整窗口，请重试。',
+  'mini.failure.resize': '未能调整播放器尺寸。',
+  'mini.failure.pin': '未能更改窗口置顶状态。',
+  'mini.failure.save': '未能保存窗口恢复信息。',
+};

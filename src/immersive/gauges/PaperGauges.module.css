@@ -1,0 +1,73 @@
+/* 位置与字号都是 CSS 变量，由放量表的外框按档给全。舞台上 `--gauge-place: absolute` 把小标、读数（数字连单位）
+   与轨都改成按块左上角绝对定位，`top` 写基线（`--gauge-trim` 把字盒底边裁到字母基线）；流式排法下这几项是
+   static，`--gauge-key-top` 给 0，Integrated 贴块顶。 */
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(2, var(--gauge-width));
+  column-gap: var(--gauge-gap);
+  font-family: var(--fontFamilyMonospace);
+}
+
+.gauge {
+  position: relative;
+  height: var(--gauge-height);
+}
+
+.key,
+.reading {
+  position: var(--gauge-place);
+  translate: var(--gauge-lift);
+}
+
+.key,
+.value,
+.unit {
+  text-box-trim: var(--gauge-trim);
+  text-box-edge: text alphabetic;
+}
+
+/* Integrated 与小标同一行、贴块的右端，字号与基线跟小标走。 */
+.note {
+  position: absolute;
+  right: 0;
+  top: var(--gauge-key-top);
+  translate: var(--gauge-lift);
+  font-size: var(--gauge-key-font);
+  line-height: 13px;
+  color: var(--colorNeutralForeground3);
+  text-box-trim: var(--gauge-trim);
+  text-box-edge: text alphabetic;
+}
+
+.key {
+  display: block;
+  top: var(--gauge-key-top);
+  font-size: var(--gauge-key-font);
+  line-height: 13px;
+  letter-spacing: 1px;
+  color: var(--paper-hot);
+}
+
+/* 单位跟在数字后面、同一基线，不推到轨的右端：数字位数不定，推到右端时两者之间的空当随数字忽宽忽窄，
+   读不成一个读数。按基线绝对定位时读数盒不给定高，底边就是基线。 */
+.reading {
+  left: var(--gauge-value-left);
+  top: var(--gauge-value-top);
+  height: var(--gauge-reading-height);
+  margin-top: var(--gauge-reading-gap);
+  padding-left: var(--gauge-value-indent);
+  display: flex;
+  align-items: baseline;
+  gap: var(--gauge-unit-gap);
+}
+
+.value {
+  font-size: var(--gauge-value-font);
+  line-height: 31px;
+  color: var(--paper-ink);
+}
+
+.unit {
+  font-size: var(--gauge-unit-font);
+  color: var(--colorNeutralForeground3);
+}

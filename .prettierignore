@@ -1,0 +1,13 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+coverage/
+vendor/
+package-lock.json
+*.log
+# Markdown 与非工程源码的目录不过 Prettier：它会把中文表格整份重排。
+*.md
+docs/
+.kiro/
+.claude/

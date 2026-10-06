@@ -1,0 +1,26 @@
+.root {
+  position: relative;
+  min-height: 56px;
+  outline: none;
+}
+.root:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.item {
+  display: grid;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+}
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+.strip {
+  position: relative;
+  will-change: transform;
+}

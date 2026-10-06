@@ -1,0 +1,28 @@
+export const savingEn = {
+  'saving.failed': 'This setting is active, but could not be saved.',
+  'saving.unavailable':
+    'Changes apply only in this window. Reopen the interface to try saving again.',
+  'saving.pending': 'Saving…',
+  'saving.saved': 'Saved',
+  'saving.retry': 'Retry saving',
+  'info.title': 'Information center',
+  'info.count': 'Information center: {count} messages',
+  'info.empty': 'No issues to address',
+  'info.preferencesUnsaved': 'Some settings could not be saved',
+  'info.preferencesDetail': '{count} settings are active but have not been saved.',
+  'info.preferenceStorageUnavailable': 'Settings storage is unavailable',
+  'info.hostTooOld': 'foo_ui_webview2 needs an update',
+  'info.hostTooOldDetail':
+    'Version {version} is installed. Version {required} or later is required.',
+  'info.hostVersionUnreadable': 'Could not read the component version',
+  'info.hostUnreachable': 'foobar2000 is not responding',
+  'info.hostReadDetail': 'Some features may be unavailable.',
+  'info.hostMethodMissing': 'The component does not support a required operation',
+  'info.hostMethodDetail': 'Update foo_ui_webview2.',
+  'info.playcountMissing': 'Playback statistics component is missing',
+  'info.playcountDetail': 'Install foo_playcount to use playback statistics and ratings.',
+  'info.libraryNotConfigured': 'The media library has no folders configured',
+  'info.libraryDetail': 'Add your music folders in foobar2000 preferences.',
+  'info.retry': 'Check again',
+  'info.dismiss': 'Do not remind me again',
+} as const;

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>foo-webview-default-theme</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: transparent;
+      }
+      #boot {
+        box-sizing: border-box;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: var(--spacingVerticalXXL) var(--spacingHorizontalXL);
+        color: var(--colorNeutralForeground1);
+        font-family: var(--fontFamilyBase);
+      }
+      main {
+        width: 100%;
+        max-width: 560px;
+      }
+      h1 {
+        margin: 0;
+        font-size: var(--fontSizeBase500);
+        line-height: var(--lineHeightBase500);
+        font-weight: var(--fontWeightSemibold);
+      }
+      p,
+      ul {
+        margin: var(--spacingVerticalM) 0;
+        font-size: var(--fontSizeBase300);
+        line-height: var(--lineHeightBase300);
+      }
+      button {
+        padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+        border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+        border-radius: var(--borderRadiusMedium);
+        background: var(--colorNeutralBackground1);
+        color: var(--colorNeutralForeground1);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--colorNeutralBackground1Hover);
+      }
+      button:focus-visible {
+        outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+        outline-offset: 2px;
+      }
+      /* 等待层与主题页 index.html 里的同一份，跳转过去时画面不变；出错时摘掉，露出下面的说明。 */
+      .startup-overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 16px;
+        background: #292929;
+        color: #d6d6d6;
+        font:
+          14px / 20px 'Segoe UI Variable',
+          'Segoe UI',
+          'Microsoft YaHei UI',
+          sans-serif;
+      }
+      .startup-overlay > * {
+        margin: 0;
+        font: inherit;
+        animation: startup-appear 150ms ease-out 300ms both;
+      }
+      .startup-spinner {
+        box-sizing: border-box;
+        width: 32px;
+        height: 32px;
+        border: 3px solid #666666;
+        border-top-color: #78d7ce;
+        border-radius: 50%;
+        animation:
+          startup-appear 150ms ease-out 300ms both,
+          startup-spin 1s linear infinite;
+      }
+      @keyframes startup-appear {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes startup-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      /* __BOOT_THEME__ */
+    </style>
+  </head>
+  <body>
+    <div id="boot">
+      <main aria-live="polite">
+        <h1 id="title"></h1>
+        <p id="detail"></p>
+        <ul id="attempts"></ul>
+        <button id="retry" hidden>重置启动计数并重试</button>
+      </main>
+    </div>
+    <div id="server-loading" class="startup-overlay" role="status">
+      <div class="startup-spinner"></div>
+      <p id="stage"></p>
+    </div>
+    <!-- __BOOT_SCRIPT__ -->
+  </body>
+</html>

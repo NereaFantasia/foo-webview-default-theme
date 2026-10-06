@@ -1,0 +1,120 @@
+.root {
+  --sort-travel: calc(126px + 32px + var(--spacingHorizontalS) * 2);
+  container-type: inline-size;
+  margin-bottom: var(--spacingVerticalL);
+}
+
+.rail {
+  position: relative;
+  height: 32px;
+}
+
+/* 两组控件保留完整尺寸，只改变位移与裁剪；反向时浏览器从当前进度接续。 */
+.search {
+  position: absolute;
+  top: 0;
+  right: calc(32px + var(--sort-travel) + var(--spacingHorizontalS));
+  width: min(240px, calc(100% - 32px - var(--spacingHorizontalS)));
+  height: 32px;
+  pointer-events: none;
+  translate: var(--sort-travel) 0;
+  clip-path: inset(-2px);
+  transition: translate var(--tool-close) var(--motion-curve-pane);
+}
+
+.input {
+  width: 100%;
+  height: 32px;
+  pointer-events: auto;
+  translate: calc(100% - 32px) 0;
+  visibility: hidden;
+  transition:
+    translate var(--tool-close) var(--motion-curve-pane),
+    visibility 0s var(--tool-close);
+}
+
+.search-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity var(--motion-faster) var(--curveLinear) var(--tool-close);
+}
+
+.sort {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(32px + var(--sort-travel));
+  height: 32px;
+  pointer-events: none;
+  clip-path: inset(-2px);
+}
+
+.sort-trigger,
+.controls {
+  position: absolute;
+  top: 0;
+  height: 32px;
+  pointer-events: auto;
+  translate: var(--sort-travel) 0;
+  transition: translate var(--tool-close) var(--motion-curve-pane);
+}
+
+.sort-trigger {
+  left: 0;
+  width: 32px;
+}
+
+.controls {
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  visibility: hidden;
+  transition:
+    translate var(--tool-close) var(--motion-curve-pane),
+    visibility 0s var(--tool-close);
+}
+
+.rail[data-sort-open] .search,
+.rail[data-sort-open] .sort-trigger,
+.rail[data-sort-open] .controls {
+  translate: 0 0;
+  transition-duration: var(--tool-open);
+}
+
+.rail[data-sort-open] .controls {
+  visibility: visible;
+  transition:
+    translate var(--tool-open) var(--motion-curve-pane),
+    visibility 0s;
+}
+
+.rail[data-find-open] .input {
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    translate var(--tool-open) var(--motion-curve-pane),
+    visibility 0s;
+}
+
+.rail[data-find-open] .search-trigger {
+  opacity: 0;
+  transition: none;
+}
+
+@container (max-width: 485px) {
+  .rail[data-find-open][data-sort-open] {
+    height: calc(64px + var(--spacingVerticalS));
+  }
+
+  .rail[data-find-open][data-sort-open] .search {
+    right: 0;
+    translate: 0 0;
+    transition: none;
+  }
+}

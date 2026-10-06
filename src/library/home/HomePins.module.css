@@ -1,0 +1,63 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+}
+.header h2 {
+  margin: 0;
+}
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--spacingHorizontalM);
+}
+.row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalS);
+  padding: var(--spacingVerticalS) 0;
+  border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke3);
+}
+.target,
+.name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.target {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.target span,
+.target small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.target small {
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+}
+.target:disabled {
+  color: var(--colorNeutralForegroundDisabled);
+  cursor: default;
+}
+.target:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+.search {
+  margin-top: var(--spacingVerticalS);
+}
+.choices {
+  height: 280px;
+  overflow: auto;
+}

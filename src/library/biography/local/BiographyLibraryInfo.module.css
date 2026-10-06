@@ -1,0 +1,22 @@
+.root,
+.collaborators {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase300);
+  color: var(--colorNeutralForeground2);
+  overflow-wrap: anywhere;
+}
+
+.root:not(:empty) {
+  margin-top: var(--spacingVerticalS);
+}
+
+.collaborators {
+  margin-top: var(--spacingVerticalM);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}

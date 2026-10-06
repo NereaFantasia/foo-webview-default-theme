@@ -1,0 +1,29 @@
+/* 标题在左、工具在右；放不下时工具整组折到下一行，左右内边距与网格对齐。 */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingVerticalS) var(--spacingHorizontalL);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL) var(--spacingVerticalS);
+}
+
+.titles {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacingHorizontalMNudge);
+  min-width: 0;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}

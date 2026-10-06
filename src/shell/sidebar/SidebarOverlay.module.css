@@ -1,0 +1,12 @@
+/* 贴着窗口左边、盖在内容上，上沿接标题栏。浮层是上层，取不透明的中性底，右侧圆角与阴影把它和内容分开。 */
+.overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  border-radius: 0 var(--borderRadiusXLarge) var(--borderRadiusXLarge) 0;
+  background-color: var(--colorNeutralBackground1);
+  box-shadow: var(--shadow16);
+}

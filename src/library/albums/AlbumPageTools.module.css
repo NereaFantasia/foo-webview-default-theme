@@ -1,0 +1,5 @@
+/* 封面大小弹出层的头一行：左边名字，右边当前的边长。 */
+.size-head {
+  display: flex;
+  justify-content: space-between;
+}

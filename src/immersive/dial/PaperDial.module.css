@@ -1,0 +1,49 @@
+/* 零尺寸的定位锚：各件按版心坐标绝对定位，锚本身不挡右栏的指针。 */
+.dial {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--fontFamilyMonospace);
+}
+
+.ring {
+  position: absolute;
+  translate: -50% -50%;
+  border: 1px solid var(--paper-ring);
+  border-radius: 50%;
+}
+
+.tick {
+  position: absolute;
+  translate: -50% -50%;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+/* 环内上下的专辑名与曲号：以环心为中线，超了省略。 */
+.text {
+  position: absolute;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.narrow .text {
+  text-align: left;
+}
+
+.narrow .album {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.transport {
+  position: absolute;
+}

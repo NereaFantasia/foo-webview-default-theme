@@ -1,0 +1,9 @@
+/* 「新建」「所有播放列表」与各张列表在同一条滚动里，整节一起滚。 */
+.scroller {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-height: 0;
+  overflow: auto;
+}

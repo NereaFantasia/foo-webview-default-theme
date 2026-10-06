@@ -1,0 +1,48 @@
+/* 按钮只是封面外面的一层：不加内边距与底色，圆角随封面的形状，悬停层裁在里面。焦点环画在封面内侧。 */
+.entry {
+  position: relative;
+  display: grid;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  overflow: hidden;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.entry[data-shape='lcd'] {
+  border-radius: var(--borderRadiusLarge) 0 0 var(--borderRadiusLarge);
+}
+
+.entry[data-shape='round'] {
+  border-radius: var(--borderRadiusCircular);
+}
+
+.entry:disabled {
+  cursor: default;
+}
+
+.entry:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+/* 压暗的一层与展开图标，悬停与键盘聚焦时淡入，83 ms。 */
+.hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--colorBackgroundOverlay);
+  color: var(--colorNeutralForegroundStaticInverted);
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  pointer-events: none;
+}
+
+.entry:not(:disabled):hover .hint,
+.entry:focus-visible .hint {
+  opacity: 1;
+}

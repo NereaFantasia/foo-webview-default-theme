@@ -1,0 +1,13 @@
+.flow {
+  position: absolute;
+  inset: 0;
+}
+
+/* canvas 由脚本现建、挂在 .flow 里，铺满它。 */
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}

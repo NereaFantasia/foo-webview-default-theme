@@ -1,0 +1,128 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.heading {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacingHorizontalS);
+}
+.heading h1 {
+  margin: 0;
+  font-size: var(--fontSizeBase600);
+  line-height: var(--lineHeightBase600);
+  font-weight: var(--fontWeightSemibold);
+}
+.heading > span {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground3);
+}
+.tools {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+}
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--spacingHorizontalL) var(--spacingVerticalL);
+}
+.rows {
+  position: relative;
+  outline: none;
+}
+.row {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+  gap: var(--spacingHorizontalS);
+  cursor: default;
+}
+.row:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+.row[aria-selected='true'],
+.row[data-current] {
+  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+}
+.row[data-current]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  height: 20px;
+  width: 3px;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorBrandForeground1);
+}
+.rows:focus-visible .row[data-focused] {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.name,
+.issue {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.name {
+  font-size: var(--fontSizeBase300);
+}
+.name small {
+  margin-left: var(--spacingHorizontalXS);
+  color: var(--colorNeutralForeground3);
+}
+.issue {
+  font-size: var(--fontSizeBase100);
+  color: var(--colorBrandForeground1);
+}
+.end {
+  position: relative;
+  flex-shrink: 0;
+}
+.count {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase100);
+}
+.actions {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+}
+.row:hover .actions,
+.row:focus-within .actions,
+.row[data-focused] .actions {
+  display: flex;
+}
+.row:hover .count,
+.row:focus-within .count,
+.row[data-focused] .count {
+  visibility: hidden;
+}
+.empty {
+  color: var(--colorNeutralForeground3);
+}

@@ -1,0 +1,70 @@
+/* 整页一个滚动区：头部与曲目表一起滚，列头吸在它的顶上。它是定位元素，表格按 offsetTop 量自己在滚动内容里的
+   位置；底部给窄窗的播放栏胶囊让位。 */
+.root {
+  --bg-chip: color-mix(in oklab, var(--colorNeutralForeground1) 6%, transparent);
+  display: grid;
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-width: 0;
+  min-height: 0;
+}
+
+.root[data-scheme='dark'] {
+  --bg-chip: color-mix(in oklab, var(--colorNeutralForeground1) 8%, transparent);
+}
+
+.scroller {
+  --detail-side-inset: var(--spacingHorizontalXXXL);
+  --detail-top-inset: calc(var(--spacingVerticalXXXL) + var(--spacingVerticalL));
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--detail-top-inset) var(--detail-side-inset)
+    calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+  outline: none;
+}
+
+.root[data-narrow] .scroller {
+  --detail-side-inset: var(--spacingHorizontalL);
+}
+
+.intro {
+  position: relative;
+  display: flow-root;
+}
+
+/* 背景随页头和工具行的高度收尾，在列头之前完全透明。 */
+.root > .glow {
+  overflow: clip;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--colorNeutralForeground1) 20%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 75%, transparent) 50%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 20%, transparent) 80%,
+    transparent
+  );
+}
+
+.spinner {
+  padding: var(--spacingVerticalXXXL) 0;
+}
+
+.notice {
+  margin-bottom: var(--spacingVerticalM);
+}
+
+/* 碟的分节头：比曲目行略重，不能折叠。 */
+.disc {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--spacingHorizontalS);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+}

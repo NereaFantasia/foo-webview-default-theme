@@ -1,0 +1,84 @@
+/* 格顶留 11、值在小标下 3、Genre 与下一行隔 18、两个时间隔 14：都没有等值的 spacing token，写成本件的几何变量。 */
+.row {
+  --cell-lead: 11px;
+  --value-lead: 3px;
+  --meta-row-gap: 18px;
+  --times-gap: 14px;
+  height: 143px;
+  display: grid;
+  grid-template-columns: 236px 272px 92px;
+}
+
+.row.compact {
+  height: 113px;
+  grid-template-columns: 1fr 92px;
+}
+
+.key,
+.mono,
+.clock {
+  font-family: var(--fontFamilyMonospace);
+}
+
+.key {
+  display: block;
+  font-size: 11px;
+  line-height: 13px;
+  letter-spacing: 1px;
+  color: var(--colorNeutralForeground3);
+}
+
+.cell {
+  padding-top: var(--cell-lead);
+}
+
+/* 分隔线离上下两条横线各留约 11，不顶满整行。 */
+.cell + .cell {
+  padding-left: var(--spacingHorizontalL);
+  background: linear-gradient(var(--paper-cross), var(--paper-cross)) 0 11px / 1px 120px no-repeat;
+}
+
+/* Year 只有四位数字，列给窄一点，厂牌名才不会折行。 */
+.meta {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  row-gap: var(--meta-row-gap);
+  align-content: start;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.times {
+  display: flex;
+  flex-direction: column;
+  gap: var(--times-gap);
+  text-align: right;
+}
+
+.value {
+  margin-top: var(--value-lead);
+}
+
+.large {
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.mono {
+  font-size: 15px;
+  line-height: 18px;
+}
+
+.clock {
+  font-size: 22px;
+  line-height: 26px;
+}
+
+.hot {
+  font-family: var(--fontFamilyMonospace);
+  font-size: 15px;
+  line-height: 18px;
+  color: var(--paper-hot);
+}
