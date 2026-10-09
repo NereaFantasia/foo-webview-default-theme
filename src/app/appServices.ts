@@ -9,6 +9,8 @@ import { installPrefStorage } from '../kit/localPref.ts';
 import { openBrowserPrefStorage } from '../kit/prefStorage.ts';
 import { bindService } from '../kit/serviceKey.ts';
 import { lyricsIntegrationKey, startLyricsIntegration } from './lyricsIntegration.ts';
+import { startFlowingBackground } from './flowingBackground.ts';
+import { flowingFieldKey } from '../theme/background/flowingField.ts';
 
 /**
  * 先读完浏览器偏好的可信副本、装上页面的偏好存储，再建服务：各服务同步读到的就是可信值。
@@ -24,11 +26,17 @@ export async function startAppServices(): Promise<AppServices> {
   const backgroundImage = startBackgroundImage(services.store);
   const baseAccent = startBaseAccent(services.store);
   const colors = startColorIntegration(services.store);
+  const flowing = startFlowingBackground(services.store);
   const lyrics = startLyricsIntegration(services);
   return {
     ...services,
-    bindings: [...services.bindings, bindService(lyricsIntegrationKey, lyrics)],
+    bindings: [
+      ...services.bindings,
+      bindService(lyricsIntegrationKey, lyrics),
+      bindService(flowingFieldKey, flowing),
+    ],
     dispose() {
+      flowing.dispose();
       lyrics.dispose();
       backgroundImage.dispose();
       colors.dispose();

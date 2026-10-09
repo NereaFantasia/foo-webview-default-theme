@@ -10,6 +10,7 @@ import { albumRow, albumTrackRow } from '../../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 
 afterEach(() => vi.useRealTimers());
+afterEach(() => vi.restoreAllMocks());
 function setup(available = true, count = 2) {
   const host = installFakeHost();
   const album = albumRow('A', 'Artist');
@@ -58,6 +59,172 @@ function setup(available = true, count = 2) {
 }
 
 describe('首页统计服务', () => {
+  it('单曲失败仍发布成功统计，失败曲目不当成从未播放', async () => {
+    const { host, service, state, album } = setup();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    host.answer('playcount.getBatch', (params) => ({
+      success: true,
+      count: 2,
+      results: listParam(params, 'paths').map((path, index) =>
+        index === 0
+          ? { path: String(path), success: false, error: 'Failed to open file' }
+          : { path: String(path), success: true, playCount: 1, lastPlayed: '2026-09-01 00:00:00' },
+      ),
+    }));
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state()).toMatchObject({
+      unreadCount: 1,
+      statistics: { recent: [album], unplayed: [] },
+    });
+  });
+
+  it('一条路径被拒时拆批隔离，其余曲目仍能读到', async () => {
+    const { host, service, state, album, rows } = setup(true, 5);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const denied = trackPathOf(rows[2]!);
+    host.answer('playcount.getBatch', (params) => {
+      const paths = listParam(params, 'paths');
+      if (paths.includes(denied)) return hostFailure('PERMISSION_DENIED');
+      return {
+        success: true,
+        count: paths.length,
+        results: paths.map((path) => ({
+          path: String(path),
+          success: true,
+          playCount: 1,
+          lastPlayed: '2026-09-01 00:00:00',
+        })),
+      };
+    });
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+  });
+
+  it('后续批次超时保留已读数据，并记录异常与批次位置', async () => {
+    const { host, service, state, album } = setup(true, HOME_STATS_BATCH + 1);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    host.answer('playcount.getBatch', (params) => {
+      const paths = listParam(params, 'paths');
+      if (paths.length === 1) throw new Error('Request timeout');
+      return {
+        success: true,
+        count: paths.length,
+        results: paths.map((path) => ({
+          path: String(path),
+          success: true,
+          playCount: 1,
+          lastPlayed: '2026-09-01 00:00:00',
+        })),
+      };
+    });
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+    expect(warn).toHaveBeenCalledWith(
+      '播放统计读取失败',
+      expect.objectContaining({
+        method: 'playcount.getBatch',
+        error: 'Request timeout',
+        offset: HOME_STATS_BATCH,
+        count: 1,
+      }),
+    );
+  });
+
+  it('全部路径被拒时限制拆批次数，重试成功清除未读计数', async () => {
+    const { host, service, state, album } = setup(true, HOME_STATS_BATCH);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    host.answer('playcount.getBatch', hostFailure('PERMISSION_DENIED'));
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('failed'));
+    expect(state().unreadCount).toBe(HOME_STATS_BATCH);
+    expect(host.callsTo('playcount.getBatch').length).toBeLessThanOrEqual(33);
+    host.answer('playcount.getBatch', (params) => {
+      const paths = listParam(params, 'paths');
+      return {
+        success: true,
+        count: paths.length,
+        results: paths.map((path) => ({
+          path: String(path),
+          success: true,
+          playCount: 1,
+          lastPlayed: '2026-09-01 00:00:00',
+        })),
+      };
+    });
+    await service.refresh();
+    expect(state()).toMatchObject({
+      status: 'ready',
+      unreadCount: 0,
+      statistics: { recent: [album] },
+    });
+  });
+
+  it('缺少应答行只计入未读，不丢弃同批成功行', async () => {
+    const { host, service, state, album, rows } = setup();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    host.answer('playcount.getBatch', {
+      success: true,
+      count: 1,
+      results: [
+        {
+          path: trackPathOf(rows[0]!),
+          success: true,
+          playCount: 1,
+          lastPlayed: '2026-09-01 00:00:00',
+        },
+      ],
+    });
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+  });
+
+  it('组件清单失败记录实际错误，刷新恢复后清除失败阶段', async () => {
+    const { host, service, state } = setup();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    host.answer(
+      'config.getComponents',
+      hostFailure('OPERATION_FAILED', 'component list unavailable'),
+    );
+    service.activate();
+    await vi.waitFor(() => expect(state().status).toBe('failed'));
+    expect(state().failure).toBe('components');
+    expect(warn).toHaveBeenCalledWith(
+      '播放统计读取失败',
+      expect.objectContaining({
+        method: 'config.getComponents',
+        code: 'OPERATION_FAILED',
+        error: 'component list unavailable',
+      }),
+    );
+    host.answer('config.getComponents', {
+      success: true,
+      count: 1,
+      components: [{ filename: 'foo_playcount', name: '', version: '3.1.9' }],
+    });
+    await service.refresh();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state().failure).toBeNull();
+  });
+
+  it('释放后的权限失败不继续拆批，也不记录过期错误', async () => {
+    const { host, service, state } = setup();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const held = host.hold('playcount.getBatch');
+    service.activate();
+    await vi.waitFor(() => expect(held.pending).toHaveLength(1));
+    const previous = state();
+    service.dispose();
+    held.respond(0, hostFailure('PERMISSION_DENIED'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state()).toBe(previous);
+    expect(warn).not.toHaveBeenCalled();
+    expect(host.callsTo('playcount.getBatch')).toHaveLength(1);
+  });
   it.each([
     { filename: 'foo_playcount', fileName: 'foo_playcount' },
     { fileName: 'E:\\foobar2000\\components\\foo_playcount' },

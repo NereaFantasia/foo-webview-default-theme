@@ -3,6 +3,39 @@ import { openHome } from '../fixtures/homePage.ts';
 import type { HeldCalls } from '../fixtures/fakeHost.ts';
 import { hostFailure, listParam } from '../fixtures/hostAnswers.ts';
 
+test('统计部分失败仍显示成功内容，重试恢复后撤下提示', async ({ page }) => {
+  let fail = true;
+  const { view } = await openHome(page, {
+    configure: (host) =>
+      host.answer('playcount.getBatch', (params) => {
+        const paths = listParam(params, 'paths');
+        return {
+          success: true,
+          count: paths.length,
+          results: paths.map((path, index) =>
+            fail && index === 0
+              ? { path: String(path), success: false, error: 'Failed to open file' }
+              : {
+                  path: String(path),
+                  success: true,
+                  playCount: 1,
+                  lastPlayed: '2026-09-01 00:00:00',
+                },
+          ),
+        };
+      }),
+  });
+  const recent = view.getByRole('region', { name: '最近听过' });
+  await expect(recent.getByText('有 1 首曲目的播放统计未能读取')).toBeVisible();
+  await expect(recent.locator('[data-home-album]')).toHaveCount(6);
+  await view.getByRole('tab', { name: '曲目推荐' }).click();
+  await expect(view.getByText('没有符合条件的曲目')).toHaveCount(0);
+  fail = false;
+  await recent.getByRole('button', { name: '重试', exact: true }).click();
+  await expect(recent.getByText('有 1 首曲目的播放统计未能读取')).toHaveCount(0);
+  await expect(view.getByText('没有符合条件的曲目')).toBeVisible();
+});
+
 test('统计未完成不阻塞专辑，返回保持候选和滚动', async ({ page }) => {
   let held: HeldCalls<'playcount.getBatch'> | undefined;
   const { view, errors } = await openHome(page, {

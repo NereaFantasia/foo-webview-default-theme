@@ -1,10 +1,11 @@
-import { ToggleButton, Tooltip, type ButtonProps } from '@fluentui/react-components';
+import { ToggleButton, Tooltip, mergeClasses, type ButtonProps } from '@fluentui/react-components';
 import { CommentText16Regular, MusicNote2Play20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { RIGHT_CARD_KEY_ATTR } from './rightCardContext.ts';
 import { useService } from '../../kit/useService.ts';
 import { rightCardKey } from './rightCardServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export interface RightCardKeyProps {
   readonly className?: string;
@@ -24,12 +25,13 @@ export function QueueKey({ className, glyphClassName, shape, marks }: RightCardK
   const rightCard = useService(rightCardKey);
   const { form, prefs } = useAtomValueRawSync(rightCard.card.view);
   const lit = form !== 'none' && prefs.page === 'queue';
+  const controls = useViewControlStyles();
   return (
     <Tooltip content={t('nav.queue')} relationship="label">
       <ToggleButton
         appearance="subtle"
         shape={shape}
-        className={className}
+        className={mergeClasses(controls.icon, className)}
         icon={<MusicNote2Play20Regular className={glyphClassName} />}
         checked={lit}
         onClick={() => rightCard.card.toggle('queue')}
@@ -45,12 +47,13 @@ export function LyricsKey({ className, shape, marks }: RightCardKeyProps) {
   const t = useAtomValueRawSync(translateAtom);
   const rightCard = useService(rightCardKey);
   const { form, prefs } = useAtomValueRawSync(rightCard.card.view);
+  const controls = useViewControlStyles();
   return (
     <Tooltip content={t('nav.lyrics')} relationship="label">
       <ToggleButton
         appearance="subtle"
         shape={shape}
-        className={className}
+        className={mergeClasses(controls.icon, className)}
         icon={<CommentText16Regular />}
         checked={form !== 'none' && prefs.page === 'lyrics'}
         onClick={() => rightCard.card.toggle('lyrics')}

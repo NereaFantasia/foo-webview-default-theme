@@ -9,6 +9,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
  */
 export const LAYERS = {
   host: 0,
+  server: 0,
   i18n: 0,
   theme: 0,
   motion: 0,

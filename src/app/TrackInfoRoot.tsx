@@ -1,5 +1,5 @@
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Track } from 'foo-webview-sdk';
 import { localeAtom, translateAtom } from '../i18n/locale.ts';
 import type { ContextMenuPoint } from '../kit/context-menu/contextMenuGeometry.ts';
@@ -61,13 +61,7 @@ function Information({ integration }: { readonly integration: TrackInfoIntegrati
   );
 }
 
-function InformationToolbar({
-  integration,
-  close,
-}: {
-  readonly integration: TrackInfoIntegration;
-  readonly close: () => void;
-}) {
+function InformationToolbar({ integration }: { readonly integration: TrackInfoIntegration }) {
   const t = useAtomValueRawSync(translateAtom);
   const locale = useAtomValueRawSync(localeAtom).active;
   return (
@@ -76,7 +70,6 @@ function InformationToolbar({
       target={integration.target}
       t={t}
       locale={locale}
-      onClose={close}
     />
   );
 }
@@ -89,9 +82,51 @@ export function TrackInfoRoot({
   readonly children: ReactNode;
 }) {
   const { store, rightCard } = services;
+  const replaying = useRef(false);
+  const remembered = useMemo(() => new Map<string, Track>(), []);
+  const remember = useCallback(
+    (track: Track) => {
+      const key = `preview:${track.handle}`;
+      remembered.delete(key);
+      remembered.set(key, track);
+      if (remembered.size > 100) {
+        const oldest = remembered.keys().next().value;
+        if (oldest !== undefined) remembered.delete(oldest);
+      }
+      return key;
+    },
+    [remembered],
+  );
   const target = useMemo(
-    () => createTrackInfoTarget(store, rightCard.deps.current),
-    [store, rightCard],
+    () =>
+      createTrackInfoTarget(store, rightCard.deps.current, (source, track) => {
+        const view = store.get(rightCard.card.view);
+        if (replaying.current || view.form === 'none' || view.prefs.page !== 'info') return;
+        const subject = source === 'preview' && track ? remember(track) : 'playing';
+        rightCard.card.history.navigate({ id: 'info', subject });
+      }),
+    [store, rightCard, remember],
+  );
+  useEffect(
+    () =>
+      rightCard.card.history.registerSubject('info', {
+        current: () => {
+          const track = store.get(target.preview);
+          return store.get(target.source) === 'preview' && track ? remember(track) : 'playing';
+        },
+        exists: (subject) => subject === 'playing' || remembered.has(subject),
+        enter: (subject) => {
+          replaying.current = true;
+          try {
+            const track = remembered.get(subject);
+            if (subject === 'playing') target.follow('playing');
+            else if (track) target.select(track);
+          } finally {
+            replaying.current = false;
+          }
+        },
+      }),
+    [rightCard, store, target, remember, remembered],
   );
   const [integration, setIntegration] = useState<TrackInfoIntegration | null>(null);
   const select = useCallback((row: TableTrack) => target.select(infoTrackFromRow(row)), [target]);
@@ -107,9 +142,7 @@ export function TrackInfoRoot({
           integration
             ? {
                 content: <Information integration={integration} />,
-                toolbar: (
-                  <InformationToolbar integration={integration} close={rightCard.card.close} />
-                ),
+                toolbar: <InformationToolbar integration={integration} />,
               }
             : null
         }

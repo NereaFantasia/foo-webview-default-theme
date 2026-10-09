@@ -3,8 +3,6 @@ import {
   ArrowClockwise16Regular,
   ArrowDownload20Regular,
   ArrowSync16Regular,
-  ArrowSync20Regular,
-  BookOpen20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -12,7 +10,9 @@ import { useInsertMotion } from '../motion/useInsertMotion.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import { useService } from '../kit/useService.ts';
-import { SettingsCard } from '../settings/SettingsCard.tsx';
+import { SettingsCard, type SettingsCardIds } from '../settings/SettingsCard.tsx';
+import { SettingsExpander } from '../settings/SettingsExpander.tsx';
+import { SettingsRow } from '../settings/SettingsRow.tsx';
 import { SettingsSaveNotice } from '../settings/SettingsSaveNotice.tsx';
 import { SettingsSelect } from '../settings/SettingsSelect.tsx';
 import { UpdateSettingsContext } from '../settings/updateSettingsContext.ts';
@@ -22,6 +22,9 @@ import { OnboardingUpdateContext } from '../settings/onboarding/onboardingSlots.
 import { ChangelogDialog } from '../update/ChangelogDialog.tsx';
 import { changelogViewKey } from '../update/changelogView.ts';
 import { statusLine } from './updateIntegration.ts';
+import { backendBootstrapKey } from '../update/backendBootstrap.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
+import { PluginUpdateRow } from './PluginUpdateRow.tsx';
 
 const MODE_TEXT: Readonly<
   Record<UpdateMode, { readonly label: MessageKey; readonly description: MessageKey }>
@@ -32,19 +35,13 @@ const MODE_TEXT: Readonly<
 };
 
 /** 更新方式三选一，选中即保存；这个窗口不运行更新器时禁用。 */
-function UpdateModeCard() {
+function UpdateModeRow() {
   const t = useAtomValueRawSync(translateAtom);
   const updater = useService(updaterKey);
   const mode = useAtomValueRawSync(updater.mode);
   const status = useAtomValueRawSync(updater.status);
-  const saving = useAtomValueRawSync(updater.persistence.state);
   return (
-    <SettingsCard
-      icon={<ArrowSync20Regular />}
-      title={t('update.modeTitle')}
-      field
-      feedback={<SettingsSaveNotice persistence={updater.persistence} keys={[...saving.keys()]} />}
-    >
+    <SettingsRow title={t('update.modeTitle')} field>
       {(ids) => (
         <SettingsSelect
           {...ids}
@@ -58,7 +55,7 @@ function UpdateModeCard() {
           onChange={(value) => void updater.setMode(value)}
         />
       )}
-    </SettingsCard>
+    </SettingsRow>
   );
 }
 
@@ -73,7 +70,7 @@ interface UpdateStatusCardProps {
  * 按钮平时是「检查更新」；查到新版但没下载时换成「下载并安装」，已下载新版本时换成「立即重启」，更新状态损坏时换成「重置更新状态」。检查、
  * 下载与安装进行中，或者这个窗口不运行更新器时禁用。
  */
-function UpdateStatusCard({ quiet = false, beforeRestart }: UpdateStatusCardProps) {
+function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps = {}) {
   const t = useAtomValueRawSync(translateAtom);
   const updater = useService(updaterKey);
   const status = useAtomValueRawSync(updater.status);
@@ -90,7 +87,9 @@ function UpdateStatusCard({ quiet = false, beforeRestart }: UpdateStatusCardProp
   const ready = status.phase === 'ready';
   const available = status.phase === 'available';
   const broken = status.phase === 'manual' && status.reason === 'state';
-  const busy = ['off', 'checking', 'downloading', 'installing', 'shared'].includes(status.phase);
+  const busy = ['off', 'checking', 'downloading', 'installing', 'shared', 'maintenance'].includes(
+    status.phase,
+  );
   const line =
     restartFailed && ready
       ? { text: t('update.restartFailed'), error: true }
@@ -100,60 +99,140 @@ function UpdateStatusCard({ quiet = false, beforeRestart }: UpdateStatusCardProp
     const done = await updater.restart();
     if (alive.current) setRestartFailed(!done);
   };
+  return {
+    description: line.text,
+    error: line.error,
+    control: ({ labelId, descriptionId }: SettingsCardIds) => (
+      <Button
+        id={buttonId}
+        appearance={(ready || available) && !quiet ? 'primary' : 'secondary'}
+        icon={ready ? <ArrowClockwise16Regular /> : <ArrowSync16Regular />}
+        iconPosition="after"
+        disabledFocusable={busy}
+        aria-labelledby={`${buttonId} ${labelId}`}
+        aria-describedby={descriptionId}
+        onClick={() =>
+          ready
+            ? void restart()
+            : available
+              ? void updater.install()
+              : broken
+                ? void updater.reset()
+                : void updater.check()
+        }
+      >
+        {t(
+          ready
+            ? 'update.restartNow'
+            : available
+              ? 'update.installNow'
+              : broken
+                ? 'update.reset'
+                : 'update.checkNow',
+        )}
+      </Button>
+    ),
+  };
+}
+
+function UpdateStatusCard(props: UpdateStatusCardProps) {
+  const t = useAtomValueRawSync(translateAtom);
+  const status = useUpdateStatus(props);
   return (
     <SettingsCard
       icon={<ArrowDownload20Regular />}
       title={t('update.statusTitle')}
-      description={line.text}
-      error={line.error}
+      description={status.description}
+      error={status.error}
     >
-      {({ labelId, descriptionId }) => (
-        <Button
-          id={buttonId}
-          appearance={(ready || available) && !quiet ? 'primary' : 'secondary'}
-          icon={ready ? <ArrowClockwise16Regular /> : <ArrowSync16Regular />}
-          iconPosition="after"
-          disabledFocusable={busy}
-          aria-labelledby={`${buttonId} ${labelId}`}
-          aria-describedby={descriptionId}
-          onClick={() =>
-            ready
-              ? void restart()
-              : available
-                ? void updater.install()
-                : broken
-                  ? void updater.reset()
-                  : void updater.check()
-          }
-        >
-          {t(
-            ready
-              ? 'update.restartNow'
-              : available
-                ? 'update.installNow'
-                : broken
-                  ? 'update.reset'
-                  : 'update.checkNow',
-          )}
-        </Button>
-      )}
+      {status.control}
     </SettingsCard>
   );
 }
 
-function ChangelogCard() {
+function ChangelogRow() {
   const t = useAtomValueRawSync(translateAtom);
   const updater = useService(updaterKey);
   const view = useService(changelogViewKey);
   const mode = useAtomValueRawSync(updater.mode);
   return (
-    <SettingsCard
-      icon={<BookOpen20Regular />}
+    <SettingsRow
       title={t('update.logTitle')}
       description={mode === 'off' ? t('update.logNetwork') : undefined}
     >
       {() => <Button onClick={view.show}>{t('update.logOpen')}</Button>}
-    </SettingsCard>
+    </SettingsRow>
+  );
+}
+
+function UpdateSettingsExpander() {
+  const t = useAtomValueRawSync(translateAtom);
+  const updater = useService(updaterKey);
+  const saving = useAtomValueRawSync(updater.persistence.state);
+  const status = useUpdateStatus();
+  return (
+    <SettingsExpander
+      icon={<ArrowDownload20Regular />}
+      title={t('update.statusTitle')}
+      description={status.description}
+      error={status.error}
+      control={status.control}
+      feedback={<SettingsSaveNotice persistence={updater.persistence} keys={[...saving.keys()]} />}
+      defaultOpen={false}
+    >
+      <UpdateModeRow />
+      <BackendStatusRow />
+      <PluginUpdateRow />
+      <ChangelogRow />
+    </SettingsExpander>
+  );
+}
+
+function BackendStatusRow() {
+  const t = useAtomValueRawSync(translateAtom);
+  const backend = useService(backendBootstrapKey);
+  const status = useAtomValueRawSync(backend.status);
+  const controls = useViewControlStyles();
+  if (status.phase === 'off') return null;
+  const keys = {
+    preparing: 'update.backendPreparing',
+    installing: 'update.backendInstalling',
+    connecting: 'update.backendConnecting',
+    failed: 'update.backendFailed',
+    unsupported: 'update.backendUnsupported',
+  } as const;
+  const description =
+    status.phase === 'runtime'
+      ? t('update.backendRuntime', { completed: status.completed, total: status.total })
+      : status.phase === 'ready'
+        ? t('update.backendReady', { version: status.version })
+        : t(keys[status.phase]);
+  return (
+    <SettingsRow
+      title={t('update.backendTitle')}
+      description={description}
+      error={status.phase === 'failed'}
+      feedback={
+        status.phase === 'failed' ? (
+          <details>
+            <summary>{t('update.backendDetails')}</summary>
+            <div>{status.detail}</div>
+          </details>
+        ) : undefined
+      }
+    >
+      {({ descriptionId }) =>
+        status.phase === 'failed' ? (
+          <Button
+            className={controls.field}
+            aria-describedby={descriptionId}
+            onClick={() => void backend.retry()}
+          >
+            {t('update.backendRetry')}
+          </Button>
+        ) : null
+      }
+    </SettingsRow>
   );
 }
 
@@ -226,15 +305,7 @@ function OnboardingUpdate() {
 /** 把更新设置放进设置页「关于」与新人引导第 4 步的插槽；更新服务由 `app/services.ts` 创建。 */
 export function UpdateRoot({ children }: { readonly children: ReactNode }) {
   return (
-    <UpdateSettingsContext
-      value={
-        <>
-          <UpdateModeCard />
-          <UpdateStatusCard />
-          <ChangelogCard />
-        </>
-      }
-    >
+    <UpdateSettingsContext value={<UpdateSettingsExpander />}>
       <OnboardingUpdateContext value={<OnboardingUpdate />}>
         {children}
         <ChangelogDialog />

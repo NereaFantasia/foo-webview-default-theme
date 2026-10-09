@@ -13,12 +13,13 @@
 
 .root[data-player] {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  height: 56px;
+  height: 64px;
 }
 
 /* ⋯ 离窗口左缘 8，其后各组之间隔 16。 */
 .start {
   display: flex;
+  align-self: stretch;
   align-items: center;
   gap: var(--spacingHorizontalL);
   min-width: 0;
@@ -26,16 +27,18 @@
 }
 
 .tools {
+  display: flex;
+  align-items: center;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-/* 播放控制组离 ⋯ 24，比别的组之间多 8；音量键离下一首 16，与胶囊里控制组与音量键之间一样。 */
+/* 播放控制组离主菜单 28；音量键离下一首 16，与胶囊里控制组与音量键之间一样。 */
 .player {
   display: flex;
   align-items: center;
   gap: var(--spacingHorizontalL);
-  margin-left: var(--spacingHorizontalS);
+  margin-left: var(--spacingHorizontalM);
 }
 
 .volume {
@@ -66,6 +69,13 @@
   margin-right: var(--spacingHorizontalL);
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+/* 窄窗仍需同时容纳导航、面板入口与窗口三键。 */
+@media (max-width: 480px) {
+  .entries {
+    margin-right: 0;
+  }
 }
 
 /* 宿主版本不满足时的提示：只有 ⋯ 与三键时占两者之间的余量，放着播放栏时占中间一列与三键之间的余量，

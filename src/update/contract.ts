@@ -59,6 +59,17 @@ export interface RootPayload {
   readonly revokedKeys: readonly string[];
   /** 累计更新日志的附件：只用来展示，缺失或写错时当作没有，不连累整份清单，也不参与选版。 */
   readonly changelog: ReleaseFile | null;
+  /**
+   * 插件候选与主题分开选择。列表不是数组或超过 64 项时整体忽略，单个候选格式不对只丢掉这一项；
+   * 两种情况都不影响主题候选。
+   */
+  readonly plugins: readonly PluginCandidate[];
+}
+export type PluginArch = 'x64' | 'x86';
+/** URL 指向独立签名的插件发行清单；哈希绑定其原始字节。 */
+export interface PluginCandidate extends ReleaseFile {
+  readonly version: string;
+  readonly arch: PluginArch;
 }
 export interface ReleaseFile {
   readonly url: string;
@@ -92,6 +103,7 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 const MAX_FRONTEND_BYTES = 64 * 1024 * 1024;
 /** 累计更新日志的上限：每版几百字节，够存上千个版本。 */
 export const CHANGELOG_LIMIT = 1024 * 1024;
+const MAX_PLUGIN_RELEASE_BYTES = 128 * 1024;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -183,7 +195,7 @@ function loaderVersion(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 }
 
-function releaseFile(value: unknown, max: number): ReleaseFile | null {
+export function releaseFile(value: unknown, max: number): ReleaseFile | null {
   if (!record(value)) return null;
   const size = value.size;
   if (
@@ -237,6 +249,13 @@ function strings(value: unknown, valid: (item: unknown) => item is string): stri
   return Array.isArray(value) && value.length <= 256 && value.every(valid) ? [...value] : null;
 }
 
+function pluginCandidate(value: unknown): PluginCandidate | null {
+  if (!record(value) || !isStableVersion(value.version)) return null;
+  if (value.arch !== 'x64' && value.arch !== 'x86') return null;
+  const file = releaseFile(value, MAX_PLUGIN_RELEASE_BYTES);
+  return file ? { ...file, version: value.version, arch: value.arch } : null;
+}
+
 /** 读取已验签的 payload 文本；格式与更新器要求先于其余字段判断，它们以后可能改变结构。 */
 export function readRootPayload(text: string): RootReading {
   const value = parse(text);
@@ -280,6 +299,10 @@ export function readRootPayload(text: string): RootReading {
       keys: published,
       revokedKeys,
       changelog: releaseFile(value.changelog, CHANGELOG_LIMIT),
+      plugins:
+        Array.isArray(value.plugins) && value.plugins.length <= 64
+          ? value.plugins.flatMap((item) => pluginCandidate(item) ?? [])
+          : [],
     },
   };
 }

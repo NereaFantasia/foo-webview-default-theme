@@ -70,6 +70,15 @@ test('快捷键一览：按所在的地方分小节，键帽写出按法；卡�
 });
 
 test('版本写成一行；复制把主题版本与诊断信息放进剪贴板，没复制成时写出错误', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgentData', {
+      configurable: true,
+      value: {
+        platform: 'Windows',
+        getHighEntropyValues: async () => ({ platformVersion: '13.0.0' }),
+      },
+    });
+  });
   const settings = await openSettings(page);
   await expect(settings.card('版本')).toContainText(
     '默认主题 0.1.0 · foo_ui_webview2 2.0.0 · foobar2000 v2.25（64 位）',
@@ -83,6 +92,9 @@ test('版本写成一行；复制把主题版本与诊断信息放进剪贴板�
         'foo-webview-default-theme 0.1.0',
         'foobar2000 v2.25 (64-bit, portable)',
         'foo_ui_webview2 2.0.0 (requires 2.0.0 or later)',
+        'Window platform: windows11',
+        'Backdrop: requested=inherit, reported=unknown, effective=unknown',
+        'Backdrop application: applied',
       ].join('\n'),
     },
   ]);
@@ -104,14 +116,16 @@ test('宿主在、版本读不到：说明行是一道横线，不写没有宿�
   expect(settings.errors).toEqual([]);
 });
 
-test('主题更新：版本卡后面是更新方式与检查更新；开发服务器下不运行更新器，控件禁用并写明原因', async ({
+test('主题更新：卡头保留状态和检查按钮，方式与内容默认收起；不运行更新器时禁用', async ({
   page,
 }) => {
   const settings = await openSettings(page, { config: { 'defaultTheme.update.auto': true } });
   const titles = page
-    .locator('[data-settings-card] [id]')
-    .filter({ hasText: /^(版本|更新方式|主题更新|已关闭的提醒)$/ });
-  await expect(titles).toHaveText(['版本', '更新方式', '主题更新', '已关闭的提醒']);
+    .locator('[data-settings-card] [id], [data-settings-expander] > :first-child [id]')
+    .filter({ hasText: /^(版本|主题更新|已关闭的提醒)$/ });
+  await expect(titles).toHaveText(['版本', '主题更新', '已关闭的提醒']);
+  await expect(settings.row('更新方式')).toHaveCount(0);
+  await settings.expand('主题更新');
   // 只有旧键时按它回退：true 视为自动下载并安装。
   const select = page.getByRole('combobox', { name: '更新方式' });
   await expect(select).toHaveText('自动下载并安装');
@@ -129,6 +143,7 @@ test('更新方式：新键有值时以新键为准，不看旧键', async ({ pa
   const settings = await openSettings(page, {
     config: { 'defaultTheme.update.mode': 'notify', 'defaultTheme.update.auto': true },
   });
+  await settings.expand('主题更新');
   await expect(page.getByRole('combobox', { name: '更新方式' })).toHaveText('仅提醒');
   expect(settings.errors).toEqual([]);
 });

@@ -64,18 +64,32 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   if (!shader) return null;
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
+  if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
+  gl.deleteShader(shader);
+  return null;
 }
 
 function link(gl: WebGL2RenderingContext, vertex: string, fragment: string): Program | null {
   const vs = compile(gl, gl.VERTEX_SHADER, vertex);
   const fs = compile(gl, gl.FRAGMENT_SHADER, fragment);
   const program = gl.createProgram();
-  if (!vs || !fs || !program) return null;
+  if (!vs || !fs || !program) {
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+    gl.deleteProgram(program);
+    return null;
+  }
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+  gl.detachShader(program, vs);
+  gl.detachShader(program, fs);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    gl.deleteProgram(program);
+    return null;
+  }
   const uniforms: Uniforms = {};
   const count = Number(gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS));
   for (let index = 0; index < count; index += 1) {
@@ -98,6 +112,7 @@ function floatTexture(gl: WebGL2RenderingContext): WebGLTexture | null {
 
 interface Renderer {
   draw(history: SpectrumHistory, options: TerrainDrawOptions): void;
+  dispose(): void;
 }
 
 /** 编着色器、建纹理与缓冲；缺扩展或编不过返回 `null`。 */
@@ -113,8 +128,36 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
   const lineVao = gl.createVertexArray();
   const emptyVao = gl.createVertexArray();
   const cornerAt = line ? gl.getAttribLocation(line.program, 'corner') : -1;
-  if (!seed || !scan || !line || !historyTexture || !corners || !lineVao || !emptyVao) return null;
-  if (cornerAt < 0 || skylines.some((t) => !t) || framebuffers.some((f) => !f)) return null;
+  let uploaded: { history: SpectrumHistory; count: number; rows: number; bands: number } | null =
+    null;
+  let disposed = false;
+  function dispose(): void {
+    if (disposed) return;
+    disposed = true;
+    uploaded = null;
+    gl.deleteTexture(historyTexture);
+    for (const texture of skylines) gl.deleteTexture(texture);
+    for (const framebuffer of framebuffers) gl.deleteFramebuffer(framebuffer);
+    gl.deleteBuffer(corners);
+    gl.deleteVertexArray(lineVao);
+    gl.deleteVertexArray(emptyVao);
+    for (const linked of [seed, scan, line]) gl.deleteProgram(linked?.program ?? null);
+  }
+  if (
+    !seed ||
+    !scan ||
+    !line ||
+    !historyTexture ||
+    !corners ||
+    !lineVao ||
+    !emptyVao ||
+    cornerAt < 0 ||
+    skylines.some((t) => !t) ||
+    framebuffers.some((f) => !f)
+  ) {
+    dispose();
+    return null;
+  }
 
   gl.bindVertexArray(lineVao);
   gl.bindBuffer(gl.ARRAY_BUFFER, corners);
@@ -125,8 +168,6 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.clearColor(0, 0, 0, 0);
 
-  let uploaded: { history: SpectrumHistory; count: number; rows: number; bands: number } | null =
-    null;
   let skylineSize = { columns: 0, rows: 0 };
 
   // 历史纹理固定在 0 号单元，轮廓纹理在 1 号单元。
@@ -156,7 +197,9 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
   }
 
   return {
+    dispose,
     draw(history, options) {
+      if (disposed) return;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -239,9 +282,10 @@ export function probeTerrainGpu(): boolean {
   const canvas = new OffscreenCanvas(1, 1);
   const gl = canvas.getContext('webgl2', GPU_ATTRIBUTES);
   if (!gl) return false;
-  const ok = createRenderer(gl, canvas) !== null;
+  const renderer = createRenderer(gl, canvas);
+  renderer?.dispose();
   gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return ok;
+  return renderer !== null;
 }
 
 /**
@@ -258,6 +302,10 @@ export function openTerrainGpu(canvas: GpuCanvas, onLost: () => void): TerrainDr
   let lost = false;
   return {
     kind: 'webgl',
+    dispose() {
+      lost = true;
+      renderer.dispose();
+    },
     resize(width, height, pixelRatio) {
       canvas.width = Math.max(1, Math.round(width * pixelRatio));
       canvas.height = Math.max(1, Math.round(height * pixelRatio));

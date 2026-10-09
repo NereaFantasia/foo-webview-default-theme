@@ -33,7 +33,10 @@ function textLog() {
       },
       {
         version: '0.1.0',
-        notes: { 'zh-CN': { title: '首个版本', summary: '本机自带的更新内容。' } },
+        notes: {
+          'zh-CN': { title: '首个版本', summary: '本机自带的更新内容。' },
+          en: { title: 'First version', summary: 'Bundled release notes.' },
+        },
       },
     ],
   });
@@ -43,6 +46,38 @@ function textLog() {
 // 验签、解压、哈希与 base64 往返都在浏览器里做；宿主替身只负责网络应答和内存里的模板目录。
 
 test.use({ screenshot: 'off' });
+
+for (const colorScheme of ['light', 'dark'] as const)
+  test(`本地服务失败显示诊断与重试，恢复后移除提醒（${colorScheme}）`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    const host = await installPageHost(page);
+    host.config.set('defaultTheme.update.mode', 'off');
+    host.config.set('defaultTheme.changelog.seen', '0.1.0');
+    const disk = answerTemplateDisk(host, {
+      'fe/0.1.0/installed.json': JSON.stringify({ files: { 'backend.json': 'a'.repeat(64) } }),
+      'fe/0.1.0/backend.json': '{}',
+    });
+    await page.route('**/backend-ui-probe', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><html lang="zh-CN"><title>本地服务</title></html>',
+      }),
+    );
+    await page.goto('/backend-ui-probe');
+    await page.evaluate(async (startup) => {
+      const { mountChangelogPage }: typeof import('../fixtures/ChangelogPage.tsx') = await import(
+        `${location.origin}/tests/fixtures/ChangelogPage.tsx`
+      );
+      mountChangelogPage([], startup);
+    }, STARTUP);
+    await page.locator('[data-settings-toggle]').click();
+    await expect(page.getByText('本地服务未就绪', { exact: true }).first()).toBeVisible();
+    await page.getByText('诊断详情', { exact: true }).click();
+    await expect(page.getByText('后端描述校验失败', { exact: true })).toBeVisible();
+    disk.write('fe/0.1.0/installed.json', JSON.stringify({ files: {} }));
+    await page.getByRole('button', { name: '重试本地服务', exact: true }).click();
+    await expect(page.getByText('本地服务未就绪', { exact: true })).toHaveCount(0);
+  });
 
 const CURRENT = { v: '0.1.0', dir: '0.1.0' };
 const STARTUP = {
@@ -119,11 +154,21 @@ async function run(
   published: Awaited<ReturnType<typeof publish>>,
   action: 'check' | 'install' | 'view' = 'install',
   seen = '0.1.0',
+  locale?: { host: string; selected: string },
 ) {
   page.on('pageerror', (error) => console.error(error.message));
   const host = await installPageHost(page);
   host.config.set('defaultTheme.update.mode', action === 'check' ? 'notify' : 'off');
   host.config.set('defaultTheme.changelog.seen', seen);
+  if (locale) {
+    host.config.set('defaultTheme.locale', locale.selected);
+    host.answer('system.getLocale', () => ({
+      success: true,
+      locale: locale.host,
+      language: '',
+      country: '',
+    }));
+  }
   const disk = answerTemplateDisk(host, {
     'current.json': JSON.stringify({ schema: 1, frontend: { version: CURRENT } }),
     'fe/0.1.0/installed.json': JSON.stringify({
@@ -168,6 +213,7 @@ async function run(
     },
     { keys: published.keys, startup: STARTUP, action },
   );
+  if (action === 'view' && seen === CURRENT.v) await page.locator('[data-settings-toggle]').click();
   return { status, disk, host };
 }
 
@@ -307,6 +353,7 @@ test('升级首次展示只用本机日志，关闭后重开页面不再自动�
     },
     { keys: [], startup: STARTUP },
   );
+  await page.locator('[data-settings-toggle]').click();
   await expect(page.getByRole('button', { name: '查看', exact: true })).toBeVisible();
   await expect(dialog).not.toBeVisible();
   expect(host.callsTo('http.get')).toEqual([]);
@@ -318,7 +365,7 @@ test('提醒档的信息中心展示日志标题，查看后关闭信息中心�
   await page.getByRole('combobox', { name: '更新方式' }).click();
   await page.getByRole('option', { name: /仅提醒/ }).click();
   await expect.poll(() => host.config.get('defaultTheme.update.mode')).toBe('notify');
-  await page.getByRole('button', { name: /检查更新/ }).click();
+  await page.getByRole('button', { name: '检查更新 主题更新', exact: true }).click();
   await page.locator('[data-info-center-trigger]').click();
   const notice = page.locator('[data-info-kind="updateAvailable"]');
   await expect(notice).toContainText('Updates, your way');
@@ -334,3 +381,17 @@ test('提醒档的信息中心展示日志标题，查看后关闭信息中心�
   await expect.poll(() => host.config.get('defaultTheme.update.mode')).toBe('off');
   await expect(page.locator('[data-info-center-trigger]')).not.toBeVisible();
 });
+
+for (const locale of [
+  { host: 'en-US', selected: 'zh-CN', view: '查看', title: '首个版本' },
+  { host: 'zh-CN', selected: 'en', view: 'View', title: 'First version' },
+]) {
+  test(`宿主为 ${locale.host} 时日志跟随手动选择的 ${locale.selected}`, async ({ page }) => {
+    await run(page, await publish(), 'view', '0.1.0', locale);
+    await page.getByRole('button', { name: locale.view, exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('tab', { name: '0.1.0', exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: locale.title, exact: true })).toBeVisible();
+    await expect(dialog.getByRole('tabpanel')).toHaveAttribute('lang', locale.selected);
+  });
+}

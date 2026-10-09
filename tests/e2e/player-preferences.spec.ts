@@ -23,9 +23,9 @@ test('宽窗里底部通栏换成标题栏再换回来：版式即时换，高�
   await switchPreference(page, 'player-bar', 'titlebar');
   await expect(page.locator('[data-player-bar]')).toHaveCount(0);
   await expect(page.locator('header [data-now-playing]')).toContainText(PLAYING_TRACK.title);
-  expect(await boxOf(page, 'header')).toMatchObject({ height: 56 });
-  await expect.poll(heights).toEqual([{ height: 48 }, { height: 56 }]);
-  await expect.poll(lastRegion).toEqual({ region: { x: 1280 - 92, y: 0, width: 46, height: 56 } });
+  expect(await boxOf(page, 'header')).toMatchObject({ height: 64 });
+  await expect.poll(heights).toEqual([{ height: 48 }, { height: 64 }]);
+  await expect.poll(lastRegion).toEqual({ region: { x: 1280 - 92, y: 0, width: 46, height: 64 } });
   expect(await stored(page, PLAYER_BAR_STORAGE_KEY)).toBe('titlebar');
 
   await page.reload();

@@ -45,7 +45,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--borderRadiusCircular);
-  background: var(--line);
+  background: var(--player-rail);
 }
 
 /* 已播的一段按比例横向缩放，不逐帧改宽。 */
@@ -54,6 +54,7 @@
   inset: 0;
   background: var(--accent);
   transform-origin: left center;
+  transform: scaleX(var(--seek-progress, 0));
 }
 
 /* 滑块 12，中心落在播到的位置上；只是标记，指针照旧落在命中区上。 */
@@ -64,6 +65,7 @@
 .thumb {
   position: absolute;
   top: 50%;
+  left: calc(var(--seek-indicator, 0) * 100%);
   width: 12px;
   height: 12px;
   border-radius: var(--borderRadiusCircular);

@@ -39,6 +39,9 @@
 
 /* 分页栏左右与头对齐，下面一道细线把它和内容区分开。 */
 .tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
   padding: 0 var(--spacingHorizontalS);
   border-bottom: var(--strokeWidthThin) solid var(--line);
 }
@@ -60,4 +63,42 @@
 .content[data-page='lyrics'] {
   overflow: hidden;
   scrollbar-gutter: auto;
+}
+
+.root[data-lyrics-preview] > * {
+  grid-column: 1;
+}
+
+.root > .toolbar {
+  grid-row: 2;
+}
+
+.root > .tabs {
+  grid-row: 1;
+}
+
+.root > .history {
+  grid-row: 3;
+}
+
+.root > .content {
+  grid-row: 4;
+}
+
+.root[data-lyrics-preview] > .content {
+  grid-row: 1 / -1;
+}
+
+.root[data-lyrics-preview] > .toolbar,
+.root[data-lyrics-preview] > .tabs {
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.root[data-lyrics-preview][data-controls-visible] > .toolbar,
+.root[data-lyrics-preview][data-controls-visible] > .tabs {
+  opacity: 1;
+  pointer-events: auto;
 }

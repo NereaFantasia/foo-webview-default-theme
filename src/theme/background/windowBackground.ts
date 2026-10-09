@@ -4,6 +4,8 @@ import type { Store } from '../../kit/store.ts';
 import { colorSchemeAtom } from '../colorScheme.ts';
 import type { CoverProfile } from '../coverPalette.ts';
 import type { ColorScheme } from '../themes.ts';
+import { loadBackgroundAppearance, resetBackgroundAppearance } from './backgroundAppearance.ts';
+import { loadThemeBackground } from './themeBackground.ts';
 
 export const WINDOW_BACKGROUND_KEY = 'default-theme.window-background.v1';
 export const BACKGROUND_SOURCES = ['material', 'cover', 'palette', 'image'] as const;
@@ -23,8 +25,8 @@ export interface BackgroundPreferences {
 export const BACKGROUND_DEFAULTS: BackgroundPreferences = {
   source: 'material',
   imageName: '',
-  light: { shade: 65, blur: 48, content: 85, inactive: 6 },
-  dark: { shade: 25, blur: 64, content: 70, inactive: 18 },
+  light: { shade: 65, blur: 48, content: 92, inactive: 6 },
+  dark: { shade: 25, blur: 64, content: 88, inactive: 18 },
 };
 export const BACKGROUND_LIMITS: Readonly<
   Record<keyof BackgroundParameters, readonly [number, number]>
@@ -32,7 +34,7 @@ export const BACKGROUND_LIMITS: Readonly<
   shade: [0, 100],
   blur: [0, 120],
   content: [0, 100],
-  inactive: [0, 50],
+  inactive: [0, 100],
 };
 export const backgroundCoverAtom = atom<{
   readonly url: string;
@@ -83,6 +85,21 @@ export const backgroundParametersAtom = atom(
 /** 在首帧之前调。读不了或存档坏了用缺省材质。 */
 export function loadWindowBackground(store: Store, storage?: PrefStorage | null): void {
   backgroundPref.load(store, storage);
+  loadBackgroundAppearance(store, storage);
+  loadThemeBackground(store, storage);
+}
+
+export function resetBackgroundParameters(
+  store: Store,
+  scheme: ColorScheme,
+  storage?: PrefStorage | null,
+): void {
+  backgroundPref.set(
+    store,
+    { ...store.get(backgroundPref.atom), [scheme]: BACKGROUND_DEFAULTS[scheme] },
+    storage,
+  );
+  resetBackgroundAppearance(store, scheme, storage);
 }
 
 export function chooseBackgroundSource(

@@ -1,4 +1,4 @@
-import { Button, Tooltip } from '@fluentui/react-components';
+import { mergeClasses, Button, Tooltip } from '@fluentui/react-components';
 import { PanelLeft16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { MessageKey } from '../../i18n/en.ts';
@@ -6,6 +6,7 @@ import { translateAtom } from '../../i18n/locale.ts';
 import { sidebarPrefsAtom, sidebarPrefsKey } from './sidebarPrefs.ts';
 import { sidebarViewAtom, sidebarViewKey } from './sidebarView.ts';
 import { useService } from '../../kit/useService.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export interface SidebarKeyProps {
   readonly className?: string;
@@ -22,6 +23,7 @@ export const SIDEBAR_KEY_ATTR = 'data-sidebar-key';
  * （641–1007 恒为图标态，≤ 640 不显示），这个键改成以浮层展开整张侧边栏，再按一次收起。
  */
 export function SidebarKey({ className, round = true }: SidebarKeyProps) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const { hidden } = useAtomValueRawSync(sidebarPrefsAtom);
   const { tier, overlay } = useAtomValueRawSync(sidebarViewAtom);
@@ -36,7 +38,7 @@ export function SidebarKey({ className, round = true }: SidebarKeyProps) {
       <Button
         appearance="subtle"
         shape={round ? 'circular' : 'rounded'}
-        className={className}
+        className={mergeClasses(className, viewControls.icon)}
         icon={<PanelLeft16Regular />}
         aria-expanded={expanded}
         {...{ [SIDEBAR_KEY_ATTR]: true }}

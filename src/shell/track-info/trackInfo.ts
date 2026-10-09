@@ -2,6 +2,7 @@ import type { Track } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { hostCommand, settle } from '../../host/hostCall.ts';
+import { hasPlaycountComponent } from '../../host/playcountComponent.ts';
 import { waitForHost } from '../../host/waitForHost.ts';
 import type { Translate } from '../../i18n/translate.ts';
 import type { Store } from '../../kit/store.ts';
@@ -143,11 +144,7 @@ export function startTrackInfo(
       update(id, { statistics: failedRead(installed) });
       return;
     }
-    const available = installed.components.some(
-      (component) =>
-        (component.filename ?? component.fileName ?? '').split(/[\\/]/).pop()?.toLowerCase() ===
-        'foo_playcount.dll',
-    );
+    const available = hasPlaycountComponent(installed.components);
     if (!available) {
       update(id, { statistics: { status: 'unavailable' } });
       return;

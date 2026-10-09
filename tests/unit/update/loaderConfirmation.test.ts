@@ -1,6 +1,7 @@
 import { createStore } from 'jotai/vanilla';
 import { webview } from 'foo-webview-sdk/bridge';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import metadata from '../../../package.json' with { type: 'json' };
 import {
   clearPanelStartup,
   confirmedStartupAtom,
@@ -19,13 +20,14 @@ import type { LoaderStorage } from '../../../src/kit/loaderStorage.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
 
-const CURRENT = { v: '0.1.0', dir: '0.1.0' };
+const CURRENT = { v: metadata.version, dir: metadata.version };
 const OLD = { v: '0.0.9', dir: '0.0.9' };
-const BAD = { v: '0.2.0', dir: '0.2.0_abcdef' };
+const BAD_VERSION = metadata.version.replace(/\d+$/, (patch) => String(Number(patch) + 1));
+const BAD = { v: BAD_VERSION, dir: `${BAD_VERSION}_abcdef` };
 const ID = '11111111-1111-4111-8111-111111111111';
 const SESSION_ID = '22222222-2222-4222-8222-222222222222';
 const BASE = 'E:\\themes\\default';
-const URL = new globalThis.URL('https://foo-ui-webview2.local/fe/0.1.0/index.html');
+const URL = new globalThis.URL(`https://foo-ui-webview2.local/fe/${CURRENT.dir}/index.html`);
 
 function setup(
   frontend: Record<string, unknown> = { version: CURRENT },
@@ -137,6 +139,19 @@ function setup(
 }
 
 describe('启动确认', () => {
+  it('页面目录与实际包版本不符时拒绝确认，不写安装状态', async () => {
+    const env = setup();
+    env.service.dispose();
+    const service = startLoaderConfirmation(env.store, {
+      ...env.options,
+      url: new globalThis.URL(`/fe/${OLD.dir}/index.html`, URL),
+    });
+    onTestFinished(service.dispose);
+    await service.confirm();
+    expect(env.state()).toBe('failed');
+    expect(env.writes).toEqual([]);
+    expect(env.store.get(confirmedStartupAtom)).toBeNull();
+  });
   it.each([false, true])(
     '虚拟主机读取标识拒绝时，以宿主核对结果决定是否首次发布（已有标识：%s）',
     async (exists) => {

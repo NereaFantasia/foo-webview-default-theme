@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+import type { Atom } from 'jotai/vanilla';
 import type { PlaybackService } from '../../playback/playbackContract.ts';
 import type { ImmersiveCoverService } from '../cover/immersiveCover.ts';
 import type { SpectrumHistoryService } from '../spectrum/spectrumHistory.ts';
@@ -11,6 +12,9 @@ import type { TerrainHistoryService } from '../terrain/terrainHistory.ts';
  * 或数据不进 store 的那几样。页面的服务还没起来（首帧、页面已离开）时后几样为 null，件按没有数据画。
  */
 export interface ViewServices {
+  readonly active: Atom<boolean>;
+  /** 完整窗口可显示；退出后的最后画面也要在隐藏时立即释放。 */
+  readonly visible: Atom<boolean>;
   readonly playback: Pick<PlaybackService, 'playOrPause' | 'previous' | 'next' | 'seek'>;
   readonly cover: Pick<ImmersiveCoverService, 'markLoaded' | 'markFailed'> | null;
   readonly spectrum: Pick<

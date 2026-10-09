@@ -1,19 +1,35 @@
 import { blueFromArgb, greenFromArgb, Hct, redFromArgb } from '@material/material-color-utilities';
 import type { CoverProfile, CoverTone } from '../coverPalette.ts';
+import type { ColorScheme } from '../themes.ts';
 
 export type PaletteCorners = readonly number[];
 
-export function backgroundPalette(profile: CoverProfile | null, base: CoverTone): PaletteCorners {
+/** 背景使用面积排序；强调色的小色块不能扩大成四分之一的窗口。 */
+export function backgroundPalette(
+  profile: CoverProfile | null,
+  base: CoverTone,
+  scheme: ColorScheme,
+): PaletteCorners {
   const dominant = profile?.dominant ?? base;
-  const colors = [
-    dominant.argb,
-    profile?.secondary[0]?.argb ??
-      Hct.from(dominant.hue, dominant.chroma, Math.min(95, dominant.tone + 16)).toInt(),
-    profile?.secondary[1]?.argb ?? profile?.accent?.argb ?? dominant.argb,
-    profile?.secondary[2]?.argb ??
-      Hct.from(dominant.hue, dominant.chroma, Math.max(8, dominant.tone - 16)).toInt(),
-  ];
-  return colors.flatMap((argb) => [redFromArgb(argb), greenFromArgb(argb), blueFromArgb(argb)]);
+  const mean = profile?.lightness?.mean ?? dominant.tone;
+  const dark = scheme === 'dark';
+  const center = dark ? 12 + (mean - 50) * 0.03 : 95 + (mean - 50) * 0.012;
+  const shade = (color: CoverTone, offset: number) => {
+    const tone = Math.max(
+      dark ? 8 : 93,
+      Math.min(dark ? 16 : 97, center + (color.tone - mean) * 0.025 + offset),
+    );
+    const argb = Hct.from(color.hue, Math.min(color.chroma, dark ? 36 : 16), tone).toInt();
+    return [redFromArgb(argb), greenFromArgb(argb), blueFromArgb(argb)];
+  };
+  return [0, 1.5, -1, 0.5].flatMap((offset, index) => {
+    const ground = shade(dominant, offset);
+    const swatch = profile?.palette?.[index];
+    if (!swatch || index === 0) return ground;
+    const amount = Math.min(1, (swatch.population / Math.max(1, profile?.pixelCount ?? 1)) * 4);
+    const color = shade(swatch.color, offset);
+    return ground.map((value, channel) => value + (color[channel] - value) * amount);
+  });
 }
 
 /** 连续双线性场只变形采样坐标；没有封面纹理、独立光斑或逐帧随机数。 */

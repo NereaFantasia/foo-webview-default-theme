@@ -11,16 +11,16 @@ afterEach(() => {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function windowState(maximized: boolean, focused = true) {
+function windowState(maximized: boolean, focused = true, minimized = false) {
   return {
     success: true as const,
     maximized,
-    minimized: false,
+    minimized,
     fullscreen: false,
     alwaysOnTop: false,
     focused,
     isMaximized: maximized,
-    isMinimized: false,
+    isMinimized: minimized,
     isFullscreen: false,
     isAlwaysOnTop: false,
     isFocused: focused,
@@ -218,5 +218,106 @@ describe('startWindowShell', () => {
     expect(state().status).toBe('disconnected');
     await shell.close();
     expect(host.calls).toEqual([]);
+  });
+
+  it('连接成功不等于活动快照有效；初读后才发布最小化与焦点', async () => {
+    const host = installFakeHost();
+    const held = host.hold('window.getState');
+    const { shell, state } = await start(host);
+    await settle();
+    expect(state()).toMatchObject({ status: 'connected', minimized: null });
+    held.respond(0, windowState(true, false, true));
+    await shell.ready;
+    expect(state()).toMatchObject({ maximized: true, minimized: true, active: false });
+    shell.dispose();
+  });
+
+  it('普通回读失败保留快照；恢复复核同步废弃旧快照且失败后不还原', async () => {
+    const host = installFakeHost();
+    host.answer('window.getState', windowState(true, false, true));
+    const { shell, state } = await start(host);
+    await shell.ready;
+    host.answer('window.getState', hostFailure('OPERATION_FAILED'));
+    await shell.toggleMaximize();
+    expect(state()).toMatchObject({ maximized: true, minimized: true, active: false });
+
+    const refresh = shell.refreshState();
+    expect(state()).toMatchObject({ maximized: true, minimized: null, active: false });
+    await refresh;
+    expect(state().minimized).toBeNull();
+    shell.dispose();
+  });
+
+  it('复核与命令回读共用代次，较早的成功应答不能盖掉复核失败后的无效态', async () => {
+    const host = installFakeHost();
+    const { shell, state } = await start(host);
+    await shell.ready;
+    const held = host.hold('window.getState');
+    const earlier = shell.toggleMaximize();
+    await settle();
+    const latest = shell.refreshState();
+    await settle();
+    expect(held.pending).toHaveLength(2);
+    held.respond(1, hostFailure('OPERATION_FAILED'));
+    await latest;
+    held.respond(0, windowState(true, false, true));
+    await earlier;
+    expect(state()).toMatchObject({ maximized: false, minimized: null, active: true });
+    shell.dispose();
+  });
+
+  it('宿主已不可用时撤销快照，不发新的回读请求', async () => {
+    const host = installFakeHost();
+    let available = true;
+    const store = createStore();
+    const shell = startWindowShell(store, {
+      ...host.fb,
+      isAvailable: () => available,
+    });
+    await shell.ready;
+    available = false;
+    await shell.refreshState();
+    expect(store.get(windowShellAtom).minimized).toBeNull();
+    expect(host.callsTo('window.getState')).toHaveLength(1);
+    shell.dispose();
+  });
+
+  it('应答返回时宿主已不可用，不再采纳成功的旧快照', async () => {
+    const host = installFakeHost();
+    let available = true;
+    const store = createStore();
+    const shell = startWindowShell(store, {
+      ...host.fb,
+      isAvailable: () => available,
+    });
+    await shell.ready;
+    const held = host.hold('window.getState');
+    const refresh = shell.refreshState();
+    await settle();
+    available = false;
+    held.respond(0, windowState(true, false, true));
+    await refresh;
+    expect(store.get(windowShellAtom)).toMatchObject({ maximized: false, minimized: null });
+    shell.dispose();
+  });
+
+  it('释放后快照失效，晚到应答和重复复核不能继续写入或调用宿主', async () => {
+    const host = installFakeHost();
+    const { shell, state } = await start(host);
+    await shell.ready;
+    const held = host.hold('window.getState');
+    const pending = shell.refreshState();
+    await settle();
+    shell.dispose();
+    shell.dispose();
+    const stopped = state();
+    held.respond(0, windowState(true, false, true));
+    await pending;
+    await shell.refreshState();
+    expect(state()).toBe(stopped);
+    expect(state().minimized).toBeNull();
+    expect(host.listenerCount('window:stateChanged')).toBe(0);
+    expect(host.listenerCount('window:dpiChanged')).toBe(0);
+    expect(host.callsTo('window.getState')).toHaveLength(2);
   });
 });

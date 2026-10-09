@@ -1,4 +1,5 @@
 import type { Track } from 'foo-webview-sdk';
+import { atom } from 'jotai/vanilla';
 import type {
   PcmRingRead,
   PcmSegment,
@@ -6,7 +7,7 @@ import type {
   PcmStreamOptions,
   PcmStreamOutcome,
 } from 'foo-webview-sdk/bridge';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
 import {
   READ_FPS,
   STREAM_BUFFER_SECONDS,
@@ -123,14 +124,21 @@ function fakeStreams(outcome: PcmStreamOutcome | null) {
 }
 
 async function setup(
-  options: { outcome?: PcmStreamOutcome | null; player?: PlayingTrack; first?: Track | null } = {},
+  options: {
+    outcome?: PcmStreamOutcome | null;
+    player?: PlayingTrack;
+    first?: Track | null;
+    active?: boolean;
+  } = {},
 ) {
   const player = options.player ?? (await startPlayingTrack());
   const first = options.first === undefined ? A : options.first;
   if (first) player.play(first);
   const fake = fakeStreams(options.outcome === undefined ? OK : options.outcome);
   const frames = fakeFrames();
-  const service = startLiveLoudness(player.store, { host: fake.host, clock: frames.clock });
+  const active = atom(options.active ?? true);
+  const service = startLiveLoudness(player.store, { host: fake.host, clock: frames.clock, active });
+  onTestFinished(() => service.dispose());
   await flush();
   return {
     ...player,
@@ -139,6 +147,7 @@ async function setup(
     service,
     state: () => player.store.get(liveLoudnessAtom),
     step: () => frames.step(STEP_MS),
+    activate: (value: boolean) => player.store.set(active, value),
   };
 }
 
@@ -373,5 +382,64 @@ describe('startLiveLoudness', () => {
     await flush();
     expect(fake.streams).toHaveLength(1);
     expect(state()).toBe(last);
+  });
+
+  test('初始隐藏不订阅，恢复后只建一份流；休眠同步停帧和退订并清空积分窗', async () => {
+    const x = await setup({ active: false });
+    expect(x.fake.streams).toHaveLength(0);
+    expect(x.frames.pending()).toBe(0);
+    x.activate(true);
+    x.fake.nth(0).reads.push(readOf(sine(3, -20)));
+    await x.step();
+    x.activate(false);
+    expect(x.fake.nth(0).unsubscribed).toBe(1);
+    expect(x.frames.pending()).toBe(0);
+    expect(x.state()).toEqual(EMPTY);
+    x.activate(true);
+    x.activate(true);
+    expect(x.fake.streams).toHaveLength(2);
+    x.fake.nth(1).reads.push(readOf(sine(0.1, -32)));
+    await x.step();
+    expectNear(x.state().shortTerm, -32, 0.2, '恢复后的新积分窗');
+    x.service.dispose();
+    x.service.dispose();
+    expect(x.fake.nth(1).unsubscribed).toBe(1);
+  });
+
+  test('旧流 ready 晚到不影响恢复后的流', async () => {
+    const x = await setup({ outcome: null });
+    x.activate(false);
+    x.activate(true);
+    x.fake.nth(0).answer(REFUSED);
+    await flush();
+    expect(x.fake.nth(1).unsubscribed).toBe(0);
+    expect(x.state()).toEqual(EMPTY);
+    expect(x.frames.pending()).toBe(1);
+  });
+
+  test('发布读数时同步休眠，当前回调不再补排下一帧', async () => {
+    const x = await setup();
+    const off = x.store.sub(liveLoudnessAtom, () => x.activate(false));
+    x.fake.nth(0).reads.push(readOf(sine(0.1, -23)));
+    await x.step();
+    off();
+    expect(x.frames.pending()).toBe(0);
+    expect(x.fake.nth(0).unsubscribed).toBe(1);
+    expect(x.state()).toEqual(EMPTY);
+  });
+
+  test('失败后休眠恢复不重试，隐藏期间停止再播放仍遵循原重试规则', async () => {
+    const x = await setup({ outcome: REFUSED });
+    x.activate(false);
+    x.activate(true);
+    expect(x.fake.streams).toHaveLength(1);
+    expect(x.state().failed).toBe(true);
+    x.activate(false);
+    x.stop();
+    await flush();
+    x.play(B);
+    expect(x.fake.streams).toHaveLength(1);
+    x.activate(true);
+    expect(x.fake.streams).toHaveLength(2);
   });
 });

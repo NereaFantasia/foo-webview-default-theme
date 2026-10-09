@@ -25,11 +25,24 @@
 
 /* 展开区里的小标题：与子行文字对齐，与上一行之间一条分隔线。 */
 .heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
   padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalXXS)
     calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
   color: var(--text-muted);
   font-size: var(--fontSizeBase200);
   line-height: var(--lineHeightBase200);
+}
+
+.group {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalXXS)
+    calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
 }
 
 .heading:not(:first-child) {

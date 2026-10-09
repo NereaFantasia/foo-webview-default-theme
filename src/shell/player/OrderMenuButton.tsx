@@ -22,6 +22,7 @@ import { PLAYER_KEY_ATTR, PLAYER_SURFACE_ATTR } from './playerFocus.ts';
 import { ORDER_KEY_ICONS, ORDER_MENU_ICONS } from './playerIcons.ts';
 import { useService } from '../../kit/useService.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const GROUP = 'order';
 
@@ -46,7 +47,7 @@ const useStyles = makeStyles({
 export interface OrderMenuButtonProps {
   readonly className: string;
   readonly disabled: boolean;
-  /** 底部通栏里的键：图标 20，其余 16。 */
+  /** 使用 20px 图标，缺省为 16px。 */
   readonly large?: boolean;
 }
 
@@ -55,6 +56,7 @@ export interface OrderMenuButtonProps {
  * 选了只发命令，选中项与键上的图标等宿主回读了新顺序才动；还没读到顺序时按缺省画、菜单里没有选中项。
  */
 export function OrderMenuButton({ className, disabled, large = false }: OrderMenuButtonProps) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const current = useAtomValueRawSync(playbackOrderAtom);
   const playback = useService(playbackKey);
@@ -88,7 +90,7 @@ export function OrderMenuButton({ className, disabled, large = false }: OrderMen
         >
           <Button
             appearance="subtle"
-            className={className}
+            className={mergeClasses(className, viewControls.icon)}
             icon={<Icon />}
             disabled={disabled}
             {...{ [PLAYER_KEY_ATTR]: 'order' }}

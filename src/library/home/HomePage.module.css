@@ -2,7 +2,10 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalXL);
+  padding: calc(var(--spacingVerticalL) + var(--nav-inset, 0px)) var(--spacingHorizontalXL)
+    calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+  scroll-padding-top: var(--nav-inset, 0px);
+  scroll-padding-bottom: var(--player-inset, 0px);
   display: flex;
   flex-direction: column;
   gap: var(--spacingVerticalL);
@@ -10,6 +13,7 @@
 .root > * {
   flex-shrink: 0;
 }
+
 .root h1 {
   font-size: var(--fontSizeBase600);
   font-weight: var(--fontWeightSemibold);
@@ -61,7 +65,8 @@
 }
 @media (max-width: 600px) {
   .root {
-    padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+    padding: calc(var(--spacingVerticalM) + var(--nav-inset, 0px)) var(--spacingHorizontalM)
+      calc(var(--spacingVerticalM) + var(--player-inset, 0px));
   }
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

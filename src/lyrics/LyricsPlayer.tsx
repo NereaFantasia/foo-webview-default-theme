@@ -11,7 +11,7 @@ import { reducedMotionAtom } from '../motion/reducedMotion.ts';
 import { colorSchemeAtom } from '../theme/colorScheme.ts';
 import { startLyricsDriver, type LyricsClockFace, type LyricsDriver } from './lyricsDriver.ts';
 import type { LyricsMotion } from './lyricsMotion.ts';
-import { lyricsProcessConfig, type LyricsDisplay } from './lyricsDisplay.ts';
+import { lyricsFontFamily, lyricsProcessConfig, type LyricsDisplay } from './lyricsDisplay.ts';
 import styles from './LyricsPlayer.module.css';
 
 export interface LyricsPlayerProps {
@@ -21,9 +21,10 @@ export interface LyricsPlayerProps {
   readonly clock: LyricsClockFace;
   /** 歌词区看得见时为真；看不见时停帧，省下每帧的排版。 */
   readonly active: boolean;
-  /** 正文字号，CSS 像素；译文与音译按 AMLL 的比例跟着缩。 */
+  /** 正文字号，CSS 像素。 */
   readonly fontSize: number;
   readonly display?: LyricsDisplay;
+  readonly offset?: number;
   /** 点了某一行：交回那一行的开始时间，秒。 */
   readonly onSeek?: (seconds: number) => void;
 }
@@ -42,6 +43,7 @@ export function LyricsPlayer({
   active,
   fontSize,
   display,
+  offset = 0,
   onSeek,
 }: LyricsPlayerProps) {
   const host = useRef<HTMLDivElement>(null);
@@ -123,13 +125,40 @@ export function LyricsPlayer({
   }, [player, display, motion.scaleSpring]);
 
   useEffect(() => {
+    driver.current?.setOffset(offset);
+  }, [player, offset, lines]);
+
+  useEffect(() => {
     driver.current?.setActive(active && player !== null);
   }, [player, active]);
 
+  useLayoutEffect(() => {
+    if (!player) return;
+    player.calcLayout(LayoutReason.ConfigChange);
+    let cancelled = false;
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) player.calcLayout(LayoutReason.ConfigChange);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    player,
+    fontSize,
+    display?.fontFamily,
+    display?.translationFontSize,
+    display?.showTranslation,
+    display?.showRomanization,
+  ]);
+
   const style: CSSProperties & Record<`--${string}`, string> = {
+    fontFamily: lyricsFontFamily(display?.fontFamily ?? ''),
     '--amll-lp-font-size': `${fontSize}px`,
     '--lyrics-transition-duration': `${reduced ? 0 : motion.transitionMs}ms`,
     '--lyrics-transition-curve': curve(motion.transitionCurve),
+    ...(display?.translationFontSize != null
+      ? { '--lyrics-translation-size': `${display.translationFontSize}px` }
+      : {}),
   };
   return (
     <div
@@ -139,6 +168,8 @@ export function LyricsPlayer({
       data-scheme={scheme}
       data-spring={motion.spring && !reduced ? 'on' : 'off'}
       data-reduced-motion={reduced || undefined}
+      data-translation={display?.showTranslation === false ? 'hidden' : undefined}
+      data-romanization={display?.showRomanization === false ? 'hidden' : undefined}
     />
   );
 }

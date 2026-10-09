@@ -7,6 +7,7 @@ import {
   RIGHT_CARD_STORAGE_KEY,
   startRightCard,
 } from '../../../../src/shell/right-card/rightCard.ts';
+import { historyAtom, startNavHistory } from '../../../../src/nav/navHistory.ts';
 
 function memoryStorage(initial?: string): PrefStorage & { value(): string | null } {
   let stored = initial ?? null;
@@ -40,6 +41,46 @@ describe('parseRightCardPrefs', () => {
 });
 
 describe('startRightCard', () => {
+  it('四个页签与歌词子页使用独立历史，后退不改变主视图', () => {
+    const store = createStore();
+    const main = startNavHistory(store);
+    const card = startRightCard(store, { wide: atom(true) }, memoryStorage());
+    main.navigate({ id: 'albums' });
+    card.toggle('lyrics');
+    card.history.navigate({ id: 'lyricsSearch', subject: 'song-a' });
+    card.history.navigate({ id: 'lyricsCandidate', subject: 'song-a', candidate: 'source:1' });
+    expect(store.get(card.view).prefs.page).toBe('lyrics');
+    expect(card.history.back()).toBe(true);
+    expect(store.get(card.navigation).place.id).toBe('lyricsSearch');
+    card.select('bio');
+    expect(store.get(card.navigation).next).toBeNull();
+    expect(store.get(card.view).prefs.page).toBe('bio');
+    card.history.back();
+    expect(store.get(card.view).prefs.page).toBe('lyrics');
+    expect(store.get(historyAtom).place).toEqual({ id: 'albums' });
+    card.close();
+    card.toggle('lyrics');
+    expect(store.get(card.navigation).place.id).toBe('lyricsSearch');
+    card.dispose();
+  });
+
+  it('换曲后跳过旧曲目的候选，替换当前子页不新增记录', () => {
+    const store = createStore();
+    const card = startRightCard(store, { wide: atom(true) }, memoryStorage());
+    let track = 'song-a';
+    for (const id of ['lyricsSearch', 'lyricsCandidate'] as const)
+      card.history.registerSubject(id, { exists: (subject) => subject === track });
+    card.select('lyrics');
+    card.history.navigate({ id: 'lyricsSearch', subject: track });
+    card.history.navigate({ id: 'lyricsCandidate', subject: track, candidate: 'source:1' });
+    track = 'song-b';
+    card.history.replace({ id: 'lyrics' });
+    expect(store.get(card.navigation).place.id).toBe('lyrics');
+    card.history.back();
+    expect(store.get(card.view).prefs.page).toBe('queue');
+    card.dispose();
+  });
+
   it('简介与歌词页可以切换、收起与恢复', () => {
     const store = createStore();
     const storage = memoryStorage(JSON.stringify({ page: 'bio', open: true }));
@@ -89,7 +130,7 @@ describe('startRightCard', () => {
     card.dispose();
   });
 
-  it('拖宽按整像素落盘，夹进 300–480；封面收起与展开落盘', () => {
+  it('拖宽按整像素落盘，夹进 280–480；封面收起与展开落盘', () => {
     const store = createStore();
     const storage = memoryStorage();
     const card = startRightCard(store, { wide: atom(true) }, storage);

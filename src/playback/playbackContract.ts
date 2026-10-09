@@ -38,6 +38,8 @@ export interface PlaybackState {
   readonly canSeek: boolean;
   /** 装载着的曲目；停止或没有曲目时为 null。暂停时仍在。 */
   readonly track: Track | null;
+  /** 已确认的播放轮次；同一首重新开始也递增，标签更新与位置回读不改变它。 */
+  readonly trackGeneration: number;
   /** 秒。 */
   readonly position: number;
   readonly duration: number;
@@ -63,7 +65,7 @@ export interface PlaybackService {
   stop(): Promise<void>;
   next(): Promise<void>;
   previous(): Promise<void>;
-  /** 秒，夹在 0 与曲长之间。 */
+  /** 秒，夹在0与曲长之间；本次命令及位置回读处理完毕后兑现，不用兑现状态判断成功。 */
   seek(seconds: number): Promise<void>;
   /**
    * 收 dB，全服务串行发送，在途时只保留最新待发值。`refresh` 为真时，

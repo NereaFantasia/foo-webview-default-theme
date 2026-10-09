@@ -55,10 +55,11 @@
   padding-left: var(--spacingHorizontalXXL);
 }
 
-/* 卡列最宽 760，再宽就在右边留白，不把卡片拉长。 */
+/* 卡列最宽 760，额外宽度分到两侧，保持在目录右侧的内容区居中。 */
 .column {
   display: flex;
   flex-direction: column;
   gap: var(--spacingVerticalXXL);
   max-width: 760px;
+  margin-inline: auto;
 }

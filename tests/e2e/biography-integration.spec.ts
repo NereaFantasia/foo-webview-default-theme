@@ -44,6 +44,11 @@ async function start(page: Page) {
   }));
   await enterSettings(page);
   await page.locator('[data-settings-nav]').getByRole('button', { name: '在线内容' }).click();
+  await page
+    .locator('[data-settings-expander]')
+    .filter({ has: page.getByRole('switch', { name: '在线艺人简介', exact: true }) })
+    .locator('[data-settings-toggle]')
+    .click();
   await expect(toggle(page)).toBeEnabled();
   return player;
 }
@@ -266,6 +271,7 @@ test('中文没有正文时显示纯英文，简介语言可独立切换日语�
   await page.reload();
   await expect(panel(page).getByText('クイーンはイギリスのロックバンドです。')).toBeVisible();
   await enterSettings(page);
+  await page.getByRole('button', { name: '在线艺人简介', exact: true }).click();
   await expect(select).toHaveText('日本語');
   expect(errors).toEqual([]);
 });
@@ -278,7 +284,7 @@ test('设置页统计与清理接入，关闭在线仍可清理，不清除身�
   await expect(panel(page).getByText('Queen 的正文')).toBeVisible();
   await settled(page);
   const cache = page
-    .locator('[data-settings-card]')
+    .locator('[data-settings-row]')
     .filter({ has: page.getByText('简介缓存', { exact: true }) });
   await expect(cache).toContainText('2 条');
   await toggle(page).uncheck();

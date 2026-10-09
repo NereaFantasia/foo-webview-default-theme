@@ -5,13 +5,67 @@
   overflow: hidden;
   pointer-events: none;
   background: var(--colorNeutralBackground1);
-  filter: brightness(var(--background-brightness));
+}
+
+.root[data-background-pending] {
+  opacity: 0;
+}
+
+.root.material[data-background-source='material'] {
+  background: transparent;
 }
 
 .art {
   position: absolute;
   inset: calc(-1 * var(--background-blur));
-  filter: blur(var(--background-blur));
+  filter: blur(var(--background-blur)) saturate(var(--background-saturation))
+    brightness(var(--background-exposure));
+}
+
+/* 流动背景的颜色与模糊在绘制时确定，固定配方不再叠加图片偏好的滤镜或遮罩。 */
+.root[data-background-source='palette'] .art {
+  inset: 0;
+  filter: none;
+}
+
+.root[data-background-source='palette'] .shade {
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+/* 浅色色场在输出时限制明度，不再用中性覆盖层稀释颜色变化。 */
+.root[data-background-source='palette'][data-scheme='light'] .shade {
+  opacity: 0;
+}
+
+.root[data-background-source='palette'] .inactive {
+  display: none;
+}
+
+/* 原图先限制亮部，遮罩再控制浓淡。 */
+.root[data-scheme='dark'] {
+  background: var(--colorNeutralBackground2);
+}
+
+.root[data-scheme='dark']:not([data-background-source='palette']) .art {
+  filter: blur(var(--background-blur)) saturate(var(--background-saturation))
+    brightness(calc(0.16 * var(--background-exposure)));
+}
+
+/* 极暗原图仍需给浅色外壳的次要文字留足明度；流动背景不重复混白。 */
+.root[data-scheme='light']:not([data-background-source='palette']) .art {
+  opacity: 0.36;
+}
+
+.root[data-scheme='dark'] .shade,
+.root[data-scheme='dark'] .inactive {
+  background: var(--colorNeutralBackground2);
+}
+
+.root.solid {
+  background: var(--theme-background-color);
+  filter: none;
+  transition: background-color var(--motion-fast) var(--curveLinear);
 }
 
 .shade {
@@ -19,4 +73,13 @@
   inset: 0;
   background: var(--colorNeutralBackground1);
   opacity: var(--background-shade);
+}
+
+/* 失焦只向全窗中性底渐变，重新聚焦时从当前透明度返回；正文和前景表面不参与动画。 */
+.inactive {
+  position: absolute;
+  inset: 0;
+  background: var(--colorNeutralBackground1);
+  opacity: var(--background-inactive);
+  transition: opacity var(--motion-fast) var(--motion-curve-backdrop);
 }

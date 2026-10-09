@@ -33,6 +33,7 @@ import { BiographyIdentityChoice } from './identity/BiographyIdentityChoice.tsx'
 import { IDLE_IDENTITY } from './identity/identityRecord.ts';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
 import styles from './BiographyPanel.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export type BiographyTranslate = (key: keyof typeof biographyEn) => string;
 
@@ -66,6 +67,7 @@ export function BiographyOnlineSetting({
   readonly labelId?: string;
   readonly inputRef?: Ref<HTMLInputElement>;
 }) {
+  const controls = useViewControlStyles();
   const state = useAtomValueRawSync(prefs.state);
   return (
     <div className={styles.setting}>
@@ -78,7 +80,11 @@ export function BiographyOnlineSetting({
         onChange={(_, data) => prefs.setEnabled(data.checked)}
       />
       <span role="status">{state.failed && t('biography.prefsFailed')}</span>
-      {state.failed && <Button onClick={() => void prefs.retry()}>{t('biography.retry')}</Button>}
+      {state.failed && (
+        <Button className={controls.field} onClick={() => void prefs.retry()}>
+          {t('biography.retry')}
+        </Button>
+      )}
     </div>
   );
 }
@@ -91,6 +97,7 @@ function BiographyIdentityForm({
   layout,
   note,
 }: BiographyPanelProps & { readonly note?: string }) {
+  const controls = useViewControlStyles();
   const settings = useAtomValueRawSync(prefs.state);
   const [url, setUrl] = useState(artist ? lastfmBiographyUrl(artist, language) : '');
   const [failed, setFailed] = useState(false);
@@ -109,6 +116,7 @@ function BiographyIdentityForm({
           validationMessage={failed ? t('biography.invalidUrl') : undefined}
         >
           <Input
+            className={controls.field}
             value={url}
             onChange={(_, data) => {
               setUrl(data.value);
@@ -118,7 +126,11 @@ function BiographyIdentityForm({
         </Field>
       </div>
       <div className={styles['identity-actions']}>
-        <Button type="submit" disabled={!settings.loaded || settings.busy}>
+        <Button
+          className={controls.field}
+          type="submit"
+          disabled={!settings.loaded || settings.busy}
+        >
           {t('biography.confirm')}
         </Button>
       </div>
@@ -138,6 +150,7 @@ function BiographyIdentityForm({
 }
 
 export function BiographyPanel(props: BiographyPanelProps) {
+  const controls = useViewControlStyles();
   const { artist, service, prefs, t } = props;
   const links = useExternalLinks();
   const state = useAtomValueRawSync(service.state);
@@ -180,6 +193,7 @@ export function BiographyPanel(props: BiographyPanelProps) {
               <>
                 <Tooltip content={t('biography.refresh')} relationship="label">
                   <Button
+                    className={controls.icon}
                     appearance="subtle"
                     icon={<ArrowClockwise20Regular />}
                     aria-label={t('biography.refresh')}
@@ -189,6 +203,7 @@ export function BiographyPanel(props: BiographyPanelProps) {
                 </Tooltip>
                 <Tooltip content={t('biography.changeIdentity')} relationship="label">
                   <Button
+                    className={controls.icon}
                     appearance="subtle"
                     icon={<PersonEdit20Regular />}
                     aria-label={t('biography.changeIdentity')}
@@ -203,6 +218,7 @@ export function BiographyPanel(props: BiographyPanelProps) {
                 <MenuTrigger disableButtonEnhancement>
                   <Tooltip content={t('biography.options')} relationship="label">
                     <Button
+                      className={controls.icon}
                       appearance="subtle"
                       icon={<MoreHorizontal20Regular />}
                       aria-label={t('biography.options')}
@@ -246,6 +262,7 @@ export function BiographyPanel(props: BiographyPanelProps) {
         )}
         {(state.problem || state.detailsProblem || state.status === 'cleared') && (
           <Button
+            className={controls.icon}
             size="small"
             appearance="subtle"
             icon={<ArrowClockwise20Regular />}

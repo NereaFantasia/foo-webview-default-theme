@@ -8,7 +8,7 @@
   padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
   border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusLarge);
-  background: var(--colorNeutralBackground1);
+  background: var(--bg-panel-overlay);
   box-shadow: var(--shadow16);
 }
 .input {
@@ -47,10 +47,13 @@
   cursor: pointer;
 }
 .word:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
+}
+.word:active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
 .word[data-selected] {
-  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+  background-color: var(--bg-selected);
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
   outline-offset: -2px;
 }

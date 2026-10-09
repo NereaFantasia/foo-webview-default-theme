@@ -1,11 +1,5 @@
-import { Button } from '@fluentui/react-components';
-import {
-  Database20Regular,
-  Delete20Regular,
-  Globe20Regular,
-  Key20Regular,
-  LocalLanguage20Regular,
-} from '@fluentui/react-icons';
+import { Button, Switch } from '@fluentui/react-components';
+import { Delete20Regular, Globe20Regular, Open20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { localeAtom, translateAtom } from '../i18n/locale.ts';
@@ -28,6 +22,10 @@ import {
   OnlineSettingsNavigationContext,
 } from '../settings/onlineSettingsContext.ts';
 import { SettingsCard } from '../settings/SettingsCard.tsx';
+import { SettingsExpander } from '../settings/SettingsExpander.tsx';
+import { SettingsRow } from '../settings/SettingsRow.tsx';
+import { useHostAbsent } from '../settings/useHostAbsent.ts';
+import { EXTERNAL_LINK_CONFIRM } from '../kit/external-link/externalLinkGate.ts';
 import { OnboardingOnlineContext } from '../settings/onboarding/onboardingSlots.ts';
 import { SettingsSaveNotice } from '../settings/SettingsSaveNotice.tsx';
 import { LASTFM_KEY_PREF } from '../library/biography/lastfm-api/lastfmKey.ts';
@@ -75,7 +73,7 @@ function BiographyContent({ integration }: { readonly integration: BiographyInte
   );
 }
 
-function LastfmKeyCard({
+function LastfmKeyRow({
   integration,
   online,
 }: {
@@ -87,25 +85,19 @@ function LastfmKeyCard({
   const check = useAtomValueRawSync(integration.lastfmKey.check);
   const status = lastfmKeyStatus(key, check, online, t);
   return (
-    <SettingsCard
-      icon={<Key20Regular />}
+    <SettingsRow
       title={t('biography.lastfmKey')}
-      feedback={
-        <SettingsSaveNotice
-          persistence={integration.lastfmKey.persistence}
-          keys={[LASTFM_KEY_PREF.key]}
-        />
-      }
       description={status.text}
       error={status.error}
+      disabled={!online}
       field
     >
       {(ids) => <LastfmKeySetting {...ids} service={integration.lastfmKey} online={online} t={t} />}
-    </SettingsCard>
+    </SettingsRow>
   );
 }
 
-/** 在线艺人简介的开关卡，说明行写清数据发给谁：设置页「在线内容」与新人引导第 4 步共用。 */
+/** 新人引导的独立开关卡，和设置页共用开关逻辑，说明行写清数据发给谁。 */
 function BiographyOnlineCard({
   integration,
   inputRef,
@@ -136,6 +128,16 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
   const t = useAtomValueRawSync(translateAtom);
   const prefs = useAtomValueRawSync(integration.prefs.state);
   const cache = useAtomValueRawSync(integration.cacheState);
+  const key = useAtomValueRawSync(integration.lastfmKey.key);
+  const check = useAtomValueRawSync(integration.lastfmKey.check);
+  const keyStatus = lastfmKeyStatus(key, check, prefs.enabled, t);
+  const error = prefs.failed
+    ? t('biography.prefsFailed')
+    : keyStatus.error
+      ? keyStatus.text
+      : cache.failed
+        ? t('biography.cacheClearFailed')
+        : undefined;
   const requested = useAtomValueRawSync(integration.settingsRequested);
   const selectOnline = useContext(OnlineSettingsNavigationContext);
   const input = useRef<HTMLInputElement>(null);
@@ -161,36 +163,90 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
   ];
   return (
     <>
-      <BiographyOnlineCard integration={integration} inputRef={input} />
-      <SettingsCard icon={<LocalLanguage20Regular />} title={t('biography.language')} field>
-        {(ids) => (
-          <SettingsSelect
-            {...ids}
-            options={options}
-            value={prefs.language}
-            disabled={!prefs.loaded || prefs.busy}
-            onChange={(value) => integration.prefs.setLanguage(value)}
+      <SettingsExpander
+        icon={<Globe20Regular />}
+        title={t('biography.online')}
+        description={[t('biography.privacy'), error].filter(Boolean).join(' ')}
+        error={error !== undefined}
+        defaultOpen={false}
+        feedback={
+          <SettingsSaveNotice
+            persistence={integration.lastfmKey.persistence}
+            keys={[LASTFM_KEY_PREF.key]}
+          />
+        }
+        control={({ labelId }) => (
+          <BiographyOnlineSetting
+            prefs={integration.prefs}
+            t={t}
+            labelId={labelId}
+            inputRef={input}
           />
         )}
-      </SettingsCard>
-      <LastfmKeyCard integration={integration} online={prefs.enabled} />
-      <SettingsCard
-        icon={<Database20Regular />}
-        title={t('biography.cache')}
-        description={summary}
-        error={cache.failed}
       >
-        {() => (
-          <Button
-            icon={<Delete20Regular />}
-            disabled={!cache.loaded || cache.clearing}
-            onClick={() => void integration.clearCache()}
-          >
-            {t('biography.clearCache')}
-          </Button>
-        )}
-      </SettingsCard>
+        <SettingsRow title={t('biography.language')} disabled={!prefs.enabled} field>
+          {(ids) => (
+            <SettingsSelect
+              {...ids}
+              options={options}
+              value={prefs.language}
+              disabled={!prefs.loaded || prefs.busy || !prefs.enabled}
+              onChange={(value) => integration.prefs.setLanguage(value)}
+            />
+          )}
+        </SettingsRow>
+        <LastfmKeyRow integration={integration} online={prefs.enabled} />
+        <SettingsRow title={t('biography.cache')} description={summary} error={cache.failed}>
+          {() => (
+            <Button
+              icon={<Delete20Regular />}
+              disabled={!cache.loaded || cache.clearing}
+              onClick={() => void integration.clearCache()}
+            >
+              {t('biography.clearCache')}
+            </Button>
+          )}
+        </SettingsRow>
+      </SettingsExpander>
+      <ExternalConfirmationCard integration={integration} />
     </>
+  );
+}
+
+function ExternalConfirmationCard({ integration }: { readonly integration: BiographyIntegration }) {
+  const t = useAtomValueRawSync(translateAtom);
+  const enabled = useAtomValueRawSync(EXTERNAL_LINK_CONFIRM.atom);
+  const absent = useHostAbsent();
+  const [loaded, setLoaded] = useState(false);
+  const links = integration.links;
+  useEffect(() => {
+    let alive = true;
+    void links.ready.then(() => {
+      if (alive) setLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [links]);
+  return (
+    <SettingsCard
+      icon={<Open20Regular />}
+      title={t('settings.confirmExternal')}
+      description={absent ? t('settings.needsHost') : undefined}
+      feedback={
+        <SettingsSaveNotice persistence={links.persistence} keys={[EXTERNAL_LINK_CONFIRM.key]} />
+      }
+    >
+      {({ labelId, descriptionId }) => (
+        <Switch
+          checked={enabled}
+          disabled={absent || !loaded}
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          onChange={(_, data) => links.setConfirmation(data.checked)}
+        />
+      )}
+    </SettingsCard>
   );
 }
 

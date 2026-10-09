@@ -31,6 +31,7 @@ import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 import { AddFoldersAction } from '../AddFoldersAction.tsx';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 interface HomeView {
   readonly mode: HomeMode;
@@ -56,6 +57,7 @@ export function HomePage() {
 }
 
 function HomeContent() {
+  const viewControls = useViewControlStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const albums = useService(albumsKey);
@@ -172,7 +174,13 @@ function HomeContent() {
     void home.recent.refresh();
   };
   return (
-    <section ref={root} className={styles.root} data-page="home" aria-label={t('place.home')}>
+    <section
+      ref={root}
+      className={styles.root}
+      data-page="home"
+      aria-label={t('place.home')}
+      data-page-scrolls-header
+    >
       <header className={styles.header}>
         <h1>{t('place.home')}</h1>
         <PrimaryPlayButton
@@ -186,7 +194,10 @@ function HomeContent() {
       {notice && <p role="alert">{t(notice)}</p>}
       {catalog.status === 'failed' && (
         <p role="alert">
-          {t('album.readFailed')} <Button onClick={refresh}>{t('album.retry')}</Button>
+          {t('album.readFailed')}{' '}
+          <Button className={viewControls.field} onClick={refresh}>
+            {t('album.retry')}
+          </Button>
         </p>
       )}
       {catalog.status === 'ready' && !catalog.enabled && <p>{t('album.disabledTitle')}</p>}
@@ -200,13 +211,17 @@ function HomeContent() {
       {(feed.dirty || recent.dirty) && (
         <div className={styles.header}>
           <span role="status">{t('home.changed')}</span>
-          <Button icon={<ArrowClockwise20Regular />} onClick={refresh}>
+          <Button
+            className={viewControls.field}
+            icon={<ArrowClockwise20Regular />}
+            onClick={refresh}
+          >
             {t('home.refresh')}
           </Button>
         </div>
       )}
       {feed.available !== false &&
-        (feed.status !== 'ready' || feed.statistics.recent.length > 0) && (
+        (feed.status !== 'ready' || feed.unreadCount > 0 || feed.statistics.recent.length > 0) && (
           <section aria-label={t('home.recent')} data-home-section="recent">
             <h2>{t('home.recent')}</h2>
             {albumGrid(feed.statistics.recent)}
@@ -215,8 +230,26 @@ function HomeContent() {
             )}
             {(feed.status === 'failed' || feed.status === 'unavailable') && (
               <p role="alert">
-                {t('home.statsFailed')}{' '}
-                <Button onClick={() => void home.feed.refresh()}>{t('album.retry')}</Button>
+                {t(
+                  feed.failure === 'components'
+                    ? 'home.statsProbeFailed'
+                    : feed.failure === 'library'
+                      ? 'home.statsLibraryFailed'
+                      : feed.failure === 'albums'
+                        ? 'album.readFailed'
+                        : 'home.statsFailed',
+                )}{' '}
+                <Button className={viewControls.field} onClick={refresh}>
+                  {t('album.retry')}
+                </Button>
+              </p>
+            )}
+            {feed.status === 'ready' && feed.unreadCount > 0 && (
+              <p role="status">
+                {t('home.statsPartial', { count: feed.unreadCount })}{' '}
+                <Button className={viewControls.field} onClick={refresh}>
+                  {t('album.retry')}
+                </Button>
               </p>
             )}
           </section>
@@ -227,6 +260,8 @@ function HomeContent() {
           <h2>{t('home.added')}</h2>
           <Tooltip content={t('home.refreshAdded')} relationship="label">
             <Button
+              appearance="subtle"
+              className={viewControls.icon}
               icon={<ArrowClockwise20Regular />}
               aria-label={t('home.refreshAdded')}
               onClick={() => {
@@ -243,7 +278,9 @@ function HomeContent() {
         {(recent.status === 'failed' || recent.status === 'unavailable') && (
           <p role="alert">
             {t('home.addedFailed')}{' '}
-            <Button onClick={() => void home.recent.refresh()}>{t('album.retry')}</Button>
+            <Button className={viewControls.field} onClick={() => void home.recent.refresh()}>
+              {t('album.retry')}
+            </Button>
           </p>
         )}
         {recent.status === 'disabled' && <p>{t('album.disabledTitle')}</p>}
@@ -260,6 +297,8 @@ function HomeContent() {
           <h2>{t('home.explore')}</h2>
           <Tooltip content={t('home.nextBatch')} relationship="label">
             <Button
+              appearance="subtle"
+              className={viewControls.icon}
               icon={<ArrowClockwise20Regular />}
               aria-label={t('home.nextBatch')}
               disabled={view.mode === 'albums' ? !catalog.albums.length : !candidates.length}
@@ -293,6 +332,7 @@ function HomeContent() {
           </TabList>
           {view.mode === 'albums' ? (
             <Select
+              select={{ className: viewControls.field }}
               aria-label={t('home.duration')}
               value={String(view.duration)}
               onChange={(_, data) => {
@@ -311,6 +351,7 @@ function HomeContent() {
             </Select>
           ) : (
             <Select
+              select={{ className: viewControls.field }}
               aria-label={t('home.gemCondition')}
               value={view.gem}
               onChange={(_, data) =>
@@ -349,9 +390,15 @@ function HomeContent() {
                 }}
               />
             ))}
-            {!gems.length && feed.status === 'ready' && <p>{t('home.noGems')}</p>}
+            {!gems.length && feed.status === 'ready' && feed.unreadCount === 0 && (
+              <p>{t('home.noGems')}</p>
+            )}
             {!!candidates.length && (
-              <Button appearance="subtle" onClick={() => home.openGems(view.gem)}>
+              <Button
+                className={viewControls.icon}
+                appearance="subtle"
+                onClick={() => home.openGems(view.gem)}
+              >
                 {t('home.viewAll')}
               </Button>
             )}

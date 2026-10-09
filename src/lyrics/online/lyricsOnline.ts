@@ -25,15 +25,11 @@ export function createLyricsOnline(host: LyricsHttpHost, sources = createLyricsS
     const selected = (prefs.sources ?? []).flatMap((id) =>
       sources.filter((source) => source.id === id),
     );
-    return searchOnline(
-      query,
-      selected.filter((source) => source.id !== 'lrcmux'),
-      {
-        mode: 'sequential',
-        minimum: 'high',
-        fallbacks: selected.filter((source) => source.id === 'lrcmux'),
-        signal,
-      },
-    );
+    return searchOnline(query, selected, {
+      mode: 'sequential',
+      priority: prefs.order,
+      minimum: 'high',
+      signal,
+    });
   };
 }

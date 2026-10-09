@@ -13,8 +13,15 @@ import { serviceKey } from '../kit/serviceKey.ts';
 import type { Store } from '../kit/store.ts';
 import { startChangelogFeed, type Changelog } from './changelogFeed.ts';
 import type { ChangelogCatalog } from './changelog.ts';
-import { BUILT_IN_KEYS, ROOT_URL, readRelease, type PublishedKey } from './contract.ts';
+import {
+  BUILT_IN_KEYS,
+  ROOT_URL,
+  readRelease,
+  type PublishedKey,
+  type RootPayload,
+} from './contract.ts';
 import { installFrontend } from './frontendInstall.ts';
+import { pluginMaintenanceActive } from './pluginMaintenance.ts';
 import { confirmedStartupAtom, type ConfirmedStartup } from './loaderConfirmation.ts';
 import { json, marker, pendingPointer, versionRef } from './loaderContract.ts';
 import { fetchText, fetchVerified, type ReleaseHttp } from './releaseFetch.ts';
@@ -62,6 +69,7 @@ const MODE = atom<UpdateMode>(
 type CheckKind = 'scheduled' | 'manual' | 'install' | 'reset';
 
 export type UpdateStatus =
+  | { readonly phase: 'maintenance' }
   /** 这个窗口不运行更新器：还没确认、确认失败、弹窗或不受支持的来源。 */
   | { readonly phase: 'off'; readonly reason?: 'storage' }
   | {
@@ -129,6 +137,12 @@ export interface UpdaterService {
   readonly changelogFailed: Atom<boolean>;
   readonly catalog: Atom<ChangelogCatalog | null>;
   readonly persistence: ConfigPersistence;
+  readonly publication: Atom<UpdatePublication | null>;
+  /**
+   * 在主题检查、指针提交与清理的同一队列里执行组件维护；执行期间状态为 `maintenance`，`restart` 返回 false。
+   * 当前启动未确认、存储不可用，或已有未结束、读不懂的插件维护记录时拒绝执行。
+   */
+  maintain(action: () => Promise<void>): Promise<void>;
   setMode(mode: UpdateMode): Promise<boolean>;
   /** 手动检查：不看失败上限，auto 档接着下载安装，另两档只检查；正在检查时共用同一轮。 */
   check(): Promise<void>;
@@ -138,6 +152,12 @@ export interface UpdaterService {
   reset(): Promise<void>;
   restart(): Promise<boolean>;
   dispose(): void;
+}
+
+export interface UpdatePublication {
+  readonly text: string;
+  readonly payload: RootPayload;
+  readonly revokedKeys: readonly string[];
 }
 
 const FIRST_CHECK_MS = 60_000;
@@ -171,6 +191,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
   const feed = startChangelogFeed(store);
   const status = atom<UpdateStatus>({ phase: 'off' });
   const catalog = atom<ChangelogCatalog | null>(null);
+  const publication = atom<UpdatePublication | null>(null);
   let disposed = false;
   let running: Promise<void> | undefined;
   /** 检查与清理排在同一条队列里：清理算保留集时不能有安装进行到一半。 */
@@ -179,6 +200,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
   let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
   let presence: RunMarker | undefined;
   let checkedAt: number | null = null;
+  let maintaining = false;
 
   function alive(): void {
     if (disposed) throw new Error('更新服务已释放');
@@ -213,7 +235,12 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     if (presence?.shared()) return show({ phase: 'shared' });
     const files = templateFiles(host.file, startup.directory, alive);
     store.set(catalog, null);
+    if (await pluginMaintenanceActive(files)) {
+      show({ phase: 'maintenance' });
+      return;
+    }
     show({ phase: 'checking' });
+    store.set(publication, null);
     if (kind === 'reset') {
       await loadFailedReleases(files);
       await loadPointer(files);
@@ -231,6 +258,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     // 序号、信任集与撤回表先整体落盘，之后才按这份清单选版本、下载。
     await saveUpdateState(files, state);
     const { payload } = decision;
+    store.set(publication, { text: root.value, payload, revokedKeys: decision.state.revokedKeys });
     // 日志排在这一轮之后拉取，不拖慢检查。
     queue = queue.then(() => feed.refresh(host.http, payload.changelog));
 
@@ -317,6 +345,10 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     if (!result.ok) return fail(files, state, candidate.version, result.problem);
     // 安装期间指针可能被启动确认之外的写入改过，提交前重新读一次。
     const pointer = pendingPointer(await loadPointer(files), result.version);
+    if (await pluginMaintenanceActive(files)) {
+      show({ phase: 'maintenance' });
+      return;
+    }
     await files.writeText('current.json', JSON.stringify(pointer), { atomic: true });
     alive();
     store.set(catalog, (value) => value && { ...value, pending: result.version.v });
@@ -355,6 +387,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
       if (disposed || !presence || presence.shared()) return;
       const files = templateFiles(host.file, startup.directory, alive);
       try {
+        if (await pluginMaintenanceActive(files)) return;
         await cleanVersions(files, host, startup.session.version, await presence.stale(), alive);
       } catch {
         // 清理失败不影响使用，下次启动再删。
@@ -412,6 +445,32 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     changelogFailed: feed.failed,
     catalog: atom((get) => get(catalog)),
     persistence: prefs,
+    publication: atom((get) => get(publication)),
+    maintain(action) {
+      const startup = store.get(confirmedStartupAtom);
+      const task = queue.then(async () => {
+        alive();
+        if (
+          !startup ||
+          options.storageAvailable === false ||
+          store.get(confirmedStartupAtom) !== startup
+        )
+          throw new Error('当前安装尚未就绪');
+        const files = templateFiles(host.file, startup.directory, alive);
+        if (await pluginMaintenanceActive(files)) throw new Error('已有插件维护事务');
+        const previous = store.get(status);
+        maintaining = true;
+        show({ phase: 'maintenance' });
+        try {
+          await action();
+        } finally {
+          maintaining = false;
+          if (!disposed && !(await pluginMaintenanceActive(files))) show(previous);
+        }
+      });
+      queue = task.catch(() => {});
+      return task;
+    },
     setMode: (value) =>
       options.storageAvailable === false ? Promise.resolve(false) : prefs.set(UPDATE_MODE, value),
     check: () => check('manual'),
@@ -421,7 +480,10 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
         const current = store.get(status);
         if (current.phase === 'manual' && current.reason === 'state') return check('reset');
       }),
-    restart: () => hostCommand(() => host.misc.restart()),
+    restart: () =>
+      maintaining || store.get(status).phase === 'maintenance'
+        ? Promise.resolve(false)
+        : hostCommand(() => host.misc.restart()),
     dispose() {
       disposed = true;
       for (const off of offs) off();

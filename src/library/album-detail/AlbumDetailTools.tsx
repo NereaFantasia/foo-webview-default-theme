@@ -31,6 +31,13 @@ import type { TableSort } from '../../table/TrackTableHeader.tsx';
 import { DETAIL_SORT_FIELDS, detailSort, detailSortField } from './albumDetailItems.ts';
 import styles from './AlbumDetailTools.module.css';
 
+const ENABLED_CONTROL = '&:not(:disabled, [aria-disabled="true"]):not(:has(> :disabled))';
+const CHIP_SURFACE = {
+  '@media (forced-colors: none)': {
+    [ENABLED_CONTROL]: { backgroundColor: 'var(--bg-chip)' },
+  },
+};
+
 const useStyles = makeStyles({
   icon: {
     width: '32px',
@@ -41,7 +48,7 @@ const useStyles = makeStyles({
     transitionDuration: durationVar('faster'),
     transitionTimingFunction: tokens.curveLinear,
   },
-  open: { backgroundColor: 'var(--bg-chip)', color: 'var(--text-primary)' },
+  open: { ...CHIP_SURFACE, color: 'var(--text-primary)' },
   active: { color: 'var(--accent)' },
   field: {
     height: '32px',
@@ -51,13 +58,13 @@ const useStyles = makeStyles({
     paddingRight: `calc(${tokens.spacingHorizontalM} + ${tokens.spacingHorizontalXXS})`,
     justifyContent: 'space-between',
     fontWeight: tokens.fontWeightRegular,
-    backgroundColor: 'var(--bg-chip)',
+    ...CHIP_SURFACE,
   },
   direction: {
     width: '32px',
     minWidth: '32px',
     height: '32px',
-    backgroundColor: 'var(--bg-chip)',
+    ...CHIP_SURFACE,
   },
   search: {
     width: '100%',
@@ -65,24 +72,30 @@ const useStyles = makeStyles({
     maxWidth: '100%',
     height: '32px',
     borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: 'var(--bg-chip)',
-    ':focus-within': {
-      ...shorthands.borderColor(tokens.colorBrandStroke1),
+    '@media (forced-colors: none)': {
+      [ENABLED_CONTROL]: {
+        backgroundColor: 'var(--bg-chip)',
+        ':focus-within': { ...shorthands.borderColor(tokens.colorBrandStroke1) },
+      },
+      '::after': { display: 'none' },
     },
-    '::after': { display: 'none' },
   },
   menu: { minWidth: '176px' },
   surface: {
-    ...shorthands.borderColor(
-      `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
-    ),
     transitionProperty: 'background-color, border-color',
     transitionDuration: durationVar('faster'),
     transitionTimingFunction: tokens.curveLinear,
-    ':hover': {
-      backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 12%, transparent)`,
+    '@media (forced-colors: none)': {
+      [ENABLED_CONTROL]: {
+        ...shorthands.borderColor(
+          `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
+        ),
+        ':hover': {
+          backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 12%, transparent)`,
+        },
+        ':active,:hover:active,:active:focus-visible': { backgroundColor: 'var(--bg-chip)' },
+      },
     },
-    ':active': { backgroundColor: 'var(--bg-chip)' },
   },
 });
 

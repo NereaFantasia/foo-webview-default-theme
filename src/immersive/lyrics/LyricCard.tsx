@@ -1,3 +1,5 @@
+import { useService } from '../../kit/useService.ts';
+import { lyricsDisplayKey, lyricsFontFamily } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -26,11 +28,11 @@ interface CardFit {
   width: number;
 }
 
-const freshFit = (key: string, width: number): CardFit => ({
+const freshFit = (key: string, width: number, sub: number): CardFit => ({
   key,
   step: 'font',
   main: LYRIC_FONT.main,
-  sub: LYRIC_FONT.sub,
+  sub,
   width,
 });
 
@@ -49,6 +51,8 @@ function cardWidth(main: HTMLElement | null, sub: HTMLElement | null): number {
  */
 export function LyricCard() {
   const t = useAtomValueRawSync(translateAtom);
+  const displayService = useService(lyricsDisplayKey);
+  const display = useAtomValueRawSync(displayService.display);
   const { state, source, lineCount } = useAtomValueRawSync(lyricLogAtom);
   const card = useAtomValueRawSync(lyricCardAtom);
   const synced = state === 'synced' ? card : null;
@@ -63,9 +67,20 @@ export function LyricCard() {
 
   const mainRef = useRef<HTMLDivElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
-  const key = JSON.stringify([state, card?.main ?? null, card?.sub ?? null, lineCount]);
-  const [fit, setFit] = useState<CardFit>(() => freshFit(key, CARD_MIN));
-  if (fit.key !== key) setFit(freshFit(key, fit.width));
+  const subSize =
+    synced?.subKind === 'translation'
+      ? (display.translationFontSize ?? LYRIC_FONT.sub)
+      : LYRIC_FONT.sub;
+  const key = JSON.stringify([
+    state,
+    card?.main ?? null,
+    card?.sub ?? null,
+    lineCount,
+    subSize,
+    display.fontFamily,
+  ]);
+  const [fit, setFit] = useState<CardFit>(() => freshFit(key, CARD_MIN, subSize));
+  if (fit.key !== key) setFit(freshFit(key, fit.width, subSize));
 
   useLayoutEffect(() => {
     if (fit.step === 'done') return;
@@ -76,14 +91,20 @@ export function LyricCard() {
       return;
     }
     const mainSize = main ? fittedFontSize(LYRIC_TEXT_WIDTH, main.scrollWidth, MAIN_FIT) : fit.main;
-    const subSize = sub ? fittedFontSize(LYRIC_TEXT_WIDTH, sub.scrollWidth, SUB_FIT) : fit.sub;
+    const fittedSub = sub
+      ? fittedFontSize(LYRIC_TEXT_WIDTH, sub.scrollWidth, {
+          ...SUB_FIT,
+          max: subSize,
+          min: Math.min(subSize, SUB_FIT.min),
+        })
+      : fit.sub;
     // 字号没降就不用按新字号再排一遍，眼下量到的字宽就是终值。
-    if (mainSize === fit.main && subSize === fit.sub) {
+    if (mainSize === fit.main && fittedSub === fit.sub) {
       setFit({ ...fit, step: 'done', width: cardWidth(main, sub) });
     } else {
-      setFit({ ...fit, step: 'width', main: mainSize, sub: subSize });
+      setFit({ ...fit, step: 'width', main: mainSize, sub: fittedSub });
     }
-  }, [fit]);
+  }, [fit, subSize]);
 
   if (!shown) return null;
   return (
@@ -98,7 +119,7 @@ export function LyricCard() {
           <div
             ref={mainRef}
             className={`${styles.text} ${styles.main}`}
-            style={{ fontSize: `${fit.main}px` }}
+            style={{ fontSize: `${fit.main}px`, fontFamily: lyricsFontFamily(display.fontFamily) }}
             data-field="lyric-main"
           >
             {synced.main}
@@ -108,7 +129,7 @@ export function LyricCard() {
               ref={subRef}
               className={`${styles.text} ${styles.sub}`}
               data-kind={synced.subKind}
-              style={{ fontSize: `${fit.sub}px` }}
+              style={{ fontSize: `${fit.sub}px`, fontFamily: lyricsFontFamily(display.fontFamily) }}
               data-field="lyric-sub"
             >
               {synced.sub}

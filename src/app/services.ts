@@ -72,7 +72,12 @@ import {
 } from '../track/trackRatings.ts';
 import { watchColorScheme } from '../theme/colorScheme.ts';
 import { browserMatchMedia } from '../theme/mediaQuery.ts';
-import { startBackdrop, backdropKey } from '../theme/backdrop.ts';
+import {
+  startBackdrop,
+  backdropKey,
+  backdropNoticeAtom,
+  backdropDiagnosticsAtom,
+} from '../theme/backdrop.ts';
 import { hasBlockingAtom, startInfoCenter, infoCenterKey } from '../host/infoCenter.ts';
 import type { Store } from '../kit/store.ts';
 import type { BrowserDataWriter } from '../kit/browserDataStorage.ts';
@@ -80,6 +85,8 @@ import { createConfigWriter, type ConfigWriter } from '../host/configWrite.ts';
 import { startTray, trayKey } from '../playback/tray.ts';
 import { createTrayIcons } from '../shell/trayIcons.ts';
 import { startWindowShell, windowShellKey } from '../host/windowShell.ts';
+import { startWindowZoom, windowZoomKey } from '../host/windowZoom.ts';
+import { startWindowActivity } from '../host/windowActivity.ts';
 import { startMiniWindow, miniWindowKey } from '../host/miniWindow.ts';
 import { startWindowTitle } from '../playback/windowTitle.ts';
 import {
@@ -102,10 +109,14 @@ import {
   type LoaderConfirmationService,
 } from '../update/loaderConfirmation.ts';
 import { startUpdater, updaterKey } from '../update/updater.ts';
+import { startBackendConnection } from '../server/backendConnection.ts';
+import { startBackendBootstrap, backendBootstrapKey } from '../update/backendBootstrap.ts';
+import { startPluginUpdater, pluginUpdaterKey } from '../update/pluginUpdater.ts';
 import { startChangelogView, changelogViewKey } from '../update/changelogView.ts';
 import { updateNotice } from './updateIntegration.ts';
 import { startOnboarding, onboardingKey } from '../settings/onboarding/onboarding.ts';
 import { startupOverlay } from './startupOverlay.ts';
+import { immersiveIntegrationKey, startImmersiveIntegration } from './immersiveIntegration.ts';
 import {
   prefSaveStatesAtom,
   prefStorageAvailableAtom,
@@ -195,11 +206,19 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   scope.stop(prefs.subscribe(publishSaving));
   publishSaving();
   const startup = scope.own(startLoaderConfirmation(store));
+  const connection = scope.own(startBackendConnection(store));
+  const backend = scope.add(
+    backendBootstrapKey,
+    startBackendBootstrap(store, connection, {
+      storageAvailable: prefs.available,
+    }),
+  );
   const configWriter = createConfigWriter(fb, dataWriter);
   const updater = scope.add(
     updaterKey,
     startUpdater(store, { writer: configWriter, storageAvailable: prefs.available }),
   );
+  scope.add(pluginUpdaterKey, startPluginUpdater(store, updater, backend, connection));
   const changelog = scope.add(changelogViewKey, startChangelogView(store, updater, configWriter));
   const media = browserMatchMedia();
   scope.stop(watchColorScheme(store, media));
@@ -207,6 +226,7 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   scope.stop(watchReducedMotion(store, media));
   scope.add(localeKey, startLocale(store, fb, undefined, dataWriter));
   scope.add(backdropKey, startBackdrop(store));
+  scope.add(windowZoomKey, startWindowZoom(store));
   const history = scope.bind(historyKey, startNavHistory(store, loadStartPlace(store)));
   const commands = scope.add(commandsKey, startCommandRegistry(window));
   scope.stop(registerNavCommands(commands, history));
@@ -215,7 +235,12 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   loadVolumeScale(store);
   scope.own(startNowPlaying(store));
   const windowShell = scope.add(windowShellKey, startWindowShell(store));
+  scope.own(startWindowActivity(store, windowShell));
   scope.add(miniWindowKey, startMiniWindow(store, prefs, windowShell));
+  scope.add(
+    immersiveIntegrationKey,
+    startImmersiveIntegration(store, { history, commands, playback }),
+  );
   scope.own(startWindowTitle(store));
   scope.add(mainMenuKey, startMainMenu(store));
   scope.add(
@@ -223,7 +248,6 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
     startTray(store, {
       playback,
       icon: createTrayIcons(),
-      visible: () => document.visibilityState === 'visible',
       configWriter,
     }),
   );
@@ -296,7 +320,12 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
         check: updater.check,
         install: updater.install,
         showChangelog: changelog.show,
+        backend: {
+          failed: atom((get) => get(backend.status).phase === 'failed'),
+          retry: backend.retry,
+        },
       },
+      { notice: backdropNoticeAtom, diagnostics: backdropDiagnosticsAtom },
     ),
   );
   scope.add(

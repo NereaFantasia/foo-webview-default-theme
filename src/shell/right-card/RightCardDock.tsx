@@ -2,7 +2,8 @@ import { createPresenceComponent } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useLightDismiss } from '../../nav/useLightDismiss.ts';
-import { CURVE } from '../../motion/timing.ts';
+import { CURVE, DURATION_MS } from '../../motion/timing.ts';
+import { SidePanel, SidePanelHost } from '../../kit/SidePanel.tsx';
 import { CONTENT_MIN, RIGHT_CARD_WIDTH } from './rightCard.ts';
 import { RightCard } from './RightCard.tsx';
 import { RIGHT_CARD_KEY_ATTR, RightCardContext } from './rightCardContext.ts';
@@ -17,26 +18,20 @@ import { GUTTER, RightCardSplitter } from './RightCardSplitter.tsx';
 const DOCK_OPEN_MS = 200;
 const DOCK_CLOSE_MS = 100;
 
-/** 浮层开合照 SplitView 的浮层窗格：从右边滑入 350 ms，滑出 120 ms。 */
-const OVERLAY_OPEN_MS = 350;
-const OVERLAY_CLOSE_MS = 120;
-
 const DockMotion = createPresenceComponent(() => {
-  const keyframes = [{ clipPath: 'inset(0 0 0 100%)' }, { clipPath: 'inset(0 0 0 0)' }];
+  const keyframes = [{ clipPath: 'inset(0 0 0 100%)' }, { clipPath: 'inset(0)' }];
   const easing = CURVE.pane.timing;
+  // 收起时主内容已扩宽，淡出减轻两边文字在退场期间的重叠。
+  const fade = [{ opacity: 0 }, { opacity: 1 }];
   return {
-    enter: { keyframes, duration: DOCK_OPEN_MS, easing },
-    exit: { keyframes: [...keyframes].reverse(), duration: DOCK_CLOSE_MS, easing },
-  };
-});
-
-/** 滑出时多走一截，让过浮层与内容区右缘之间的那道缝，最后一帧不在窗口边上留一条。 */
-const OverlayMotion = createPresenceComponent(() => {
-  const keyframes = [{ translate: 'calc(100% + 16px) 0' }, { translate: '0 0' }];
-  const easing = CURVE.decelerateMax.timing;
-  return {
-    enter: { keyframes, duration: OVERLAY_OPEN_MS, easing },
-    exit: { keyframes: [...keyframes].reverse(), duration: OVERLAY_CLOSE_MS, easing },
+    enter: [
+      { keyframes, duration: DOCK_OPEN_MS, easing },
+      { keyframes: fade, duration: DURATION_MS.faster, easing: CURVE.linear.timing },
+    ],
+    exit: [
+      { keyframes: [...keyframes].reverse(), duration: DOCK_CLOSE_MS, easing },
+      { keyframes: [...fade].reverse(), duration: DURATION_MS.faster, easing: CURVE.linear.timing },
+    ],
   };
 });
 
@@ -48,6 +43,8 @@ export interface RightCardDockProps {
   readonly capsule: boolean;
   /** 窗口窄于 641：浮层铺满内容卡。 */
   readonly compact: boolean;
+  /** 窄窗左侧导航浮层，与右侧共用定位容器。 */
+  readonly startOverlay?: ReactNode;
   /** 内容卡。 */
   readonly children: ReactNode;
 }
@@ -60,7 +57,7 @@ function returnFocus(page: string): void {
 
 /**
  * 右侧卡与内容卡放在一起的那一层。宽窗里卡停靠在内容卡右边，中间是 8 的拖拽条；卡的宽度照存的，内容卡
- * 至少留 480，不够时卡让宽，最窄 300。窄窗里卡不占位，盖在内容卡右侧（≤ 640 时铺满），点外面、按 Esc 收起。
+ * 至少留 480，不够时卡让宽，最窄 280。窄窗里卡不占位，盖在内容卡右侧（≤ 640 时铺满），点外面、按 Esc 收起。
  *
  * 停靠的卡收起时版式当场回到只有内容卡一列，卡还要播完收起：这期间它按收起前量下的宽度浮在原位，压在
  * 已经变宽的内容卡上，播完卸下。
@@ -70,6 +67,7 @@ export function RightCardDock({
   navRow,
   capsule,
   compact,
+  startOverlay,
   children,
 }: RightCardDockProps) {
   const { prefs, form } = useAtomValueRawSync(services.card.view);
@@ -100,8 +98,9 @@ export function RightCardDock({
   const leaving = form !== 'docked';
   return (
     <RightCardContext value={services}>
-      <div
+      <SidePanelHost
         ref={dock}
+        compact={compact}
         className={styles.dock}
         style={columns ? { gridTemplateColumns: columns } : undefined}
       >
@@ -118,20 +117,20 @@ export function RightCardDock({
             <RightCard />
           </div>
         </DockMotion>
-        <OverlayMotion visible={form === 'overlay'} unmountOnExit>
-          <div
-            ref={panel}
-            className={styles.card}
-            data-form="overlay"
-            data-nav-row={navRow || undefined}
-            data-capsule={capsule || undefined}
-            data-compact={compact || undefined}
-            onPointerDownCapture={markInside}
-          >
-            <RightCard />
-          </div>
-        </OverlayMotion>
-      </div>
+        <SidePanel
+          ref={panel}
+          side="end"
+          open={form === 'overlay'}
+          data-form="overlay"
+          data-nav-row={navRow || undefined}
+          data-capsule={capsule || undefined}
+          data-compact={compact || undefined}
+          onPointerDownCapture={markInside}
+        >
+          <RightCard />
+        </SidePanel>
+        {startOverlay}
+      </SidePanelHost>
     </RightCardContext>
   );
 }

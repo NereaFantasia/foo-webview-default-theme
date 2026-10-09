@@ -1,0 +1,56 @@
+.root {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+.root header,
+.root footer {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+}
+.root header > span {
+  font-size: var(--fontSizeBase200);
+  color: var(--colorNeutralForeground2);
+}
+.body {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacingVerticalM);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalM);
+}
+.actions,
+.offset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+}
+.offset > span {
+  flex: 1;
+}
+.details {
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 0 var(--spacingHorizontalM) var(--spacingVerticalM);
+}
+.details dl {
+  display: grid;
+  gap: var(--spacingVerticalS);
+}
+.details dt {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}
+.details dd {
+  margin: 0 0 var(--spacingVerticalM);
+  overflow-wrap: anywhere;
+}

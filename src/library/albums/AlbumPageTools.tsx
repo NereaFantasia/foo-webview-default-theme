@@ -14,6 +14,7 @@ import {
   Slider,
   Tooltip,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import { Menu, Popover } from '../../motion/Surfaces.tsx';
@@ -33,6 +34,7 @@ import {
 import { browserPrefsAtom, TILE_SIZE_MAX, TILE_SIZE_MIN, TILE_SIZE_STEP } from './browserPrefs.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export const DIMENSION_LABELS: Readonly<Record<SectionDimension, MessageKey>> = {
   album: 'album.dimAlbum',
@@ -85,6 +87,7 @@ export function DimensionMenu() {
   const t = useAtomValueRawSync(translateAtom);
   const { dimension } = useAtomValueRawSync(browserPrefsAtom);
   const albums = useService(albumsKey);
+  const controls = useViewControlStyles();
   return (
     <Menu
       checkedValues={{ dimension: [dimension] }}
@@ -94,7 +97,7 @@ export function DimensionMenu() {
       }}
     >
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton data-album-tool="dimension">
+        <MenuButton appearance="subtle" className={controls.field} data-album-tool="dimension">
           {t('album.dimensionValue', { value: t(DIMENSION_LABELS[dimension]) })}
         </MenuButton>
       </MenuTrigger>
@@ -115,6 +118,7 @@ export function SortMenu() {
   const t = useAtomValueRawSync(translateAtom);
   const { sort } = useAtomValueRawSync(browserPrefsAtom);
   const albums = useService(albumsKey);
+  const controls = useViewControlStyles();
   return (
     <Menu
       checkedValues={{ sort: [sort] }}
@@ -124,7 +128,7 @@ export function SortMenu() {
       }}
     >
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton data-album-tool="sort">
+        <MenuButton appearance="subtle" className={controls.field} data-album-tool="sort">
           {t('album.sortValue', { value: t(SORT_SHORT[sort]) })}
         </MenuButton>
       </MenuTrigger>
@@ -147,12 +151,18 @@ export function TileSizeButton() {
   const { tileSize } = useAtomValueRawSync(browserPrefsAtom);
   const albums = useService(albumsKey);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const sliderId = useId();
   return (
     <Popover positioning="below-end" trapFocus>
       <PopoverTrigger disableButtonEnhancement>
         <Tooltip content={t('album.tileSize')} relationship="label">
-          <Button appearance="subtle" icon={<ResizeImage20Regular />} data-album-tool="tile-size" />
+          <Button
+            appearance="subtle"
+            className={controls.icon}
+            icon={<ResizeImage20Regular />}
+            data-album-tool="tile-size"
+          />
         </Tooltip>
       </PopoverTrigger>
       <PopoverSurface className={classes.size}>
@@ -186,6 +196,7 @@ export function PageMenu({ facetsOpen, onFacetsOpenChange, facetCount }: PageMen
   const { style, form } = useAtomValueRawSync(browserPrefsAtom);
   const albums = useService(albumsKey);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   return (
     <Menu
       checkedValues={{ facets: facetsOpen ? ['open'] : [] }}
@@ -196,7 +207,7 @@ export function PageMenu({ facetsOpen, onFacetsOpenChange, facetCount }: PageMen
       <MenuTrigger disableButtonEnhancement>
         <Tooltip content={t('album.pageMenu')} relationship="label">
           <Button
-            className={classes.more}
+            className={mergeClasses(classes.more, controls.icon)}
             appearance="subtle"
             icon={<MoreHorizontal20Regular />}
             data-album-tool="page-menu"

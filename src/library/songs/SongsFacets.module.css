@@ -33,7 +33,7 @@
   max-height: 30vh;
   padding: var(--spacingVerticalXS);
   overflow-y: auto;
-  background: var(--colorNeutralBackground2);
+  background: var(--bg-view-control);
   border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
   border-radius: var(--borderRadiusMedium);
 }
@@ -50,13 +50,13 @@
   border-radius: var(--borderRadiusMedium);
 }
 .row:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
 }
 .on {
-  background: var(--colorSubtleBackgroundSelected);
+  background-color: var(--bg-selected);
 }
-.on:hover {
-  background: var(--colorSubtleBackgroundPressed);
+.row:active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
 .count {
   flex: none;

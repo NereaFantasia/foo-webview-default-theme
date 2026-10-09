@@ -1,3 +1,5 @@
+import { startLyricsArchive } from '../../../src/lyrics/lyricsArchive.ts';
+import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
 import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { startLocalLyrics } from '../../../src/lyrics/lyricsLocal.ts';
@@ -35,7 +37,7 @@ const httpLyrics = (
   ]),
 });
 
-function setup(enabled = false) {
+function setup(enabled = false, withArchive = false) {
   const host = installFakeHost();
   host.answer('lyrics.get', { success: true, available: false, path: '' });
   host.answer('http.get', (params) => {
@@ -48,6 +50,9 @@ function setup(enabled = false) {
   const connected = atom(true);
   const pref = atom<LyricsPrefs>({ enabled, sources: ['lrclib'] });
   const local = startLocalLyrics(store, { host: host.fb, track: current, connected });
+  const archive = withArchive
+    ? startLyricsArchive(store, current, host.fb, createMemoryConfigWriter(host.fb))
+    : undefined;
   const service = startLyrics(store, {
     host: host.fb,
     track: current,
@@ -55,10 +60,12 @@ function setup(enabled = false) {
     connected,
     local,
     prefs: { pref },
+    archive,
   });
   onTestFinished(() => {
     service.dispose();
     local.dispose();
+    archive?.dispose();
   });
   return {
     host,
@@ -69,6 +76,8 @@ function setup(enabled = false) {
     play: (next: LyricsTarget | null) => store.set(current, next),
     show: (value: boolean) => store.set(active, value),
     connect: (value: boolean) => store.set(connected, value),
+    order: (order: NonNullable<LyricsPrefs['order']>) =>
+      store.set(pref, { ...store.get(pref), order }),
     online: (value: boolean) => store.set(pref, { ...store.get(pref), enabled: value }),
   };
 }
@@ -151,6 +160,129 @@ describe('当前曲目歌词', () => {
       expect(env.store.get(env.service.choices)).toMatchObject({ status: 'idle', candidates: [] });
     },
   );
+
+  it('全局顺序可以让在线优先，也会回退到本地', async () => {
+    const env = setup(true);
+    env.host.answer('lyrics.get', {
+      success: true,
+      available: true,
+      source: 'embedded',
+      path: '',
+      lyrics: '本地歌词',
+      synced: false,
+    });
+    env.order(['line', 'local', 'word', 'plain']);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ source: 'lrclib' });
+    env.order(['word', 'local', 'line', 'plain']);
+    await expect.poll(env.state).toMatchObject({ source: 'embedded' });
+    env.online(false);
+    env.order(['line', 'plain', 'local', 'word']);
+    expect(env.state()).toMatchObject({ source: 'embedded' });
+  });
+
+  it('默认版本在重新读取后保留，恢复自动选择才清除；跳转夹在曲长内', async () => {
+    const env = setup(true, true);
+    env.host.answer('lyrics.get', {
+      success: true,
+      available: true,
+      source: 'embedded',
+      path: '',
+      lyrics: '本地歌词',
+      synced: false,
+    });
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ source: 'embedded' });
+    await env.service.search('默认版本');
+    const candidate = env.store.get(env.service.choices).candidates[0];
+    if (!candidate) throw new Error('缺少候选');
+    expect(await env.service.choose(candidate, true)).toBe(true);
+    await expect
+      .poll(() => env.host.config.get('defaultTheme.lyrics.track.a'))
+      .toHaveProperty('selected');
+    env.service.refresh();
+    expect(env.state()).toMatchObject({ source: 'lrclib' });
+    await env.service.setOffset(2);
+    expect(env.store.get(env.service.offset)).toBe(2);
+    env.service.refresh();
+    expect(env.store.get(env.service.offset)).toBe(2);
+    expect(env.service.seekTime(10)).toBe(12);
+    expect(env.service.seekTime(119)).toBe(120);
+    await env.service.setOffset(-3);
+    expect(env.service.seekTime(1)).toBe(0);
+    await env.service.restoreAutomatic();
+    await expect.poll(env.state).toMatchObject({ source: 'embedded' });
+  });
+
+  it('恢复自动选择即时取词，保存稍后完成不作废已经发出的取词', async () => {
+    const env = setup(true, true);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ source: 'lrclib' });
+    await env.service.search('默认版本');
+    const candidate = env.store.get(env.service.choices).candidates[0];
+    if (!candidate) throw new Error('缺少候选');
+    await env.service.choose(candidate, true);
+    await expect
+      .poll(() => env.host.config.get('defaultTheme.lyrics.track.a'))
+      .toHaveProperty('selected');
+    const saving = env.host.hold('config.set');
+    const fetching = env.host.hold('http.get');
+    const restored = env.service.restoreAutomatic();
+    await expect.poll(() => fetching.pending.length).toBe(1);
+    saving.respond(0, { success: true, key: 'defaultTheme.lyrics.track.a' });
+    await restored;
+    fetching.respond(0, httpLyrics('a', '[00:01]恢复后的自动歌词'));
+    await expect.poll(env.state).toMatchObject({
+      source: 'lrclib',
+      content: { kind: 'synced', lines: [{ words: [{ word: '恢复后的自动歌词' }] }] },
+    });
+    expect(fetching.pending).toHaveLength(0);
+  });
+
+  it('同一关键词失败后可重新搜索，显式刷新跳过成功缓存', async () => {
+    const env = setup(true);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ source: 'lrclib' });
+    env.host.answer('http.get', hostFailure('OPERATION_FAILED'));
+    await env.service.search('重试关键词');
+    expect(env.store.get(env.service.choices).failed).toEqual(['lrclib']);
+    env.host.answer('http.get', httpLyrics('恢复结果'));
+    await env.service.search('重试关键词');
+    expect(env.store.get(env.service.choices)).toMatchObject({
+      candidates: [{ title: '恢复结果' }],
+      failed: [],
+    });
+    env.host.answer('http.get', httpLyrics('更新结果'));
+    await env.service.search('重试关键词', true);
+    expect(env.store.get(env.service.choices)).toMatchObject({
+      candidates: [{ title: '更新结果' }],
+      failed: [],
+    });
+  });
+
+  it('候选预览不替换正文，页面往返保留搜索与正文缓存', async () => {
+    const env = setup(true);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ status: 'ready' });
+    const before = env.state();
+    await env.service.search('另一个版本');
+    const candidate = env.store.get(env.service.choices).candidates[0];
+    if (!candidate) throw new Error('缺少候选');
+    expect(await env.service.previewCandidate(candidate)).not.toBeNull();
+    expect(env.state()).toEqual(before);
+    env.show(false);
+    env.show(true);
+    expect(env.store.get(env.service.choices)).toMatchObject({
+      status: 'ready',
+      keywords: '另一个版本',
+    });
+    const calls = env.host.callsTo('http.get').length;
+    await env.service.search('另一个版本');
+    expect(env.store.get(env.service.choices).candidates).toEqual([candidate]);
+    expect(env.host.callsTo('http.get')).toHaveLength(calls);
+    expect(await env.service.choose({ ...candidate })).toBe(true);
+    expect(env.state()).toMatchObject({ candidate: { title: '另一个版本' } });
+  });
 
   it('本地优先，启用在线也不搜索已有歌词；纯文本保留原文', async () => {
     const env = setup(true);

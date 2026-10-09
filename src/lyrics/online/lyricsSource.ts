@@ -32,6 +32,8 @@ export interface LyricsCandidate {
   readonly durationMs: number;
   /** 搜索应答里已经带着歌词时直接放这里，取词不再发请求。 */
   readonly content?: LyricsContent;
+  /** 来源给出的本候选封面地址；不借用正在播放曲目的图片。 */
+  readonly coverUrl?: string;
 }
 
 /** 取词的结果：`missing` 是来源明确没有这首的词（含纯音乐），`failed` 是请求或解析失败，可以稍后再试。 */
@@ -42,4 +44,6 @@ export interface LyricsSource {
   /** 请求失败答 `failed`；搜到零条答空数组。 */
   search(query: LyricsQuery, signal?: AbortSignal): Promise<readonly LyricsCandidate[] | 'failed'>;
   fetch(candidate: LyricsCandidate, signal?: AbortSignal): Promise<LyricsFetchResult>;
+  /** 根据本来源的候选身份补查封面；没有封面时返回空串。 */
+  cover?(ref: string, signal?: AbortSignal): Promise<string>;
 }

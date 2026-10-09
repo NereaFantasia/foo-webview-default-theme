@@ -31,6 +31,7 @@ import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export const BASE_ACCENT_LABELS: Readonly<Record<BaseAccentMode, MessageKey>> = {
   teal: 'settings.accentTeal',
@@ -86,6 +87,7 @@ function CoverAccentRow() {
 
 /** 基础强调色：自定义时旁边是取色键，Windows 强调色时旁边是刷新键。 */
 function BaseAccentRow() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
   const mode = useAtomValueRawSync(baseAccentModeAtom);
@@ -113,6 +115,8 @@ function BaseAccentRow() {
           {mode === 'windows' && (
             <Tooltip content={t('settings.refreshWindowsAccent')} relationship="label">
               <Button
+                appearance="subtle"
+                className={viewControls.icon}
                 icon={<ArrowClockwise20Regular />}
                 aria-label={t('settings.refreshWindowsAccent')}
                 onClick={() => refreshWindowsAccent(store)}

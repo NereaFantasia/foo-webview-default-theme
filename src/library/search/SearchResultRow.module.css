@@ -18,11 +18,21 @@
 }
 .row:hover,
 .tile:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background-color: var(--state-hover);
+}
+.row:active,
+.tile:active {
+  background-color: var(--state-pressed);
 }
 .row[data-selected],
 .tile[data-selected] {
-  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+  background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+}
+@media (forced-colors: active) {
+  .row[data-selected],
+  .tile[data-selected] {
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
 }
 [role='listbox']:focus-visible .row[data-focused],
 [role='listbox']:focus-visible .tile[data-focused] {

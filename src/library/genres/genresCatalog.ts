@@ -37,6 +37,7 @@ export function startGenresCatalog(
 ): GenresCatalogService {
   store.set(stateAtom, { status: 'idle', entries: [], generation: 0 });
   let wanted = false;
+  let releaseTracks: (() => void) | undefined;
   let disposed = false;
   let serial = 0;
   let loaded = -1;
@@ -119,7 +120,8 @@ export function startGenresCatalog(
     want() {
       if (disposed) return;
       wanted = true;
-      tracksService.want();
+      // 流派页每次挂载都会调 want；整库曲目只登记一次，到 dispose 才释放。
+      releaseTracks ??= tracksService.want();
       const library = store.get(libraryTracksAtom);
       if (library.status === 'failed') update({ status: 'failed' });
       else if (library.generation === 0) update({ status: 'loading' });
@@ -133,6 +135,8 @@ export function startGenresCatalog(
     dispose() {
       disposed = true;
       serial += 1;
+      releaseTracks?.();
+      releaseTracks = undefined;
       offTracks();
       offAlbums();
     },

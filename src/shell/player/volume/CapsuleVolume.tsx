@@ -16,10 +16,11 @@ import { MENU_SURFACE_MOTION } from '../../../motion/MenuMotion.tsx';
 import { roleVar } from '../../../theme/roles.ts';
 import { OutputDeviceList } from './OutputDeviceList.tsx';
 import { PLAYER_KEY_ATTR, PLAYER_SURFACE_ATTR } from '../playerFocus.ts';
-import { VOLUME_ICONS, VOLUME_ICONS_LARGE } from '../playerIcons.ts';
+import { VOLUME_ICONS_LARGE } from '../playerIcons.ts';
 import { useVolumeControl, type VolumeControl } from './useVolumeControl.ts';
 import { useVolumePreview } from './useVolumePreview.ts';
 import { VolumeStack } from './VolumeStack.tsx';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   key: {
@@ -74,7 +75,7 @@ function VolumeFlyout({ control }: { readonly control: VolumeControl }) {
 }
 
 export interface CapsuleVolumeProps {
-  /** 放在底部通栏里：键 36 见方、图标 20。 */
+  /** 放在底部通栏里：命中区改为 36 见方。 */
   readonly roomy?: boolean;
   /** 放在标题栏里：浮层朝下开、左缘对齐这个键。缺省朝上开、右缘对齐。 */
   readonly below?: boolean;
@@ -94,13 +95,14 @@ const BELOW_TITLEBAR_OFFSET = (56 - 36) / 2 + 4;
  * Popover 自己处理），焦点回到这个键。
  */
 export function CapsuleVolume({ roomy = false, below = false }: CapsuleVolumeProps) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
   const control = useVolumeControl();
   const { preview, show } = useVolumePreview();
   const [open, setOpen] = useState(false);
   const [tip, setTip] = useState(false);
-  const Icon = (roomy ? VOLUME_ICONS_LARGE : VOLUME_ICONS)[control.level];
+  const Icon = VOLUME_ICONS_LARGE[control.level];
   return (
     <Popover
       open={open}
@@ -128,7 +130,7 @@ export function CapsuleVolume({ roomy = false, below = false }: CapsuleVolumePro
         >
           <Button
             appearance="subtle"
-            className={mergeClasses(classes.key, roomy && classes.roomy)}
+            className={mergeClasses(classes.key, roomy && classes.roomy, viewControls.icon)}
             icon={<Icon />}
             aria-label={t('player.output')}
             disabled={!control.connected}

@@ -1,5 +1,5 @@
 import type { Atom } from 'jotai/vanilla';
-import { choiceCodec, defineLocalPref, type PrefStorage } from '../kit/localPref.ts';
+import { choiceCodec, defineLocalPref, ON_OFF, type PrefStorage } from '../kit/localPref.ts';
 import type { Store } from '../kit/store.ts';
 
 /**
@@ -24,6 +24,7 @@ export type PlayerBarStyle = (typeof PLAYER_BAR_STYLES)[number];
 
 export const DEFAULT_PLAYER_BAR_STYLE: PlayerBarStyle = 'bottom';
 export const PLAYER_BAR_STORAGE_KEY = 'default-theme.player-bar.v1';
+export const CAPSULE_BLUR_STORAGE_KEY = 'default-theme.capsule-blur.v1';
 
 const stylePref = defineLocalPref<PlayerBarStyle>({
   key: PLAYER_BAR_STORAGE_KEY,
@@ -33,9 +34,18 @@ const stylePref = defineLocalPref<PlayerBarStyle>({
 
 export const playerBarStyleAtom: Atom<PlayerBarStyle> = stylePref.atom;
 
+const capsuleBlurPref = defineLocalPref<boolean>({
+  key: CAPSULE_BLUR_STORAGE_KEY,
+  fallback: true,
+  ...ON_OFF,
+});
+
+export const capsuleBlurAtom: Atom<boolean> = capsuleBlurPref.atom;
+
 /** 读存档写进 `store`；在首帧之前调。 */
 export function loadPlayerBarStyle(store: Store, storage?: PrefStorage | null): void {
   stylePref.load(store, storage);
+  capsuleBlurPref.load(store, storage);
 }
 
 /** 换形态并记住，立即生效；和此刻一样就不写。 */
@@ -45,6 +55,14 @@ export function choosePlayerBarStyle(
   storage?: PrefStorage | null,
 ): void {
   stylePref.set(store, style, storage);
+}
+
+export function chooseCapsuleBlur(
+  store: Store,
+  enabled: boolean,
+  storage?: PrefStorage | null,
+): void {
+  capsuleBlurPref.set(store, enabled, storage);
 }
 
 /** 外壳此刻怎么排：播放栏在哪、导航键在哪。标题栏与主窗都按它排，两处的判断不会各写一份走样。 */

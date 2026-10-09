@@ -1,38 +1,13 @@
-import {
-  Button,
-  DrawerBody,
-  DrawerHeader,
-  DrawerHeaderTitle,
-  OverlayDrawer,
-  createPresenceComponent,
-  makeStyles,
-  type OverlayDrawerProps,
-} from '@fluentui/react-components';
+import { Button, useFocusFinders, useRestoreFocusSource } from '@fluentui/react-components';
 import { Dismiss20Regular } from '@fluentui/react-icons';
-import type { ReactNode } from 'react';
-import { CURVE } from '../../motion/timing.ts';
+import { createContext, useId, useRef, useState, type ReactNode } from 'react';
+import { SidePanel } from '../../kit/SidePanel.tsx';
+import { useLightDismiss } from '../../nav/useLightDismiss.ts';
+import styles from './LibraryDrawer.module.css';
 
-/** WinUI SplitView 的侧向浮层：打开 350 ms，关闭 120 ms；减弱动效由 Fluent 缩到终态。 */
-const DrawerMotion = createPresenceComponent({
-  enter: {
-    keyframes: [{ translate: '-100% 0' }, { translate: '0 0' }],
-    duration: 350,
-    easing: CURVE.decelerateMax.timing,
-  },
-  exit: {
-    keyframes: [{ translate: '0 0' }, { translate: '-100% 0' }],
-    duration: 120,
-    easing: CURVE.decelerateMax.timing,
-  },
-});
-const DRAWER_MOTION: OverlayDrawerProps['surfaceMotion'] = {
-  children: (_, props) => <DrawerMotion {...props} />,
-};
+/** 未包在抽屉里时为 undefined；挂载中的标题工具插槽暂为 null。 */
+export const LibraryDrawerToolsContext = createContext<HTMLElement | null | undefined>(undefined);
 
-const useStyles = makeStyles({
-  drawer: { width: '320px', maxWidth: '100vw' },
-  body: { display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0 },
-});
 interface LibraryDrawerProps {
   readonly open: boolean;
   readonly title: string;
@@ -41,30 +16,57 @@ interface LibraryDrawerProps {
   onOpenChange(open: boolean): void;
 }
 export function LibraryDrawer(props: LibraryDrawerProps) {
-  const classes = useStyles();
+  const id = useId();
+  const [tools, setTools] = useState<HTMLDivElement | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const restoreFocus = useRestoreFocusSource();
+  const { findFirstFocusable } = useFocusFinders();
+  const markInside = useLightDismiss({
+    id: `library.drawer.${id}`,
+    open: props.open,
+    panel,
+    escapeFromInput: true,
+    exempt: (target) => opener.current?.contains(target) ?? false,
+    onDismiss: () => props.onOpenChange(false),
+  });
   return (
-    <OverlayDrawer
-      surfaceMotion={DRAWER_MOTION}
-      className={classes.drawer}
-      position="start"
-      open={props.open}
-      onOpenChange={(_, data) => props.onOpenChange(data.open)}
-    >
-      <DrawerHeader>
-        <DrawerHeaderTitle
-          action={
-            <Button
-              appearance="transparent"
-              icon={<Dismiss20Regular />}
-              aria-label={props.closeLabel}
-              onClick={() => props.onOpenChange(false)}
-            />
+    <LibraryDrawerToolsContext value={tools}>
+      <SidePanel
+        {...restoreFocus}
+        ref={panel}
+        className={styles.drawer}
+        side="start"
+        open={props.open}
+        role="dialog"
+        aria-labelledby={id}
+        data-library-drawer
+        onPointerDownCapture={markInside}
+        onMotionStart={(_, { direction }) => {
+          const node = panel.current;
+          if (direction !== 'enter' || !node) return;
+          if (!node.contains(document.activeElement)) {
+            opener.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            (findFirstFocusable(node) ?? node).focus({ preventScroll: true });
           }
-        >
-          {props.title}
-        </DrawerHeaderTitle>
-      </DrawerHeader>
-      <DrawerBody className={classes.body}>{props.children}</DrawerBody>
-    </OverlayDrawer>
+        }}
+        tabIndex={-1}
+      >
+        <header className={styles.header}>
+          <h2 id={id} className={styles.title}>
+            {props.title}
+          </h2>
+          <div ref={setTools} className={styles.tools} />
+          <Button
+            appearance="transparent"
+            icon={<Dismiss20Regular />}
+            aria-label={props.closeLabel}
+            onClick={() => props.onOpenChange(false)}
+          />
+        </header>
+        <div className={styles.body}>{props.children}</div>
+      </SidePanel>
+    </LibraryDrawerToolsContext>
   );
 }

@@ -1,0 +1,42 @@
+.handle {
+  z-index: 1;
+  display: grid;
+  width: var(--spacingHorizontalS);
+  min-height: 0;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+/* 命中区一直保留，显隐只改变覆盖在边线上的竖条，不推动两侧内容。 */
+.grip {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorNeutralForeground3);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-normal) var(--curveLinear),
+    background-color var(--motion-faster) var(--curveLinear);
+}
+
+.handle:hover .grip {
+  opacity: 1;
+  transition-delay: var(--motion-slow), 0s;
+}
+
+/* 悬停等待只用于显示提示；抓取与键盘聚焦需要立即反馈。 */
+.handle:focus-visible .grip,
+.handle[data-dragging] .grip {
+  opacity: 1;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+
+.handle[data-dragging] .grip {
+  background-color: var(--colorCompoundBrandForeground1);
+}
+
+.handle:focus-visible .grip {
+  box-shadow: inset 0 0 0 var(--strokeWidthThick) var(--colorStrokeFocus2);
+}

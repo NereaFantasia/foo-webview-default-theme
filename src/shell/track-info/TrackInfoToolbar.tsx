@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Menu,
   MenuItem,
@@ -13,7 +14,6 @@ import {
   ArrowSync16Regular,
   ChevronDown16Regular,
   Copy16Regular,
-  Dismiss16Regular,
   Eye16Regular,
   MoreHorizontal16Regular,
   Play12Regular,
@@ -26,6 +26,7 @@ import type { TrackInfoTarget } from './trackInfoTarget.ts';
 import { infoMediaKind } from './trackInfoModel.ts';
 import cardStyles from '../right-card/RightCard.module.css';
 import styles from './TrackInfoToolbar.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   source: {
@@ -58,14 +59,13 @@ export function TrackInfoToolbar({
   target,
   t,
   locale,
-  onClose,
 }: {
   readonly service: TrackInfoService;
   readonly target: TrackInfoTarget;
   readonly t: Translate;
   readonly locale: string;
-  readonly onClose: () => void;
 }) {
+  const controls = useViewControlStyles();
   const source = useAtomValueRawSync(target.source);
   const preview = useAtomValueRawSync(target.preview);
   const state = useAtomValueRawSync(service.state);
@@ -76,7 +76,7 @@ export function TrackInfoToolbar({
       <Menu surfaceMotion={MENU_SURFACE_MOTION} checkedValues={{ source: [source] }}>
         <MenuTrigger disableButtonEnhancement>
           <Button
-            className={classes.source}
+            className={mergeClasses(classes.source, controls.icon)}
             appearance="subtle"
             size="small"
             icon={{ children: <SourceIcon />, className: classes.sourceIcon }}
@@ -86,7 +86,7 @@ export function TrackInfoToolbar({
             <ChevronDown16Regular />
           </Button>
         </MenuTrigger>
-        <MenuPopover>
+        <MenuPopover data-right-card-surface>
           <MenuList>
             <MenuItemRadio name="source" value="playing" onClick={() => target.follow('playing')}>
               {t('trackInfo.playing')}
@@ -106,14 +106,14 @@ export function TrackInfoToolbar({
         <Menu surfaceMotion={MENU_SURFACE_MOTION}>
           <MenuTrigger disableButtonEnhancement>
             <Button
-              className={classes.icon}
+              className={mergeClasses(classes.icon, controls.icon)}
               appearance="subtle"
               size="small"
               icon={<MoreHorizontal16Regular />}
               aria-label={t('rightCard.more')}
             />
           </MenuTrigger>
-          <MenuPopover>
+          <MenuPopover data-right-card-surface>
             <MenuList>
               <MenuItem
                 icon={<Copy16Regular />}
@@ -139,9 +139,6 @@ export function TrackInfoToolbar({
                 onClick={() => void service.copyTags()}
               >
                 {t('trackInfo.copyTags')}
-              </MenuItem>
-              <MenuItem icon={<Dismiss16Regular />} onClick={onClose}>
-                {t('rightCard.close')}
               </MenuItem>
             </MenuList>
           </MenuPopover>

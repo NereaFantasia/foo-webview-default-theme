@@ -10,6 +10,7 @@ import type { HomeGemMode, HomeTrack } from './homeModel.ts';
 import styles from './HomeTrackRow.module.css';
 import { useService } from '../../kit/useService.ts';
 import { albumDetailKey } from '../album-detail/albumDetail.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export function HomeTrackRow({
   item,
@@ -20,6 +21,7 @@ export function HomeTrackRow({
   readonly mode: HomeGemMode;
   readonly onMenu: (item: HomeTrack, at: TablePoint) => void;
 }) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const albumDetail = useService(albumDetailKey);
   const home = useHomeServices();
@@ -52,6 +54,7 @@ export function HomeTrackRow({
       <span className={styles.duration}>{durationText(track.duration)}</span>
       <Tooltip content={t('album.play')} relationship="label">
         <Button
+          className={viewControls.icon}
           appearance="subtle"
           icon={<Play20Filled />}
           disabled={busy}
@@ -61,6 +64,7 @@ export function HomeTrackRow({
       </Tooltip>
       <Tooltip content={t('menu.more')} relationship="label">
         <Button
+          className={viewControls.icon}
           appearance="subtle"
           icon={<MoreHorizontal20Regular />}
           aria-label={t('menu.more')}

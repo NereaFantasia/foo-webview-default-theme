@@ -65,6 +65,8 @@ export interface TerrainDrawer {
   /** canvas 的物理尺寸按 CSS 尺寸 × 像素比重设，位图随之清空。 */
   resize(width: number, height: number, pixelRatio: number): void;
   draw(history: SpectrumHistory, options: TerrainDrawOptions): void;
+  /** 释放绘制对象；canvas 的最后画面由挂载方按退场或隐藏状态撤销。 */
+  dispose?(): void;
 }
 
 /** canvas 2D 画法：`drawTerrain` 在调用方线程上跑，光栅方式由调用方取上下文时定。 */
@@ -87,6 +89,8 @@ export function canvasDrawer(
 }
 
 export interface TerrainPainter {
+  /** 主线程已确定的上下文种类；Worker 的种类由统计消息回报。 */
+  readonly surface?: TerrainSurfaceKind;
   /** 改设置并排一次重画；尺寸或像素比变了，先按物理像素重设 canvas（位图随之清空）。 */
   update(changes: Partial<TerrainPaintSettings>): void;
   /** 缓冲里进了新行：从现在起算滑动进度，排一次重画。 */
@@ -106,7 +110,7 @@ export interface TerrainPainter {
  */
 export function createTerrainPainter(
   drawer: TerrainDrawer,
-  history: () => SpectrumHistory,
+  source: () => SpectrumHistory,
   initial: TerrainPaintSettings,
   now: () => number = () => performance.now(),
   clock?: FrameClock,
@@ -115,12 +119,14 @@ export function createTerrainPainter(
   let lastFrameAt: number | null = null;
   let meter: PaintMeter | null = null;
   let disposed = false;
+  let history: (() => SpectrumHistory) | null = source;
 
   const applySize = (): void => drawer.resize(settings.width, settings.height, settings.pixelRatio);
 
   function paint(): void {
     // GPU 上下文丢了时调用方在 `draw` 里就把画师释放了，这一次别再排下一帧。
-    if (disposed || settings.frozen || settings.width === 0 || settings.height === 0) return;
+    if (disposed || !history || settings.frozen || settings.width === 0 || settings.height === 0)
+      return;
     const interval = Math.max(1, settings.frameInterval);
     const elapsed = lastFrameAt === null ? Number.POSITIVE_INFINITY : now() - lastFrameAt;
     const settled = elapsed > Math.max(4 * interval, SETTLE_MS);
@@ -147,6 +153,7 @@ export function createTerrainPainter(
   if (settings.width > 0 && settings.height > 0) applySize();
 
   return {
+    surface: drawer.kind,
     update(changes) {
       if (disposed) return;
       const resized =
@@ -166,9 +173,12 @@ export function createTerrainPainter(
       meter = report && !disposed ? createPaintMeter((stats) => report(stats, drawer.kind)) : null;
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
+      history = null;
       meter = null;
       frames.cancel();
+      drawer.dispose?.();
     },
   };
 }

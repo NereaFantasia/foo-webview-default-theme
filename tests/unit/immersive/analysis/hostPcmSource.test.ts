@@ -146,4 +146,49 @@ describe('hostFullRatePcm', () => {
     planes?.release();
     expect(piece.log).toStrictEqual(['view 0', 'view 1', 'release']);
   });
+
+  test.each([createHostPcmSource, createHostFullRatePcm])(
+    '取消后晚到的缓冲只释放，不拷贝也不读声道',
+    async (create) => {
+      const piece = fakePcm();
+      let answer = () => {};
+      const { host } = fakeHost(
+        () =>
+          new Promise<DecodedPcm>((resolve) => {
+            answer = () => resolve(piece.pcm);
+          }),
+      );
+      const controller = new AbortController();
+      const result = create(host)(CUE, RANGE, controller.signal);
+      controller.abort();
+      answer();
+      await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+      expect(piece.log).toEqual(['release']);
+    },
+  );
+
+  test.each([createHostPcmSource, createHostFullRatePcm])(
+    '已取消的请求不发起解码',
+    async (create) => {
+      const { host, calls } = fakeHost(async () => fakePcm().pcm);
+      const controller = new AbortController();
+      controller.abort();
+      await expect(create(host)(CUE, RANGE, controller.signal)).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+      expect(calls).toEqual([]);
+    },
+  );
+
+  test('读取声道视图失败也释放共享缓冲', async () => {
+    const piece = fakePcm();
+    piece.pcm.getChannelView = () => {
+      throw new Error('view failed');
+    };
+    const { host } = fakeHost(async () => piece.pcm);
+    await expect(
+      createHostFullRatePcm(host)(CUE, RANGE, new AbortController().signal),
+    ).rejects.toThrow('view failed');
+    expect(piece.log).toEqual(['release']);
+  });
 });

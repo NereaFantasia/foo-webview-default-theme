@@ -49,7 +49,7 @@ export interface TerrainHistoryService {
   readonly history: SpectrumHistory;
   /** 推进的行数，每推一行加一。 */
   version(): number;
-  /** 每推一行叫一次 `listener`；返回退订函数。 */
+  /** 推行或清空缓冲时通知；清空不增加版本号。返回退订函数。 */
   subscribe(listener: () => void): () => void;
   dispose(): void;
 }
@@ -57,15 +57,33 @@ export interface TerrainHistoryService {
 /** 跟着 `source` 的帧推行；播放状态读 `playbackAtom`，在帧到时现读。 */
 export function startTerrainHistory(store: Store, source: TerrainSource): TerrainHistoryService {
   const history = createSpectrumHistory(TERRAIN_ROWS, TERRAIN_POINTS);
-  const shaped = new Float32Array(TERRAIN_CHAIN_POINTS);
-  const scratch = new Float32Array(TERRAIN_CHAIN_POINTS);
-  const row = new Float32Array(TERRAIN_POINTS);
+  history.release();
+  let shaped = new Float32Array(0);
+  let scratch = new Float32Array(0);
+  let row = new Float32Array(0);
   const listeners = new Set<() => void>();
   let version = 0;
 
+  function release(): void {
+    history.release();
+    shaped = new Float32Array(0);
+    scratch = new Float32Array(0);
+    row = new Float32Array(0);
+    for (const listener of [...listeners]) listener();
+  }
+
   const off = source.subscribe(() => {
     const frame = source.frame();
-    if (!frame || store.get(playbackAtom).state === 'paused') return;
+    if (!frame) {
+      release();
+      return;
+    }
+    if (store.get(playbackAtom).state === 'paused') return;
+    if (shaped.length === 0) {
+      shaped = new Float32Array(TERRAIN_CHAIN_POINTS);
+      scratch = new Float32Array(TERRAIN_CHAIN_POINTS);
+      row = new Float32Array(TERRAIN_POINTS);
+    }
     shapeTerrainFrame(frame, shaped, scratch);
     for (let point = 0; point < TERRAIN_POINTS; point += 1) {
       row[point] = shaped[point * TERRAIN_DECIMATION] ?? 0;
@@ -86,6 +104,7 @@ export function startTerrainHistory(store: Store, source: TerrainSource): Terrai
     },
     dispose() {
       off();
+      release();
       listeners.clear();
     },
   };

@@ -21,6 +21,7 @@ import { useHostAbsent } from './useHostAbsent.ts';
 import { useService } from '../kit/useService.ts';
 import { SettingsSaveNotice } from './SettingsSaveNotice.tsx';
 import { UpdateSettingsContext } from './updateSettingsContext.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 /** 「已复制」在按钮上留多久，毫秒。 */
 const COPIED_MS = 2000;
@@ -30,6 +31,7 @@ const COPIED_MS = 2000;
  * 读到版本之前复制禁用：确定没有宿主时说明行写明原因，还在连、读取失败时是一道横线。
  */
 function VersionCard() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const diagnostics = useAtomValueRawSync(diagnosticsAtom);
   const absent = useHostAbsent();
@@ -78,6 +80,7 @@ function VersionCard() {
     >
       {({ labelId, descriptionId }) => (
         <Button
+          className={viewControls.field}
           id={buttonId}
           icon={outcome === 'copied' ? <Checkmark16Regular /> : <Copy16Regular />}
           iconPosition="after"
@@ -98,6 +101,7 @@ function VersionCard() {
  * 按钮禁用但仍能接焦点：刚按过「恢复」，条数归零、按钮随之禁用，焦点要留在它上面，不能掉到 body。
  */
 function RemindersCard() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const count = useAtomValueRawSync(dismissedCountAtom);
   const infoCenter = useService(infoCenterKey);
@@ -116,6 +120,7 @@ function RemindersCard() {
     >
       {({ labelId, descriptionId }) => (
         <Button
+          className={viewControls.field}
           id={buttonId}
           icon={<ArrowCounterclockwise16Regular />}
           iconPosition="after"

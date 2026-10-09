@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react';
-import { NowPlayingPage } from '../immersive/page/NowPlayingPage.tsx';
 import { AlbumDetailPage } from '../library/album-detail/AlbumDetailPage.tsx';
 import { AlbumsPage } from '../library/albums/AlbumsPage.tsx';
 import { SongsPage } from '../library/songs/SongsPage.tsx';
@@ -9,10 +8,17 @@ import { PlaylistPage } from '../playlist/PlaylistPage.tsx';
 import { SettingsPage } from '../settings/SettingsPage.tsx';
 import { SearchPage } from '../library/search/SearchPage.tsx';
 import type { PageProps, PlaceId } from '../nav/places.ts';
-import { VideoPage } from '../video/VideoPage.tsx';
 import { ARTISTS_PAGES } from '../library/artists/page/ArtistsPage.tsx';
 import { HomePage } from '../library/home/HomePage.tsx';
 import { ChannelPage } from '../library/home/ChannelPage.tsx';
+import { deferPage } from './DeferredPage.tsx';
+
+const NowPlayingPage = deferPage(() =>
+  import('./ImmersivePage.tsx').then((module) => module.ImmersivePage),
+);
+const VideoPage = deferPage(() =>
+  import('../video/VideoPage.tsx').then((module) => module.VideoPage),
+);
 
 /** 各地点的页面。没登记的地点显示占位页；页面按所在的历史记录登记快照，见 `usePageSnapshot`。 */
 export const PAGES: Partial<Record<PlaceId, ComponentType<PageProps>>> = {

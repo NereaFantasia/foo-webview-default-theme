@@ -37,7 +37,7 @@ export type ImmersiveScene = 'paper';
 export const IMMERSIVE_SCENES = ['paper'] as const;
 export const DEFAULT_SCENE: ImmersiveScene = 'paper';
 
-const KEYS = {
+export const IMMERSIVE_PREF_KEYS = {
   terrain: 'default-theme.immersive.terrain.v1',
   wash: 'default-theme.immersive.wash.v1',
   hostFullscreen: 'default-theme.immersive.hostFullscreen.v1',
@@ -50,21 +50,29 @@ const WAVEFORM_MODE: PrefCodec<WaveformMode> = {
   format: (mode) => mode,
 };
 
-const terrain = defineLocalPref({ key: KEYS.terrain, fallback: true, ...ON_OFF });
+const terrain = defineLocalPref({ key: IMMERSIVE_PREF_KEYS.terrain, fallback: true, ...ON_OFF });
 const wash = defineLocalPref<WashChoice>({
-  key: KEYS.wash,
+  key: IMMERSIVE_PREF_KEYS.wash,
   fallback: 'flow',
   ...choiceCodec(WASH_CHOICES),
 });
-const hostFullscreen = defineLocalPref({ key: KEYS.hostFullscreen, fallback: false, ...ON_OFF });
-const fpsCap = defineLocalPref<FpsCap>({ key: KEYS.fpsCap, fallback: 0, ...choiceCodec(FPS_CAPS) });
+const hostFullscreen = defineLocalPref({
+  key: IMMERSIVE_PREF_KEYS.hostFullscreen,
+  fallback: false,
+  ...ON_OFF,
+});
+const fpsCap = defineLocalPref<FpsCap>({
+  key: IMMERSIVE_PREF_KEYS.fpsCap,
+  fallback: 0,
+  ...choiceCodec(FPS_CAPS),
+});
 const waveformMode = defineLocalPref<WaveformMode>({
-  key: KEYS.waveformMode,
+  key: IMMERSIVE_PREF_KEYS.waveformMode,
   fallback: 'rms',
   ...WAVEFORM_MODE,
 });
 const scene = defineLocalPref<ImmersiveScene>({
-  key: KEYS.scene,
+  key: IMMERSIVE_PREF_KEYS.scene,
   fallback: DEFAULT_SCENE,
   ...choiceCodec(IMMERSIVE_SCENES),
 });

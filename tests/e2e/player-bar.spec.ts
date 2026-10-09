@@ -11,7 +11,7 @@ const key = (page: Page, name: string) => page.locator(`header [data-player-key=
 const slider = (page: Page) => page.getByRole('slider', { name: '播放进度' });
 const panel = (page: Page) => page.locator('[data-output-panel]');
 
-test('标题栏里 ⋯ 之后是四键，正中是 540 × 44 的正在播放条与 44 的方块键，两块合起来在窗口居中', async ({
+test('标题栏里 ⋯ 之后是四键，正中是 540 × 52 的正在播放条与 44 的方块键，两块合起来在窗口居中', async ({
   page,
 }) => {
   const { errors } = await openPlayer(page);
@@ -31,7 +31,7 @@ test('标题栏里 ⋯ 之后是四键，正中是 540 × 44 的正在播放条�
     x: left,
     y: 6,
     width: 540,
-    height: 44,
+    height: 52,
   });
   expect(await boxOf(page, 'header [data-player-key="volume"]')).toEqual({
     x: left + 548,
@@ -75,7 +75,7 @@ test('正在播放条写曲名、艺人与格式标记；停止时整条收掉�
   await host.emit('playback:stopped', { reason: 'user' });
   await expect(lcd).toHaveCount(0);
   await expect(slider(page)).toHaveCount(0);
-  expect(await boxOf(page, 'header')).toMatchObject({ height: 56 });
+  expect(await boxOf(page, 'header')).toMatchObject({ height: 64 });
   await expect(key(page, 'play')).toBeEnabled();
   await expect(key(page, 'volume')).toBeVisible();
 

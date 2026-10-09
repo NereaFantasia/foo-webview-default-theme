@@ -28,7 +28,6 @@ import {
   methodNotFound,
   type ConfigValue,
 } from '../../fixtures/hostAnswers.ts';
-import { trackRow } from '../../fixtures/libraryRows.ts';
 import { installFakeHost, type UnitHost } from '../../fixtures/unitHost.ts';
 
 /** 与装配层一样，提醒条件取自媒体库与播放统计。 */
@@ -73,9 +72,11 @@ async function start(host: UnitHost) {
   };
 }
 
-/** 探一次 foo_playcount 装没装；替身的缺省应答是没装：各首的求值都是空串。 */
+/** 缺省组件清单为空，提醒应判为未安装。 */
 async function probePlaycount(host: UnitHost, store: ReturnType<typeof createStore>) {
-  await startPlayStats(store, host.fb).probe([trackRow('Modal Soul', 'Feather')]);
+  const stats = startPlayStats(store, host.fb);
+  onTestFinished(() => stats.dispose());
+  await stats.probe();
 }
 
 describe('startInfoCenter', () => {
@@ -332,6 +333,27 @@ describe('startInfoCenter', () => {
     expect(store.get(infoMessagesAtom)).toEqual([]);
   });
 
+  it('已安装播放统计组件时，空的曲目统计不产生缺失提醒', async () => {
+    const host = installFakeHost();
+    host.answer('config.getComponents', {
+      success: true,
+      count: 1,
+      components: [{ name: '播放统计信息', version: '3.1.10', filename: 'foo_playcount' }],
+    });
+    const { store, kinds } = await start(host);
+    await probePlaycount(host, store);
+    expect(kinds()).toEqual([]);
+    expect(host.callsTo('titleformat.evalBatch')).toEqual([]);
+  });
+
+  it('组件清单读取失败时不产生未安装提醒', async () => {
+    const host = installFakeHost();
+    host.answer('config.getComponents', hostFailure('OPERATION_FAILED'));
+    const { store, kinds } = await start(host);
+    await probePlaycount(host, store);
+    expect(kinds()).toEqual([]);
+  });
+
   it('提醒级：媒体库没配置、没装 foo_playcount；阻断级排在前面；配置好了媒体库那条随之消失', async () => {
     const host = installFakeHost();
     versionIs(host, '1.12.3');
@@ -447,6 +469,10 @@ describe('startInfoCenter', () => {
     const check = vi.fn(async () => {});
     const install = vi.fn(async () => {});
     const showChangelog = vi.fn();
+    const failed = atom(true);
+    const retry = async () => {
+      store.set(failed, false);
+    };
     const service = startInfoCenter(
       store,
       REMINDERS,
@@ -454,13 +480,20 @@ describe('startInfoCenter', () => {
       createMemoryConfigWriter(host.fb),
       undefined,
       undefined,
-      { notice, restart, check, install, showChangelog },
+      { notice, restart, check, install, showChangelog, backend: { failed, retry } },
     );
     onTestFinished(() => service.dispose());
     await service.ready;
     const updates = () =>
       store.get(infoMessagesAtom).filter((message) => message.kind.startsWith('update'));
     expect(updates()).toEqual([]);
+    expect(
+      store.get(infoMessagesAtom).some((message) => message.kind === 'backendUnavailable'),
+    ).toBe(true);
+    service.retryBackend();
+    expect(
+      store.get(infoMessagesAtom).some((message) => message.kind === 'backendUnavailable'),
+    ).toBe(false);
     store.set(notice, { kind: 'updatePlugin', latest: '0.3.0', required: '2.4.0' });
     expect(updates()).toEqual([
       { kind: 'updatePlugin', level: 'reminder', params: { latest: '0.3.0', required: '2.4.0' } },

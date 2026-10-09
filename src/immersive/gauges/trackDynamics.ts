@@ -87,11 +87,23 @@ export async function measureTrack(
     loudness: ReturnType<typeof createBlockMeter>;
   } | null = null;
   for (let start = 0; start < duration; start += step) {
-    const piece = await source(track, { start, end: Math.min(duration, start + step) }, signal);
-    if (!isCurrent() || !piece) {
+    if (signal.aborted || !isCurrent()) return null;
+    let piece = await source(track, { start, end: Math.min(duration, start + step) }, signal);
+    if (signal.aborted || !isCurrent() || !piece) {
       piece?.release();
       return null;
     }
+    const release = () => {
+      const previous = piece;
+      piece = null;
+      previous?.release();
+    };
+    // 让出主线程期间也可能进入休眠，不能等下一片调度才归还共享缓冲。
+    const abort = () => {
+      meters = null;
+      release();
+    };
+    signal.addEventListener('abort', abort, { once: true });
     try {
       const channels = piece.planes.length;
       if (!meters) {
@@ -112,10 +124,11 @@ export async function measureTrack(
         meters.dr.push(piece.planes, at, to);
         meters.loudness.push(piece.planes, at, to);
         await pause();
-        if (!isCurrent()) return null;
+        if (signal.aborted || !isCurrent()) return null;
       }
     } finally {
-      piece.release();
+      signal.removeEventListener('abort', abort);
+      release();
     }
   }
   if (!meters) return null;
@@ -129,13 +142,14 @@ export const trackDynamicsAtom: Atom<DynamicsModel> = atom((get) => get(stateAto
 /** 跟着 `currentTrackAtom` 算读数；编辑标签不重算。`pause` 是片与片之间的让出，缺省等一个 `setTimeout(0)`。 */
 export function startTrackDynamics(
   store: Store,
-  options: { source: PlanesSource | null; pause?: () => Promise<void> },
+  options: { source: PlanesSource | null; pause?: () => Promise<void>; active?: Atom<boolean> },
 ): TrackDynamicsService {
   const { source, pause } = options;
   store.set(stateAtom, { status: source ? 'idle' : 'unavailable', result: null });
   let token = 0;
   let inflight: AbortController | null = null;
   let unavailable = source === null;
+  let disposed = false;
   let last: { key: string; value: TrackDynamics | null } | null = null;
   // 上一次看到的输入；还没看过时为 null。
   let input: { key: string; want: boolean } | null = null;
@@ -169,9 +183,10 @@ export function startTrackDynamics(
   }
 
   function follow(): void {
+    if (disposed) return;
     const track = store.get(currentTrackAtom);
     const key = track?.path ? trackKeyOf(track) : '';
-    const want = store.get(playbackConnectedAtom);
+    const want = store.get(playbackConnectedAtom) && (!options.active || store.get(options.active));
     if (input && input.key === key && input.want === want) return;
     input = { key, want };
     if (!source || unavailable) return;
@@ -190,12 +205,17 @@ export function startTrackDynamics(
 
   // 先订阅再初读。
   const offs = [store.sub(currentTrackAtom, follow), store.sub(playbackConnectedAtom, follow)];
+  if (options.active) offs.push(store.sub(options.active, follow));
   follow();
 
   return {
     dispose() {
+      if (disposed) return;
+      disposed = true;
       stop();
       for (const off of offs.splice(0)) off();
+      last = null;
+      store.set(stateAtom, { status: unavailable ? 'unavailable' : 'idle', result: null });
     },
   };
 }

@@ -12,7 +12,8 @@ import { isLocalMedia } from '../analysis/localMedia.ts';
  *
  * 缓存没命中时 SDK 自己等 `audio:fullWaveformReady / Failed` 事件，这里只看最终结果：代次守卫丢掉换曲后
  * 晚到的；失败有三条路：同步答 `success: false`、失败事件、SDK 的 60 s 超时（后两条是 reject）。
- * 换曲与释放都不取消宿主那边的解码，解完进了缓存，再切回这一首就是命中。
+ * 换曲、休眠与释放通过 SDK 取消未完成的解码；完整结果与失败记忆在休眠时保留，
+ * 失败仍在换曲或重新连接后重试。
  *
  * 路径交 `track.handle`：CUE 与多轨文件的分轨自带 `|subsong:N`，端点按后缀取那一轨。宿主没连上时不问；
  * 网络流也不问：端点先在 fb2k 主线程同步读文件状态，对 URL 是网络超时。
@@ -51,14 +52,16 @@ export const fullWaveformAtom: Atom<FullWaveform> = atom((get) => get(stateAtom)
 /** 跟着 `currentTrackAtom` 取整轨波形；编辑标签不重取。`pendingDelay` 是毫秒，缺省 `PENDING_DELAY_MS`。 */
 export function startFullWaveform(
   store: Store,
-  options: { host?: FullWaveformHost; pendingDelay?: number } = {},
+  options: { host?: FullWaveformHost; pendingDelay?: number; active?: Atom<boolean> } = {},
 ): FullWaveformService {
   const host = options.host ?? fb;
   const pendingDelay = options.pendingDelay ?? PENDING_DELAY_MS;
   store.set(stateAtom, INITIAL);
   let token = 0;
-  // 上一次看到的输入：宿主连上时是曲目身份，否则是空串；还没看过时为 undefined。
-  let input: string | undefined;
+  let disposed = false;
+  let input: { key: string; want: boolean; connected: boolean } | null = null;
+  let last: { key: string; value: FullWaveform } | null = null;
+  let inflight: AbortController | null = null;
   let pendingTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clearPending(): void {
@@ -67,11 +70,12 @@ export function startFullWaveform(
   }
 
   /** 问一次；拿不到点（任一条失败路径）给 `null`。 */
-  async function request(path: string): Promise<readonly number[] | null> {
+  async function request(path: string, signal: AbortSignal): Promise<readonly number[] | null> {
     try {
       const result = await host.audio.generateFullWaveform(path, {
         resolution: WAVEFORM_RESOLUTION,
         method: 'rms',
+        signal,
       });
       const points = result.success === false ? undefined : result.waveform;
       return Array.isArray(points) && points.length > 0 ? points : null;
@@ -80,45 +84,68 @@ export function startFullWaveform(
     }
   }
 
-  async function load(path: string, id: number): Promise<void> {
+  async function load(path: string, key: string, id: number): Promise<void> {
+    const controller = new AbortController();
+    inflight = controller;
     pendingTimer = setTimeout(() => {
       pendingTimer = undefined;
       if (id === token && store.get(stateAtom).status === 'idle') {
         store.set(stateAtom, { status: 'pending', rms: [] });
       }
     }, pendingDelay);
-    const points = await request(path);
+    const points = await request(path, controller.signal);
     if (id !== token) return;
+    inflight = null;
     clearPending();
-    store.set(stateAtom, points ? { status: 'ready', rms: points } : FAILED);
+    last = { key, value: points ? { status: 'ready', rms: points } : FAILED };
+    store.set(stateAtom, last.value);
   }
 
   function follow(): void {
+    if (disposed) return;
     const track = store.get(currentTrackAtom);
-    const next = store.get(playbackConnectedAtom) && track?.path ? trackKeyOf(track) : '';
-    if (next === input) return;
-    input = next;
+    const key = track?.path ? trackKeyOf(track) : '';
+    const connected = store.get(playbackConnectedAtom);
+    const want = connected && (!options.active || store.get(options.active));
+    if (input?.key === key && input.want === want && input.connected === connected) return;
+    if (last?.value.status === 'failed' && (input?.key !== key || input.connected !== connected))
+      last = null;
+    input = { key, want, connected };
     token += 1;
+    inflight?.abort();
+    inflight = null;
     clearPending();
-    store.set(stateAtom, INITIAL);
-    if (!next || !track) return;
-    // 流没有「整轨」，按不可用报，免得波形区一直空着没个说法。
-    if (!isLocalMedia(track.path)) {
-      store.set(stateAtom, FAILED);
+    if (last?.key === key) {
+      store.set(stateAtom, last.value);
       return;
     }
-    void load(track.handle, token);
+    store.set(stateAtom, INITIAL);
+    if (!want || !key || !track) return;
+    // 流没有「整轨」，按不可用报，免得波形区一直空着没个说法。
+    if (!isLocalMedia(track.path)) {
+      last = { key, value: FAILED };
+      store.set(stateAtom, last.value);
+      return;
+    }
+    void load(track.handle, key, token);
   }
 
   // 先订阅再初读。
   const offs = [store.sub(currentTrackAtom, follow), store.sub(playbackConnectedAtom, follow)];
+  if (options.active) offs.push(store.sub(options.active, follow));
   follow();
 
   return {
     dispose() {
+      if (disposed) return;
+      disposed = true;
       token += 1;
+      inflight?.abort();
+      inflight = null;
       clearPending();
       for (const off of offs.splice(0)) off();
+      last = null;
+      store.set(stateAtom, INITIAL);
     },
   };
 }

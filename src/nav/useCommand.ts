@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef } from 'react';
 import type { CommandRegistry, CommandSpec } from './commandRegistry.ts';
 
-export const CommandsContext = createContext<Pick<CommandRegistry, 'register'> | null>(null);
+export const CommandsContext = createContext<Pick<CommandRegistry, 'register' | 'list'> | null>(
+  null,
+);
 
 /**
  * 在组件存活期间登记一条命令。`run` 与 `enabled` 每次都取最近一次渲染传进来的，调用方不必记忆化；

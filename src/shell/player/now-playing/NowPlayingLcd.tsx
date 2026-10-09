@@ -1,5 +1,5 @@
 import { Button, Tooltip, makeStyles } from '@fluentui/react-components';
-import { MoreHorizontal16Regular } from '@fluentui/react-icons';
+import { MoreHorizontal20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useRef, useState } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
@@ -28,11 +28,11 @@ const useStyles = makeStyles({
   },
 });
 
-/** 封面边长，CSS 像素：与这一条同高。 */
-const COVER = 44;
+/** 封面边长，CSS 像素；与播放条齐高。 */
+const COVER = 52;
 
 /**
- * 宽窗标题栏正中的正在播放条（540 × 44）：左端封面（按下进沉浸视图），曲名一行、右上是格式标记，第二行是艺人与专辑（`TrackByline`）、右端是星级，
+ * 宽窗标题栏正中的正在播放条（540 × 52）：左端封面（按下进沉浸视图），曲名一行、右上是格式标记，第二行是艺人与专辑（`TrackByline`）、右端是星级，
  * 贴底一条能点能拖的进度线，悬停它进悬停态（`ScrubSeek`），封面以外的东西模糊变淡；右端 ⋯ 打开当前曲目菜单。
  * 停止时封面换占位图标、曲名写「未在播放」、进度线不画。过长的文字截断、右缘渐隐、定时滚动一遍，悬停出全文；
  * 星与格式标记不让位。换曲时两行字先退后进（`useTextSwap`，悬停态里直接换），封面擦除（`NowPlayingCover`）。
@@ -91,7 +91,7 @@ export function NowPlayingLcd() {
           <Button
             appearance="subtle"
             className={classes.more}
-            icon={<MoreHorizontal16Regular />}
+            icon={<MoreHorizontal20Regular />}
             {...menu.more}
             {...{ [PLAYER_KEY_ATTR]: 'more' }}
           />

@@ -19,6 +19,7 @@ import { translateAtom } from '../../i18n/locale.ts';
 import { useHomeServices } from './homeContext.ts';
 import { HOME_PIN_LIMIT, homePinKey, type HomePin } from './homePins.ts';
 import styles from './HomePins.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const PIN_LABELS = {
   album: 'place.albums',
@@ -27,6 +28,7 @@ const PIN_LABELS = {
 } as const;
 
 export function HomePins() {
+  const viewControls = useViewControlStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const state = useAtomValueRawSync(home.pins.state);
@@ -44,7 +46,10 @@ export function HomePins() {
     <>
       {state.readFailed && (
         <p role="alert">
-          {t('home.pinsReadFailed')} <Button onClick={home.pins.retry}>{t('album.retry')}</Button>
+          {t('home.pinsReadFailed')}{' '}
+          <Button className={viewControls.field} onClick={home.pins.retry}>
+            {t('album.retry')}
+          </Button>
         </p>
       )}
       {state.saveFailed && <p role="alert">{t('home.pinsSaveFailed')}</p>}
@@ -56,6 +61,8 @@ export function HomePins() {
         <h2>{t('home.pins')}</h2>
         <Tooltip content={t('home.addPin')} relationship="label">
           <Button
+            appearance="subtle"
+            className={viewControls.icon}
             icon={<Add20Regular />}
             aria-label={t('home.addPin')}
             onClick={() => setOpen(true)}
@@ -82,6 +89,8 @@ export function HomePins() {
               </button>
               <Tooltip content={t('home.unpin')} relationship="label">
                 <Button
+                  appearance="subtle"
+                  className={viewControls.icon}
                   icon={<PinOff20Regular />}
                   aria-label={t('home.unpin')}
                   onClick={() => home.pins.toggle(saved)}

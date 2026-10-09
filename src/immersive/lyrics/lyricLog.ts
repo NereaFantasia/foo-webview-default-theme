@@ -1,3 +1,4 @@
+import type { LyricsDisplay } from '../../lyrics/lyricsDisplay.ts';
 import { atom, type Atom } from 'jotai/vanilla';
 import { playbackAtom } from '../../playback/playback.ts';
 import type { Store } from '../../kit/store.ts';
@@ -54,6 +55,7 @@ const EMPTY: Loaded = { state: 'none', source: '', lineCount: 0, lines: [] };
 const NO_ROWS: LyricRows = { prev: null, current: null, next: null };
 const loadedAtom = atom<Loaded>(EMPTY);
 const positionAtom = atom(0);
+const showTranslationAtom = atom(true);
 
 export const lyricLogAtom: Atom<LyricLog> = atom((get) => {
   const { state, source, lineCount } = get(loadedAtom);
@@ -86,7 +88,7 @@ export const lyricRowsAtom: Atom<LyricRows> = atom((get) => {
 export const lyricCardAtom: Atom<LyricCardLines | null> = atom((get) => {
   const { current, next } = get(lyricRowsAtom);
   if (!current) return null;
-  if (current.translation) {
+  if (current.translation && get(showTranslationAtom)) {
     return { main: current.text, sub: current.translation, subKind: 'translation' };
   }
   if (next?.text) return { main: current.text, sub: next.text, subKind: 'next' };
@@ -136,18 +138,37 @@ function project(result: LyricsState): Loaded {
  */
 export function startLyricLog(
   store: Store,
-  { lyrics, active }: { lyrics: Pick<LyricsService, 'state'>; active: Atom<boolean> },
+  {
+    lyrics,
+    active,
+    offset,
+    display,
+  }: {
+    lyrics: Pick<LyricsService, 'state'>;
+    active: Atom<boolean>;
+    offset?: Atom<number>;
+    display?: Atom<LyricsDisplay>;
+  },
 ): LyricLogService {
   store.set(loadedAtom, EMPTY);
   store.set(positionAtom, 0);
   let offs: (() => void)[] = [];
   const updateLyrics = () => store.set(loadedAtom, project(store.get(lyrics.state)));
-  const updatePosition = () => store.set(positionAtom, store.get(playbackAtom).position);
+  const updatePosition = () =>
+    store.set(positionAtom, store.get(playbackAtom).position - (offset ? store.get(offset) : 0));
+  const updateDisplay = () =>
+    store.set(showTranslationAtom, display ? store.get(display).showTranslation : true);
 
   function follow(): void {
     for (const off of offs.splice(0)) off();
     if (!store.get(active)) return;
-    offs = [store.sub(lyrics.state, updateLyrics), store.sub(playbackAtom, updatePosition)];
+    offs = [
+      store.sub(lyrics.state, updateLyrics),
+      store.sub(playbackAtom, updatePosition),
+      ...(offset ? [store.sub(offset, updatePosition)] : []),
+      ...(display ? [store.sub(display, updateDisplay)] : []),
+    ];
+    updateDisplay();
     updatePosition();
     updateLyrics();
   }

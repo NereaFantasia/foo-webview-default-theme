@@ -9,7 +9,7 @@ import styles from './ShortcutsSection.module.css';
 
 /** 一个键帽：键盘上的一个键，或鼠标的一个键。按键名不翻译，鼠标键的名字由调用方给译好的。 */
 function KeyCap({ children }: { readonly children: ReactNode }) {
-  return <kbd className={styles.keyCap}>{children}</kbd>;
+  return <kbd className={styles['key-cap']}>{children}</kbd>;
 }
 
 /** 一种按法画成的键帽：组合键一键一帽，鼠标键一帽写它的名字。 */

@@ -1,6 +1,7 @@
 import { Dropdown, makeStyles, mergeClasses, Option, tokens } from '@fluentui/react-components';
 import type { SettingsCardIds } from './SettingsCard.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export interface SettingsOption<T extends string> {
   readonly value: T;
@@ -42,12 +43,13 @@ export function SettingsSelect<T extends string>({
   labelId,
   descriptionId,
 }: SettingsSelectProps<T>) {
+  const controls = useViewControlStyles();
   const { compact } = useSettingsLayout();
   const classes = useStyles();
   const selected = options.find((option) => option.value === value);
   return (
     <Dropdown
-      className={mergeClasses(classes.root, compact && classes.fill)}
+      className={mergeClasses(classes.root, compact && classes.fill, controls.field)}
       aria-labelledby={labelId}
       aria-describedby={descriptionId}
       disabled={disabled}

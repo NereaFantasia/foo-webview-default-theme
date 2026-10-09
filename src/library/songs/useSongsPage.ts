@@ -133,7 +133,7 @@ export function useSongsPage(): SongsPageModel {
   useEffect(() => {
     if (library.status !== 'ready') return;
     const all = [...library.byHandle.values()];
-    void albumList.stats.probe(all);
+    void albumList.stats.probe();
     if (statsShown && stats.available) void albumList.stats.fetch(all, library.generation);
   }, [albumList, library, statsShown, stats.available]);
 

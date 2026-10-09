@@ -26,7 +26,7 @@ import {
 import type { OrderName } from '../../playback/playbackOrder.ts';
 import type { VolumeLevel } from './volume/volumeControl.ts';
 
-/** 音量键与静音键的图标，随音量档与静音变；标题栏与胶囊里 16。 */
+/** 输出面板与浮层里的静音图标，16px；随音量档与静音变。 */
 export const VOLUME_ICONS: Readonly<Record<VolumeLevel, FluentIcon>> = {
   muted: SpeakerMute16Regular,
   low: Speaker016Regular,
@@ -34,7 +34,7 @@ export const VOLUME_ICONS: Readonly<Record<VolumeLevel, FluentIcon>> = {
   high: Speaker216Regular,
 };
 
-/** 同上，底部通栏里的键是 20。 */
+/** 播放栏的音量与静音图标，20px；三种布局共用。 */
 export const VOLUME_ICONS_LARGE: Readonly<Record<VolumeLevel, FluentIcon>> = {
   muted: SpeakerMute20Regular,
   low: Speaker020Regular,
@@ -53,7 +53,7 @@ export const ORDER_KEY_ICONS: Readonly<Record<OrderName, FluentIcon>> = {
   'shuffle-folders': FolderOpen16Regular,
 };
 
-/** 播放顺序菜单各项的图标：菜单项的图标槽是 20 像素；底部通栏里的顺序键也用这一套。 */
+/** 播放顺序菜单各项的图标：菜单项的图标槽是 20 像素；播放栏的顺序键也用这一套。 */
 export const ORDER_MENU_ICONS: Readonly<Record<OrderName, FluentIcon>> = {
   default: ArrowRight20Regular,
   'repeat-playlist': ArrowRepeatAll20Regular,

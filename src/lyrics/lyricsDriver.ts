@@ -24,6 +24,7 @@ const browserFrames: FrameSource = {
 export interface LyricsDriver {
   /** 歌词区看不见时停帧并暂停播放器；再看得见时直接跳到当前位置，不从停下的地方滚过去。 */
   setActive(active: boolean): void;
+  setOffset(seconds: number): void;
   dispose(): void;
 }
 
@@ -41,8 +42,9 @@ export function startLyricsDriver(
   let disposed = false;
   let handle: number | null = null;
   let last = 0;
+  let offset = 0;
 
-  const ms = (seconds: number) => seconds * 1000;
+  const ms = (seconds: number) => (seconds - offset) * 1000;
 
   function applyState(): void {
     if (clock.state === 'playing') player.resume();
@@ -85,6 +87,11 @@ export function startLyricsDriver(
       active = next;
       if (active) start();
       else stop();
+    },
+    setOffset(seconds) {
+      if (disposed || !Number.isFinite(seconds)) return;
+      offset = seconds;
+      if (active) player.setCurrentTime(ms(clock.position()), true);
     },
     dispose() {
       if (disposed) return;

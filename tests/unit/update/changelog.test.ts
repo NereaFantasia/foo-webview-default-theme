@@ -208,16 +208,41 @@ describe('notesFor', () => {
   const en = read('Fixes', 'Fixed');
   const both = { version: '0.2.0', date: null, notes: { en, 'zh-CN': zh } };
 
-  it('优先取界面语言', () => {
-    expect(notesFor(both, 'zh-CN')).toEqual({ notes: zh, language: 'zh-CN' });
-    expect(notesFor(both, 'en')).toEqual({ notes: en, language: 'en' });
+  it('手动选择的界面语言优先于宿主基准语言', () => {
+    expect(notesFor(both, { active: 'zh-CN', base: 'en' })).toEqual({
+      notes: zh,
+      language: 'zh-CN',
+    });
+    expect(notesFor(both, { active: 'en', base: 'zh-CN' })).toEqual({
+      notes: en,
+      language: 'en',
+    });
   });
 
   it('缺界面语言时整页改用另一种内置语言，再缺取第一种', () => {
-    expect(notesFor({ ...both, notes: { en } }, 'zh-CN')).toEqual({ notes: en, language: 'en' });
+    const locale = { active: 'zh-CN', base: 'zh-CN' } as const;
+    expect(notesFor({ ...both, notes: { en } }, locale)).toEqual({ notes: en, language: 'en' });
     const ja = read('修正');
-    expect(notesFor({ ...both, notes: { ja } }, 'en')).toEqual({ notes: ja, language: 'ja' });
-    expect(notesFor({ ...both, notes: {} }, 'en')).toEqual({ notes: null, language: null });
+    expect(notesFor({ ...both, notes: { ja } }, locale)).toEqual({ notes: ja, language: 'ja' });
+    expect(notesFor({ ...both, notes: {} }, locale)).toEqual({ notes: null, language: null });
+  });
+
+  it('外部界面语言有日志时优先使用，缺失时回退到宿主基准语言', () => {
+    const fr = read('Corrections', 'Fixed');
+    const locale = { active: 'fr', base: 'zh-CN' } as const;
+    expect(notesFor({ ...both, notes: { ...both.notes, fr } }, locale)).toEqual({
+      notes: fr,
+      language: 'fr',
+    });
+    expect(notesFor(both, locale)).toEqual({ notes: zh, language: 'zh-CN' });
+    expect(notesFor(both, { active: 'fr', base: 'en' })).toEqual({ notes: en, language: 'en' });
+  });
+
+  it('当前语言标签按规范大小写匹配', () => {
+    expect(notesFor(both, { active: 'zh-cn', base: 'en' })).toEqual({
+      notes: zh,
+      language: 'zh-CN',
+    });
   });
 });
 
@@ -233,7 +258,7 @@ describe('readChangelog 的规范化', () => {
     );
     const entry = entries?.[0];
     expect(entry?.notes).toEqual({ 'zh-CN': read('小写'), en: read('Upper', 'Fixed') });
-    expect(entry && notesFor(entry, 'zh-CN').language).toBe('zh-CN');
+    expect(entry && notesFor(entry, { active: 'zh-CN', base: 'en' }).language).toBe('zh-CN');
   });
 
   it('按码点截断，不切开 emoji', () => {

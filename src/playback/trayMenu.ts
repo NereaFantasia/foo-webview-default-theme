@@ -127,11 +127,12 @@ export function buildTrayMenu(input: TrayMenuInput): TrayMenuZones {
 export function trayMenuConfig(options: {
   readonly dark: boolean;
   readonly css: string;
+  readonly backdrop: 'acrylic' | 'none';
 }): TrayMenuConfig {
   return {
     render: 'webview',
     layoutMode: 'zones',
-    backdrop: 'acrylic',
+    backdrop: options.backdrop,
     backdropDarkMode: options.dark,
     autoNowPlaying: true,
     showPlaybackControls: false,

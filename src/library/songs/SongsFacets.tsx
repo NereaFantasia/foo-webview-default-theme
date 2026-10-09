@@ -23,6 +23,7 @@ import type { SongsFilter } from './songsFilter.ts';
 import { decadeLabel } from './songsLabels.ts';
 import { useService } from '../../kit/useService.ts';
 import { songsKey } from './songsServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const LABELS: Readonly<Record<SongFacet, MessageKey>> = {
   genre: 'songs.facetGenre',
@@ -53,7 +54,7 @@ const useStyles = makeStyles({
     ':hover': { color: tokens.colorBrandForegroundLinkHover },
     ':active': { color: tokens.colorBrandForegroundLinkPressed },
   },
-  search: { minHeight: '28px', backgroundColor: 'transparent' },
+  search: { minHeight: '28px' },
 });
 
 export interface SongsFacetsProps {
@@ -93,6 +94,7 @@ interface FacetColumnProps {
 }
 
 function FacetColumn({ facet, values, checked }: FacetColumnProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
   const songs = useService(songsKey);
@@ -114,7 +116,7 @@ function FacetColumn({ facet, values, checked }: FacetColumnProps) {
           <Button
             appearance="transparent"
             size="small"
-            className={mergeClasses(styles.checked, classes.checked)}
+            className={mergeClasses(styles.checked, classes.checked, controls.icon)}
             onClick={() => {
               for (const name of checked) songs.filter.toggleFacet(facet, name);
             }}
@@ -128,7 +130,7 @@ function FacetColumn({ facet, values, checked }: FacetColumnProps) {
           <Input
             size="small"
             appearance="filled-darker"
-            className={mergeClasses(styles.search, classes.search)}
+            className={mergeClasses(styles.search, classes.search, controls.field)}
             contentBefore={<Search16Regular />}
             placeholder={t(facet === 'artist' ? 'songs.facetSearch' : 'songs.facetFilter')}
             aria-label={t(facet === 'artist' ? 'songs.facetSearch' : 'songs.facetFilter')}

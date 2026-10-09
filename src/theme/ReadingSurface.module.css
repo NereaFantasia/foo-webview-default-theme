@@ -1,0 +1,39 @@
+.root {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: calc(var(--radius-card) - var(--strokeWidthThin));
+  pointer-events: none;
+}
+
+/* 遮罩只留下细边，颜色来自同位置的窗口画面；不为每张卡重复绘制色场。 */
+.edge {
+  position: absolute;
+  inset: 0;
+  border: var(--strokeWidthThin) solid var(--reading-stroke);
+  border-radius: inherit;
+  backdrop-filter: var(--reading-edge-filter);
+  mask:
+    linear-gradient(var(--colorNeutralForeground1) 0 0) padding-box,
+    linear-gradient(var(--colorNeutralForeground1) 0 0);
+  mask-composite: exclude;
+}
+
+.fill {
+  position: absolute;
+  inset: var(--strokeWidthThin);
+  overflow: hidden;
+  border-radius: calc(var(--radius-card) - 2 * var(--strokeWidthThin));
+  background: var(--bg-pane);
+  backdrop-filter: var(--surface-filter);
+}
+
+.fill::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url('/cover-grain.png');
+  opacity: var(--surface-grain);
+  mix-blend-mode: soft-light;
+  content: '';
+}

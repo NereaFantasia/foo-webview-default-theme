@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useRef } from 'react';
-import type { HistoryEntry, SnapshotHooks, SnapshotSlot } from './navHistory.ts';
+import type { HistoryEntry, SnapshotHooks, SnapshotSlot, NavHistoryService } from './navHistory.ts';
 import { useService } from '../kit/useService.ts';
 import { historyKey } from './navHistory.ts';
 
@@ -18,6 +18,17 @@ export function usePageSnapshot<S extends object>(
 ): void {
   const entry = useContext(PageEntryContext);
   const history = useService(historyKey);
+  useHistorySnapshot(history, entry, slot, hooks, ready);
+}
+
+/** 快照只绑定所属历史实例；主视图与右侧卡可以共享恢复时序。 */
+export function useHistorySnapshot<S extends object>(
+  history: Pick<NavHistoryService, 'registerSnapshot'>,
+  entry: HistoryEntry | null,
+  slot: SnapshotSlot<S>,
+  hooks: SnapshotHooks<S>,
+  ready: boolean,
+): void {
   const latest = useRef(hooks);
   useLayoutEffect(() => {
     latest.current = hooks;

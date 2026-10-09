@@ -67,6 +67,31 @@ async function start(host: UnitHost) {
 }
 
 describe('startPlayback', () => {
+  it('同一路径收到新曲目事件也开启新播放轮次，标签编辑和回读不归零', async () => {
+    const host = installFakeHost();
+    playing(host);
+    const { state, playback } = await start(host);
+    try {
+      const first = state().trackGeneration;
+      expect(first).toBeGreaterThan(0);
+      host.emit('playback:edited', { ...FEATHER, title: '修改后的标题' });
+      expect(state()).toMatchObject({ trackGeneration: first, position: 42 });
+      playback.retry();
+      await settle();
+      expect(state().trackGeneration).toBe(first);
+      host.emit('playback:trackChanged', FEATHER);
+      expect(state()).toMatchObject({ trackGeneration: first + 1, position: 0 });
+      await settle();
+      expect(state()).toMatchObject({ trackGeneration: first + 1, position: 42 });
+      host.emit('playback:stopped', { reason: 'starting_another' });
+      expect(state().trackGeneration).toBe(first + 1);
+      host.emit('playback:trackChanged', LUV);
+      expect(state()).toMatchObject({ trackGeneration: first + 2, position: 0 });
+    } finally {
+      playback.dispose();
+    }
+  });
+
   it.each(['seek', 'highRes', 'state'] as const)(
     '%s 事件使同曲目的旧进度读取作废',
     async (event) => {

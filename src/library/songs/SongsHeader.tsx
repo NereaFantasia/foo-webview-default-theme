@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Link,
   Title2,
@@ -23,17 +24,24 @@ import { songsPrefsAtom } from './songsPrefs.ts';
 import type { SongsPageModel } from './useSongsPage.ts';
 import { useService } from '../../kit/useService.ts';
 import { songsKey } from './songsServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   title: { margin: 0, whiteSpace: 'nowrap' },
   query: { width: '320px', minWidth: '160px', flexShrink: 1 },
   wideQuery: { width: 'auto', minWidth: 0, flex: 1 },
   facetsActive: {
-    color: tokens.colorBrandForeground1,
-    backgroundColor: `color-mix(in oklab, ${tokens.colorBrandStroke1} 18%, transparent)`,
-    ':hover': {
-      color: tokens.colorBrandForegroundLinkHover,
-      backgroundColor: `color-mix(in oklab, ${tokens.colorBrandStroke1} 24%, transparent)`,
+    '@media (forced-colors: none)': {
+      color: tokens.colorBrandForeground1,
+      backgroundImage: 'linear-gradient(var(--bg-selected), var(--bg-selected))',
+      ':hover': {
+        color: tokens.colorBrandForegroundLinkHover,
+      },
+    },
+    '@media (forced-colors: active)': {
+      borderBottomColor: 'Highlight',
+      borderBottomWidth: tokens.strokeWidthThick,
+      borderBottomStyle: 'solid',
     },
   },
 });
@@ -56,6 +64,7 @@ export interface SongsHeaderProps {
  * 查询有误时保留上次结果并暂停页头操作，错误说明提供查询菜单入口。
  */
 export function SongsHeader({ model, selected, queryOpen, onQueryOpenChange }: SongsHeaderProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const plural = useAtomValueRawSync(pluralAtom);
   const prefs = useAtomValueRawSync(songsPrefsAtom);
@@ -126,11 +135,12 @@ export function SongsHeader({ model, selected, queryOpen, onQueryOpenChange }: S
         </div>
         <Tooltip content={t('songs.facetsToggle')} relationship="label">
           <ToggleButton
-            className={facets > 0 ? classes.facetsActive : undefined}
+            className={mergeClasses(facets > 0 ? classes.facetsActive : undefined, controls.icon)}
             checked={prefs.facetsOpen}
             icon={<Options20Regular />}
             onClick={() => songs.prefs.setFacetsOpen(!prefs.facetsOpen)}
             data-songs-facets-toggle
+            appearance="subtle"
           >
             {facets > 0 ? facets : undefined}
           </ToggleButton>
@@ -150,6 +160,7 @@ export function SongsHeader({ model, selected, queryOpen, onQueryOpenChange }: S
         </Tooltip>
         <Tooltip content={t('songs.shuffle')} relationship="label">
           <Button
+            className={controls.field}
             icon={<ArrowShuffle20Regular />}
             disabled={!playable}
             onClick={() => void songs.actions.play(run, 'shuffle')}

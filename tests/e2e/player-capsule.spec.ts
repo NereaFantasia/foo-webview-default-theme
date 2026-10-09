@@ -129,7 +129,7 @@ test('胶囊的音量键点开朝上的浮层：静音键、滑条与数值；�
 
 test('卡片按有没有胶囊给出 --player-inset：宽窗 0，窄窗是胶囊高 64 加离底 16', async ({ page }) => {
   const { errors } = await openPlayer(page);
-  const card = page.locator('main > div').first();
+  const card = page.locator('[data-with-nav-row]');
   // 放一个高为 --player-inset 的探针量出来，不认计算值的写法。
   const inset = () =>
     card.evaluate((element) => {

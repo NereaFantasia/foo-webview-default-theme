@@ -20,6 +20,7 @@ import styles from './FacetBar.module.css';
 import { FACET_FIELDS, hasFacetSelection, type FacetField } from './facets.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const LABELS: Readonly<Record<FacetField, MessageKey>> = {
   genre: 'album.facetGenre',
@@ -51,6 +52,7 @@ export function FacetBar() {
   const options = useAtomValueRawSync(facetOptionsAtom);
   const albums = useService(albumsKey);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const numbers = new Intl.NumberFormat();
   const chips = FACET_FIELDS.flatMap((field) =>
     [...facets[field]].map((name) => ({ field, name, label: labelOf(t, field, name) })),
@@ -71,7 +73,12 @@ export function FacetBar() {
           }}
         >
           <MenuTrigger disableButtonEnhancement>
-            <MenuButton size="small" data-facet={field}>
+            <MenuButton
+              appearance="subtle"
+              className={controls.field}
+              size="small"
+              data-facet={field}
+            >
               {facets[field].size > 0
                 ? `${t(LABELS[field])} ${facets[field].size}`
                 : t(LABELS[field])}
@@ -108,6 +115,8 @@ export function FacetBar() {
             <Tag
               key={tagValue(chip.field, chip.name)}
               value={tagValue(chip.field, chip.name)}
+              appearance="outline"
+              className={controls.tag}
               dismissible
               dismissIcon={{ 'aria-label': t('album.facetRemove', { value: chip.label }) }}
             >
@@ -119,6 +128,7 @@ export function FacetBar() {
       <Button
         size="small"
         appearance="subtle"
+        className={controls.icon}
         disabled={!hasFacetSelection(facets)}
         onClick={() => albums.browse.clearFacets()}
       >

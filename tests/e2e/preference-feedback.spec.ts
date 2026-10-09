@@ -166,7 +166,7 @@ test('存储初始化不可用时直接说明，修改仍生效但不显示无�
   await expect(settings.card('颜色模式').getByRole('button', { name: '重试保存' })).toHaveCount(0);
 });
 
-test('Last.fm 设置卡区分校验与保存结果，汇总不显示凭据，重试只保存', async ({ page }) => {
+test('Last.fm 设置卡收起后仍可重试保存，汇总不显示凭据，重试只保存', async ({ page }) => {
   const key = 'defaultTheme.online.lastfmKey';
   const chosen = '0123456789abcdef0123456789abcdef';
   const settings = await openSettings(page);
@@ -182,27 +182,34 @@ test('Last.fm 设置卡区分校验与保存结果，汇总不显示凭据，重
     body: '{}',
     responseType: 'text',
   });
-  const card = settings.card('Last.fm API 密钥');
+  await settings.expand('在线艺人简介');
+  const row = settings.row('Last.fm API 密钥');
+  const card = settings.expander('在线艺人简介');
   const input = page.getByLabel('Last.fm API 密钥', { exact: true });
   await input.fill(chosen);
   await input.press('Enter');
-  await expect(card).toContainText('可用');
+  await expect(row).toContainText('可用');
   await expect(card).toContainText('设置已生效，但未能保存');
+  await card.locator('[data-settings-toggle]').click();
+  await expect(row).toHaveCount(0);
+  await expect(card.getByText('设置已生效，但未能保存。', { exact: true })).toBeVisible();
   await page.locator('[data-info-center-trigger]').click();
   await expect(summary(page)).toContainText('部分设置未能保存');
   await expect(center(page)).not.toContainText(chosen);
   await expect(center(page)).not.toContainText(key);
+  await page.keyboard.press('Escape');
   const calls = settings.host.callsTo('http.get').length;
   settings.host.answer('http.get', hostFailure('OPERATION_FAILED'));
   settings.host.answer('config.set', () => {
     settings.host.config.set(key, chosen);
     return { success: true, key };
   });
-  await summary(page).getByRole('button', { name: '重试保存' }).click();
-  await expect(summary(page)).toContainText('已保存');
-  await page.keyboard.press('Escape');
+  await card.getByRole('button', { name: '重试保存' }).click();
+  await expect(card).toContainText('已保存');
   await expect(card).not.toContainText('未能保存');
-  await expect(card).toContainText('可用');
+  await expect(card.locator('[data-settings-toggle]')).toHaveAttribute('aria-expanded', 'false');
+  await settings.expand('在线艺人简介');
+  await expect(row).toContainText('可用');
   expect(settings.host.config.get(key)).toBe(chosen);
   expect(settings.host.callsTo('http.get')).toHaveLength(calls);
 });

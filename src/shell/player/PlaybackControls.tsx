@@ -1,14 +1,10 @@
 import { Button, Tooltip, makeStyles, mergeClasses } from '@fluentui/react-components';
 import {
-  Next16Regular,
   Next20Regular,
-  Pause16Regular,
   Pause20Regular,
   Pause24Filled,
-  Play16Regular,
   Play20Regular,
   Play24Filled,
-  Previous16Regular,
   Previous20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
@@ -23,10 +19,10 @@ import { playingAudibleAtom } from '../../playback/playingTrack.ts';
 import { noteSkip } from './now-playing/trackSwap.ts';
 import { useService } from '../../kit/useService.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
-// 标题栏与胶囊里四键一样大：命中区 28 × 36；胶囊里上一首、播放、下一首的图标 20，标题栏里与窗口三键一样是
-// 16，顺序键都是 16；播放键不放大、不加圆底，只比其余三键亮一档。底部通栏里键 36 见方、隔 8、图标 20，
-// 播放键是 40 的主色圆底、图标 22。
+// 三种布局的图标共用尺寸：播放与暂停 22，其余 20。标题栏与胶囊的命中区是 28 × 36，
+// 底部通栏的键 36 见方、隔 8，播放键另用 40 的主色圆底。
 const useStyles = makeStyles({
   key: {
     minWidth: '28px',
@@ -39,7 +35,7 @@ const useStyles = makeStyles({
   roomy: { minWidth: '36px', width: '36px' },
   hero: { minWidth: '40px', width: '40px', height: '40px', padding: '0' },
   // 按钮的图标槽缺省 20 见方，播放键的图标比它大：图标与槽都挂这一条。
-  heroIcon: { width: '22px', height: '22px', fontSize: '22px' },
+  playIcon: { width: '22px', height: '22px', fontSize: '22px' },
 });
 
 interface KeyProps {
@@ -55,13 +51,14 @@ interface KeyProps {
 }
 
 function PlayerKey(props: KeyProps) {
+  const controls = useViewControlStyles();
   const { name, label, icon, iconClassName, className, hero = false, disabled, onClick } = props;
   return (
     <Tooltip content={label} relationship="label">
       <Button
         appearance={hero ? 'primary' : 'subtle'}
         shape={hero ? 'circular' : 'rounded'}
-        className={className}
+        className={mergeClasses(className, !hero && controls.icon)}
         icon={{ className: iconClassName, children: icon }}
         disabled={disabled}
         {...{ [PLAYER_KEY_ATTR]: name }}
@@ -76,8 +73,6 @@ export interface PlaybackControlsProps {
   readonly compact?: boolean;
   /** 底部通栏那一档：键更大、键间隔 8，播放键是主色圆底。 */
   readonly prominent?: boolean;
-  /** 标题栏那一档：图标与窗口三键一样是 16。 */
-  readonly titlebar?: boolean;
 }
 
 /**
@@ -85,11 +80,7 @@ export interface PlaybackControlsProps {
  * 图标与名字跟着宿主报的状态走；顺序键弹出七选一的菜单（`OrderMenuButton`）。命令不做乐观更新，以宿主
  * 回读为准。没连上宿主时全部置灰。上一首、下一首键按下时记下方向，换曲的过渡按它翻（`trackSwap.ts`）。
  */
-export function PlaybackControls({
-  compact = false,
-  prominent = false,
-  titlebar = false,
-}: PlaybackControlsProps) {
+export function PlaybackControls({ compact = false, prominent = false }: PlaybackControlsProps) {
   const t = useAtomValueRawSync(translateAtom);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const audible = useAtomValueRawSync(playingAudibleAtom);
@@ -98,10 +89,8 @@ export function PlaybackControls({
   const classes = useStyles();
   const disabled = !connected;
   const key = mergeClasses(classes.key, prominent && classes.roomy);
-  const PlayIcon = prominent ? Play24Filled : titlebar ? Play16Regular : Play20Regular;
-  const PauseIcon = prominent ? Pause24Filled : titlebar ? Pause16Regular : Pause20Regular;
-  const PreviousIcon = titlebar ? Previous16Regular : Previous20Regular;
-  const NextIcon = titlebar ? Next16Regular : Next20Regular;
+  const PlayIcon = prominent ? Play24Filled : Play20Regular;
+  const PauseIcon = prominent ? Pause24Filled : Pause20Regular;
   return (
     <div
       ref={handOffPlayerFocus}
@@ -113,13 +102,13 @@ export function PlaybackControls({
       {/* 最窄一档里顺序键单独卸下，焦点也要跟走。 */}
       {!compact && (
         <span ref={handOffPlayerFocus} className={styles.slot}>
-          <OrderMenuButton className={key} disabled={disabled} large={prominent} />
+          <OrderMenuButton className={key} disabled={disabled} large />
         </span>
       )}
       <PlayerKey
         name="previous"
         label={t('player.previous')}
-        icon={<PreviousIcon />}
+        icon={<Previous20Regular />}
         className={key}
         disabled={disabled}
         onClick={() => {
@@ -132,12 +121,12 @@ export function PlaybackControls({
         label={audible ? t('player.pause') : t('player.play')}
         icon={
           audible ? (
-            <PauseIcon className={prominent ? classes.heroIcon : undefined} />
+            <PauseIcon className={classes.playIcon} />
           ) : (
-            <PlayIcon className={prominent ? classes.heroIcon : undefined} />
+            <PlayIcon className={classes.playIcon} />
           )
         }
-        iconClassName={prominent ? classes.heroIcon : undefined}
+        iconClassName={classes.playIcon}
         className={prominent ? classes.hero : mergeClasses(key, classes.primary)}
         hero={prominent}
         disabled={disabled}
@@ -146,7 +135,7 @@ export function PlaybackControls({
       <PlayerKey
         name="next"
         label={t('player.next')}
-        icon={<NextIcon />}
+        icon={<Next20Regular />}
         className={key}
         disabled={disabled}
         onClick={() => {

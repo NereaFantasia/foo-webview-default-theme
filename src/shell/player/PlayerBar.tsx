@@ -1,4 +1,4 @@
-import { Button, Tooltip, makeStyles } from '@fluentui/react-components';
+import { mergeClasses, Button, Tooltip, makeStyles } from '@fluentui/react-components';
 import { PictureInPicture20Regular, Pulse20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useContext, useRef } from 'react';
@@ -25,8 +25,10 @@ import { TrackByline } from './TrackByline.tsx';
 import { TruncatedText } from './TruncatedText.tsx';
 import { useOpenNowPlaying } from './now-playing/useOpenNowPlaying.ts';
 import { useTextSwap } from './now-playing/useTextSwap.ts';
+import { SeekLyricsPopover } from './SeekLyrics.tsx';
 import { useVolumeControl } from './volume/useVolumeControl.ts';
 import { VolumeSlider } from './volume/VolumeSlider.tsx';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 // 键 36 见方、图标 20，与控制组的键一样大。
 const useStyles = makeStyles({
@@ -44,6 +46,7 @@ const COVER = 48;
 
 /** 迷你播放器键：把主窗口缩成迷你播放器。宿主窗口没连上、或正在切换时置灰。 */
 function MiniKey() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const mini = useService(miniWindowKey);
   const { busy } = useAtomValueRawSync(miniWindowAtom);
@@ -54,7 +57,7 @@ function MiniKey() {
       <Tooltip content={t('player.miniPlayer')} relationship="label">
         <Button
           appearance="subtle"
-          className={classes.key}
+          className={mergeClasses(classes.key, viewControls.icon)}
           icon={<PictureInPicture20Regular />}
           disabled={busy || status !== 'connected'}
           onClick={() => void mini.enter()}
@@ -67,6 +70,7 @@ function MiniKey() {
 
 /** 最右边的沉浸键：与封面一样进沉浸视图，没连上宿主时置灰。 */
 function ImmersiveKey() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const open = useOpenNowPlaying();
   const classes = useStyles();
@@ -75,7 +79,7 @@ function ImmersiveKey() {
       <Tooltip content={t('player.immersive')} relationship="label">
         <Button
           appearance="subtle"
-          className={classes.key}
+          className={mergeClasses(classes.key, viewControls.icon)}
           icon={<Pulse20Regular />}
           disabled={!open}
           onClick={open ?? undefined}
@@ -116,7 +120,13 @@ export function PlayerBar() {
       data-tier={tier}
     >
       <div className={styles.progress}>
-        <SeekBar interactive thickness={4} thumb clock />
+        <SeekBar
+          interactive
+          thickness={4}
+          thumb
+          clock
+          preview={(target) => <SeekLyricsPopover target={target} />}
+        />
       </div>
       <div className={styles.main}>
         <div

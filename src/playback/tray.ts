@@ -9,6 +9,7 @@ import type { PlaybackService } from './playbackContract.ts';
 import { isOrderName } from './playbackOrder.ts';
 import { dbOf, positionOf, volumeScaleAtom } from './volumeScale.ts';
 import { colorSchemeAtom } from '../theme/colorScheme.ts';
+import { nativeMaterialsAllowedAtom } from '../theme/backdrop.ts';
 import { themeFor } from '../theme/themes.ts';
 import type { Store } from '../kit/store.ts';
 import {
@@ -30,25 +31,24 @@ import {
 import { serviceKey } from '../kit/serviceKey.ts';
 
 /**
- * 托盘：图标与提示、三区自绘菜单、左键收起，外加两只开关（`traySwitches.ts`）。
+ * 托盘：图标与提示、三区自绘菜单和两只开关（`traySwitches.ts`）。
  *
  * 菜单的样式、深浅、文案、勾选与音量条的位置都随整份菜单下发，任一变了就整份重发（音量条与主窗按同一个
  * 刻度换算，换了刻度也重发），合并 `MENU_COALESCE_MS` 内的变化；
  * 三区与配置经 `setMenuZones` 一次替换，宿主按到达先后处理，背靠背的两次留下后一次。
- * 歌曲卡、音量条与顺序子菜单的点击经 `tray:menuItemClicked` 回到页面；隐藏到托盘后点图标，页面收不到。
+ * 歌曲卡、音量条与顺序子菜单的点击经 `tray:menuItemClicked` 回到页面，深度挂起时不能及时处理。
+ * 图标点击不在页面中控制窗口：隐藏期间的点击可能在恢复后才送达，此时的可见性不代表点击时的窗口状态。
  */
 export interface TrayFace extends HostReadyFace, TraySwitchFace {
   on: typeof fb.on;
   tray: TraySwitchFace['tray'] &
     Pick<typeof fb.tray, 'create' | 'destroy' | 'setTooltip' | 'setMenuZones'>;
-  ui: Pick<typeof fb.ui, 'minimize' | 'focus'>;
+  ui: Pick<typeof fb.ui, 'focus'>;
 }
 
 export interface TrayDeps {
   readonly playback: Pick<PlaybackService, 'setOrder' | 'setVolume'>;
   readonly icon: (name: TrayIconName) => TrayIconSvg | undefined;
-  /** 页面此刻是否可见。 */
-  readonly visible: () => boolean;
   readonly configWriter: Pick<ConfigWriter, 'set'>;
 }
 
@@ -127,6 +127,8 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
     if (!connected()) return;
     const mine = ++menuSerial;
     const scheme = store.get(colorSchemeAtom);
+    const acrylic = store.get(nativeMaterialsAllowedAtom);
+    const theme = themeFor(scheme);
     const zones = buildTrayMenu({
       t: store.get(translateAtom),
       icon: deps.icon,
@@ -134,8 +136,13 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
       volume: positionOf(store.get(volumeDbAtom), store.get(volumeScaleAtom)),
     });
     const config = trayMenuConfig({
+      backdrop: acrylic ? 'acrylic' : 'none',
       dark: scheme === 'dark',
-      css: trayMenuCss(themeFor(scheme), scheme === 'dark'),
+      // 未启用材质时，菜单面板需要自己提供不透明的中性底。
+      css: trayMenuCss(
+        acrylic ? theme : { ...theme, colorNeutralBackgroundAlpha2: theme.colorNeutralBackground1 },
+        scheme === 'dark',
+      ),
     });
     const ok = await hostCommand(() => host.tray.setMenuZones(zones, config));
     if (!ok && mine === menuSerial) fail('menu');
@@ -174,14 +181,16 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
     }
     if (!created) fail('create');
     offs.push(
-      host.on('tray:click', (payload) => {
-        if (payload.button === 0 && deps.visible()) void hostCommand(() => host.ui.minimize());
-      }),
       host.on('tray:menuItemClicked', (payload) => onItemClicked(payload.id, payload.value)),
       store.sub(currentTrackAtom, () => void pushTooltip()),
-      ...[colorSchemeAtom, translateAtom, playbackOrderAtom, volumeDbAtom, volumeScaleAtom].map(
-        (input) => store.sub(input, scheduleMenu),
-      ),
+      ...[
+        colorSchemeAtom,
+        translateAtom,
+        playbackOrderAtom,
+        volumeDbAtom,
+        volumeScaleAtom,
+        nativeMaterialsAllowedAtom,
+      ].map((input) => store.sub(input, scheduleMenu)),
     );
     // 建图标的往返途中曲目可能已经变了（页面加载时播放服务的初读常在这时到），这期间没人订阅，
     // 订上之后按当前曲目补一次；与建图标时的提示相同就不发。

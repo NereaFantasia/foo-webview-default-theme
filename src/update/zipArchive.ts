@@ -191,7 +191,7 @@ function checkLayout(entries: readonly Entry[]): Entry[] {
   return files;
 }
 
-async function inflate(
+export async function inflate(
   input: Uint8Array<ArrayBuffer>,
   size: number,
 ): Promise<Uint8Array<ArrayBuffer>> {

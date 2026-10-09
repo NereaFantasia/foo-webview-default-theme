@@ -5,6 +5,7 @@ import {
   ToolbarRadioButton,
   Tooltip,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import { Filter16Regular, Grid20Regular, TextBulletListLtr20Regular } from '@fluentui/react-icons';
@@ -33,6 +34,7 @@ import { facetSelectionCount } from './facets.ts';
 import { ListSortMenu } from '../album-list/ListSortMenu.tsx';
 import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   title: { margin: 0, whiteSpace: 'nowrap' },
@@ -103,6 +105,7 @@ export function AlbumPageHeader({ facetsOpen, onFacetsOpenChange }: AlbumPageHea
     ? { tracks: orders.total, selected: countRows(ranges) }
     : { tracks: null, selected: selectedAlbums };
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const filter = useRef<HTMLInputElement>(null);
   const { term } = browse;
 
@@ -141,6 +144,7 @@ export function AlbumPageHeader({ facetsOpen, onFacetsOpenChange }: AlbumPageHea
           <Tooltip content={t('album.formWall')} relationship="label">
             <ToolbarRadioButton
               appearance="subtle"
+              className={controls.icon}
               name="form"
               value="wall"
               icon={<Grid20Regular />}
@@ -150,6 +154,7 @@ export function AlbumPageHeader({ facetsOpen, onFacetsOpenChange }: AlbumPageHea
           <Tooltip content={t('album.formList')} relationship="label">
             <ToolbarRadioButton
               appearance="subtle"
+              className={controls.icon}
               name="form"
               value="list"
               icon={<TextBulletListLtr20Regular />}
@@ -159,7 +164,7 @@ export function AlbumPageHeader({ facetsOpen, onFacetsOpenChange }: AlbumPageHea
         </Toolbar>
         <Input
           ref={filter}
-          className={classes.filter}
+          className={mergeClasses(classes.filter, controls.field)}
           contentBefore={<Filter16Regular />}
           placeholder={t('album.filter')}
           aria-label={t('album.filter')}

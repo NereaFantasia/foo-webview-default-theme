@@ -64,7 +64,7 @@ export const liveLoudnessAtom: Atom<LiveLoudness> = atom((get) => get(stateAtom)
 
 export function startLiveLoudness(
   store: Store,
-  options: { host?: LiveLoudnessHost; clock?: FrameClock } = {},
+  options: { host?: LiveLoudnessHost; clock?: FrameClock; active?: Atom<boolean> } = {},
 ): LiveLoudnessService {
   const host = options.host ?? fb;
   store.set(stateAtom, INITIAL);
@@ -77,6 +77,7 @@ export function startLiveLoudness(
   let lastSegment: number | null | undefined;
   // 这一拍最后一块算完时的读数；这一拍没出块时为 null。
   let latest: Pick<LiveLoudness, 'momentary' | 'shortTerm'> | null = null;
+  let disposed = false;
 
   const patch = (next: Partial<LiveLoudness>) =>
     store.set(stateAtom, { ...store.get(stateAtom), ...next });
@@ -116,22 +117,24 @@ export function startLiveLoudness(
     const current = stream;
     if (!current) return;
     const read = current.read();
+    if (stream !== current) return;
     if (read) consume(read, current);
     if (latest) patch(latest);
     latest = null;
-    scheduler.schedule();
+    if (stream === current) scheduler.schedule();
   }
 
   /** 摘掉订阅、丢掉累加状态；不写读数。 */
   function teardown(): void {
     scheduler.cancel();
-    stream?.unsubscribe();
+    const previous = stream;
     stream = null;
     meter = null;
     format = '';
     lastSegment = undefined;
     latest = null;
     recent.clear();
+    previous?.unsubscribe();
   }
 
   function open(): void {
@@ -149,7 +152,13 @@ export function startLiveLoudness(
   }
 
   function follow(): void {
+    if (disposed) return;
     const on = store.get(activeAtom);
+    if (options.active && !store.get(options.active)) {
+      teardown();
+      store.set(stateAtom, { ...INITIAL, failed: on && store.get(stateAtom).failed });
+      return;
+    }
     if (on && !stream && !store.get(stateAtom).failed) open();
     if (on) return;
     if (stream) teardown();
@@ -157,12 +166,15 @@ export function startLiveLoudness(
   }
 
   // 先订阅再初读。
-  const off = store.sub(activeAtom, follow);
+  const offs = [store.sub(activeAtom, follow)];
+  if (options.active) offs.push(store.sub(options.active, follow));
   follow();
 
   return {
     dispose() {
-      off();
+      if (disposed) return;
+      disposed = true;
+      for (const off of offs) off();
       teardown();
     },
   };

@@ -38,7 +38,11 @@ export interface TemplateFiles {
   readText(relative: string): Promise<string | null>;
   readBytes(relative: string): Promise<Uint8Array<ArrayBuffer> | null>;
   writeText(relative: string, text: string, options?: { readonly atomic?: boolean }): Promise<void>;
-  writeBytes(relative: string, bytes: Uint8Array): Promise<void>;
+  writeBytes(
+    relative: string,
+    bytes: Uint8Array,
+    options?: { readonly append?: boolean; readonly atomic?: boolean },
+  ): Promise<void>;
   exists(relative: string): Promise<boolean>;
 }
 
@@ -96,11 +100,27 @@ export function templateFiles(
     throw new TemplateFileError('read', relative, answer?.error);
   }
 
-  async function write(relative: string, content: string, binary: boolean, atomic: boolean) {
+  async function write(
+    relative: string,
+    content: string,
+    binary: boolean,
+    atomic: boolean,
+    append = false,
+  ) {
     const target = path(relative, atomic);
     check();
     const answer = await settle(() =>
-      host.write(target, content, binary ? { encoding: 'binary' } : { atomic }),
+      host.write(
+        target,
+        content,
+        binary
+          ? {
+              encoding: 'binary',
+              ...(append ? { append: true } : {}),
+              ...(atomic ? { atomic: true } : {}),
+            }
+          : { atomic },
+      ),
     );
     check();
     if (!answer || answer.success === false)
@@ -120,6 +140,7 @@ export function templateFiles(
       return bytes;
     },
     writeText: (relative, text, options) => write(relative, text, false, options?.atomic ?? false),
-    writeBytes: (relative, bytes) => write(relative, `base64:${toBase64(bytes)}`, true, false),
+    writeBytes: (relative, bytes, options) =>
+      write(relative, `base64:${toBase64(bytes)}`, true, options?.atomic ?? false, options?.append),
   };
 }

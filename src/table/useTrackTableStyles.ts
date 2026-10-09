@@ -1,6 +1,7 @@
 import { createCustomFocusIndicatorStyle, makeStyles, tokens } from '@fluentui/react-components';
 import { LIST_ROW_MOTION, LIST_ROW_SELECTED_MOTION } from '../motion/listRowMotion.ts';
 import { COLUMN_IDS } from './columns/columns.ts';
+import { roleVar } from '../theme/roles.ts';
 
 /** 选中行的底：品牌色按比例混进透明，悬停时再深一档。 */
 const SELECTED = `color-mix(in oklab, ${tokens.colorBrandStroke1} 18%, transparent)`;
@@ -99,12 +100,23 @@ export const useTrackTableStyles = makeStyles({
     cursor: 'default',
     fontSize: tokens.fontSizeBase200,
     ...LIST_ROW_MOTION,
+    '@media (forced-colors: none)': {
+      backgroundColor: 'transparent',
+      ':hover': { backgroundColor: roleVar('state-hover') },
+      ':active': { backgroundColor: roleVar('state-pressed') },
+    },
   },
   selected: {
     ...LIST_ROW_SELECTED_MOTION,
-    backgroundColor: SELECTED,
-    ':hover': { backgroundColor: SELECTED_HOVER },
-    ':active': { backgroundColor: SELECTED_HOVER },
+    '@media (forced-colors: none)': {
+      backgroundColor: SELECTED,
+      ':hover': { backgroundColor: SELECTED_HOVER },
+      ':active': { backgroundColor: SELECTED_HOVER },
+    },
+    '@media (forced-colors: active)': {
+      outline: `${tokens.strokeWidthThin} solid Highlight`,
+      outlineOffset: `calc(-3 * ${tokens.strokeWidthThin})`,
+    },
   },
   cell: { minWidth: 0, minHeight: 0, height: '100%', overflow: 'hidden' },
   numeric: {

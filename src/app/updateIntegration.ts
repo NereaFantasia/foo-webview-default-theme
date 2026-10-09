@@ -29,7 +29,7 @@ export function updateNotice(
         const entry = get(updater.changelog)?.entries.find(
           (item) => item.version === current.version,
         );
-        const title = entry ? notesFor(entry, get(localeAtom).base).notes?.title : undefined;
+        const title = entry ? notesFor(entry, get(localeAtom)).notes?.title : undefined;
         return { kind: 'updateAvailable', version: current.version, title: title ?? '' };
       }
       case 'blocked':
@@ -84,6 +84,8 @@ export function statusLine(
   t: Translate,
 ): { readonly text?: string; readonly error: boolean } {
   switch (status.phase) {
+    case 'maintenance':
+      return { text: t('update.pluginMaintenance'), error: false };
     case 'off':
       return {
         text: t(status.reason === 'storage' ? 'update.storageUnavailable' : 'update.unavailable'),

@@ -21,6 +21,7 @@ import { RightCardDock } from './right-card/RightCardDock.tsx';
 import { TitleBar } from './TitleBar.tsx';
 import { useService } from '../kit/useService.ts';
 import { rightCardKey } from './right-card/rightCardServices.ts';
+import { ReadingSurface } from '../theme/ReadingSurface.tsx';
 
 /**
  * 侧边栏卸掉时（藏起来、窗口跨档）焦点在里面，就交给侧边栏键（导航行或标题栏里），不让它掉到 body 上。
@@ -40,9 +41,9 @@ function keepFocus(node: HTMLElement | null): (() => void) | undefined {
  * 只有内容卡铺底、带圆角。
  *
  * 播放栏按用户选的形态（`playerBarStyle.ts`）放：底部通栏横在最下面一行；胶囊浮在卡片底部，卡片上的
- * `--player-inset` 给出它盖住的高度，页面的滚动区要按它在底部加内边距，最后一截才滚得出来。没有当前曲目
- * 时这两样都不出，`--player-inset` 回到 0。播放栏在标题栏时卡片顶部固定一条导航行，放后退、前进与侧边栏
- * 键；另两种形态这几个键在标题栏。
+ * `--player-inset` 给出它盖住的高度，页面在滚动内容末尾留出这段空间，视口延伸到胶囊下方。没有当前曲目
+ * 时这两样都不出，`--player-inset` 回到 0。播放栏在标题栏时，导航按钮浮在卡片顶部；整页滚动的页面
+ * 在内容首部让位，固定工具栏的页面保持原位。另两种形态的导航键在标题栏。
  *
  * 内容卡右边能开右侧卡（`right-card/`）：宽窗里停靠成第二张卡，窄窗里盖在内容卡上，导航行与胶囊照常露着。
  *
@@ -66,21 +67,29 @@ export function MainWindow() {
   const shown = useSidebarMotion({ pane, content, form, tier, width, reduced });
   let column = 0;
   if (form !== 'none') column = form === 'expanded' ? width : RAIL_WIDTH;
+  const bodyStyle = {
+    gridTemplateColumns: `${column}px minmax(0, 1fr)`,
+    '--sidebar-column-width': `${column}px`,
+  };
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-bottom-player={(shell.bottom && hasTrack) || undefined}>
       <TitleBar />
       <div
         ref={body}
         className={styles.body}
-        style={{ gridTemplateColumns: `${column}px minmax(0, 1fr)` }}
+        style={bodyStyle}
         data-sidebar={form}
+        data-panel-nav={shell.navRow || undefined}
+        data-panel-player={capsule || undefined}
+        data-panel-compact={tier === 'hidden' || undefined}
       >
         {shown !== 'none' && (
           <aside ref={keepFocus} className={styles.sidebar}>
             <div
               ref={pane}
               className={styles.pane}
+              data-sidebar-rail={shown === 'rail' || undefined}
               style={{ width: shown === 'expanded' ? width : RAIL_WIDTH }}
             >
               {shown === 'expanded' ? <Sidebar /> : <SidebarRail />}
@@ -94,19 +103,20 @@ export function MainWindow() {
             navRow={shell.navRow}
             capsule={capsule}
             compact={tier === 'hidden'}
+            startOverlay={tier !== 'wide' ? <SidebarOverlay rail={pane} /> : undefined}
           >
             <div
               className={styles.card}
               data-capsule={capsule || undefined}
               data-with-nav-row={shell.navRow || undefined}
             >
+              <ReadingSurface />
               {shell.navRow && <NavRow />}
               <CentralView />
-              {capsule && <PlayerCapsule />}
+              <PlayerCapsule visible={capsule} />
             </div>
           </RightCardDock>
         </main>
-        {tier !== 'wide' && <SidebarOverlay />}
       </div>
       {shell.bottom && hasTrack && <PlayerBar />}
     </div>

@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Input,
   Menu,
@@ -29,6 +30,7 @@ import { filterArtists } from '../artistCatalog.ts';
 import { isCompilation } from '../artistNames.ts';
 import { useArtistList } from './useArtistList.ts';
 import styles from './ArtistsList.module.css';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   input: { minWidth: 0, flex: 1 },
@@ -52,6 +54,7 @@ export interface ArtistsListProps {
 }
 
 export function ArtistsList(props: ArtistsListProps) {
+  const controls = useViewControlStyles();
   const services = useArtists();
   const t = useAtomValueRawSync(translateAtom);
   const locale = useAtomValueRawSync(localeAtom).active;
@@ -114,9 +117,13 @@ export function ArtistsList(props: ArtistsListProps) {
     if (element) element.scrollTop = props.scrollTop.current;
   }, [props.scroll, props.scrollTop]);
   return (
-    <aside className={styles.root} aria-label={t('artists.title')}>
+    <aside
+      className={styles.root}
+      aria-label={t('artists.title')}
+      data-compact={props.compact || undefined}
+    >
       <header className={styles.heading}>
-        <h1>{t('artists.title')}</h1>
+        {!props.compact && <h1>{t('artists.title')}</h1>}
         <span>
           {t('artists.total', { count: catalog.rows.length })} · {t(`artists.${catalog.basis}`)}
         </span>
@@ -124,7 +131,7 @@ export function ArtistsList(props: ArtistsListProps) {
       <div className={styles.tools}>
         <div className={styles.filter}>
           <Input
-            className={classes.input}
+            className={mergeClasses(classes.input, controls.field)}
             contentBefore={<Filter16Regular />}
             value={props.text}
             aria-label={t('artists.filter')}
@@ -140,6 +147,7 @@ export function ArtistsList(props: ArtistsListProps) {
           >
             <MenuTrigger disableButtonEnhancement>
               <Button
+                className={controls.field}
                 aria-label={t('artists.sort')}
                 icon={<ChevronDown16Regular />}
                 iconPosition="after"
@@ -261,7 +269,7 @@ export function ArtistsList(props: ArtistsListProps) {
                   </span>
                   <span className={styles.actions}>
                     <Button
-                      className={classes.action}
+                      className={mergeClasses(classes.action, controls.icon)}
                       appearance="subtle"
                       icon={<MoreHorizontal20Regular />}
                       tabIndex={-1}

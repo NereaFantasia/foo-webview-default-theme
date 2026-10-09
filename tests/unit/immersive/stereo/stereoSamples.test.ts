@@ -37,7 +37,9 @@ const MIRRORED = waveformAnswer({ left: [0.25, -0.25], right: [0.5, -0.5] });
 const near = (a: number | null, b: number, epsilon = 1e-9) =>
   expect(a !== null && Math.abs(a - b) < epsilon, `${a} ≠ ${b}`).toBe(true);
 
-async function start(options: { reduced?: boolean; spectrum?: SpectrumStatus } = {}) {
+async function start(
+  options: { reduced?: boolean; spectrum?: SpectrumStatus; active?: boolean } = {},
+) {
   const host = installFakeHost();
   host.answer('audio.getWaveform', STEREO);
   const store = createStore();
@@ -46,8 +48,10 @@ async function start(options: { reduced?: boolean; spectrum?: SpectrumStatus } =
   await startPlayback(store, host.fb).ready;
   await flush();
   const spectrumStatus = atom<SpectrumStatus>(options.spectrum ?? 'idle');
+  const active = atom(options.active ?? true);
   const frames = fakeFrames();
   const stereo = startStereoSamples(store, {
+    active,
     spectrumStatus,
     host: host.fb,
     frameClock: frames.clock,
@@ -65,6 +69,7 @@ async function start(options: { reduced?: boolean; spectrum?: SpectrumStatus } =
     await flush();
   };
   return {
+    store,
     host,
     frames,
     stereo,
@@ -73,6 +78,7 @@ async function start(options: { reduced?: boolean; spectrum?: SpectrumStatus } =
     status: () => store.get(stereoFieldStatusAtom),
     answerWith: (answer: AudioGetWaveformResponse) => host.answer('audio.getWaveform', answer),
     setSpectrum: (status: SpectrumStatus) => store.set(spectrumStatus, status),
+    setActive: (value: boolean) => store.set(active, value),
     /** 频谱在出帧且正在播放：闸开。 */
     async open() {
       store.set(spectrumStatus, 'live');
@@ -99,6 +105,70 @@ test('闸关着不问；闸开后按窗长、有符号、立体声、抽点数�
   near(correlation, 1);
   near(width, 1 / 9);
   near(balance, 20 * Math.log10(0.5));
+});
+
+test('隐藏优先于暂停定格，同步清空积分与样本，恢复从新的窗口开始', async () => {
+  const t = await start();
+  await t.open();
+  await t.frames.step();
+  await t.setState('paused');
+  expect(t.stereo.points()).toHaveLength(4);
+  t.setActive(false);
+  expect(t.stereo.points()).toHaveLength(0);
+  expect(t.stereo.readings().correlation).toBeNull();
+  expect(t.frames.pending()).toBe(0);
+  t.setActive(true);
+  expect(t.stereo.points()).toHaveLength(0);
+  expect(t.frames.pending()).toBe(0);
+  t.answerWith(MIRRORED);
+  await t.setState('playing');
+  await t.frames.step();
+  near(t.stereo.readings().balance, -20 * Math.log10(0.5));
+});
+
+test('初始休眠不取数，失败记忆跨二十次休眠恢复保留', async () => {
+  const t = await start({ active: false });
+  await t.open();
+  expect(t.frames.pending()).toBe(0);
+  expect(t.asked()).toHaveLength(0);
+  t.answerWith(waveformFailure('bad params', 'INVALID_PARAMS'));
+  t.setActive(true);
+  await t.frames.step();
+  expect(t.status()).toBe('unsupported');
+  for (let round = 0; round < 20; round += 1) {
+    t.setActive(false);
+    t.setActive(true);
+    expect(t.frames.pending()).toBe(0);
+  }
+  expect(t.asked()).toHaveLength(1);
+});
+
+test('休眠后旧应答不覆盖恢复中的新请求', async () => {
+  const t = await start();
+  await t.open();
+  const held = t.host.hold('audio.getWaveform');
+  await t.frames.step();
+  t.setActive(false);
+  expect(t.frames.pending()).toBe(0);
+  t.setActive(true);
+  held.release();
+  await flush();
+  expect(t.stereo.points()).toHaveLength(0);
+  await t.frames.step();
+  expect(t.stereo.points()).toHaveLength(4);
+});
+
+test('发布能力结果时同步休眠，旧应答不能重新持有样本', async () => {
+  const t = await start();
+  const off = t.store.sub(stereoFieldStatusAtom, () => {
+    if (t.status() === 'supported') t.setActive(false);
+  });
+  await t.open();
+  await t.frames.step();
+  expect(t.stereo.points()).toHaveLength(0);
+  expect(t.stereo.readings().correlation).toBeNull();
+  expect(t.frames.pending()).toBe(0);
+  off();
 });
 
 test('起服务时闸已经开着：不等变化，第一拍就问', async () => {

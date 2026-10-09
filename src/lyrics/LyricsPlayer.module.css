@@ -4,7 +4,22 @@
   height: 100%;
   overflow: hidden;
   --amll-lp-color: var(--colorNeutralForeground1);
-  --amll-lp-hover-bg-color: var(--colorSubtleBackgroundHover);
+  --amll-lp-hover-bg-color: var(--state-hover);
+}
+
+.root :global([class*='_lyricLineWrapper']:active) {
+  --amll-lp-hover-bg-color: var(--state-pressed);
+}
+
+/* AMLL 的译文紧跟主行，音译是后一条副行；两者共用副行类名。 */
+.root :global([class*='_lyricMainLine'] + [class*='_lyricSubLine']) {
+  font-size: var(--lyrics-translation-size, max(0.5em, var(--fontSizeBase100)));
+}
+
+.root[data-translation='hidden'] :global([class*='_lyricMainLine'] + [class*='_lyricSubLine']),
+.root[data-romanization='hidden'] :global([class*='_lyricSubLine'] + [class*='_lyricSubLine']),
+.root[data-romanization='hidden'] :global([class*='_romanWord']) {
+  display: none;
 }
 
 /* AMLL 用 plus-lighter 叠在深色底上；浅色底上它会把深色的字提亮到看不见。 */

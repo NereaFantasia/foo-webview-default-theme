@@ -88,13 +88,17 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalXL,
     paddingRight: tokens.spacingHorizontalXL,
     boxShadow: tokens.shadow2,
-    ...shorthands.borderColor(
-      `color-mix(in srgb, ${tokens.colorNeutralForeground1} 12%, transparent)`,
-    ),
+    '@media (forced-colors: none)': {
+      '&:not(:disabled, [aria-disabled="true"])': {
+        ...shorthands.borderColor(
+          `color-mix(in srgb, ${tokens.colorNeutralForeground1} 12%, transparent)`,
+        ),
+      },
+    },
     transitionProperty: 'background-color, color, box-shadow, scale',
     transitionDuration: durationVar('faster'),
     transitionTimingFunction: tokens.curveLinear,
-    ':active': { scale: '0.97', boxShadow: 'none' },
+    '&:not(:disabled, [aria-disabled="true"]):active': { scale: '0.97', boxShadow: 'none' },
   },
   secondary: {
     height: '40px',
@@ -102,25 +106,27 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightRegular,
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
-    backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 10%, transparent)`,
-    ...shorthands.borderColor(
-      `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
-    ),
     boxShadow: tokens.shadow2,
     transitionProperty: 'background-color, border-color, box-shadow, scale',
     transitionDuration: durationVar('faster'),
     transitionTimingFunction: tokens.curveLinear,
-    ':hover': {
-      backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 15%, transparent)`,
+    '@media (forced-colors: none)': {
+      '&:not(:disabled, [aria-disabled="true"])': {
+        backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 10%, transparent)`,
+        ...shorthands.borderColor(
+          `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
+        ),
+        ':hover': {
+          backgroundColor: `color-mix(in oklab, ${tokens.colorNeutralForeground1} 15%, transparent)`,
+        },
+        ':active,:hover:active,:active:focus-visible': { backgroundColor: 'var(--bg-chip)' },
+      },
     },
-    ':active': {
-      backgroundColor: 'var(--bg-chip)',
+    '&:not(:disabled, [aria-disabled="true"]):active': {
       boxShadow: 'none',
       scale: '0.97',
     },
-    ':disabled': {
-      backgroundColor: tokens.colorNeutralBackgroundDisabled,
-      color: tokens.colorNeutralForegroundDisabled,
+    ':disabled,[aria-disabled="true"]': {
       boxShadow: 'none',
       scale: '1',
     },

@@ -31,6 +31,7 @@ import type { FoldersView } from './useFoldersView.ts';
 import styles from './FoldersToolbar.module.css';
 import { useService } from '../../../kit/useService.ts';
 import { foldersKey } from '../foldersServices.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   slider: { width: '128px', minWidth: '128px' },
@@ -45,7 +46,6 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightRegular,
     whiteSpace: 'nowrap',
     '&[aria-pressed="true"]': {
-      backgroundColor: `color-mix(in oklab, ${tokens.colorBrandStroke1} 18%, transparent)`,
       color: tokens.colorBrandForeground1,
       fontWeight: tokens.fontWeightSemibold,
     },
@@ -59,6 +59,7 @@ export interface FoldersToolbarProps {
   onDirectory(): void;
 }
 export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const folders = useService(foldersKey);
   const catalog = useAtomValueRawSync(foldersTreeAtom);
@@ -80,6 +81,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
       <div className={styles.path}>
         {compact && (
           <Button
+            className={controls.icon}
             {...drawerTrigger}
             appearance="transparent"
             icon={<PanelLeft20Regular />}
@@ -91,6 +93,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
         {!compact && (
           <Tooltip content={t('folders.parent')} relationship="label">
             <Button
+              className={controls.icon}
               appearance="transparent"
               icon={<ArrowUp20Regular />}
               disabled={!node?.parent}
@@ -116,6 +119,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
         <div className={styles['path-actions']}>
           <Tooltip content={t(pinned ? 'folders.unpin' : 'folders.pin')} relationship="label">
             <Button
+              className={controls.icon}
               appearance="transparent"
               icon={pinned ? <PinOff20Regular /> : <Pin20Regular />}
               disabled={!node || preview.nodes.length !== 1}
@@ -124,6 +128,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
           </Tooltip>
           <Tooltip content={t('folders.refresh')} relationship="label">
             <Button
+              className={controls.icon}
               appearance="transparent"
               icon={<ArrowSync20Regular />}
               disabled={catalog.status === 'loading'}
@@ -138,7 +143,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
             <ToggleButton
               size="small"
               appearance="subtle"
-              className={classes.segment}
+              className={mergeClasses(classes.segment, controls.icon)}
               checked={prefs.recursive}
               onClick={() => folders.prefs.change({ recursive: true })}
             >
@@ -147,7 +152,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
             <ToggleButton
               size="small"
               appearance="subtle"
-              className={classes.segment}
+              className={mergeClasses(classes.segment, controls.icon)}
               checked={!prefs.recursive}
               onClick={() => folders.prefs.change({ recursive: false })}
             >
@@ -162,7 +167,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
                 <ToggleButton
                   size="small"
                   appearance="subtle"
-                  className={mergeClasses(classes.segment, classes.view)}
+                  className={mergeClasses(classes.segment, classes.view, controls.icon)}
                   checked={prefs.view === 'list'}
                   icon={<List20Regular />}
                   onClick={() => folders.prefs.change({ view: 'list' })}
@@ -174,7 +179,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
                 <ToggleButton
                   size="small"
                   appearance="subtle"
-                  className={mergeClasses(classes.segment, classes.view)}
+                  className={mergeClasses(classes.segment, classes.view, controls.icon)}
                   checked={prefs.view === 'covers'}
                   icon={<Grid20Regular />}
                   onClick={() => folders.prefs.change({ view: 'covers' })}
@@ -197,7 +202,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
               />
             ) : (
               <Dropdown
-                className={classes.density}
+                className={mergeClasses(classes.density, controls.field)}
                 appearance="outline"
                 aria-label={t('folders.density')}
                 value={t(`folders.${prefs.density}`)}
@@ -216,6 +221,7 @@ export function FoldersToolbar({ model, compact, onDirectory }: FoldersToolbarPr
           </div>
           <Tooltip content={t('folders.columns')} relationship="label">
             <Button
+              className={controls.icon}
               appearance="transparent"
               icon={<Table20Regular />}
               onClick={(event) => {

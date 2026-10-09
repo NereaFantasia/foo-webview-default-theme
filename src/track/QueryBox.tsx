@@ -33,12 +33,12 @@ import { fillQuery, needsConnector, type PresetId, type QuerySnippet } from './q
 import { changeQueryText, queryInputText, type QueryInput } from './queryInput.ts';
 import { QueryScopeMenu } from './QueryScopeMenu.tsx';
 import type { QueryScope } from './trackQuery.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   control: { flexShrink: 0, whiteSpace: 'nowrap' },
   trailing: { flexShrink: 0, alignItems: 'center' },
   surface: {
-    backgroundColor: tokens.colorNeutralBackground2,
     height: '32px',
     minWidth: 0,
     flex: 1,
@@ -76,6 +76,7 @@ export interface QueryBoxProps {
 
 /** 模式与两份草稿由页面持有；输入法组词期间只更新本地显示，不发布中间输入。 */
 export function QueryBox(props: QueryBoxProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
   const { scope, menuOpen, onMenuOpenChange } = props;
@@ -147,7 +148,7 @@ export function QueryBox(props: QueryBoxProps) {
     <div ref={setBox} className={styles.box} data-query-box>
       <Input
         ref={input}
-        className={mergeClasses(classes.surface, invalid && classes.invalid)}
+        className={mergeClasses(classes.surface, invalid && classes.invalid, controls.field)}
         role="combobox"
         aria-label={props.label}
         aria-invalid={invalid || undefined}
@@ -178,7 +179,7 @@ export function QueryBox(props: QueryBoxProps) {
             <Button
               appearance="transparent"
               size="small"
-              className={mergeClasses(classes.funnel, menuOpen && classes.active)}
+              className={mergeClasses(classes.funnel, menuOpen && classes.active, controls.icon)}
               icon={menuOpen ? <Filter16Filled /> : <Filter16Regular />}
               aria-expanded={shown}
               onMouseDown={(event) => event.preventDefault()}
@@ -198,7 +199,11 @@ export function QueryBox(props: QueryBoxProps) {
             <>
               <Tooltip content={t('query.clear')} relationship="label">
                 <Button
-                  className={mergeClasses(classes.control, value === '' && classes.clear)}
+                  className={mergeClasses(
+                    classes.control,
+                    value === '' && classes.clear,
+                    controls.icon,
+                  )}
                   appearance="transparent"
                   size="small"
                   icon={<Dismiss16Regular />}
@@ -231,7 +236,7 @@ export function QueryBox(props: QueryBoxProps) {
       />
       <Tooltip content={t('query.advanced')} relationship="label">
         <ToggleButton
-          className={classes.toggle}
+          className={mergeClasses(classes.toggle, controls.icon)}
           appearance="subtle"
           checked={advanced}
           icon={<Code16Regular />}

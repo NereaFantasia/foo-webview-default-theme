@@ -52,8 +52,14 @@ function shapeFrame(element: HTMLElement, kind: SurfaceKind, value: number): Key
   if (kind === 'flyout') return flyoutFrame(element, value);
   if (kind === 'dialog') return { scale: String(1 + (1 - value) * 0.05) };
   const sign = kind === 'start' ? -1 : 1;
-  const direction = getComputedStyle(element).direction === 'rtl' ? -sign : sign;
-  return { translate: `${direction * (1 - value) * 100}% 0` };
+  const style = getComputedStyle(element);
+  const direction = style.direction === 'rtl' ? -sign : sign;
+  // 浮动面板需要越过容器边缘留白；普通抽屉没有额外余量，沿用自身宽度。
+  const offset = style.getPropertyValue('--surface-slide-offset').trim();
+  const distance = direction * (1 - value);
+  return {
+    translate: offset ? `calc(${distance} * (100% + ${offset})) 0` : `${distance * 100}% 0`,
+  };
 }
 
 /** 浮层的位置与透明度分别保留进度，反向前先取当前值，再取消旧动画。 */

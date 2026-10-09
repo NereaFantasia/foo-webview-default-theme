@@ -29,6 +29,19 @@ async function setup(visible = true) {
 }
 
 describe('曲目信息读取', () => {
+  test('组件模块名没有扩展名时照常读取播放统计', async () => {
+    const { host, service, state } = await setup();
+    host.answer('config.getComponents', {
+      success: true,
+      count: 1,
+      components: [{ name: '播放统计信息', version: '3.1.10', filename: 'foo_playcount' }],
+    });
+    service.setSections(['statistics']);
+    await flush();
+    expect(state().statistics).toMatchObject({ status: 'ready', value: { playCount: 12 } });
+    expect(host.callsTo('playcount.get')).toHaveLength(1);
+  });
+
   test('先订阅再读取；默认只读元数据、技术字段、评分，展开后才读其他分组', async () => {
     const { host, store, service, state } = await setup();
     expect(host.listenerCount('metadb:changed')).toBe(1);

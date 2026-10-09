@@ -90,8 +90,29 @@ describe('readRootPayload', () => {
         keys: [],
         revokedKeys: [],
         changelog: null,
+        plugins: [],
       },
     });
+  });
+
+  it('读出插件候选，读不懂的丢掉这一个', () => {
+    const plugin = {
+      version: '2.1.0',
+      arch: 'x64',
+      url: 'https://cnb.cool/foo-ui-webview2/default-theme/-/releases/download/v2.1.0/plugin.json',
+      size: 1024,
+      sha256: SHA,
+    };
+    const read = (value: unknown) => {
+      const reading = readRootPayload(root({ plugins: value }));
+      return reading.kind === 'ok' ? reading.payload.plugins : 'invalid';
+    };
+    expect(read(undefined)).toEqual([]);
+    expect(read([plugin])).toEqual([plugin]);
+    expect(
+      read([plugin, { ...plugin, arch: 'arm64' }, { ...plugin, version: '2.1' }, '不是对象']),
+    ).toEqual([plugin]);
+    expect(read('不是数组')).toEqual([]);
   });
 
   it('读出更新日志附件，写错时当作没有，不连累整份清单', () => {

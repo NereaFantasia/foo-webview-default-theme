@@ -93,6 +93,8 @@ export const CURVE = {
   pane: customCurve(0, 0.35, 0.15, 1),
   /** 折叠卡收起。 */
   collapse: customCurve(1, 1, 0, 1),
+  /** Acrylic 与中性底之间的材质淡变。 */
+  backdrop: customCurve(0.5, 0, 0, 0.9),
   /** 列表项的选中指示条从无到有纵向放大（WinUI ListViewItem）。 */
   indicator: customCurve(0.167, 0.167, 0, 1),
 } as const;
@@ -114,6 +116,7 @@ export const MOTION_VARIABLES: Readonly<Record<`--${string}`, string>> = {
   '--motion-curve-point-to-point': CURVE.pointToPoint.timing,
   '--motion-curve-pane': CURVE.pane.timing,
   '--motion-curve-collapse': CURVE.collapse.timing,
+  '--motion-curve-backdrop': CURVE.backdrop.timing,
 };
 
 /** 减弱动效时覆盖上面的时长变量，写样式的一方不必自己判断。 */

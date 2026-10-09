@@ -22,5 +22,12 @@ export const savingZhCN = {
   'info.libraryNotConfigured': '媒体库尚未配置文件夹',
   'info.libraryDetail': '请在 foobar2000 首选项中添加音乐文件夹。',
   'info.retry': '重新检查',
+  'info.windowEffectsLimited': '部分窗口效果不可用',
+  'info.windowEffectsWindows10':
+    'Windows 10 下，Mica、Mica Alt 和窗口 Acrylic 材质改用主题色背景，托盘菜单使用纯色。原生窗口保留直角，最大化按钮不提供贴靠布局。封面、图片和流动色场仍可使用。',
+  'info.windowEffectsUnknown':
+    '无法确认系统是否支持窗口材质，材质模式暂用主题色背景。托盘菜单使用纯色，封面、图片和流动色场仍可使用。',
+  'info.windowEffectsFailed':
+    '窗口材质未能应用，材质模式暂用主题色背景。原有材质选择已保留，封面、图片和流动色场仍可使用。',
   'info.dismiss': '不再提示',
 } as const;

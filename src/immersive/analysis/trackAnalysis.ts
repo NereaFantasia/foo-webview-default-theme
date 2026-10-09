@@ -13,7 +13,12 @@ import {
 } from '../tempo/onsetEnvelope.ts';
 import { analyseSegments, type PcmPiece, type SegmentOptions } from '../waveform/segmentedBands.ts';
 import { analyseTempo } from '../tempo/tempoSegments.ts';
-import { ANALYSIS_SAMPLE_RATE, type WaveformBands } from '../waveform/waveformBands.ts';
+import {
+  ANALYSIS_SAMPLE_RATE,
+  renderBands,
+  type BandSignals,
+  type WaveformBands,
+} from '../waveform/waveformBands.ts';
 
 /**
  * 整轨分析：按段取一遍 PCM、分一遍频，同时得出整轨波形的分频结果与逐拍拍点（`tempoSegments.ts`，变速曲逐段）。
@@ -80,6 +85,8 @@ interface Result {
 }
 
 const stateAtom = atom<TrackAnalysisModel>({ status: 'unavailable', bands: null, beats: null });
+// 退出后重新进入也须等上一段离线渲染结束；完成即撤掉引用，不缓存音频。
+const renderingByStore = new WeakMap<Store, Promise<BandSignals>>();
 
 export const trackAnalysisAtom: Atom<TrackAnalysisModel> = atom((get) => get(stateAtom));
 
@@ -95,11 +102,16 @@ export function startTrackAnalysis(
   options: TrackAnalysisOptions,
 ): TrackAnalysisService {
   const { source, wanted } = options;
-  const { beats: findBeats = analyseTempo, ...segmentDeps } = options.deps ?? {};
+  const {
+    beats: findBeats = analyseTempo,
+    render = renderBands,
+    ...segmentDeps
+  } = options.deps ?? {};
   store.set(stateAtom, modelOf(source ? 'idle' : 'unavailable', null));
   let token = 0;
   let inflight: AbortController | null = null;
   let unavailable = source === null;
+  let disposed = false;
   let last: Result | null = null;
   // 上一次看到的输入；还没看过时为 null。
   let input: { key: string; want: boolean } | null = null;
@@ -124,6 +136,15 @@ export function startTrackAnalysis(
         {
           ...segmentDeps,
           isCurrent: () => id === token,
+          render: async (audio) => {
+            const rendering = render(audio);
+            renderingByStore.set(store, rendering);
+            try {
+              return await rendering;
+            } finally {
+              renderingByStore.delete(store);
+            }
+          },
           onSegment: (signals, piece, start, end) => {
             if (!energies) return;
             accumulateEnergies(signals, piece.audio.sampleRate, piece.start, start, end, energies);
@@ -155,6 +176,7 @@ export function startTrackAnalysis(
   }
 
   function follow(): void {
+    if (disposed) return;
     const track = store.get(currentTrackAtom);
     const key = track?.path ? trackKeyOf(track) : '';
     const want = store.get(playbackConnectedAtom) && store.get(wanted);
@@ -171,6 +193,18 @@ export function startTrackAnalysis(
       return;
     }
     store.set(stateAtom, modelOf('loading', null));
+    const rendering = renderingByStore.get(store);
+    if (rendering) {
+      // 离线渲染不能中断；当前段结束前不再解码，恢复只重算最新仍需要的曲目。
+      const id = token;
+      const resume = () => {
+        if (disposed || id !== token) return;
+        input = null;
+        follow();
+      };
+      void rendering.then(resume, resume);
+      return;
+    }
     void load(track, key, token, source);
   }
 
@@ -184,8 +218,12 @@ export function startTrackAnalysis(
 
   return {
     dispose() {
+      if (disposed) return;
+      disposed = true;
       stop();
       for (const off of offs.splice(0)) off();
+      last = null;
+      store.set(stateAtom, modelOf(unavailable ? 'unavailable' : 'idle', null));
     },
   };
 }

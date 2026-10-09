@@ -47,7 +47,11 @@ export const BLOCKING_KINDS = [
   'hostUnreachable',
   'hostMethodMissing',
 ] as const;
-export const REMINDER_KINDS = ['playcountMissing', 'libraryNotConfigured'] as const;
+export const REMINDER_KINDS = [
+  'playcountMissing',
+  'libraryNotConfigured',
+  'windowEffectsLimited',
+] as const;
 export type BlockingKind = (typeof BLOCKING_KINDS)[number];
 /** 也是 config 里「不再提示」的键，改名要写迁移。 */
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
@@ -63,6 +67,7 @@ export type UpdateNotice =
   | { readonly kind: 'updateShared' }
   | { readonly kind: 'updateFailed' };
 export interface UpdateFeedback {
+  readonly backend?: StartupConfirmationFeedback;
   readonly notice: Atom<UpdateNotice | null>;
   restart(): Promise<boolean>;
   check(): Promise<void>;
@@ -76,6 +81,7 @@ export type InfoKind =
   | UpdateNotice['kind']
   | 'preferencesUnsaved'
   | 'preferenceStorageUnavailable'
+  | 'backendUnavailable'
   | 'startupUnconfirmed';
 
 export interface StartupConfirmationFeedback {
@@ -84,6 +90,13 @@ export interface StartupConfirmationFeedback {
 }
 const startupFailureAtom = atom<Atom<boolean>>(atom(false));
 const updateNoticeAtom = atom<Atom<UpdateNotice | null>>(atom(null));
+const backendFailureAtom = atom<Atom<boolean>>(atom(false));
+
+export interface WindowEffectsFeedback {
+  readonly notice: Atom<'windows10' | 'unknown' | 'failed' | null>;
+  readonly diagnostics: Atom<string>;
+}
+const windowEffectsAtom = atom<WindowEffectsFeedback | null>(null);
 
 const retryingPreferencesAtom = atom(false);
 export const preferenceSaveSummaryAtom = atom((get) => ({
@@ -99,7 +112,9 @@ export const preferenceSaveSummaryAtom = atom((get) => ({
 /**
  * 提醒级各种类此刻成不成立。条件出自媒体库与播放统计，由装配层传进来，信息中心只管去重、排序与「不再提示」。
  */
-export type ReminderSources = Readonly<Record<ReminderKind, Atom<boolean>>>;
+export type ReminderSources = Readonly<
+  Record<Exclude<ReminderKind, 'windowEffectsLimited'>, Atom<boolean>>
+>;
 
 const NO_REMINDERS: ReminderSources = {
   playcountMissing: atom(false),
@@ -193,15 +208,20 @@ export const infoMessagesAtom: Atom<readonly InfoMessage[]> = atom((get) => {
     blocking.push(['hostMethodMissing', params]);
   }
   const sources = get(sourcesAtom);
+  const windowEffects = get(windowEffectsAtom);
+  const effectsNotice = windowEffects ? get(windowEffects.notice) : null;
   const active: Record<ReminderKind, boolean> = {
     playcountMissing: get(sources.playcountMissing),
     libraryNotConfigured: get(sources.libraryNotConfigured),
+    windowEffectsLimited: effectsNotice !== null,
   };
   const dismissed = get(DISMISSED.atom);
   const saving = get(preferenceSaveSummaryAtom);
   const preferences: InfoMessage[] = [];
   if (get(get(startupFailureAtom)))
     preferences.push({ kind: 'startupUnconfirmed', level: 'reminder', params: {} });
+  if (get(get(backendFailureAtom)))
+    preferences.push({ kind: 'backendUnavailable', level: 'reminder', params: {} });
   const update = get(get(updateNoticeAtom));
   if (update) {
     const { kind, ...params } = update;
@@ -219,7 +239,11 @@ export const infoMessagesAtom: Atom<readonly InfoMessage[]> = atom((get) => {
     ...blocking.map(([kind, params]): InfoMessage => ({ kind, level: 'blocking', params })),
     ...preferences,
     ...REMINDER_KINDS.filter((kind) => active[kind] && !dismissedNow(dismissed, kind, check)).map(
-      (kind): InfoMessage => ({ kind, level: 'reminder', params: {} }),
+      (kind): InfoMessage => ({
+        kind,
+        level: 'reminder',
+        params: kind === 'windowEffectsLimited' ? { reason: effectsNotice ?? '' } : {},
+      }),
     ),
   ];
 });
@@ -249,7 +273,12 @@ export const dismissedCountAtom: Atom<number> = atom((get) => {
 /** 诊断信息，界面上的页脚与「复制诊断信息」（`diagnosticText`）用它；读到版本之前为 null。 */
 export const diagnosticsAtom: Atom<Diagnostics | null> = atom((get) => {
   const check = get(checkAtom);
-  return check.state === 'read' ? diagnosticsOf(check.info) : null;
+  if (check.state !== 'read') return null;
+  const windowEffects = get(windowEffectsAtom);
+  return {
+    ...diagnosticsOf(check.info),
+    ...(windowEffects ? { windowEffects: get(windowEffects.diagnostics) } : {}),
+  };
 });
 
 export interface InfoCenterService {
@@ -270,6 +299,7 @@ export interface InfoCenterService {
   /** 只重试调用时失败的偏好，交回原服务使用当前值，已保存的项不重写。 */
   retryPreferences(): Promise<void>;
   retryStartup(): void;
+  retryBackend(): void;
   /** 新版本已下载时重启 foobar2000，让引导页换上新版本。 */
   restartForUpdate(): void;
   /** 更新多次失败后手动再试一次。 */
@@ -288,9 +318,12 @@ export function startInfoCenter(
   preferences?: Pick<PagePrefStorage, 'retry'>,
   startup?: StartupConfirmationFeedback,
   update?: UpdateFeedback,
+  windowEffects?: WindowEffectsFeedback,
 ): InfoCenterService {
+  store.set(windowEffectsAtom, windowEffects ?? null);
   store.set(startupFailureAtom, startup?.failed ?? atom(false));
   store.set(updateNoticeAtom, update?.notice ?? atom(null));
+  store.set(backendFailureAtom, update?.backend?.failed ?? atom(false));
   store.set(sourcesAtom, reminders);
   store.set(checkAtom, CHECKING);
   store.set(missingAtom, NO_MISSING);
@@ -376,6 +409,9 @@ export function startInfoCenter(
     },
     retryStartup() {
       if (!disposed) void startup?.retry();
+    },
+    retryBackend() {
+      if (!disposed) void update?.backend?.retry();
     },
     restartForUpdate() {
       if (!disposed) void update?.restart();

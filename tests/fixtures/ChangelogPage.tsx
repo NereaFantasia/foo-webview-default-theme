@@ -21,6 +21,9 @@ import {
   type ConfirmedStartup,
 } from '../../src/update/loaderConfirmation.ts';
 import { startUpdater, updaterKey } from '../../src/update/updater.ts';
+import { startBackendConnection } from '../../src/server/backendConnection.ts';
+import { startBackendBootstrap, backendBootstrapKey } from '../../src/update/backendBootstrap.ts';
+import { startPluginUpdater, pluginUpdaterKey } from '../../src/update/pluginUpdater.ts';
 import { createMemoryConfigWriter } from './dataWriter.ts';
 
 function Settings() {
@@ -31,6 +34,9 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
   const store = createStore();
   const writer = createMemoryConfigWriter(fb);
   const updater = startUpdater(store, { keys, writer, pause: async () => {} });
+  const connection = startBackendConnection(store);
+  const backend = startBackendBootstrap(store, connection);
+  const plugin = startPluginUpdater(store, updater, backend, connection, { keys });
   const view = startChangelogView(store, updater, writer);
   const commands = startCommandRegistry(window);
   const locale = startLocale(store, fb, 'zh-CN');
@@ -47,10 +53,16 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
       check: updater.check,
       install: updater.install,
       showChangelog: view.show,
+      backend: {
+        failed: atom((get) => get(backend.status).phase === 'failed'),
+        retry: backend.retry,
+      },
     },
   );
   const services = serviceMap([
     bindService(updaterKey, updater),
+    bindService(backendBootstrapKey, backend),
+    bindService(pluginUpdaterKey, plugin),
     bindService(changelogViewKey, view),
     bindService(commandsKey, commands),
     bindService(infoCenterKey, info),
@@ -83,7 +95,10 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
       root.unmount();
       info.dispose();
       view.dispose();
+      plugin.dispose();
       updater.dispose();
+      backend.dispose();
+      connection.dispose();
       locale.dispose();
       commands.dispose();
     },

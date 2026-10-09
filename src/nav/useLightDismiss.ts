@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
-import { useCommand } from './useCommand.ts';
+import { useContext, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { CommandsContext, useCommand } from './useCommand.ts';
 
 export interface LightDismissOptions {
   /** Esc 命令的 id，各浮层各用各的。 */
@@ -7,6 +7,8 @@ export interface LightDismissOptions {
   readonly open: boolean;
   /** 浮层的根。焦点在它里面的输入框时 Esc 归输入框。 */
   readonly panel: RefObject<HTMLElement | null>;
+  /** 输入框没有启用的 Esc 命令时允许关闭；缺省把 Esc 留给输入框。 */
+  readonly escapeFromInput?: boolean;
   /** 按在这里不算「外面」：开关这个浮层的那个键，免得按下时关掉、松开时的单击又打开。 */
   exempt?(target: Element): boolean;
   /** 此刻不许轻关，比如改名进行中：在外面按下只让改名框失焦提交，浮层留着。 */
@@ -22,11 +24,12 @@ export interface LightDismissOptions {
  * 事件照样沿组件树冒到浮层根上。返回的处理函数挂在浮层根的 `onPointerDownCapture` 上，记下这一下按在
  * 里面；document 上的监听在冒泡阶段最后才到，据此判断。
  *
- * Esc 登记在浮层层。焦点在浮层里的输入框时不认领，交给输入框那一层：改名框的 Esc 取消改名，筛选框的
+ * Esc 登记在浮层层。缺省在浮层里的输入框获焦时不认领，交给输入框那一层：改名框的 Esc 取消改名，筛选框的
  * Esc 收起筛选，再按一次才关浮层。Fluent 的菜单开着时它自己接 Esc 并拦下缺省，轮不到这里。
  */
 export function useLightDismiss(options: LightDismissOptions): () => void {
   const { id, open, panel } = options;
+  const commands = useContext(CommandsContext);
   const latest = useRef(options);
   const inside = useRef(false);
   useLayoutEffect(() => {
@@ -61,7 +64,24 @@ export function useLightDismiss(options: LightDismissOptions): () => void {
         (focused instanceof HTMLInputElement &&
           focused.type !== 'checkbox' &&
           focused.type !== 'radio');
-      return !(typing && (panel.current?.contains(focused) ?? false));
+      if (!(typing && (panel.current?.contains(focused) ?? false))) return true;
+      if (!latest.current.escapeFromInput) return false;
+      // 浮层层先于输入层分派；先查输入框是否认领此键，才能保留先清空、再收起的语义。
+      return !commands
+        ?.list()
+        .some(
+          (command) =>
+            command.layer === 'input' &&
+            command.keys?.some(
+              (key) =>
+                key.key.toLowerCase() === 'escape' &&
+                !key.alt &&
+                !key.ctrl &&
+                !key.shift &&
+                !key.meta,
+            ) &&
+            (command.enabled?.() ?? true),
+        );
     },
     run: () => latest.current.onDismiss(true),
   });

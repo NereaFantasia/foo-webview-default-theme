@@ -10,19 +10,17 @@ import { RAIL_WIDTH, snapDrag, snapKey, type SidebarShape } from '../../nav/side
 import styles from './SidebarSplitter.module.css';
 import { useCommand } from '../../nav/useCommand.ts';
 import { useService } from '../../kit/useService.ts';
+import { SplitterHandle } from '../SplitterHandle.tsx';
 
 export interface SidebarSplitterProps {
-  /** 侧边栏左缘所在的元素：指针离它左缘的距离减去握柄半宽，就是指针对应的侧边栏宽度。 */
+  /** 侧边栏左缘所在的元素，用作拖动坐标原点。 */
   readonly origin: RefObject<HTMLElement | null>;
 }
 
-/** 握柄的命中区宽，CSS 像素，就是侧边栏与内容卡之间那条缝。 */
-const GUTTER = 8;
 const BOUNDS = { min: SIDEBAR_WIDTH.min, max: SIDEBAR_WIDTH.max } as const;
 
 /**
- * 侧边栏与内容区之间的分栏握柄（WAI-ARIA separator）：整条 8 px 都是命中区，2 × 48 的握柄平时隐藏，悬停、
- * 聚焦、拖动时才显示。拖动中按吸附规则实时换形态（`sidebarSnap.ts`），每一下都落盘；拖动中按 Esc 回到拖动
+ * 主内容卡左缘的分栏握柄。拖动中按吸附规则实时换形态（`sidebarSnap.ts`），每一下都落盘；按 Esc 回到拖动
  * 之前的形态。双击在图标态与上次的展开宽度之间切换。焦点在握柄上时 ← / →、Home、End、Enter 按吸附规则
  * 换算。
  *
@@ -48,11 +46,13 @@ export function SidebarSplitter({ origin }: SidebarSplitterProps) {
     const left = origin.current?.getBoundingClientRect().left ?? 0;
     const prefs = store.get(sidebarPrefsAtom);
     const rest: SidebarShape = { rail: prefs.rail, width: prefs.width };
+    // 保存按下位置到侧栏右缘的距离，包含卡片留白与手柄内的抓取偏移。
+    const offset = event.clientX - left - (rest.rail ? RAIL_WIDTH : rest.width);
     let shape = rest;
     event.preventDefault();
     element.setPointerCapture(pointerId);
     const move = (moved: globalThis.PointerEvent) => {
-      shape = snapDrag(moved.clientX - left - GUTTER / 2, shape, BOUNDS, rest.width);
+      shape = snapDrag(moved.clientX - left - offset, shape, BOUNDS, rest.width);
       sidebar.setShape(shape);
     };
     const end = () => {
@@ -102,21 +102,16 @@ export function SidebarSplitter({ origin }: SidebarSplitterProps) {
   useCommand(resizeKey('Enter'));
 
   return (
-    <div
+    <SplitterHandle
       ref={handle}
       className={styles.splitter}
-      role="separator"
-      tabIndex={0}
-      aria-orientation="vertical"
       aria-label={t('sidebar.resize')}
       aria-valuenow={rail ? RAIL_WIDTH : width}
       aria-valuemin={RAIL_WIDTH}
       aria-valuemax={SIDEBAR_WIDTH.max}
-      data-dragging={dragging || undefined}
+      dragging={dragging}
       onPointerDown={press}
       onDoubleClick={() => sidebar.toggleRail()}
-    >
-      <span className={styles.grip} />
-    </div>
+    />
   );
 }

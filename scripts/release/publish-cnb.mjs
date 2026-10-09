@@ -4,7 +4,8 @@
 // CNB 仓库的 README 是同目录的 cnb-readme.md，写明这个仓库只用于分发。
 //
 // 用法：node scripts/release/publish-cnb.mjs --dir <输出目录>/v<版本> --checkout <CNB 仓库的本地克隆目录>
-//   [--dry-run] [--probe probe-<标识>]
+//   [--dry-run] [--probe probe-<标识>] [--plugin]
+// --plugin 时 --dir 指向 build-plugin 生成的 plugin-<版本>-win-<架构> 目录，按插件发行核对后发布。
 // 令牌从环境变量 CNB_TOKEN 读，不写进命令行；--dry-run 只做核对与只读查询，不写入 CNB。
 // --probe 使用独立的预发布标签，匿名核对附件后结束，不推根清单，也不设为最新发行版。
 
@@ -16,6 +17,8 @@ import { BUILT_IN_KEYS, ROOT_URL } from '../../src/update/contract.ts';
 import { INITIAL_TRUST, acceptRoot } from '../../src/update/rootTrust.ts';
 import { sha256, verifyArtifacts } from './artifacts.mjs';
 import { cnbClient, confirmPublic, downloadPublic, planAssets } from './cnb.mjs';
+import { verifyPublishedRuntime } from './runtime-verify.mjs';
+import { verifyPluginArtifacts } from './plugin-artifacts.mjs';
 
 const REPO = 'foo-ui-webview2/default-theme';
 const REMOTE = `https://cnb.cool/${REPO}.git`;
@@ -34,6 +37,7 @@ async function publish() {
       checkout: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
       probe: { type: 'string' },
+      plugin: { type: 'boolean', default: false },
     },
   });
   if (!values.dir || !values.checkout) throw new Error('需要 --dir 与 --checkout');
@@ -65,9 +69,15 @@ async function publish() {
     console.log(`${dryRun ? '[干跑] ' : ''}${message}`);
   }
 
-  const verified = await verifyArtifacts(values.dir);
+  const verified = await (values.plugin
+    ? verifyPluginArtifacts(values.dir)
+    : verifyArtifacts(values.dir));
   const tag = values.probe ?? verified.tag;
   step(`分发物核对通过：${verified.tag}，根清单序号 ${verified.serial}`);
+  if (verified.runtime) {
+    await verifyPublishedRuntime(verified.runtime);
+    step('公共运行时及全部附件匿名核对通过');
+  }
 
   if (values.probe) {
     step(`探测发行版 ${tag}：核对附件后结束，不更新根清单`);

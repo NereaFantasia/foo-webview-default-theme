@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Popover,
   PopoverSurface,
@@ -17,6 +18,7 @@ import { roleVar } from '../../../theme/roles.ts';
 import { OutputDeviceList } from './OutputDeviceList.tsx';
 import { playbackConnectedAtom } from '../../../playback/playerAtoms.ts';
 import { PLAYER_KEY_ATTR, PLAYER_SURFACE_ATTR } from '../playerFocus.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   key: {
@@ -44,6 +46,7 @@ const useStyles = makeStyles({
  * Esc 与点别处收起。
  */
 export function OutputDeviceButton() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const classes = useStyles();
@@ -60,7 +63,7 @@ export function OutputDeviceButton() {
         <Tooltip content={t('player.outputDevice')} relationship="label">
           <Button
             appearance="subtle"
-            className={classes.key}
+            className={mergeClasses(classes.key, viewControls.icon)}
             icon={<SpeakerBox20Regular />}
             disabled={!connected}
             aria-expanded={open}

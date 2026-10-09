@@ -59,19 +59,23 @@ export interface SpectrumHistory {
   push(frame: ArrayLike<number>, retention?: number): void;
   /** 逻辑行 k：0 是最新一帧，`rows − 1` 是最旧一帧；返回的是缓冲上的视图，不拷贝。 */
   row(k: number): Float32Array;
+  /** 撤销缓冲引用并清零行数；下一次写入时重新分配。已交出的行视图由消费者释放。 */
+  release(): void;
 }
 
 const clamp01 = (value: number): number =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 
 export function createSpectrumHistory(rows = TERRAIN_ROWS, bands = TERRAIN_BANDS): SpectrumHistory {
-  const data = new Float32Array(rows * bands);
+  let data = new Float32Array(rows * bands);
   let head = 0;
   let count = 0;
   return {
     rows,
     bands,
-    data,
+    get data() {
+      return data;
+    },
     get head() {
       return head;
     },
@@ -79,6 +83,7 @@ export function createSpectrumHistory(rows = TERRAIN_ROWS, bands = TERRAIN_BANDS
       return count;
     },
     push(frame, retention = 0) {
+      if (data.length === 0) data = new Float32Array(rows * bands);
       const previous = count > 0 ? data.subarray(head * bands, (head + 1) * bands) : null;
       const keep = previous && retention > 0 ? Math.min(1, retention) : 0;
       head = (head + rows - 1) % rows;
@@ -119,6 +124,11 @@ export function createSpectrumHistory(rows = TERRAIN_ROWS, bands = TERRAIN_BANDS
     row(k) {
       const physical = (head + k) % rows;
       return data.subarray(physical * bands, (physical + 1) * bands);
+    },
+    release() {
+      data = new Float32Array(0);
+      head = 0;
+      count = 0;
     },
   };
 }

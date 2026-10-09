@@ -5,7 +5,7 @@
   overflow: clip;
   border: var(--strokeWidthThin) solid var(--line);
   border-radius: var(--radius-control);
-  background-color: var(--bg-surface);
+  background-color: var(--bg-view-control);
 }
 
 /* 卡头：图标 20、文字占余量，控件、预览与箭头按内容宽排在右边；连外框 58 高，与设置卡齐平。 */
@@ -29,11 +29,11 @@
 }
 
 .interactive:hover {
-  background-color: var(--colorSubtleBackgroundHover);
+  background-color: var(--state-hover);
 }
 
 button.interactive:active {
-  background-color: var(--colorSubtleBackgroundPressed);
+  background-color: var(--state-pressed);
 }
 
 button.head:focus-visible {
@@ -122,11 +122,11 @@ button.head:focus-visible {
 }
 
 .toggle:hover {
-  background-color: var(--colorSubtleBackgroundHover);
+  background-color: var(--state-hover);
 }
 
 .toggle:active {
-  background-color: var(--colorSubtleBackgroundPressed);
+  background-color: var(--state-pressed);
 }
 
 .toggle:focus-visible {

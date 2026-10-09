@@ -27,11 +27,20 @@
 }
 
 .track:hover {
-  background: var(--bg-hover);
+  background-color: var(--state-hover);
+}
+
+.track:active {
+  background-color: var(--state-pressed);
 }
 
 .track[aria-selected='true'] {
-  background: var(--bg-selected);
+  background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+}
+@media (forced-colors: active) {
+  .track[aria-selected='true'] {
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
 }
 
 .tracks:focus-visible .track[data-focused] {

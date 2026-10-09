@@ -1,5 +1,5 @@
 import { useVirtualizer, type Virtualizer, type VirtualItem } from '@tanstack/react-virtual';
-import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { flowItemSize } from './albumDropdown.ts';
 import { placeVisible, type PlacedTile } from './albumGridLayout.ts';
 import type { AlbumWallLayout } from './useAlbumWallLayout.ts';
@@ -56,6 +56,16 @@ export function useAlbumWallRows(
     (index: number) => `${index}:${items[index]?.kind ?? ''}:${rowHeight}:${headerHeight}`,
     [items, rowHeight, headerHeight],
   );
+  const [bottomInset, setBottomInset] = useState(0);
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const measure = () => setBottomInset(bottomPadding(element));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [scroller]);
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scroller.current,
@@ -64,6 +74,7 @@ export function useAlbumWallRows(
       return item ? flowItemSize(item, rowHeight, headerHeight) : rowHeight;
     },
     getItemKey,
+    scrollPaddingEnd: bottomInset,
     overscan: OVERSCAN + Math.ceil(reach / Math.max(1, rowHeight)),
   });
   const shape: FlowShape = { items, rowHeight, headerHeight };

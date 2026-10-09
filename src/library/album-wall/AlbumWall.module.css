@@ -15,7 +15,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 0 var(--spacingHorizontalXXL) var(--spacingVerticalL);
+  padding: 0 var(--spacingHorizontalXXL) calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+  scroll-padding-bottom: var(--player-inset, 0px);
   outline: none;
 }
 

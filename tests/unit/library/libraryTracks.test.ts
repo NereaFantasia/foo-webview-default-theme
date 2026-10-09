@@ -127,4 +127,32 @@ describe('取曲目', () => {
     await Promise.all([first, second]);
     expect(titles()).toEqual(['Locomotion']);
   });
+
+  it('撤到没人要后库变更只记下过时，重新要时补取一次', async () => {
+    const { host, service, state } = setup();
+    host.answer('library.getAll', tracksAnswer(LIBRARY));
+    const release = service.want();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    release();
+    vi.useFakeTimers();
+    host.emit('library:itemsModified', changed);
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
+    expect(host.callsTo('library.getAll')).toHaveLength(1);
+    service.want();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(host.callsTo('library.getAll')).toHaveLength(2);
+  });
+
+  it('还有人要时撤回一处，库变更照旧重取', async () => {
+    const { host, service, state } = setup();
+    host.answer('library.getAll', tracksAnswer(LIBRARY));
+    const release = service.want();
+    service.want();
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    release();
+    vi.useFakeTimers();
+    host.emit('library:itemsModified', changed);
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
+    expect(host.callsTo('library.getAll')).toHaveLength(2);
+  });
 });

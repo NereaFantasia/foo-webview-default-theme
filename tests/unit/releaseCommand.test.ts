@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ROOT_URL } from '../../src/update/contract.ts';
+import { runtimeArtifacts } from '../../scripts/release/runtime-artifacts.mjs';
 
 const mocks = vi.hoisted(() => ({
   args: [] as string[],
@@ -53,7 +54,12 @@ interface NetworkCall {
 }
 
 function network(
-  options: { rootStatus?: number; downloadStatus?: number; existingStable?: boolean } = {},
+  options: {
+    rootStatus?: number;
+    downloadStatus?: number;
+    existingStable?: boolean;
+    runtime?: Map<string, Uint8Array>;
+  } = {},
 ) {
   const calls: NetworkCall[] = [];
   const events: string[] = [];
@@ -64,6 +70,11 @@ function network(
     const method = init.method ?? 'GET';
     const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
     calls.push({ url, method, body });
+    if (url.includes('/releases/download/rt-node-')) {
+      const bytes = options.runtime?.get(url);
+      events.push(`runtime-download:${url.split('/').pop()}`);
+      return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
+    }
     if (url === ROOT_URL)
       return events.some((event) => event.endsWith('manifest.json'))
         ? new Response(MANIFEST)
@@ -128,6 +139,61 @@ function gitArgs(): string[][] {
 }
 
 describe('CNB 发布命令', () => {
+  it.each(['runtime.json', 'node.part000', 'LICENSE', null])(
+    '公共运行时附件 %s 缺失时不推进根清单，完整时才能发布',
+    async (missing) => {
+      const node = new Uint8Array([1, 2, 3]);
+      const built = runtimeArtifacts({
+        version: '24.16.0',
+        arch: 'x64',
+        node,
+        license: new Uint8Array([4]),
+        source: {
+          url: 'https://nodejs.org/dist/v24.16.0/win-x64/node.exe',
+          size: node.length,
+          sha256: createHash('sha256').update(node).digest('hex'),
+        },
+      });
+      const base = `https://cnb.cool/${REPO}/-/releases/download/${built.tag}`;
+      const manifest = built.assets.find((asset) => asset.name === 'runtime.json');
+      if (!manifest) throw new Error('缺少运行时清单');
+      const runtime = new Map(
+        built.assets
+          .filter((asset) => asset.name !== missing)
+          .map((asset) => [`${base}/${asset.name}`, asset.bytes]),
+      );
+      mocks.verify.mockResolvedValueOnce({
+        version: '0.1.0',
+        tag: 'v0.1.0',
+        serial: 1,
+        manifest: MANIFEST,
+        notes: {},
+        assets: ASSETS,
+        runtime: {
+          url: `${base}/runtime.json`,
+          size: manifest.bytes.length,
+          sha256: createHash('sha256').update(manifest.bytes).digest('hex'),
+        },
+      });
+      const { events } = network({ runtime });
+      if (missing) {
+        await expect(command()).rejects.toThrow('公开运行时');
+        expect(mocks.write).not.toHaveBeenCalled();
+        expect(mocks.git).not.toHaveBeenCalled();
+      } else {
+        await expect(command()).resolves.toBeUndefined();
+        const written = events.findIndex((event) => event.endsWith('manifest.json'));
+        expect(written).toBeGreaterThan(-1);
+        expect(
+          events.slice(0, written).filter((event) => event.startsWith('runtime-download:')),
+        ).toEqual([
+          'runtime-download:runtime.json',
+          'runtime-download:node.part000',
+          'runtime-download:LICENSE',
+        ]);
+      }
+    },
+  );
   it('探测只创建独立预发布与附件，空仓库只推说明和许可，不读取或写入根清单', async () => {
     mocks.args.push('--probe', PROBE_TAG);
     const { calls, events } = network();

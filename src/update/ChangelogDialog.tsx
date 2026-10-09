@@ -141,7 +141,7 @@ export function ChangelogDialog() {
     run: () => {},
   });
   const entry = log?.entries.find((item) => item.version === version);
-  const page = entry ? notesFor(entry, locale.base) : null;
+  const page = entry ? notesFor(entry, locale) : null;
   const state = entry && catalog ? changelogVersionState(entry.version, catalog) : null;
   const reason = state ? REASON_TEXT[state] : undefined;
   const loading = fetching || status.phase === 'checking';
@@ -265,14 +265,8 @@ export function ChangelogDialog() {
               ))}
             </TabList>
             <div className={styles.bottom}>
-              <span className={styles.source} role="status">
-                {t(
-                  unavailable
-                    ? 'update.logRemoteFailed'
-                    : log?.source === 'remote'
-                      ? 'update.logRemote'
-                      : 'update.logBundled',
-                )}
+              <span className={styles.notice} role="status">
+                {unavailable ? t('update.logRemoteFailed') : null}
               </span>
               <div className={styles.actions}>
                 {installable && (

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import type { PaintStats } from '../../../../src/immersive/perf/paintMeter.ts';
 import type { TerrainThread } from '../../../../src/immersive/perf/perfOverlay.ts';
 import {
@@ -85,6 +85,7 @@ function fakeBackends({ worker = true, gpu = 'ok', context2d = true }: BackendOp
     };
     painters.push(fake);
     return {
+      surface: path === 'worker' ? undefined : path === 'webgl' ? 'webgl' : '2d',
       update: (changes) => fake.updates.push(changes),
       frameArrived: () => {
         fake.arrived += 1;
@@ -138,6 +139,103 @@ function recorder() {
 }
 
 describe('mountTerrain', () => {
+  test('二十次休眠逐次释放，恢复只建一份画师；旧错误不触发后台重建', () => {
+    const { backends, log, painters } = fakeBackends();
+    const mount = mountTerrain(backends, SETTINGS);
+    const history = createSpectrumHistory(4, 3);
+    for (let round = 0; round < 20; round += 1) {
+      mount.setHistory(history);
+      expect(painters.filter((painter) => !painter.disposed)).toHaveLength(1);
+      mount.setHistory(null);
+      expect(painters.filter((painter) => !painter.disposed)).toHaveLength(0);
+      expect(log.at(-1)).toBe(`release ${round + 1}`);
+      at(painters, round).fail();
+      expect(painters).toHaveLength(round + 1);
+    }
+    mount.dispose();
+  });
+
+  test('可见退场只留画布，取数来源与画师立即停；随后隐藏立即释放，不等卸载', () => {
+    const { backends, log, painters } = fakeBackends();
+    const mount = mountTerrain(backends, SETTINGS);
+    mount.setHistory(createSpectrumHistory(4, 3));
+    mount.setHistory(null, true);
+    expect(at(painters, 0).disposed).toBe(true);
+    expect(log).toEqual(['canvas 1']);
+    at(painters, 0).fail();
+    mount.update({ width: 500 });
+    mount.frameArrived();
+    expect(painters).toHaveLength(1);
+    expect(at(painters, 0).arrived).toBe(0);
+    mount.setHistory(null);
+    expect(log).toEqual(['canvas 1', 'release 1']);
+    mount.dispose();
+    expect(log).toHaveLength(2);
+  });
+
+  test('挂载重建沿用失败记录，不再尝试已失败的 Worker 与 GPU', () => {
+    const { backends, painters } = fakeBackends();
+    const failures = { worker: false, gpu: false };
+    const first = mountTerrain(backends, SETTINGS, failures);
+    first.setHistory(createSpectrumHistory(4, 3));
+    at(painters, 0).fail();
+    at(painters, 1).fail();
+    first.dispose();
+    const second = mountTerrain(backends, SETTINGS, failures);
+    second.setHistory(createSpectrumHistory(4, 3));
+    expect(painters.map((painter) => painter.path)).toEqual(['worker', 'webgl', '2d', '2d']);
+    second.dispose();
+  });
+
+  test('GPU 探测不可用也记住结论，恢复只尝试 2D', () => {
+    const { backends } = fakeBackends({ worker: false, gpu: 'none' });
+    const startMain = vi.spyOn(backends, 'startMain');
+    const mount = mountTerrain(backends, SETTINGS);
+    const history = createSpectrumHistory(4, 3);
+    mount.setHistory(history);
+    mount.setHistory(null);
+    mount.setHistory(history);
+    expect(startMain.mock.calls.map((args) => args[2])).toEqual([true, false]);
+    mount.dispose();
+  });
+
+  test('Worker 回报 GPU 不可用后，恢复也不重复探测；旧 Worker 的晚到回报无效', () => {
+    const { backends } = fakeBackends();
+    const startWorker = vi.spyOn(backends, 'startWorker');
+    const mount = mountTerrain(backends, SETTINGS);
+    const history = createSpectrumHistory(4, 3);
+    mount.setHistory(history);
+    mount.setHistory(null);
+    startWorker.mock.calls[0]?.[4]('2d');
+    mount.setHistory(history);
+    startWorker.mock.calls[1]?.[4]('2d');
+    mount.setHistory(null);
+    mount.setHistory(history);
+    expect(startWorker.mock.calls.map((args) => args[3])).toEqual([true, true, false]);
+    mount.dispose();
+  });
+
+  test('画师清理抛错也撤销画布，下一次释放不重复清理旧画师', () => {
+    const releaseCanvas = vi.fn();
+    const dispose = vi.fn(() => {
+      throw new Error('清理失败');
+    });
+    const mount = mountTerrain(
+      {
+        replaceCanvas: vi.fn(),
+        releaseCanvas,
+        startWorker: () => ({ update() {}, frameArrived() {}, meter() {}, dispose }),
+        startMain: () => null,
+      },
+      SETTINGS,
+    );
+    mount.setHistory(createSpectrumHistory(4, 3));
+    expect(() => mount.setHistory(null)).toThrow('清理失败');
+    expect(releaseCanvas).toHaveBeenCalledOnce();
+    mount.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
   test('能转给 Worker：在第一块 canvas 上起，照当前设置起步并先排一次重画；回报带 worker', () => {
     const { backends, log, painters } = fakeBackends();
     const mount = mountTerrain(backends, SETTINGS);

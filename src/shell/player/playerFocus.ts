@@ -31,8 +31,12 @@ const LAST_RESORT = '[data-menu="main"]';
 
 /** 按名字找一个此刻能聚焦的件；置灰的键（`disabled`）聚焦不上，跳过。 */
 function playerKey(name: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    `[${PLAYER_KEY_ATTR}="${CSS.escape(name)}"]:not(:disabled)`,
+  return (
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        `[${PLAYER_KEY_ATTR}="${CSS.escape(name)}"]:not(:disabled)`,
+      ),
+    ].find((element) => !element.closest('[inert]')) ?? null
   );
 }
 

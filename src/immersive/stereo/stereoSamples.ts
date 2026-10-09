@@ -71,6 +71,8 @@ export const stereoFieldStatusAtom: Atom<StereoFieldStatus> = atom((get) => get(
 const playbackStateAtom: Atom<PlaybackState['state']> = atom((get) => get(playbackAtom).state);
 
 export interface StereoSamplesOptions {
+  /** 不可显示时清空样本，优先于播放暂停的定格。 */
+  active?: Atom<boolean>;
   /** 频谱取数的状态；沉浸页传 `spectrumHistory.ts` 的 `spectrumStatusAtom`。 */
   spectrumStatus: Atom<SpectrumStatus>;
   host?: StereoFieldHost;
@@ -152,7 +154,9 @@ export function startStereoSamples(
       return;
     }
     if (left.length === 0 || right.length === 0) return;
+    const mine = generation;
     store.set(statusAtom, 'supported');
+    if (mine !== generation || disposed) return;
     sums = accumulate(sums, sumsOf(left, right), retainFor(at - lastWindowAt));
     lastWindowAt = at;
     points = rotate45(left, right);
@@ -182,6 +186,7 @@ export function startStereoSamples(
   }
 
   function gateOf(): Gate {
+    if (options.active && !store.get(options.active)) return 'closed';
     const state = store.get(playbackStateAtom);
     const spectrum = store.get(options.spectrumStatus);
     if (spectrum === 'live' && state === 'playing' && store.get(statusAtom) !== 'unsupported') {
@@ -208,13 +213,14 @@ export function startStereoSamples(
       lastWindowAt += now() - heldAt;
       heldAt = null;
     } else close();
-    if (next === 'closed') return;
+    if (next === 'closed' || next !== gate || disposed) return;
     intervalMs = 1000 / (store.get(reducedMotionAtom) ? STEREO_POLL_FPS_REDUCED : STEREO_POLL_FPS);
     scheduler.schedule();
   }
 
   const offState = store.sub(playbackStateAtom, sync);
   const offSpectrum = store.sub(options.spectrumStatus, sync);
+  const offActive = options.active ? store.sub(options.active, sync) : undefined;
   sync();
 
   return {
@@ -231,6 +237,7 @@ export function startStereoSamples(
       disposed = true;
       offState();
       offSpectrum();
+      offActive?.();
       listeners.clear();
       close();
     },

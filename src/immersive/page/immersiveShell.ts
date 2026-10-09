@@ -9,8 +9,8 @@ import type { Store } from '../../kit/store.ts';
 /**
  * 正在播放全屏页的壳：控件层的静止计时、宿主主窗全屏的记账，以及离开这一页。
  *
- * 页面挂上时启动，启动时的当前历史记录就是这一页；这条不再是当前记录（后退、前进或去了别处），
- * 或者页面卸下调了 `dispose()`，都算离开，以先到的为准。离开之后不再写状态，也不再响应宿主事件：
+ * 页面加载完成时启动，由应用持有；启动时的历史记录不再是当前记录，或应用调了 `dispose()`，
+ * 都算离开，以先到的为准。隐藏页面只停控件计时。离开之后不再写状态，也不再响应宿主事件：
  * 页面在退场过渡里还挂着，这段时间宿主报的全屏变化不能再触发一次后退。
  *
  * 全屏：宿主在时先订 `window:stateChanged`，再问一次 `isFullscreen`，`hostFullscreenAtom` 跟着宿主走；
@@ -49,6 +49,10 @@ export interface ImmersiveShellDeps {
   history: Pick<NavHistoryService, 'back' | 'navigate'>;
   /** 进入时要不要让宿主主窗一起全屏；启动时读一次。 */
   fullscreenOnEnter: () => boolean;
+  /** 迷你窗口保存与恢复期间，全屏变化由它管理，不据此后退或重新进入全屏。 */
+  fullscreenManaged?: () => boolean;
+  /** 隐藏时停止控件计时，保留全屏记账；未提供时视为一直可见。 */
+  active?: Atom<boolean>;
   host?: ImmersiveHost;
   /** 静止计时用的定时器，缺省是 `setTimeout`。 */
   schedule?: Schedule;
@@ -134,6 +138,8 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
 
   function armIdle(): void {
     cancelIdle?.();
+    cancelIdle = undefined;
+    if (left || (deps.active && !store.get(deps.active))) return;
     cancelIdle = schedule(() => {
       cancelIdle = undefined;
       update({ controlsVisible: false });
@@ -158,6 +164,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
     offState?.();
     offState = undefined;
     offHistory();
+    offActive?.();
     if (!entered) return;
     entered = false;
     exitHostFullscreen();
@@ -168,7 +175,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
     const { isFullscreen } = payload;
     setFullscreen(isFullscreen);
     // 视图让它进的全屏被宿主自己退了：它已不在全屏里，只后退，不再发 exitFullscreen。
-    if (entered && !isFullscreen) {
+    if (entered && !isFullscreen && !deps.fullscreenManaged?.()) {
       entered = false;
       goBack();
     }
@@ -182,6 +189,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
   }
 
   async function requestFullscreen(): Promise<void> {
+    if (left || deps.fullscreenManaged?.()) return;
     const answer = await settle(() => host.ui.enterFullscreen());
     if (answer === null || !answer.success || !answer.isFullscreen) return;
     if (!left) {
@@ -206,6 +214,12 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
   const offHistory = store.sub(historyAtom, () => {
     if (store.get(historyAtom).entry !== own) depart();
   });
+  const offActive = deps.active
+    ? store.sub(deps.active, () => {
+        update({ controlsVisible: true });
+        armIdle();
+      })
+    : undefined;
 
   armIdle();
   // 宿主缺席时 SDK 的调用要等约 100 ms 才答 `NOT_SUPPORTED`：不问它，没有全屏键。
@@ -224,7 +238,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
       armIdle();
     },
     async toggleFullscreen() {
-      if (left) return;
+      if (left || deps.fullscreenManaged?.()) return;
       const fullscreen = store.get(stateAtom).hostFullscreen;
       if (fullscreen === null) return;
       if (!fullscreen) {

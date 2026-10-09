@@ -21,6 +21,7 @@ const INITIAL: PlaybackState = {
   state: 'stopped',
   canSeek: false,
   track: null,
+  trackGeneration: 0,
   position: 0,
   duration: 0,
   volume: 0,
@@ -123,7 +124,12 @@ export function startPlayback(store: Store, host: PlaybackFace = fb): PlaybackSe
       store.set(trackStatusAtom, 'ready');
       return;
     }
-    update({ track: shown, position: 0, duration: track.duration });
+    update({
+      track: shown,
+      trackGeneration: store.get(stateAtom).trackGeneration + 1,
+      position: 0,
+      duration: track.duration,
+    });
     store.set(trackStatusAtom, 'ready');
     void readPosition();
   }
@@ -170,7 +176,11 @@ export function startPlayback(store: Store, host: PlaybackFace = fb): PlaybackSe
       'position',
       () => host.player.getPosition(),
       (answer) => {
-        if (trackKeyOf(answer) !== trackKeyOf(store.get(stateAtom).track)) return;
+        if (
+          transit.phase() !== 'steady' ||
+          trackKeyOf(answer) !== trackKeyOf(store.get(stateAtom).track)
+        )
+          return;
         update({
           position: answer.position,
           ...(answer.duration > 0 ? { duration: answer.duration } : {}),
@@ -188,12 +198,17 @@ export function startPlayback(store: Store, host: PlaybackFace = fb): PlaybackSe
 
   function bind(): void {
     unbind?.();
+    const starting = () => {
+      transit.starting();
+      bump('position');
+    };
     unbind = bindPlaybackEvents(host, {
       // 新曲目能不能 seek 由紧跟着的 stateChanged 带来，不另读。
       trackChanged: (track) => {
-        const fresh = transit.arrived();
+        transit.arrived();
         bump('track');
-        applyTrack(track, fresh);
+        // 新曲目事件表示新的播放轮次，同路径的循环重播也从头开始；标签变更走 edited。
+        applyTrack(track, true);
       },
       edited: (track) => {
         if (trackKeyOf(track) !== trackKeyOf(store.get(stateAtom).track)) return;
@@ -207,10 +222,13 @@ export function startPlayback(store: Store, host: PlaybackFace = fb): PlaybackSe
         bump('track');
         update({ track: withStreamTrack(tagged, stream, key) });
       },
-      starting: () => transit.starting(),
+      starting,
       stopped: (reason) => {
         // 换曲过程中的停止不清展示；这时宿主也不发 stopped 状态。其余的先核对（`stopTransit.ts`）。
-        if (reason === 'starting_another') return;
+        if (reason === 'starting_another') {
+          starting();
+          return;
+        }
         bump('track');
         bump('state');
         transit.stopped();
@@ -293,11 +311,11 @@ export function startPlayback(store: Store, host: PlaybackFace = fb): PlaybackSe
     stop: () => command(() => host.player.stop(), refreshTransport),
     next: () => command(() => host.player.next(), refreshTransport),
     previous: () => command(() => host.player.prev(), refreshTransport),
-    seek: (seconds) =>
-      command(
-        () => host.player.seek(clamp(seconds, 0, store.get(stateAtom).duration)),
-        () => void readPosition(),
-      ),
+    seek: async (seconds) => {
+      if (!connected()) return;
+      await command(() => host.player.seek(clamp(seconds, 0, store.get(stateAtom).duration)));
+      if (!disposed) await readPosition();
+    },
     setVolume(db, refresh = true) {
       if (!connected()) return Promise.resolve();
       pendingVolume = { db, refresh: refresh || (pendingVolume?.refresh ?? false) };

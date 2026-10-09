@@ -14,6 +14,7 @@ import type { SongsFilter } from '../../songs/songsFilter.ts';
 import styles from './FoldersFacets.module.css';
 import { useService } from '../../../kit/useService.ts';
 import { foldersKey } from '../foldersServices.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const LABELS = {
   genre: 'songs.facetGenre',
@@ -38,6 +39,7 @@ function FolderFacet({
   readonly values: readonly SongFacetValue[];
   readonly checked: ReadonlySet<string>;
 }) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const folders = useService(foldersKey);
   const classes = useStyles();
@@ -50,6 +52,7 @@ function FolderFacet({
       <span>{t(LABELS[facet])}</span>
       {values.length > 12 && (
         <Input
+          className={controls.field}
           size="small"
           value={needle}
           aria-label={t(LABELS[facet])}

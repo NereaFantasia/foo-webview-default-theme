@@ -67,9 +67,29 @@ export function answerTemplateDisk(
     const path = relative(params['path']);
     if (failWrites.has(path)) return hostFailure('OPERATION_FAILED', '磁盘已满');
     const bytes = bytesOf(String(params['content']), params['encoding'] === 'binary');
-    store(path, bytes);
+    const previous = params['append'] === true ? files.get(path) : undefined;
+    if (previous) {
+      const combined = new Uint8Array(previous.length + bytes.length);
+      combined.set(previous);
+      combined.set(bytes, previous.length);
+      store(path, combined);
+    } else store(path, bytes);
     atomic.set(path, params['atomic'] === true);
     return { success: true, bytesWritten: bytes.length };
+  });
+  host.answer('file.move', (params) => {
+    const source = relative(params['source']);
+    const destination = relative(params['destination']);
+    const bytes = files.get(source);
+    if (!bytes) return hostFailure('NOT_FOUND');
+    if (failWrites.has(destination)) return hostFailure('OPERATION_FAILED');
+    store(destination, bytes);
+    files.delete(source);
+    return {
+      success: true,
+      source: String(params['source']),
+      destination: String(params['destination']),
+    };
   });
   host.answer('file.getInfo', (params) => {
     const path = relative(params['path']);

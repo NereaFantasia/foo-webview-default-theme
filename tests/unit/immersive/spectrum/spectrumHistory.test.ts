@@ -14,6 +14,7 @@ import {
   maxFrequencyOf,
   smoothingFor,
   startSpectrumHistory,
+  spectrumStatusAtom,
 } from '../../../../src/immersive/spectrum/spectrumHistory.ts';
 import { spectrumAnswer } from '../../../fixtures/audioAnswers.ts';
 import { flush } from '../../../fixtures/fakeFrames.ts';
@@ -31,6 +32,52 @@ import {
  */
 afterEach(() => {
   vi.useRealTimers();
+});
+
+test('主订阅退订抛错仍退掉短窗订阅，停止计时并清空历史', async () => {
+  fakeTimers();
+  const fake = fakeHost();
+  const subscribe = fake.host.audio.subscribeSpectrum;
+  vi.spyOn(fake.host.audio, 'subscribeSpectrum').mockImplementation((callback, options) => {
+    const stream = subscribe(callback, options);
+    return Object.assign(
+      () => {
+        stream();
+        if (options?.fftSize === SPECTRUM_FFT_SIZE) throw new Error('退订失败');
+      },
+      { ready: stream.ready },
+    );
+  });
+  const x = startSpectrum(fake);
+  await flush();
+  fake.play(-30);
+  await x.frames.step();
+  expect(() => x.setHidden(true)).toThrow('退订失败');
+  expect(fake.subscriptions.map((entry) => entry.closes)).toEqual([1, 1]);
+  expect(x.frames.pending()).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(x.spectrum.history.data.byteLength).toBe(0);
+  expect(x.spectrum.frame()).toBeNull();
+  x.spectrum.dispose();
+});
+
+test('发布首帧时同步隐藏，旧回调不能重新挂计时或保留帧', async () => {
+  fakeTimers();
+  const fake = fakeHost();
+  const x = startSpectrum(fake);
+  await flush();
+  const off = x.store.sub(spectrumStatusAtom, () => {
+    if (x.status() === 'live') x.setHidden(true);
+  });
+  fake.play(-30);
+  await x.frames.step();
+  expect(x.status()).toBe('idle');
+  expect(x.spectrum.frame()).toBeNull();
+  expect(x.spectrum.history.data.byteLength).toBe(0);
+  expect(x.frames.pending()).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+  off();
+  x.spectrum.dispose();
 });
 
 /** 只换 setTimeout：帧时钟与 flush 用的 setImmediate 照走真的。 */
@@ -161,6 +208,11 @@ test('页面隐藏退订停拉转 idle，计时一起清；回到前台重新订
   fake.play(0.5);
   await frames.step();
   setHidden(true);
+  expect(spectrum.history.data.byteLength).toBe(0);
+  expect(spectrum.history.count).toBe(0);
+  expect(spectrum.frame()).toBeNull();
+  expect(frames.pending()).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
   await flush();
   expect(fake.open()).toHaveLength(0);
   expect(fake.subscriptions.map((entry) => entry.closes)).toStrictEqual([1, 1]);
@@ -181,8 +233,7 @@ test('页面隐藏退订停拉转 idle，计时一起清；回到前台重新订
     { subscriptionId: 'spectrum-3' },
     { subscriptionId: 'spectrum-4' },
   ]);
-  // 缓冲不清：旧曲的山自己滚出去。
-  expect(spectrum.history.count).toBe(2);
+  expect(spectrum.history.count).toBe(1);
 });
 
 test('减弱动效下每 4 拍（15 fps）才拉一次；页面隐藏退订、回来再订', async () => {

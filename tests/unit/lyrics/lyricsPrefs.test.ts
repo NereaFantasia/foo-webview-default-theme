@@ -77,6 +77,12 @@ describe('歌词联网偏好', () => {
       found: true,
       value: { version: 1, enabled: true, sources: ['lrclib'] },
     });
+    held.respond(0, {
+      success: true,
+      key: 'defaultTheme.lyrics.priority',
+      found: false,
+      value: null,
+    });
     await env.service.ready;
     await saved;
     expect(env.pref()).toMatchObject({ enabled: false, sources: null });

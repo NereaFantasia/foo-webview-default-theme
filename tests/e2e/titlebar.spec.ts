@@ -213,18 +213,18 @@ test('播放栏在底部时后退、前进与侧边栏键在标题栏左段：40
   expect(errors).toEqual([]);
 });
 
-test('播放栏在标题栏时宽窗 56 高、窄窗 48 高，高度都交给宿主；⋯ 离左缘 8，窗口三键铺满整条高', async ({
+test('播放栏在标题栏时宽窗 64 高、窄窗 48 高，高度都交给宿主；⋯ 离左缘 8，窗口三键铺满整条高', async ({
   page,
 }) => {
   await choosePlayerBar(page, 'titlebar');
   await open(page);
-  expect(await boxOf(page, 'header')).toMatchObject({ height: 56 });
+  expect(await boxOf(page, 'header')).toMatchObject({ height: 64 });
   expect(await boxOf(page, '[data-menu="main"]')).toMatchObject({ x: 8, width: 28, height: 36 });
   expect(await boxOf(page, '[data-caption="maximize"]')).toEqual({
     x: 1280 - 92,
     y: 0,
     width: 46,
-    height: 56,
+    height: 64,
   });
 
   await page.setViewportSize({ width: 900, height: 800 });
@@ -241,7 +241,7 @@ test('播放栏在标题栏时宽窗 56 高、窄窗 48 高，高度都交给宿
   }
   await expect
     .poll(() => host.callsTo('window.setTitlebarHeight'))
-    .toEqual([{ height: 56 }, { height: 48 }]);
+    .toEqual([{ height: 64 }, { height: 48 }]);
   expect(errors).toEqual([]);
 });
 
@@ -249,13 +249,13 @@ test('最大化键的矩形报给宿主，标题栏换档、窗口缩放时重�
   await choosePlayerBar(page, 'titlebar');
   await open(page);
   const regions = () => host.callsTo('window.setMaximizeButtonRegion');
-  await expect.poll(regions).toEqual([{ region: { x: 1188, y: 0, width: 46, height: 56 } }]);
+  await expect.poll(regions).toEqual([{ region: { x: 1188, y: 0, width: 46, height: 64 } }]);
   await page.setViewportSize({ width: 1100, height: 800 });
   await expect
     .poll(regions)
     .toEqual([
-      { region: { x: 1188, y: 0, width: 46, height: 56 } },
-      { region: { x: 1008, y: 0, width: 46, height: 56 } },
+      { region: { x: 1188, y: 0, width: 46, height: 64 } },
+      { region: { x: 1008, y: 0, width: 46, height: 64 } },
     ]);
   await page.setViewportSize({ width: 1100, height: 600 });
   await page.setViewportSize({ width: 900, height: 600 });

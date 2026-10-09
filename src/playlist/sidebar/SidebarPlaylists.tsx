@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Caption1,
   Input,
@@ -38,6 +39,7 @@ import { usePlaylistMove } from './usePlaylistMove.ts';
 import { usePlaylistReorder } from './usePlaylistReorder.ts';
 import { useService } from '../../kit/useService.ts';
 import { playlistPlacesKey } from '../playlistPlaces.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 /** 「新建」那一项的标记，取消后焦点回到它身上。 */
 export const NEW_PLAYLIST_ATTR = 'data-playlist-new';
@@ -76,6 +78,7 @@ export function SidebarPlaylists({
   selected,
   collapsible = true,
 }: SidebarPlaylistsProps) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const { items, readFailed, activateFailed } = useAtomValueRawSync(playlistsAtom);
   const actionFailure = useAtomValueRawSync(playlistActionFailureAtom);
@@ -194,7 +197,7 @@ export function SidebarPlaylists({
         {filtering && (
           <Input
             ref={filterInput}
-            className={classes.filter}
+            className={mergeClasses(classes.filter, viewControls.windowField)}
             size="small"
             value={filter}
             placeholder={t('sidebar.filterPlaylists')}

@@ -1,3 +1,5 @@
+import { useService } from '../../kit/useService.ts';
+import { lyricsDisplayKey, lyricsFontFamily } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import {
@@ -14,6 +16,8 @@ const SLOTS: readonly (keyof LyricRows)[] = ['prev', 'current', 'next'];
 /** 三行只随落到另一行、换了歌词时变，不跟每一拍进度重画。 */
 function SyncedRows() {
   const rows = useAtomValueRawSync(lyricRowsAtom);
+  const service = useService(lyricsDisplayKey);
+  const display = useAtomValueRawSync(service.display);
   return (
     <ol className={styles.rows}>
       {SLOTS.map((slot) => {
@@ -22,7 +26,12 @@ function SyncedRows() {
           <li key={slot} className={styles.row} data-slot={slot}>
             {slot === 'current' && line && <span className={styles['hot-square']} aria-hidden />}
             <span className={styles.time}>{line ? formatLyricTime(line.time) : ''}</span>
-            <span className={styles.text}>{line?.text ?? ''}</span>
+            <span
+              className={styles.text}
+              style={{ fontFamily: lyricsFontFamily(display.fontFamily) }}
+            >
+              {line?.text ?? ''}
+            </span>
           </li>
         );
       })}

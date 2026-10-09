@@ -96,7 +96,7 @@ function readEnvelope(text: string): Envelope | null {
   return { payload: value.payload, signatures };
 }
 
-async function publicKey(spki: string): Promise<CryptoKey | null> {
+async function publicKey(spki: string) {
   const der = decode(spki);
   if (!der) return null;
   try {

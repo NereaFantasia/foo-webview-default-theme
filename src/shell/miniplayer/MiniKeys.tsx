@@ -1,4 +1,4 @@
-import { Button, Tooltip, makeStyles, mergeClasses } from '@fluentui/react-components';
+import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
   Dismiss16Regular,
   Next20Regular,
@@ -31,7 +31,29 @@ export const useKeyStyles = makeStyles({
     color: roleVar('text-secondary'),
   },
   caption: { minWidth: '28px', width: '28px', height: '28px' },
-  pinned: { backgroundColor: roleVar('bg-selected'), color: roleVar('accent') },
+  pinned: {
+    '@media (forced-colors: none)': {
+      '&:not(:disabled, [aria-disabled="true"])': {
+        backgroundColor: roleVar('bg-selected'),
+        color: roleVar('accent'),
+        ':hover': {
+          backgroundColor: roleVar('bg-selected'),
+          color: roleVar('accent'),
+          backgroundImage: `linear-gradient(${roleVar('state-hover')}, ${roleVar('state-hover')})`,
+        },
+        ':active,:hover:active,:active:focus-visible': {
+          backgroundColor: roleVar('bg-selected'),
+          color: roleVar('accent'),
+          backgroundImage: `linear-gradient(${roleVar('state-pressed')}, ${roleVar('state-pressed')})`,
+        },
+      },
+    },
+    '@media (forced-colors: active)': {
+      borderBottomColor: 'Highlight',
+      borderBottomWidth: tokens.strokeWidthThick,
+      borderBottomStyle: 'solid',
+    },
+  },
   play: { minWidth: '36px', width: '36px', height: '36px', padding: '0' },
   playLarge: { minWidth: '40px', width: '40px', height: '40px' },
 });

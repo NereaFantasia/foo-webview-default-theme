@@ -14,7 +14,7 @@ const keysIn = (page: Page, scope: string) =>
     .evaluateAll((keys) => keys.map((key) => key.getAttribute('data-player-key')));
 const slider = (page: Page) => bar(page).getByRole('slider', { name: '播放进度' });
 
-test('缺省是底部通栏：标题栏 48 高、没有播放的件，通栏 92 高、贴着窗口底边铺满整宽', async ({
+test('缺省是底部通栏：标题栏 48 高、没有播放的件，通栏 88 高、贴着窗口底边铺满整宽', async ({
   page,
 }) => {
   const { errors } = await openPlayer(page);
@@ -24,15 +24,15 @@ test('缺省是底部通栏：标题栏 48 高、没有播放的件，通栏 92 
   await expect(page.locator('[data-player-capsule]')).toHaveCount(0);
   expect(await boxOf(page, '[data-player-bar]')).toEqual({
     x: 0,
-    y: 800 - 92,
+    y: 800 - 88,
     width: 1280,
-    height: 92,
+    height: 88,
   });
   // 侧边栏与内容区都止于通栏的上沿。
   const main = await boxOf(page, 'main');
-  expect(main.y + main.height).toBe(800 - 92);
+  expect(main.y + main.height).toBe(800 - 88);
   const aside = await boxOf(page, 'aside');
-  expect(aside.y + aside.height).toBe(800 - 92);
+  expect(aside.y + aside.height).toBe(800 - 88);
   expect(await keysIn(page, '[data-player-bar]')).toEqual([
     'seek',
     'cover',
@@ -143,9 +143,9 @@ for (const [width, keys] of [
   test(`${width} 宽：通栏照样在底部，按宽度收键，卡片不给胶囊让位`, async ({ page }) => {
     const { errors } = await openPlayer(page, { width });
     expect(await boxOf(page, '[data-player-bar]')).toMatchObject({
-      y: 800 - 92,
+      y: 800 - 88,
       width,
-      height: 92,
+      height: 88,
     });
     expect(await keysIn(page, '[data-player-bar]')).toEqual(keys);
     await expect(page.locator('[data-capsule]')).toHaveCount(0);
@@ -232,7 +232,7 @@ test('停止时整条收掉，侧边栏与内容区伸到窗口底边；再起�
   state.track = PLAYING_TRACK;
   await host.emit('playback:trackChanged', PLAYING_TRACK);
   await expect(bar(page)).toContainText(PLAYING_TRACK.title);
-  expect(await boxOf(page, '[data-player-bar]')).toMatchObject({ y: 800 - 92, height: 92 });
+  expect(await boxOf(page, '[data-player-bar]')).toMatchObject({ y: 800 - 88, height: 88 });
   expect(errors).toEqual([]);
 });
 

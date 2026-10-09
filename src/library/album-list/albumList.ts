@@ -103,7 +103,7 @@ export function startAlbumList(
       const loaded = store.get(libraryTracksAtom);
       if (loaded.status !== 'ready') return;
       const { available } = store.get(playStatsAtom);
-      if (available === null) void stats.probe(allTracks());
+      if (available === null) void stats.probe();
       if (available && isStatsField(store.get(listPrefsAtom).sort.field)) {
         void stats.fetch(allTracks(), loaded.generation);
       }

@@ -1,3 +1,4 @@
+import { LYRICS_PRIORITY, type LyricsPriority } from '../lyricsPrefs.ts';
 import { isWordLevel, type LyricsContent } from '../lyricsText.ts';
 import { levelRank, rankCandidates, type MatchLevel, type MatchResult } from './lyricsMatch.ts';
 import type { LyricsCandidate, LyricsQuery, LyricsSource, LyricsSourceId } from './lyricsSource.ts';
@@ -53,20 +54,20 @@ const lineTexts = (content: LyricsContent): string[] =>
 const censoredCount = (content: LyricsContent) =>
   lineTexts(content).reduce((sum, text) => sum + (text.match(/\*/g)?.length ?? 0), 0);
 
-/** 同步程度：逐字 2，逐行 1，纯文本 0。 */
-const syncRank = (content: LyricsContent) =>
-  isWordLevel(content) ? 2 : content.kind === 'synced' ? 1 : 0;
+export const lyricsCategory = (content: LyricsContent): Exclude<LyricsPriority, 'local'> =>
+  isWordLevel(content) ? 'word' : content.kind === 'synced' ? 'line' : 'plain';
 
 const hasTranslation = (content: LyricsContent) =>
   content.kind === 'synced' && content.lines.some((line) => line.translatedLyric);
 
 /**
- * 几家都取到时用哪份。先看匹配：只留与最高档相差不超过一档的；再看内容：屏蔽字少的优先，
- * 其次逐字 > 逐行 > 纯文本，再其次带译文；都一样时按 `order` 里来源的先后。
+ * 几家都取到时只留与最高匹配档相差不超过一档的，再按类别偏好选取。
+ * 同类别优先屏蔽字少、带译文的内容；仍相同时按来源顺序。
  */
 export function pickLyrics(
   found: readonly FoundLyrics[],
   order: readonly LyricsSourceId[],
+  priority: readonly LyricsPriority[] = LYRICS_PRIORITY,
 ): FoundLyrics | null {
   if (found.length === 0) return null;
   const top = Math.min(...found.map((item) => levelRank(item.match.level)));
@@ -79,19 +80,22 @@ export function pickLyrics(
       .filter((item) => levelRank(item.match.level) <= top + 1)
       .sort(
         (a, b) =>
+          priority.indexOf(lyricsCategory(a.content)) -
+            priority.indexOf(lyricsCategory(b.content)) ||
           censoredCount(a.content) - censoredCount(b.content) ||
-          syncRank(b.content) - syncRank(a.content) ||
           Number(hasTranslation(b.content)) - Number(hasTranslation(a.content)) ||
           position(a.source) - position(b.source),
       )[0] ?? null
   );
 }
 
-/** 按顺序找时，取到没有屏蔽字的逐字词就不再问后面的来源。 */
-const satisfies = (item: FoundLyrics) =>
-  isWordLevel(item.content) && censoredCount(item.content) === 0;
+/** 按顺序找时，取到首选在线类别且没有屏蔽字，就不再问后面的来源。 */
+const satisfies = (item: FoundLyrics, priority: readonly LyricsPriority[]) =>
+  lyricsCategory(item.content) === priority.find((value) => value !== 'local') &&
+  censoredCount(item.content) === 0;
 
 export interface OnlineSearchOptions {
+  readonly priority?: readonly LyricsPriority[];
   /** `parallel` 同时问所有来源，取最好的；`sequential` 按来源顺序逐个问，够好就停。 */
   readonly mode: 'parallel' | 'sequential';
   readonly minimum: MatchLevel;
@@ -108,7 +112,7 @@ export interface OnlineSearchOptions {
 async function askSources(
   query: LyricsQuery,
   sources: readonly LyricsSource[],
-  { mode, minimum, signal }: OnlineSearchOptions,
+  { mode, minimum, signal, priority = LYRICS_PRIORITY }: OnlineSearchOptions,
 ): Promise<SourceOutcome[] | null> {
   if (signal?.aborted) return null;
   if (mode === 'parallel') {
@@ -123,15 +127,20 @@ async function askSources(
     const outcome = await searchSource(source, query, minimum, signal);
     if (outcome === null) return null;
     outcomes.push(outcome);
-    if (typeof outcome === 'object' && satisfies(outcome)) break;
+    if (typeof outcome === 'object' && satisfies(outcome, priority)) break;
   }
   return signal?.aborted ? null : outcomes;
 }
 
-const bestOf = (outcomes: readonly SourceOutcome[], sources: readonly LyricsSource[]) =>
+const bestOf = (
+  outcomes: readonly SourceOutcome[],
+  sources: readonly LyricsSource[],
+  priority?: readonly LyricsPriority[],
+) =>
   pickLyrics(
     outcomes.filter((outcome) => typeof outcome === 'object'),
     sources.map((source) => source.id),
+    priority,
   );
 
 /**
@@ -145,13 +154,13 @@ export async function searchOnline(
 ): Promise<FoundLyrics | 'missing' | 'failed' | null> {
   const outcomes = await askSources(query, sources, options);
   if (!outcomes) return null;
-  const best = bestOf(outcomes, sources);
+  const best = bestOf(outcomes, sources, options.priority);
   if (best) return best;
   const fallbacks = options.fallbacks ?? [];
   if (fallbacks.length > 0) {
     const more = await askSources(query, fallbacks, options);
     if (!more) return null;
-    const backup = bestOf(more, fallbacks);
+    const backup = bestOf(more, fallbacks, options.priority);
     if (backup) return backup;
     outcomes.push(...more);
   }

@@ -98,7 +98,6 @@ function Content() {
               target={target}
               t={translate}
               locale={english ? 'en' : 'zh-CN'}
-              onClose={() => store.set(active, false)}
             />
             <TabList size="small" selectedValue="info">
               <Tab value="queue" disabled>

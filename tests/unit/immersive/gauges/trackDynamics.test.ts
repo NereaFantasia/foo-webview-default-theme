@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { atom } from 'jotai/vanilla';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { PcmUnavailableError } from '../../../../src/immersive/analysis/trackAnalysis.ts';
 import {
   measureTrack,
@@ -119,6 +120,30 @@ describe('measureTrack', () => {
     const none: PlanesSource = async () => null;
     expect(await measureTrack(TRACK, none, signal, () => true, now)).toBeNull();
   });
+
+  test('分片让出期间取消，同步释放 PCM，不等待挂起的调度回调', async () => {
+    const fake = fakeSource();
+    const controller = new AbortController();
+    let resume = () => {};
+    const result = measureTrack(
+      TRACK,
+      fake.source,
+      controller.signal,
+      () => true,
+      () =>
+        new Promise<void>((resolve) => {
+          resume = resolve;
+        }),
+    );
+    await flush();
+    expect(fake.released()).toBe(0);
+    controller.abort();
+    expect(fake.released()).toBe(1);
+    resume();
+    expect(await result).toBeNull();
+    expect(fake.released()).toBe(1);
+    expect(fake.ranges).toHaveLength(1);
+  });
 });
 
 const A = makeTrack({ path: 'file://E:/Music/a.flac', duration: 70, sampleRate: RATE });
@@ -127,8 +152,15 @@ const B = makeTrack({ path: 'file://E:/Music/b.flac', duration: 10, sampleRate: 
 async function setup(source: PlanesSource | null) {
   const player = await startPlayingTrack();
   player.play(A);
-  const service = startTrackDynamics(player.store, { source, pause: now });
-  return { ...player, service, model: () => player.store.get(trackDynamicsAtom) };
+  const active = atom(true);
+  const service = startTrackDynamics(player.store, { source, pause: now, active });
+  onTestFinished(() => service.dispose());
+  return {
+    ...player,
+    service,
+    model: () => player.store.get(trackDynamicsAtom),
+    activate: (value: boolean) => player.store.set(active, value),
+  };
 }
 
 describe('startTrackDynamics', () => {
@@ -200,6 +232,41 @@ describe('startTrackDynamics', () => {
     fake.release();
     await flush();
     expect(fake.released()).toBe(1);
-    expect(model()).toStrictEqual({ status: 'loading', result: null });
+    expect(model()).toStrictEqual({ status: 'idle', result: null });
+  });
+
+  test('休眠取消进行中的解码；隐藏中换曲不取，恢复只分析新曲', async () => {
+    const fake = fakeSource({ hold: true });
+    const x = await setup(fake.source);
+    x.activate(false);
+    expect(fake.signals[0]?.aborted).toBe(true);
+    x.play(B);
+    fake.release();
+    await flush();
+    expect(fake.ranges).toHaveLength(1);
+    expect(fake.released()).toBe(1);
+    expect(x.model().status).toBe('idle');
+    x.activate(true);
+    fake.release();
+    await flush();
+    expect(x.model().status).toBe('ready');
+    expect(fake.ranges).toHaveLength(2);
+    x.activate(false);
+    x.activate(true);
+    expect(fake.ranges).toHaveLength(2);
+  });
+
+  test.each(['failed', 'unavailable'] as const)('休眠不重置 %s 记忆', async (status) => {
+    const source = vi.fn(async () => {
+      if (status === 'unavailable') throw new PcmUnavailableError();
+      return null;
+    });
+    const x = await setup(source);
+    await flush();
+    x.activate(false);
+    x.activate(true);
+    await flush();
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(x.model().status).toBe(status);
   });
 });

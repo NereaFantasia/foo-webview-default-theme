@@ -1,19 +1,17 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { AnswerTable, FakeHostOptions } from './fakeHost.ts';
-import { hostFailure } from './hostAnswers.ts';
 import { collectPageErrors, installPageHost, type PageHost } from './pageHost.ts';
 
 // 设置页的 e2e 共用：装上宿主替身、打开页面、从侧边栏进设置页，再按标题找卡片与控件。
 
 /**
- * 设置页要用、缺省应答表里没有的几个方法。材质下发答失败：材质服务不看这次应答，只有调用记录要紧。
+ * 设置页要用、缺省应答表里没有的几个方法。材质应答保留本次提交的策略，失败场景由用例覆盖。
  */
 const SETTINGS_ANSWERS: AnswerTable = {
   clipboard: { write: { success: true } },
   config: { showLibraryPreferences: { success: true } },
   misc: { showPreferences: { success: true } },
   shell: { openExternal: { success: true } },
-  window: { setBackdropPolicy: hostFailure('OPERATION_FAILED') },
 };
 
 export interface SettingsPage {

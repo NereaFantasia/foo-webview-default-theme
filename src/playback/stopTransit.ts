@@ -4,6 +4,7 @@
  * （`stopping`），问一次宿主现在的状态：宿主这一轮已经发出的事件都排在应答前面，应答到时还没见到 starting，
  * 就是真的停了。见到 starting 或在放的状态，就是在换曲（`switching`）：旧曲目留着，等 trackChanged 换上新的；
  * 这期间报来的进度与时长属于还没打开的新曲目，不用。
+ * 手动上一首、下一首可能直接报starting，没有先报用户停止，也要进入换曲保护。
  */
 export type TransitPhase = 'steady' | 'stopping' | 'switching';
 
@@ -11,7 +12,7 @@ export interface StopTransit {
   phase(): TransitPhase;
   /** 宿主报了停止（换曲途中的 `starting_another` 除外）：先核对，再决定清不清。 */
   stopped(): void;
-  /** 停止之后又开始放了：不再等核对。 */
+  /** 开始打开曲目：保留旧曲目与位置，不再等待停止核对。 */
   starting(): void;
   /** 新曲目到了：回到平常，答它是不是停止之后重新放起来的一首（同一首重放也要从 0 起）。 */
   arrived(): boolean;
@@ -50,7 +51,7 @@ export function createStopTransit(
       void check();
     },
     starting() {
-      if (phase !== 'stopping') return;
+      if (disposed || phase === 'switching') return;
       phase = 'switching';
       generation += 1;
     },

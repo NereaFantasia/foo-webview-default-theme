@@ -2,6 +2,9 @@ import { createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
 import {
   choosePlayerBarStyle,
+  chooseCapsuleBlur,
+  capsuleBlurAtom,
+  CAPSULE_BLUR_STORAGE_KEY,
   loadPlayerBarStyle,
   PLAYER_BAR_STORAGE_KEY,
   playerBarStyleAtom,
@@ -64,6 +67,35 @@ describe('loadPlayerBarStyle', () => {
     expect(store.get(playerBarStyleAtom)).toBe('bottom');
     loadPlayerBarStyle(store, storageWith('titlebar'));
     expect(store.get(playerBarStyleAtom)).toBe('titlebar');
+  });
+});
+
+describe('胶囊模糊偏好', () => {
+  it('默认开启，关闭独立保存并在重新载入时恢复，不改变播放栏位置', () => {
+    const storage = storageWith('capsule');
+    const store = createStore();
+    loadPlayerBarStyle(store, storage);
+    expect(store.get(capsuleBlurAtom)).toBe(true);
+    chooseCapsuleBlur(store, false, storage);
+    expect(store.get(capsuleBlurAtom)).toBe(false);
+    expect(storage.saved.get(CAPSULE_BLUR_STORAGE_KEY)).toBe('off');
+    expect(storage.saved.get(PLAYER_BAR_STORAGE_KEY)).toBe('capsule');
+    const restored = createStore();
+    loadPlayerBarStyle(restored, storage);
+    expect(restored.get(capsuleBlurAtom)).toBe(false);
+    expect(restored.get(playerBarStyleAtom)).toBe('capsule');
+    chooseCapsuleBlur(restored, true, storage);
+    expect(storage.saved.get(CAPSULE_BLUR_STORAGE_KEY)).toBe('on');
+  });
+
+  it('无效值按开启处理，存储不可用时仍可关闭', () => {
+    const storage = storageWith('bottom');
+    storage.saved.set(CAPSULE_BLUR_STORAGE_KEY, 'false');
+    const store = createStore();
+    loadPlayerBarStyle(store, storage);
+    expect(store.get(capsuleBlurAtom)).toBe(true);
+    chooseCapsuleBlur(store, false, throwing);
+    expect(store.get(capsuleBlurAtom)).toBe(false);
   });
 });
 

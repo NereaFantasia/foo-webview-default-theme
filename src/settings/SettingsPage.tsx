@@ -7,12 +7,14 @@ import {
   PaintBrush20Regular,
   PlayCircle20Regular,
   Settings20Regular,
+  FullScreenMaximize20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import {
   useCallback,
   useContext,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactElement,
@@ -41,6 +43,11 @@ import {
 import { useSettingsNav } from './useSettingsNav.ts';
 import { OnlineSettingsContext, OnlineSettingsNavigationContext } from './onlineSettingsContext.ts';
 import { LyricsSettingsContext, LyricsSettingsNavigationContext } from './lyricsSettingsContext.ts';
+import { ImmersiveSettingsContext } from './immersiveSettingsContext.ts';
+
+function ImmersiveSection() {
+  return useContext(ImmersiveSettingsContext);
+}
 
 function OnlineSection() {
   return useContext(OnlineSettingsContext);
@@ -78,6 +85,12 @@ const GROUPS: readonly GroupSpec[] = [
     content: <PlaybackSection />,
   },
   {
+    id: 'immersive',
+    label: 'settings.groupImmersive',
+    icon: <FullScreenMaximize20Regular />,
+    content: <ImmersiveSection />,
+  },
+  {
     id: 'lyrics',
     label: 'lyrics.region',
     icon: <MusicNote220Regular />,
@@ -113,15 +126,24 @@ const useStyles = makeStyles({
  */
 function useWidth<E extends HTMLElement>(): [number | null, RefCallback<E>] {
   const [width, setWidth] = useState<number | null>(null);
-  const observe = useElementWidth<E>(setWidth);
+  const measured = useRef<E | null>(null);
+  const publish = useCallback((next: number) => {
+    if (next > 0) setWidth(next);
+  }, []);
+  const observe = useElementWidth<E>(publish);
   const ref = useCallback<RefCallback<E>>(
     (element) => {
+      measured.current = element;
       if (!element) return;
-      setWidth(element.clientWidth);
+      publish(element.clientWidth);
       return observe(element);
     },
-    [observe],
+    [observe, publish],
   );
+  // 目录切成分类条会改变卡列宽度，绘制前补量；隐藏页面的零宽不作为布局依据。
+  useLayoutEffect(() => {
+    if (measured.current) publish(measured.current.clientWidth);
+  });
   return [width, ref];
 }
 

@@ -20,6 +20,7 @@ import { LIST_SORT_GROUPS, type ListSortField } from './listSort.ts';
 import { playStatsAtom } from '../playStats.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumListKey } from './albumList.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 // 列表形态页头的排序：三组字段、随机与方向。
 
@@ -58,6 +59,7 @@ function pick<T extends string>(values: readonly T[], checked: readonly string[]
  * 按流派分节时流派一项置灰。「随机」每点一次重洗，已经是随机也照洗。
  */
 export function ListSortMenu() {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const { dimension } = useAtomValueRawSync(browserPrefsAtom);
   const { sort } = useAtomValueRawSync(listPrefsAtom);
@@ -80,7 +82,12 @@ export function ListSortMenu() {
       }}
     >
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton data-album-tool="sort" icon={random ? undefined : <Arrow />}>
+        <MenuButton
+          className={controls.field}
+          data-album-tool="sort"
+          icon={random ? undefined : <Arrow />}
+          appearance="subtle"
+        >
           {t('album.sortValue', { value: t(LIST_SORT_LABELS[sort.field]) })}
         </MenuButton>
       </MenuTrigger>

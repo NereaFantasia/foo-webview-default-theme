@@ -1,6 +1,6 @@
 {
   "name": "foo-webview-default-theme",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "foo_ui_webview2 的默认主题（React + Fluent UI React v9）",
   "license": "AGPL-3.0-only",

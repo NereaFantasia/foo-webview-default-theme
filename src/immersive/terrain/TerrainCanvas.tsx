@@ -60,23 +60,28 @@ export function TerrainCanvas({
   alphaFar = ALPHA_FAR,
 }: TerrainCanvasProps) {
   const store = useStore();
-  const { terrain, spectrum } = useViewServices();
+  const { terrain, spectrum, active, visible } = useViewServices();
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const metered = useAtomValueRawSync(perfOverlayEnabledAtom);
   const ramp = useAtomValueRawSync(accentRampAtom);
   const scheme = useAtomValueRawSync(colorSchemeAtom);
   const box = useRef<HTMLDivElement>(null);
   const mount = useRef<TerrainMount | null>(null);
+  const failures = useRef({ worker: false, gpu: false });
 
   // 这一个要最先：下面几个在挂载时按声明顺序跑，都往它这里写当前值，最后一个才起画师。
   useEffect(() => {
     const element = box.current;
     if (!element) return;
-    const target = mountTerrain(domTerrainBackends(element, styles.canvas), BASE_SETTINGS);
+    const target = mountTerrain(
+      domTerrainBackends(element, styles.canvas),
+      BASE_SETTINGS,
+      failures.current,
+    );
     mount.current = target;
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
-      if (!rect) return;
+      if (!rect || !store.get(active)) return;
       // 颜色也可能随断点变，换尺寸时一并重读。
       target.update({
         width: rect.width,
@@ -85,41 +90,55 @@ export function TerrainCanvas({
         lineColor: lineColorOf(element),
       });
     });
-    observer.observe(element);
+    const sync = () => {
+      if (store.get(active)) observer.observe(element);
+      else observer.disconnect();
+    };
+    const offActive = store.sub(active, sync);
+    sync();
     return () => {
+      offActive();
       observer.disconnect();
       target.dispose();
       if (mount.current === target) mount.current = null;
     };
-  }, []);
+  }, [store, active]);
 
   useEffect(() => {
     const element = box.current;
     if (element) mount.current?.update({ lineColor: lineColorOf(element) });
-  }, [ramp, scheme]);
+  }, [ramp, scheme, active]);
 
   useEffect(() => {
     mount.current?.update({ alphaNear, alphaFar });
-  }, [alphaNear, alphaFar]);
+  }, [alphaNear, alphaFar, active]);
 
   useEffect(() => {
     mount.current?.update({ glide: !reduced });
-  }, [reduced]);
+  }, [reduced, active]);
 
   useEffect(() => {
     mount.current?.meter(
       metered ? (thread, surface, stats) => reportTerrain(store, thread, surface, stats) : null,
     );
-  }, [store, metered]);
+  }, [store, metered, active]);
 
   useEffect(() => {
     const target = mount.current;
     if (!target) return;
     let interval = spectrum?.interval() ?? NOMINAL_INTERVAL_MS;
     target.update({ frameInterval: interval });
-    target.setHistory(terrain?.history ?? null);
-    if (!terrain) return;
-    return terrain.subscribe(() => {
+    const sync = () => {
+      target.setHistory(store.get(active) ? (terrain?.history ?? null) : null, store.get(visible));
+    };
+    const offActive = store.sub(active, sync);
+    const offVisible = store.sub(visible, sync);
+    sync();
+    const offTerrain = terrain?.subscribe(() => {
+      if (!store.get(active)) {
+        sync();
+        return;
+      }
       const next = spectrum?.interval() ?? NOMINAL_INTERVAL_MS;
       if (next !== interval) {
         interval = next;
@@ -127,7 +146,13 @@ export function TerrainCanvas({
       }
       target.frameArrived();
     });
-  }, [terrain, spectrum]);
+    return () => {
+      offActive();
+      offVisible();
+      offTerrain?.();
+      target.setHistory(null, store.get(visible));
+    };
+  }, [store, terrain, spectrum, active, visible]);
 
   return (
     <div

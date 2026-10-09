@@ -1,5 +1,5 @@
 import type { WindowStateChangedPayload } from 'foo-webview-sdk';
-import { createStore } from 'jotai/vanilla';
+import { atom, createStore } from 'jotai/vanilla';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   controlsVisibleAtom,
@@ -108,6 +108,30 @@ afterEach(() => {
 });
 
 describe('静止计时', () => {
+  test('初始休眠不计时，恢复才开始；释放后活动变化不能重排计时', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const store = createStore();
+    const active = atom(false);
+    const shell = startImmersiveShell(store, {
+      history: startNavHistory(store),
+      host: fakeHost({ available: false }).host.fb,
+      fullscreenOnEnter: () => false,
+      active,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    shell.touch();
+    expect(vi.getTimerCount()).toBe(0);
+    store.set(active, true);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(IDLE_HIDE_MS);
+    expect(visible(store)).toBe(false);
+    store.set(active, false);
+    expect(visible(store)).toBe(true);
+    shell.dispose();
+    store.set(active, true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test('静止 3 s 藏控件层；touch() 立刻回来并重新计时', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const { store, shell } = await mount(fakeHost().host);
@@ -143,6 +167,54 @@ describe('静止计时', () => {
 });
 
 describe('进入与离开', () => {
+  test('窗口由迷你模式管理时不自动或手动进入全屏，结束管理也不重放进入偏好', async () => {
+    const { host, calls } = fakeHost();
+    const store = createStore();
+    let managed = true;
+    const shell = startImmersiveShell(store, {
+      history: startNavHistory(store),
+      host: host.fb,
+      fullscreenOnEnter: () => true,
+      fullscreenManaged: () => managed,
+    });
+    await flush();
+    await shell.toggleFullscreen();
+    expect(calls()).toEqual([]);
+    managed = false;
+    await flush();
+    expect(calls()).toEqual([]);
+    await shell.toggleFullscreen();
+    expect(calls()).toEqual(['window.enterFullscreen']);
+    shell.dispose();
+  });
+
+  test('进入全屏应答在迷你切换中返回时保留记账，不补发窗口命令', async () => {
+    const { host, calls } = fakeHost();
+    const store = createStore();
+    const history = startNavHistory(store);
+    history.navigate(NOW_PLAYING);
+    let managed = false;
+    const held = host.hold('window.enterFullscreen');
+    const shell = startImmersiveShell(store, {
+      history,
+      host: host.fb,
+      fullscreenOnEnter: () => true,
+      fullscreenManaged: () => managed,
+    });
+    await flush();
+    managed = true;
+    held.release();
+    await flush();
+    host.emit('window:stateChanged', stateOf(false));
+    expect(store.get(historyAtom).place.id).toBe('nowPlaying');
+    expect(calls()).toEqual(['window.enterFullscreen']);
+    host.emit('window:stateChanged', stateOf(true));
+    managed = false;
+    shell.leave();
+    await flush();
+    expect(calls()).toEqual(['window.enterFullscreen', 'window.exitFullscreen']);
+  });
+
   test('进入时不全屏（缺省）：不发命令，照样订 stateChanged 跟着宿主；宿主进出全屏不连带离开', async () => {
     const { host, calls } = fakeHost();
     const { store, shell, place } = await mount(host);

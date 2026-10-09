@@ -10,6 +10,26 @@ import { hostFailure } from '../../../fixtures/hostAnswers.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 
 describe('外部链接确认', () => {
+  it('设置入口可恢复确认，保存失败仍保留当前选择，释放后不再写入', async () => {
+    const host = installFakeHost();
+    const store = createStore();
+    const gate = startExternalLinkGate(store, host.fb, createMemoryConfigWriter(host.fb));
+    await gate.ready;
+    gate.setConfirmation(false);
+    await gate.persistence.settled();
+    expect(host.config.get(EXTERNAL_LINK_CONFIRM.key)).toBe(false);
+    host.answer('config.set', hostFailure('OPERATION_FAILED'));
+    gate.setConfirmation(true);
+    await gate.persistence.settled();
+    expect(store.get(EXTERNAL_LINK_CONFIRM.atom)).toBe(true);
+    expect(store.get(gate.persistence.state).get(EXTERNAL_LINK_CONFIRM.key)?.status).toBe('failed');
+    gate.open('https://example.com/');
+    expect(store.get(gate.prompt)?.url).toBe('https://example.com/');
+    gate.dispose();
+    gate.setConfirmation(false);
+    expect(store.get(EXTERNAL_LINK_CONFIRM.atom)).toBe(true);
+  });
+
   it('确认之前不打开浏览器，取消也不写偏好；勾选后下一次直接打开', async () => {
     const host = installFakeHost();
     host.answer('shell.openExternal', { success: true });

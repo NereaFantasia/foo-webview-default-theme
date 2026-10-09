@@ -73,6 +73,22 @@ describe('startLyricsDriver', () => {
     expect(env.calls).toStrictEqual(['time 12000', 'update 0', 'time 12500', 'update 16']);
   });
 
+  it('正偏移延后显示，隐藏后再显示仍使用校正时间', () => {
+    const env = setup();
+    env.clock.at = 12;
+    env.driver.setOffset(1.5);
+    env.driver.setActive(true);
+    expect(env.calls.splice(0)).toEqual(['time 10500 seek', 'resume']);
+    env.driver.setOffset(-0.5);
+    expect(env.calls.splice(0)).toEqual(['time 12500 seek']);
+    env.driver.setActive(false);
+    env.calls.splice(0);
+    env.clock.at = 20;
+    env.driver.setActive(true);
+    expect(env.calls[0]).toBe('time 20500 seek');
+    env.driver.dispose();
+  });
+
   it('看不见时停帧并暂停，时钟变化也不再推', () => {
     const env = setup();
     env.driver.setActive(true);

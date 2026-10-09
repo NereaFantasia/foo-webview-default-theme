@@ -10,6 +10,7 @@ import {
   Title2,
   Tooltip,
   makeStyles,
+  mergeClasses,
 } from '@fluentui/react-components';
 import {
   Dismiss16Regular,
@@ -32,6 +33,7 @@ import { FILTER_SCOPES, type FilterScope } from './filter/playlistMatch.ts';
 import styles from './PlaylistPageHeader.module.css';
 import { useService } from '../kit/useService.ts';
 import { playlistPageKey } from './playlistPageServices.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   title: {
@@ -79,6 +81,7 @@ export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
   useEffect(() => playlistPage.duration.acquire(guid), [playlistPage, guid]);
   const duration = useAtomValueRawSync(playlistPage.duration.stateOf(guid));
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const input = useRef<HTMLInputElement>(null);
 
   useCommand({
@@ -123,13 +126,14 @@ export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
       <div className={styles.tools}>
         <Input
           ref={input}
-          className={classes.filter}
+          className={mergeClasses(classes.filter, controls.field)}
           contentBefore={<Filter16Regular />}
           contentAfter={
             <>
               {filter.query !== '' && (
                 <Tooltip content={t('playlistPage.clearFilter')} relationship="label">
                   <Button
+                    className={controls.icon}
                     appearance="transparent"
                     size="small"
                     icon={<Dismiss16Regular />}
@@ -152,6 +156,7 @@ export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
                 <MenuTrigger disableButtonEnhancement>
                   <Tooltip content={t('playlistPage.scope')} relationship="label">
                     <Button
+                      className={controls.icon}
                       appearance="transparent"
                       size="small"
                       icon={<Options16Regular />}

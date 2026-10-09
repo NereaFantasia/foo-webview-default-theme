@@ -13,7 +13,8 @@ export const DOWNLOAD_BASE = 'https://cnb.cool/foo-ui-webview2/default-theme/-/r
 
 /**
  * @typedef {{ version: string, upgradeFrom: string, plugin: string, loader: number,
- *   notes: Record<string, string>, zip: { size: number, sha256: string } }} ReleaseInput
+ *   notes: Record<string, string>, zip: { size: number, sha256: string },
+ *   backend?: import('../../src/update/backendManifest.ts').BackendManifest }} ReleaseInput
  */
 
 /** @param {string} version @param {string} file */
@@ -31,6 +32,7 @@ export function releaseManifest(input) {
     requiresLoader: input.loader,
     notes: input.notes,
     components: {
+      ...(input.backend ? { backend: input.backend.backend, runtime: input.backend.runtime } : {}),
       frontend: {
         url: downloadUrl(input.version, `fe-${input.version}.zip`),
         size: input.zip.size,

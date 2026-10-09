@@ -47,8 +47,11 @@ export interface LibraryTracksFace extends HostReadyFace, LibraryEventsFace {
 }
 
 export interface LibraryTracksService {
-  /** 列表形态要用了：头一次调时去取，之后跟着库变更重取。没人要时不取：整库的曲目是一大份。 */
-  want(): void;
+  /**
+   * 登记一处使用并返回释放函数，释放函数重复调用无效。没有使用方时不取整库曲目；最后一处释放后，进行中的
+   * 请求作废，库变更只标记过时，下次登记时再取。
+   */
+  want(): () => void;
   /**
    * 评分服务的重取信号（`ratingsRefetchAtom`）此刻的值。与上次交来的不同就重取：一次改动报不全时，其余曲目
    * 的评分只能靠重取行更新。还没取过的只记下，取的时候本来就是新的。
@@ -86,6 +89,9 @@ function groupByAlbum(tracks: readonly LibraryTrack[]): Map<AlbumKey, LibraryTra
  * 列表形态用的整库曲目：`library.getAll` 一次取全，按专辑分好。与专辑清单同一套规矩：先订库变更再取，变更按
  * 1 s 合并后整份重取；重取期间旧的一份留着、状态不退回 loading；晚到的旧应答丢掉。`stamp` 是评分服务的
  * `stamp`，每次发请求前拿一个。
+ *
+ * 使用方按引用计数登记：改一首歌的标签或播放统计都会触发库变更，每次重取的都是整库，所以没有使用方时只标记
+ * 过时，不重取。
  */
 export function startLibraryTracks(
   store: Store,
@@ -94,7 +100,10 @@ export function startLibraryTracks(
 ): LibraryTracksService {
   store.set(stateAtom, INITIAL);
   let disposed = false;
-  let wanted = false;
+  let active = 0;
+  let dirty = true;
+  let connected = false;
+  let loading: Promise<void> | null = null;
   let generation = 0;
   let signal: number | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -103,6 +112,7 @@ export function startLibraryTracks(
 
   async function load(): Promise<void> {
     const mine = ++generation;
+    dirty = false;
     const stale = () => disposed || mine !== generation;
     const before = store.get(stateAtom);
     if (before.status !== 'ready') store.set(stateAtom, { ...before, status: 'loading' });
@@ -123,6 +133,16 @@ export function startLibraryTracks(
     });
   }
 
+  /** 记下进行中的请求，连续登记时不重复发请求。 */
+  function reload(): Promise<void> {
+    const next = load();
+    loading = next;
+    void next.finally(() => {
+      if (loading === next) loading = null;
+    });
+    return next;
+  }
+
   function cancelTimer(): void {
     if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
@@ -130,37 +150,53 @@ export function startLibraryTracks(
 
   function schedule(): void {
     if (disposed) return;
+    dirty = true;
     cancelTimer();
     timer = setTimeout(() => {
       timer = undefined;
-      void load();
+      if (active > 0) void reload();
     }, LIBRARY_COALESCE_MS);
   }
 
   async function connect(): Promise<void> {
     if (!(await waiter.done) || disposed) return;
+    connected = true;
     offLibrary = onLibraryChanged(host, schedule);
-    await load();
+    if (active > 0 && dirty && !loading) await reload();
   }
 
   return {
     want() {
-      if (wanted || disposed) return;
-      wanted = true;
-      void connect();
+      if (disposed) return () => {};
+      active += 1;
+      if (!connected) void connect();
+      else if (dirty && !loading) void reload();
+      let released = false;
+      return () => {
+        if (released || disposed) return;
+        released = true;
+        active -= 1;
+        if (active > 0) return;
+        // 作废进行中的请求：应答回来时已无人使用，写进状态只会多留一份整库。
+        cancelTimer();
+        generation += 1;
+        loading = null;
+        dirty = true;
+      };
     },
     syncRefetch(next) {
       const changed = signal !== null && signal !== next;
       signal = next;
-      if (changed && offLibrary && !disposed) {
-        cancelTimer();
-        void load();
-      }
+      if (!changed || disposed || !connected) return;
+      dirty = true;
+      if (active === 0) return;
+      cancelTimer();
+      void reload();
     },
     retry() {
-      if (disposed || !offLibrary) return Promise.resolve();
+      if (disposed || !connected) return Promise.resolve();
       cancelTimer();
-      return load();
+      return reload();
     },
     dispose() {
       disposed = true;

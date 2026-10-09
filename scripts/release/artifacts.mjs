@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readChangelog } from '../../src/update/changelog.ts';
-import { BUILT_IN_KEYS, readRelease } from '../../src/update/contract.ts';
+import { BUILT_IN_KEYS, readRelease, releaseFile } from '../../src/update/contract.ts';
 import {
   json,
   marker,
@@ -16,6 +16,7 @@ import {
 } from '../../src/update/loaderContract.ts';
 import { INITIAL_TRUST, acceptRoot } from '../../src/update/rootTrust.ts';
 import { readZip } from '../../src/update/zipArchive.ts';
+import { readBackendManifest } from '../../src/update/backendManifest.ts';
 
 /** @param {Uint8Array} bytes */
 export function sha256(bytes) {
@@ -25,7 +26,7 @@ export function sha256(bytes) {
 /**
  * @typedef {{ name: string, bytes: Uint8Array, sha256: string }} Asset
  * @typedef {{ version: string, tag: string, serial: number, manifest: string,
- *   notes: Record<string, string>, assets: Asset[] }} VerifiedRelease
+ *   notes: Record<string, string>, assets: Asset[], runtime?: import('../../src/update/contract.ts').ReleaseFile }} VerifiedRelease
  */
 
 /** @param {string} dir @param {string} name @returns {Asset} */
@@ -121,6 +122,50 @@ export async function verifyArtifacts(dir, keys = BUILT_IN_KEYS) {
   if (!bundled || sha256(bundled.bytes) !== changelogAsset.sha256)
     throw new Error('前端包里的更新日志与发行附件不一致');
 
+  /** @type {Asset[]} */
+  const backendAssets = [];
+  /** @type {import('../../src/update/contract.ts').ReleaseFile | undefined} */
+  let runtime;
+  const backendFile = frontendFiles.files.find((file) => file.path === 'backend.json');
+  const releaseRaw = json(new TextDecoder().decode(releaseAsset.bytes));
+  const components =
+    record(releaseRaw) && record(releaseRaw.components) ? releaseRaw.components : {};
+  if (backendFile) {
+    const backend = readBackendManifest(new TextDecoder().decode(backendFile.bytes), version);
+    const be = releaseFile(components.backend, 16 * 1024 * 1024);
+    const rt = releaseFile(components.runtime, 256 * 1024);
+    if (
+      !backend ||
+      !be ||
+      !rt ||
+      be.url !== backend.backend.url ||
+      be.size !== backend.backend.size ||
+      be.sha256 !== backend.backend.sha256 ||
+      rt.url !== backend.runtime.url ||
+      rt.size !== backend.runtime.size ||
+      rt.sha256 !== backend.runtime.sha256
+    )
+      throw new Error('前端后端描述与发行清单不一致');
+    const packaged = asset(dir, `be-${version}.zip`);
+    if (
+      packaged.bytes.length !== backend.backend.size ||
+      packaged.sha256 !== backend.backend.sha256 ||
+      !backend.backend.url.endsWith(`/v${version}/be-${version}.zip`)
+    )
+      throw new Error('后端附件与发行描述不符');
+    const unpacked = await readZip(new Uint8Array(packaged.bytes));
+    if (
+      !unpacked.ok ||
+      !unpacked.files.some((file) => file.path === 'server.cjs') ||
+      unpacked.files.some((file) => file.path.toLowerCase() === 'installed.json')
+    )
+      throw new Error('后端附件结构无效');
+    backendAssets.push(packaged);
+    runtime = backend.runtime;
+  } else if (components.backend !== undefined || components.runtime !== undefined) {
+    throw new Error('发行清单声明了后端，但前端包缺少补装描述');
+  }
+
   const firstInstall = asset(dir, `foo-webview-default-theme-${version}.zip`);
   const firstFiles = await readZip(new Uint8Array(firstInstall.bytes));
   if (!firstFiles.ok) throw new Error(`客户端解不开首装包：${firstFiles.problem}`);
@@ -132,6 +177,7 @@ export async function verifyArtifacts(dir, keys = BUILT_IN_KEYS) {
     serial: decision.payload.serial,
     manifest,
     notes: release.notes,
-    assets: [releaseAsset, frontend, firstInstall, changelogAsset],
+    assets: [releaseAsset, frontend, firstInstall, changelogAsset, ...backendAssets],
+    ...(runtime ? { runtime } : {}),
   };
 }

@@ -11,13 +11,25 @@ export function domTerrainBackends(container: HTMLElement, className: string): T
   let canvas: HTMLCanvasElement | null = null;
   // 当前 canvas 在主线程上开过 WebGL2：换下时主动交还上下文，不等回收。
   let glOpened = false;
+  let transferred = false;
 
   function releaseCanvas(): void {
     if (!canvas) return;
-    if (glOpened) canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
-    canvas.remove();
+    const previous = canvas;
+    const gpu = glOpened;
+    const offscreen = transferred;
     canvas = null;
     glOpened = false;
+    transferred = false;
+    try {
+      if (gpu) previous.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+      if (!offscreen) {
+        previous.width = 0;
+        previous.height = 0;
+      }
+    } finally {
+      previous.remove();
+    }
   }
 
   return {
@@ -28,7 +40,7 @@ export function domTerrainBackends(container: HTMLElement, className: string): T
       container.append(canvas);
     },
     releaseCanvas,
-    startWorker(history, settings, onError) {
+    startWorker(history, settings, onError, gpu, onSurface) {
       const element = canvas;
       if (
         !element ||
@@ -46,13 +58,34 @@ export function domTerrainBackends(container: HTMLElement, className: string): T
       let offscreen: OffscreenCanvas;
       try {
         offscreen = element.transferControlToOffscreen();
+        transferred = true;
       } catch {
         worker.terminate();
         return null;
       }
       // `createWorkerTerrainPainter` 不管 Worker 的 error，由这里接住，交给调用方换一块 canvas 退回主线程。
       worker.addEventListener('error', onError);
-      return createWorkerTerrainPainter(worker, offscreen, history, settings);
+      try {
+        const painter = createWorkerTerrainPainter(
+          worker,
+          offscreen,
+          history,
+          settings,
+          gpu,
+          onSurface,
+        );
+        return {
+          ...painter,
+          dispose() {
+            worker.removeEventListener('error', onError);
+            painter.dispose();
+          },
+        };
+      } catch (error) {
+        worker.removeEventListener('error', onError);
+        worker.terminate();
+        throw error;
+      }
     },
     startMain(history, settings, gpu, onLost) {
       const element = canvas;

@@ -5,7 +5,11 @@ import type { Store } from '../../kit/store.ts';
 export type InfoSource = 'playing' | 'preview';
 
 /** 只保存主动选中的曲目；页面卸载或播放换曲不清掉预览。 */
-export function createTrackInfoTarget(store: Store, playing: Atom<Track | null>) {
+export function createTrackInfoTarget(
+  store: Store,
+  playing: Atom<Track | null>,
+  navigate?: (source: InfoSource, track: Track | null) => void,
+) {
   const preview = atom<Track | null>(null);
   const source = atom<InfoSource>('playing');
   const track: Atom<Track | null> = atom((get) =>
@@ -17,11 +21,14 @@ export function createTrackInfoTarget(store: Store, playing: Atom<Track | null>)
     playing,
     track,
     select(value: Track) {
+      navigate?.('preview', value);
       store.set(preview, value);
       store.set(source, 'preview');
     },
     follow(value: InfoSource) {
-      if (value === 'playing' || store.get(preview)) store.set(source, value);
+      if (value !== 'playing' && !store.get(preview)) return;
+      navigate?.(value, value === 'preview' ? store.get(preview) : null);
+      store.set(source, value);
     },
   };
 }

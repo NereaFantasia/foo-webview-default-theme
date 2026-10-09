@@ -8,7 +8,6 @@
 
 .header {
   min-width: 0;
-  min-height: 132px;
   display: flex;
   flex-direction: column;
   gap: var(--spacingVerticalS);
@@ -19,7 +18,7 @@
 }
 
 .eyebrow,
-.source {
+.notice {
   font-size: var(--fontSizeBase200);
   line-height: var(--lineHeightBase200);
   color: var(--colorNeutralForeground3);
@@ -145,7 +144,7 @@
   gap: var(--spacingHorizontalS);
 }
 
-.source {
+.notice {
   flex: 1 1 100px;
   overflow-wrap: anywhere;
 }
@@ -176,10 +175,6 @@
 }
 
 @media (max-height: 480px) {
-  .header {
-    min-height: 88px;
-  }
-
   .footer {
     min-height: 72px;
   }

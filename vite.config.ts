@@ -11,6 +11,16 @@ const VERSION = metadata.version;
 if (!versionRef({ v: VERSION, dir: VERSION })) throw new Error('版本号必须为稳定版 SemVer');
 const FRONTEND_DIR = `dist/fe/${VERSION}`;
 
+// AMLL 的未用背景层会保留 Pixi；Material 的顶层配色方案实例也会保留未用算法。
+// 这几类模块没有需要单独执行的初始化，主线程与 Worker 都只保留实际使用的导出；CSS 仍有副作用。
+const TREE_SHAKE = {
+  moduleSideEffects: (id: string) =>
+    id.endsWith('.css') ||
+    !/[\\/](@pixi|@applemusic-like-lyrics[\\/]core|@material[\\/]material-color-utilities)[\\/]/.test(
+      id,
+    ),
+};
+
 /** 安装标记最后生成；发行清单的哈希由打包发行物时提供，普通构建不伪造发行身份。 */
 function writeInstallation(): void {
   const root = resolve(FRONTEND_DIR);
@@ -60,16 +70,9 @@ export default defineConfig({
   resolve: { dedupe: ['keyborg'] },
   // 端口固定：宿主的开发服务器地址按它填，strictPort 让端口被占时直接失败，不静默换端口。
   server: { port: 5190, strictPort: true },
+  worker: { rolldownOptions: { treeshake: TREE_SHAKE } },
   build: {
     outDir: FRONTEND_DIR,
-    rolldownOptions: {
-      // 歌词只用 AMLL 的 DOM 播放器。它的背景层在模块顶层继承 pixi 的类，包又没声明无副作用，照常构建会
-      // 把整套 pixi 打进来；声明 pixi 与 AMLL core 的脚本没有副作用后，用不到的背景层连同 pixi 一起剪掉。
-      // 样式表照常保留。
-      treeshake: {
-        moduleSideEffects: (id) =>
-          id.endsWith('.css') || !/[\\/](@pixi|@applemusic-like-lyrics[\\/]core)[\\/]/.test(id),
-      },
-    },
+    rolldownOptions: { treeshake: TREE_SHAKE },
   },
 });

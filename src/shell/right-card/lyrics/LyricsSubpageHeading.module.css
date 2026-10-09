@@ -1,0 +1,11 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}
+
+.root strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

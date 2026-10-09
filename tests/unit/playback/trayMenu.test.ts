@@ -50,7 +50,7 @@ describe('buildTrayMenu', () => {
   });
 
   it('菜单配置关掉宿主注入的播放键与系统项', () => {
-    expect(trayMenuConfig({ dark: true, css: 'x' })).toMatchObject({
+    expect(trayMenuConfig({ dark: true, css: 'x', backdrop: 'acrylic' })).toMatchObject({
       render: 'webview',
       showPlaybackControls: false,
       showSystemItems: false,

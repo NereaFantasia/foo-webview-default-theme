@@ -136,9 +136,9 @@ describe('几家都取到时', () => {
     expect(picked?.source).toBe('kugou');
   });
 
-  it('屏蔽字少的优先，哪怕只是逐行', () => {
+  it('类别顺序优先于屏蔽字数量', () => {
     expect(pickLyrics([found('kugou', WORD_CENSORED), found('netease', LINE)], order)?.source).toBe(
-      'netease',
+      'kugou',
     );
   });
 

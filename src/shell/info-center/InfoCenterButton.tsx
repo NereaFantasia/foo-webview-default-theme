@@ -39,6 +39,7 @@ const useStyles = makeStyles({
 
 const LABELS: Readonly<Record<InfoKind, readonly [MessageKey, MessageKey]>> = {
   startupUnconfirmed: ['startup.unconfirmed', 'startup.unconfirmedDetail'],
+  backendUnavailable: ['update.backendFailed', 'update.backendFailureDetail'],
   updateReady: ['update.infoReady', 'update.ready'],
   updateAvailable: ['update.infoAvailable', 'update.available'],
   updatePlugin: ['update.infoPlugin', 'update.blockedPlugin'],
@@ -53,6 +54,7 @@ const LABELS: Readonly<Record<InfoKind, readonly [MessageKey, MessageKey]>> = {
   hostMethodMissing: ['info.hostMethodMissing', 'info.hostMethodDetail'],
   playcountMissing: ['info.playcountMissing', 'info.playcountDetail'],
   libraryNotConfigured: ['info.libraryNotConfigured', 'info.libraryDetail'],
+  windowEffectsLimited: ['info.windowEffectsLimited', 'info.windowEffectsWindows10'],
 };
 
 function DiagnosticMessage({
@@ -67,7 +69,9 @@ function DiagnosticMessage({
   const { kind, level, params } = message;
   const [title, detail] = LABELS[kind];
   const dismiss =
-    kind === 'playcountMissing' || kind === 'libraryNotConfigured'
+    kind === 'playcountMissing' ||
+    kind === 'libraryNotConfigured' ||
+    kind === 'windowEffectsLimited'
       ? () => service.dismissReminder(kind)
       : undefined;
   return (
@@ -77,7 +81,15 @@ function DiagnosticMessage({
       </strong>
       <p className={styles.detail}>
         {t(
-          kind === 'updateAvailable' && params['title'] ? 'update.infoAvailableDetail' : detail,
+          kind === 'windowEffectsLimited'
+            ? params['reason'] === 'unknown'
+              ? 'info.windowEffectsUnknown'
+              : params['reason'] === 'failed'
+                ? 'info.windowEffectsFailed'
+                : detail
+            : kind === 'updateAvailable' && params['title']
+              ? 'update.infoAvailableDetail'
+              : detail,
           params,
         )}
       </p>
@@ -89,6 +101,11 @@ function DiagnosticMessage({
       {kind === 'startupUnconfirmed' && (
         <Button size="small" onClick={service.retryStartup}>
           {t('startup.confirmRetry')}
+        </Button>
+      )}
+      {kind === 'backendUnavailable' && (
+        <Button size="small" onClick={service.retryBackend}>
+          {t('update.backendRetry')}
         </Button>
       )}
       {kind === 'updateReady' && (

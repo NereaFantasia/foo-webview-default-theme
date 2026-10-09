@@ -2,6 +2,7 @@
 .root {
   min-height: 0;
   overflow: auto;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalL)
+  padding: calc(var(--spacingVerticalL) + var(--nav-inset, 0px)) var(--spacingHorizontalL)
     calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+  scroll-padding-top: var(--nav-inset, 0px);
 }

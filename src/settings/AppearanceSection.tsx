@@ -1,10 +1,19 @@
 import { Switch } from '@fluentui/react-components';
-import { Color20Regular, DarkTheme20Regular, PanelBottom20Regular } from '@fluentui/react-icons';
+import {
+  Color20Regular,
+  DarkTheme20Regular,
+  PanelBottom20Regular,
+  Sparkle20Regular,
+  ZoomIn20Regular,
+} from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import {
   choosePlayerBarStyle,
+  chooseCapsuleBlur,
+  capsuleBlurAtom,
+  CAPSULE_BLUR_STORAGE_KEY,
   PLAYER_BAR_STYLES,
   PLAYER_BAR_STORAGE_KEY,
   playerBarStyleAtom,
@@ -24,10 +33,105 @@ import {
   type ColorMode,
 } from '../theme/colorScheme.ts';
 import { SettingsCard } from './SettingsCard.tsx';
+import { SettingsExpander } from './SettingsExpander.tsx';
+import { SettingsRow } from './SettingsRow.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
 import { AccentExpander, useAccentSourceName } from './AccentExpander.tsx';
 import { BackdropExpander } from './BackdropExpander.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
+import { useService } from '../kit/useService.ts';
+import {
+  windowZoomAtom,
+  windowZoomKey,
+  ZOOM_CHOICES,
+  ZOOM_STORAGE_KEY,
+} from '../host/windowZoom.ts';
+import {
+  chooseMotion,
+  MOTION_CHOICES,
+  MOTION_STORAGE_KEY,
+  motionChoiceAtom,
+  systemReducedMotionAtom,
+  type MotionChoice,
+} from '../motion/reducedMotion.ts';
+
+const MOTION_LABELS: Readonly<Record<MotionChoice, MessageKey>> = {
+  system: 'settings.motionSystem',
+  reduce: 'settings.motionReduced',
+};
+
+function ZoomCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const state = useAtomValueRawSync(windowZoomAtom);
+  const service = useService(windowZoomKey);
+  const options = ZOOM_CHOICES.map((choice) => ({
+    value: String(choice),
+    label: choice === 0 ? t('settings.zoomInherit') : `${choice}%`,
+  }));
+  if (!ZOOM_CHOICES.some((choice) => choice === state.choice))
+    options.push({ value: String(state.choice), label: `${state.choice}%` });
+  return (
+    <SettingsCard
+      icon={<ZoomIn20Regular />}
+      title={t('settings.zoom')}
+      field
+      description={
+        state.status === 'unavailable'
+          ? t('settings.needsHost')
+          : state.status === 'failed'
+            ? t('settings.zoomUnavailable')
+            : state.failed
+              ? t('settings.zoomFailed')
+              : state.choice === 0
+                ? t('settings.zoomInheritDetail')
+                : undefined
+      }
+      error={state.status === 'failed' || state.failed}
+      feedback={<LocalSaveNotice keys={[ZOOM_STORAGE_KEY]} />}
+    >
+      {(ids) => (
+        <SettingsSelect
+          {...ids}
+          options={options}
+          value={String(state.choice)}
+          disabled={state.status !== 'ready' || state.pending}
+          onChange={(value) => service.choose(Number(value))}
+        />
+      )}
+    </SettingsCard>
+  );
+}
+
+function MotionCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const choice = useAtomValueRawSync(motionChoiceAtom);
+  const systemReduced = useAtomValueRawSync(systemReducedMotionAtom);
+  const store = useStore();
+  return (
+    <SettingsCard
+      icon={<Sparkle20Regular />}
+      title={t('settings.motion')}
+      field
+      description={
+        choice === 'system'
+          ? t('settings.current', {
+              name: t(systemReduced ? 'settings.motionReduced' : 'settings.motionFull'),
+            })
+          : undefined
+      }
+      feedback={<LocalSaveNotice keys={[MOTION_STORAGE_KEY]} />}
+    >
+      {(ids) => (
+        <SettingsSelect
+          {...ids}
+          options={MOTION_CHOICES.map((value) => ({ value, label: t(MOTION_LABELS[value]) }))}
+          value={choice}
+          onChange={(value) => chooseMotion(store, value)}
+        />
+      )}
+    </SettingsCard>
+  );
+}
 
 const MODE_LABELS: Readonly<Record<ColorMode, MessageKey>> = {
   system: 'settings.colorModeSystem',
@@ -73,15 +177,16 @@ export function ColorModeCard() {
 function PlayerBarCard() {
   const t = useAtomValueRawSync(translateAtom);
   const style = useAtomValueRawSync(playerBarStyleAtom);
+  const blur = useAtomValueRawSync(capsuleBlurAtom);
   const store = useStore();
   return (
-    <SettingsCard
+    <SettingsExpander
       icon={<PanelBottom20Regular />}
       title={t('settings.playerBar')}
       field
-      feedback={<LocalSaveNotice keys={[PLAYER_BAR_STORAGE_KEY]} />}
-    >
-      {(ids) => (
+      defaultOpen={false}
+      feedback={<LocalSaveNotice keys={[PLAYER_BAR_STORAGE_KEY, CAPSULE_BLUR_STORAGE_KEY]} />}
+      control={(ids) => (
         <SettingsSelect
           {...ids}
           options={PLAYER_BAR_STYLES.map((value) => ({ value, label: t(STYLE_LABELS[value]) }))}
@@ -89,7 +194,19 @@ function PlayerBarCard() {
           onChange={(value) => choosePlayerBarStyle(store, value)}
         />
       )}
-    </SettingsCard>
+    >
+      {style !== 'bottom' && (
+        <SettingsRow title={t('settings.capsuleBlur')} field>
+          {({ labelId }) => (
+            <Switch
+              checked={blur}
+              aria-labelledby={labelId}
+              onChange={(_, data) => chooseCapsuleBlur(store, data.checked)}
+            />
+          )}
+        </SettingsRow>
+      )}
+    </SettingsExpander>
   );
 }
 
@@ -126,6 +243,8 @@ export function AppearanceSection() {
       <AccentExpander />
       <BackdropExpander />
       <PlayerBarCard />
+      <MotionCard />
+      <ZoomCard />
     </>
   );
 }

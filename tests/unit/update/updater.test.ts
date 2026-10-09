@@ -154,6 +154,26 @@ afterEach(() => {
 });
 
 describe('前端更新器', () => {
+  it('未结束或损坏的插件事务阻止检查和清理', async () => {
+    const t = await setup({ files: { 'state/plugin-maintenance.json': '{' } });
+    t.confirm();
+    await t.updater.check();
+    expect(t.status()).toEqual({ phase: 'maintenance' });
+    expect(t.fetched()).toEqual([]);
+    expect(t.pointer()).toEqual({ schema: 1, frontend: { version: CURRENT } });
+  });
+  it('下载期间出现插件事务时不提交前端 pending', async () => {
+    const t = await setup({
+      pause: async () => {
+        t.env.write('state/plugin-maintenance.json', '{');
+      },
+    });
+    await t.root(1, [await publish('0.2.0')]);
+    t.confirm();
+    await t.updater.install();
+    expect(t.status()).toEqual({ phase: 'maintenance' });
+    expect(t.pointer()).toEqual({ schema: 1, frontend: { version: CURRENT } });
+  });
   it('确认之前不检查，也不联网', async () => {
     const t = await setup();
     await t.updater.check();

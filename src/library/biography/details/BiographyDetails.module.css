@@ -28,7 +28,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--spacingVerticalM) var(--spacingHorizontalXL);
   padding: var(--spacingVerticalM) var(--spacingHorizontalM);
-  background: var(--colorNeutralBackground3);
+  background: var(--bg-view-control);
   border-radius: var(--borderRadiusMedium);
 }
 .facts > div {

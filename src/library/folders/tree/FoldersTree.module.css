@@ -22,7 +22,10 @@
   color: var(--colorNeutralForeground1);
 }
 .row:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
+}
+.row:active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
 .row > svg {
   flex: 0 0 20px;
@@ -30,7 +33,13 @@
   height: 20px;
 }
 .row[aria-selected='true'] {
-  background: color-mix(in oklab, var(--colorBrandStroke1) 18%, transparent);
+  background-color: var(--bg-selected);
+}
+@media (forced-colors: active) {
+  .row[aria-selected='true'] {
+    box-sizing: border-box;
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
 }
 .root:focus-visible .row[data-focused='true'] {
   outline: 2px solid var(--colorStrokeFocus2);
@@ -49,7 +58,10 @@
   cursor: pointer;
 }
 .toggle:enabled:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background: var(--state-hover);
+}
+.toggle:enabled:active {
+  background: var(--state-pressed);
 }
 .chevron {
   transition: transform var(--motion-fast) var(--curveDecelerateMid);

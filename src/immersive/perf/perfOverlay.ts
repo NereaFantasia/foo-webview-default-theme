@@ -12,8 +12,9 @@ import type { TerrainSurfaceKind } from '../terrain/terrainPainter.ts';
  * 小窗不该采样；回报在关着时丢掉，关掉时清空上一份。开关键要登记进命令登记处，由它调
  * `togglePerfOverlay`。
  */
+export const PERF_OVERLAY_STORAGE_KEY = 'default-theme.immersive.perfOverlay.v1';
 const enabledPref = defineLocalPref({
-  key: 'default-theme.immersive.perfOverlay.v1',
+  key: PERF_OVERLAY_STORAGE_KEY,
   fallback: false,
   ...ON_OFF,
 });

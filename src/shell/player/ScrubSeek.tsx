@@ -5,19 +5,21 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type AnimationEvent,
   type FocusEvent,
   type PointerEvent,
 } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
-import { createHoverReveal, HOVER_OPEN_MS } from './hoverReveal.ts';
+import { createHoverReveal } from './hoverReveal.ts';
 import { currentTrackAtom } from '../../playback/playback.ts';
 import { playbackCanSeekAtom, playbackDurationAtom } from '../../playback/playerAtoms.ts';
 import styles from './ScrubSeek.module.css';
 import { SeekBar } from './SeekBar.tsx';
 import { clockText } from '../../playback/seekDraft.ts';
 import { usePointerPresence } from './usePointerPresence.ts';
+import { SeekLyrics } from './SeekLyrics.tsx';
 
+/** 紧凑进度条悬停到展开前的等待，毫秒。 */
+const SCRUB_OPEN_MS = 50;
 /** 指针离开之后收回前等多久，毫秒：从线上滑过边缘的一两像素不算离开。 */
 const SCRUB_CLOSE_MS = 100;
 /** 触屏点开之后多久没动作就收回，毫秒。 */
@@ -46,12 +48,11 @@ function hoverAt(root: HTMLElement | null, x: number): Hover | null {
 }
 
 /**
- * 正在播放条与胶囊的进度线，带悬停态：指针停在线的命中区 300 ms，或键盘聚焦到进度条，就进悬停态，线挪到这一块的
- * 垂直正中、加粗到 4、出滑块，两端写已播与总长，指针处的时间写在这一块下方的提示里；这一块里封面以外的东西由
- * 外面按 `onScrubChange` 模糊变淡。悬停态里命中区撑满这一块（封面除外），指针离开就收回。
+ * 正在播放条与胶囊的紧凑进度线：悬停后轻抬并加粗，两端时间覆盖在轨道上方，鼠标位置用竖条标出。
+ * 命中区与轨道宽度不随显隐改变，时间和预览装饰不接指针；周围内容由外面按 `onScrubChange` 模糊变淡。
  *
- * 没进悬停态时照样能点、能拖；拖动期间不进也不出，免得线在指针底下换了位置。触屏点一下只进悬停态、不跳，
- * 之后点哪跳哪，3 s 没动作收回，拖着的时候不算没动作。不能跳转（网络流、没有时长）时悬停态里只写已播与一句说明。
+ * 起拖和键盘聚焦立即显示时间，拖动时竖条随目标位置移动。触屏点一下只展开、不跳，之后点哪跳哪，
+ * 3 s 没动作收回，拖着的时候不收。不能跳转时显示已播与说明，不画预览竖条。
  */
 export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -61,9 +62,10 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
   const root = useRef<HTMLDivElement>(null);
   const [scrub, setScrub] = useState<ScrubState | undefined>(undefined);
   const [hover, setHover] = useState<Hover | null>(null);
+  const [focused, setFocused] = useState(false);
   const [reveal] = useState(() =>
     createHoverReveal({
-      openMs: HOVER_OPEN_MS,
+      openMs: SCRUB_OPEN_MS,
       closeMs: SCRUB_CLOSE_MS,
       onChange: (open) => setScrub(open ? 'on' : 'off'),
     }),
@@ -75,7 +77,7 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
   const lastX = useRef<number | null>(null);
   const on = scrub === 'on';
 
-  // 停止时线整条卸下；收回的动效挂在线上，停着的这个「刚收回」要清掉，不然起播时新挂上的线会再落一次。
+  // 没有曲目时清掉交互态，新挂上的进度线从常态开始。
   if (!track && scrub !== undefined) setScrub(undefined);
 
   const latest = useRef(onScrubChange);
@@ -98,7 +100,7 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
   useEffect(() => {
     if (!track) reveal.dismiss();
   }, [track, reveal]);
-  // 进悬停态时线换了位置与宽度，按新的版式量一次指针处。
+  // 指针停着不动也要在悬停展开时显示预览位置。
   useLayoutEffect(() => {
     if (on && lastX.current !== null) setHover(hoverAt(root.current, lastX.current));
   }, [on]);
@@ -114,6 +116,9 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
   const onPointerDownCapture = (event: PointerEvent<HTMLDivElement>) => {
     pressing.current = true;
     pointerType.current = event.pointerType;
+    lastX.current = event.clientX;
+    setFocused(false);
+    reveal.hold('focus', false);
     if (event.pointerType !== 'touch') return;
     const opening = !reveal.open;
     touched();
@@ -124,28 +129,31 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
     reveal.show();
   };
   const onDragChange = (dragging: boolean) => {
-    if (reveal.open) {
-      reveal.hold('drag', dragging);
-      // 触屏拖完从松手起重新计 3 s。
-      if (!dragging && pointerType.current === 'touch') touched();
-      return;
+    reveal.hold('drag', dragging);
+    if (dragging) reveal.show();
+    else if (pointerType.current === 'touch') touched();
+    else if (lastX.current !== null && root.current?.matches(':hover')) {
+      setHover(hoverAt(root.current, lastX.current));
     }
-    // 在细线上拖：拖动期间不进悬停态，松手时指针还在线上就重新计时。
-    if (dragging) reveal.leave();
-    else if (pointerType.current !== 'touch' && root.current?.matches(':hover')) reveal.enter();
   };
   // 按下引起的聚焦不算键盘聚焦：浏览器把脚本调的 focus() 按上一次聚焦的来路判 :focus-visible，页面上还没用鼠标
   // 聚焦过、或刚按过键时也会判成是，悬停态就会一直按着不收。
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (pressing.current || !event.target.matches(':focus-visible')) return;
+    setFocused(true);
     reveal.hold('focus', true);
     reveal.show();
   };
-  const onBlur = () => reveal.hold('focus', false);
-  // 线在指针底下换成一句说明、滑块随悬停态进出时，指针底下的节点会被换掉。
+  const onBlur = () => {
+    setFocused(false);
+    reveal.hold('focus', false);
+  };
   usePointerPresence(root, {
     enter: (event) => {
-      if (event.pointerType !== 'touch') reveal.enter();
+      if (event.pointerType !== 'touch') {
+        lastX.current = event.clientX;
+        reveal.enter();
+      }
     },
     leave: (event) => {
       if (event.pointerType !== 'touch') reveal.leave();
@@ -153,16 +161,6 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
       setHover(null);
     },
   });
-  // 收回的动效播完就回到「从没进过」。只认线那一层自己的动效，里面时间淡入的不算。
-  const onAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
-    if (
-      scrub === 'off' &&
-      event.target instanceof Element &&
-      event.target.parentElement === root.current
-    )
-      setScrub(undefined);
-  };
-
   // 提示贴着这一块的下沿、横向跟着指针。
   const target: PositioningVirtualElement | undefined = hover
     ? {
@@ -192,25 +190,77 @@ export function ScrubSeek({ form, onScrubChange }: ScrubSeekProps) {
         }}
         onFocus={onFocus}
         onBlur={onBlur}
-        onAnimationEnd={onAnimationEnd}
+        onPointerMoveCapture={(event) => {
+          lastX.current = event.clientX;
+        }}
       >
         <SeekBar
           interactive
-          thickness={on ? 4 : form === 'lcd' ? 3 : 2}
-          thumb={on}
-          clock
-          clockHidden={!on}
-          fill={on}
-          reach={form === 'lcd' ? 'down' : 'up'}
-          note={on ? t(live ? 'player.seekLive' : 'player.seekUnavailable') : undefined}
+          thickness={6}
+          className={styles.hit}
           onDragChange={onDragChange}
           onHover={(seconds, x) => {
-            lastX.current = seconds === null ? null : x;
             // 指针处的时间只在悬停态里写，平时不跟着指针重画。
             if (seconds === null) setHover(null);
-            else if (reveal.open) setHover(hoverAt(root.current, x));
+            else {
+              lastX.current = x;
+              if (reveal.open) setHover(hoverAt(root.current, x));
+            }
           }}
-        />
+        >
+          {(display) => {
+            const marker =
+              display.preview?.fraction ??
+              (display.dragging
+                ? display.fraction
+                : (hover?.fraction ?? (focused ? display.fraction : undefined)));
+            const digits = Math.max(
+              clockText(display.position).length,
+              clockText(display.duration).length,
+            );
+            return (
+              <div className={styles.display}>
+                <div
+                  className={styles.lyrics}
+                  style={{
+                    left: `calc(${digits}ch + var(--spacingHorizontalS))`,
+                    right: `calc(${digits}ch + var(--spacingHorizontalS))`,
+                  }}
+                >
+                  <SeekLyrics target={display.preview} />
+                </div>
+                <div className={styles.clocks} aria-hidden="true">
+                  <span data-seek-clock="position" data-dragging={display.dragging || undefined}>
+                    {clockText(display.position)}
+                  </span>
+                  <span className={styles.total} data-seek-clock="duration">
+                    {seekable ? clockText(display.duration) : ''}
+                  </span>
+                  {!seekable && (
+                    <span className={styles.note}>
+                      {t(live ? 'player.seekLive' : 'player.seekUnavailable')}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.line} data-seek-track aria-hidden="true">
+                  {display.track}
+                </div>
+                <span
+                  className={styles.marker}
+                  data-seek-preview
+                  data-visible={(on && seekable && marker !== undefined) || undefined}
+                  style={{
+                    left:
+                      display.dragging || hover === null || display.preview?.keyboard
+                        ? 'calc(var(--seek-indicator, 0) * 100%)'
+                        : `${(marker ?? display.fraction) * 100}%`,
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+            );
+          }}
+        </SeekBar>
       </div>
     </Tooltip>
   );

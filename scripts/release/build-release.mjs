@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { LOADER_VERSION } from '../../src/boot/loader.ts';
 import {
   changelogJson,
@@ -24,6 +25,7 @@ import { verifyArtifacts } from './artifacts.mjs';
 import { candidateOf, downloadUrl, nextRootPayload, releaseManifest } from './manifests.mjs';
 import { checkVectors, publicSpki, signEnvelope } from './signing.mjs';
 import { zipForRelease } from './zip.mjs';
+import { backendArtifacts } from './backend-artifacts.mjs';
 
 const root = new URL('../..', import.meta.url);
 const { values } = parseArgs({
@@ -34,6 +36,7 @@ const { values } = parseArgs({
     'upgrade-from': { type: 'string', default: '>=0.1.0' },
     'skip-build': { type: 'boolean', default: false },
     dist: { type: 'string', default: 'dist' },
+    runtime: { type: 'string' },
   },
 });
 if (!values.out || !values.key?.length) throw new Error('需要 --out 与至少一个 --key');
@@ -66,6 +69,12 @@ if (!values['skip-build']) {
 }
 const dist = new URL(`${values.dist}/`, root);
 const frontend = new URL(`fe/${version}/`, dist);
+const backend = values.runtime
+  ? await backendArtifacts(version, values.runtime, fileURLToPath(new URL(`be/${version}/`, dist)))
+  : null;
+if (backend) writeFileSync(new URL('backend.json', frontend), backend.text);
+else if (existsSync(new URL('backend.json', frontend)))
+  throw new Error('前端目录已有后端描述，需要提供对应 --runtime 或重新构建');
 /** @param {URL} base @param {string} [prefix] @returns {{ path: string, bytes: Uint8Array }[]} */
 function collect(base, prefix = '') {
   return readdirSync(new URL(prefix || '.', base), { withFileTypes: true }).flatMap((entry) => {
@@ -88,6 +97,7 @@ const release = releaseManifest({
   loader: LOADER_VERSION,
   notes: releaseNotes(releaseEntry),
   zip: { size: zip.length, sha256: sha256(zip) },
+  ...(backend ? { backend: backend.manifest } : {}),
 });
 const releaseText = JSON.stringify(release, null, 2) + '\n';
 const releaseSha256 = sha256(Buffer.from(releaseText, 'utf8'));
@@ -131,6 +141,7 @@ if (existsSync(out)) throw new Error(`${out} 已存在，附件发出去就不�
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'release.json'), releaseText);
 writeFileSync(join(out, `fe-${version}.zip`), zip);
+if (backend) writeFileSync(join(out, backend.name), backend.bytes);
 writeFileSync(join(out, `foo-webview-default-theme-${version}.zip`), firstInstall);
 writeFileSync(join(out, 'manifest.json'), manifest);
 writeFileSync(join(out, 'changelog.json'), changelogBytes);

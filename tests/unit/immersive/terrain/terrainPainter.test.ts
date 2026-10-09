@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import type { FrameClock } from '../../../../src/immersive/frame/frameScheduler.ts';
 import { METER_WINDOW_MS, type PaintStats } from '../../../../src/immersive/perf/paintMeter.ts';
 import {
@@ -79,6 +79,29 @@ const SETTINGS: TerrainPaintSettings = {
   glide: true,
   frozen: false,
 };
+
+test('清理同步撤销排帧并释放绘制对象，重复清理不重复释放', () => {
+  const { clock, pending, frame } = fakeClock();
+  const draw = vi.fn();
+  const dispose = vi.fn();
+  const painter = createTerrainPainter(
+    { kind: 'webgl', resize() {}, draw, dispose },
+    flatHistory,
+    SETTINGS,
+    () => 1000,
+    clock,
+  );
+  painter.frameArrived();
+  expect(pending()).toBe(1);
+  painter.dispose();
+  expect(pending()).toBe(0);
+  expect(dispose).toHaveBeenCalledOnce();
+  painter.dispose();
+  painter.frameArrived();
+  frame();
+  expect(draw).not.toHaveBeenCalled();
+  expect(dispose).toHaveBeenCalledOnce();
+});
 
 /** 全零帧填满：每行就是自己的基线，最近一行路径的第一笔是 moveTo(左沿, 基线)。 */
 function flatHistory() {

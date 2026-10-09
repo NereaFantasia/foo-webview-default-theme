@@ -86,6 +86,7 @@ test('startTerrainHistory：来源每报一帧就整形一帧、按 TERRAIN_DECI
   const fake = fakeSource();
   const terrain = startTerrainHistory(createStore(), fake.source);
   expect(terrain.history.rows).toBe(TERRAIN_ROWS);
+  expect(terrain.history.data.byteLength).toBe(0);
   expect(TERRAIN_POINTS).toBe(Math.ceil(TERRAIN_CHAIN_POINTS / TERRAIN_DECIMATION));
   expect(terrain.history.bands).toBe(TERRAIN_POINTS);
   fake.emit();
@@ -153,7 +154,27 @@ test('startTerrainHistory：保留量按来源此刻的帧距折算；每推一�
   terrain.dispose();
   expect(fake.listeners.size).toBe(0);
   fake.emit(loudFrame);
-  expect(terrain.history.count).toBe(2);
+  expect(terrain.history.count).toBe(0);
+  expect(terrain.history.data.byteLength).toBe(0);
   expect(terrain.version()).toBe(2);
-  expect(seen).toStrictEqual([1, 2]);
+  expect(seen).toStrictEqual([1, 2, 2]);
+});
+
+test('来源清空时同步撤销历史，恢复不混入旧行；暂停也不保留隐藏前的数据', async () => {
+  const host = installFakeHost();
+  const store = createStore();
+  await startPlayback(store, host.fb).ready;
+  const fake = fakeSource();
+  const terrain = startTerrainHistory(store, fake.source);
+  fake.emit(binsFrame(() => -20));
+  host.emit('playback:paused', { paused: true });
+  fake.emit(null);
+  expect(terrain.history.count).toBe(0);
+  expect(terrain.history.data.byteLength).toBe(0);
+  host.emit('playback:paused', { paused: false });
+  const quiet = binsFrame(() => -70);
+  fake.emit(quiet);
+  expect(terrain.history.count).toBe(1);
+  near(terrain.history.row(0)[64] ?? -1, shapedAt(quiet, 64), 1e-6);
+  terrain.dispose();
 });

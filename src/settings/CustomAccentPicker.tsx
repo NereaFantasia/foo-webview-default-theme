@@ -13,6 +13,7 @@ import { translateAtom } from '../i18n/locale.ts';
 import { chooseCustomAccent, customAccentAtom, isAccentHex } from '../theme/baseAccent.ts';
 import { tealBrand } from '../theme/brand.ts';
 import styles from './CustomAccentPicker.module.css';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 const COLORS = [
   tealBrand[100],
@@ -23,6 +24,7 @@ const COLORS = [
 const useStyles = makeStyles({ input: { width: '150px', minWidth: '0' } });
 
 export function CustomAccentPicker() {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
   const color = useAtomValueRawSync(customAccentAtom);
@@ -35,6 +37,8 @@ export function CustomAccentPicker() {
     <Popover positioning="below-end">
       <PopoverTrigger disableButtonEnhancement>
         <Button
+          appearance="subtle"
+          className={viewControls.icon}
           aria-label={t('settings.customAccent')}
           title={t('settings.customAccent')}
           icon={<span className={styles.preview} style={{ backgroundColor: color }} />}

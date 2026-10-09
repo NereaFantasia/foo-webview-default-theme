@@ -11,6 +11,8 @@
   padding: 0;
 }
 
-.fields .fields {
-  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+.rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }

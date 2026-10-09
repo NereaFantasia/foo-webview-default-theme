@@ -1,14 +1,28 @@
 import { useAtomValueRawSync } from 'jotai/react';
-import { useCallback, useId, useRef, type PointerEvent } from 'react';
+import { useCallback, useId, useRef, type PointerEvent, type ReactNode } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { useCommand } from '../../nav/useCommand.ts';
 import { playbackAtom } from '../../playback/playback.ts';
-import { trackKeyOf, playbackKey } from '../../playback/playbackContract.ts';
+import { playbackKey } from '../../playback/playbackContract.ts';
 import { handOffPlayerFocus, PLAYER_KEY_ATTR } from './playerFocus.ts';
 import styles from './SeekBar.module.css';
-import { clockText, keySeek, secondsAt, shownSeconds } from '../../playback/seekDraft.ts';
+import { clockText, secondsAt, shownSeconds } from '../../playback/seekDraft.ts';
 import { useSeekGesture } from './useSeekGesture.ts';
 import { useService } from '../../kit/useService.ts';
+import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
+import { useSeekMotion } from './useSeekMotion.ts';
+import { useSeekPreview, type SeekPreview } from './useSeekPreview.ts';
+
+export interface SeekBarDisplay {
+  /** 已播与剩余轨道；放在显示层，命中区与坐标换算仍由进度条维护。 */
+  readonly track: ReactNode;
+  /** 拖动与等待跳转时为操作目标，其余时候为实际进度，单位秒。 */
+  readonly position: number;
+  readonly duration: number;
+  readonly fraction: number;
+  readonly dragging: boolean;
+  readonly preview: SeekPreview | null;
+}
 
 export interface SeekBarProps {
   /** 能点能拖、能用键盘；为假时只显示。 */
@@ -29,6 +43,9 @@ export interface SeekBarProps {
   readonly note?: string;
   /** 挂在最外层：写时间时是时间与线的那一行，否则是线本身。 */
   readonly className?: string;
+  /** 自定义轨道周围的显示内容，共用同一命中区、操作状态与无障碍值。 */
+  children?(display: SeekBarDisplay): ReactNode;
+  preview?(target: SeekPreview | null): ReactNode;
   /** 拖动开始与结束（含放弃）。 */
   onDragChange?(dragging: boolean): void;
   /** 指针停在线上时，指针处是第几秒、指针的横坐标（CSS 像素）；离开线或拖起来时是 null。 */
@@ -45,7 +62,8 @@ export interface SeekBarProps {
 export function SeekBar(props: SeekBarProps) {
   const { interactive, thickness, thumb = false, clock = false, className } = props;
   const t = useAtomValueRawSync(translateAtom);
-  const { track, position, duration, canSeek } = useAtomValueRawSync(playbackAtom);
+  const { track, trackGeneration, position, duration, canSeek } = useAtomValueRawSync(playbackAtom);
+  const reduced = useAtomValueRawSync(reducedMotionAtom);
   const playback = useService(playbackKey);
   // 命令按 id 登记，同名的会顶替；两套播放栏换形态时新旧两条同时在，各用各的。
   const instance = useId();
@@ -64,8 +82,8 @@ export function SeekBar(props: SeekBarProps) {
     enabled,
     duration,
     position,
-    trackKey: trackKeyOf(track),
-    seek: (seconds) => void playback.seek(seconds),
+    generation: trackGeneration,
+    seek: (seconds) => playback.seek(seconds),
     onDragChange: (dragging) => {
       if (dragging) props.onHover?.(null, 0);
       props.onDragChange?.(dragging);
@@ -73,6 +91,23 @@ export function SeekBar(props: SeekBarProps) {
   });
   const { draft } = gesture;
   const dragging = draft.phase === 'dragging';
+  const shown = shownSeconds(draft, position);
+  const fraction = duration > 0 ? Math.min(1, Math.max(0, shown / duration)) : 0;
+  const preview = useSeekPreview(hit, {
+    enabled: enabled && (props.preview !== undefined || props.children !== undefined),
+    generation: trackGeneration,
+    duration,
+    position: shown,
+    dragging,
+    descriptionId: `${instance}-lyrics`,
+  });
+  useSeekMotion(hit, {
+    generation: trackGeneration,
+    fraction,
+    present: track !== null && duration > 0,
+    reduced,
+    intent: gesture.intent,
+  });
 
   useCommand({
     id: `player.seek${instance}.cancel`,
@@ -87,8 +122,8 @@ export function SeekBar(props: SeekBarProps) {
     keys: [{ key }],
     enabled: () => enabled && hit.current !== null && document.activeElement === hit.current,
     run: () => {
-      const next = keySeek(key, shownSeconds(draft, position), duration);
-      if (next !== null) gesture.seekTo(next);
+      preview.key();
+      gesture.seekKey(key);
     },
   });
   useCommand(seekKey('ArrowLeft'));
@@ -96,28 +131,36 @@ export function SeekBar(props: SeekBarProps) {
   useCommand(seekKey('Home'));
 
   const hover = (event: PointerEvent<HTMLDivElement>) => {
+    preview.move(event);
     if (!enabled || dragging || !props.onHover) return;
     const box = event.currentTarget.getBoundingClientRect();
     props.onHover(secondsAt(event.clientX, box.left, box.width, duration), event.clientX);
   };
 
   if (!track) return null;
-  const shown = shownSeconds(draft, position);
-  const fraction = duration > 0 ? Math.min(1, Math.max(0, shown / duration)) : 0;
   const note = !enabled && props.note ? props.note : null;
   const groove = (
     <div className={styles.track} style={{ height: thickness }}>
-      <div className={styles.fill} style={{ transform: `scaleX(${fraction})` }} />
+      <div className={styles.fill} data-seek-fill />
     </div>
   );
   // 轨道要裁掉已播那一段的圆角外沿，滑块只好与它并排放在一层定位盒里。
   // 没有时长（网络流之类）时不画滑块：它只会钉在最左边。
-  const line = note ? (
+  const line = props.children ? (
+    props.children({
+      track: groove,
+      position: shown,
+      duration,
+      fraction,
+      dragging,
+      preview: preview.target,
+    })
+  ) : note ? (
     <span className={styles.note}>{note}</span>
   ) : thumb && duration > 0 ? (
     <div className={styles.rail}>
       {groove}
-      <div className={styles.thumb} style={{ left: `${fraction * 100}%` }} />
+      <div className={styles.thumb} data-seek-thumb />
     </div>
   ) : (
     groove
@@ -130,6 +173,7 @@ export function SeekBar(props: SeekBarProps) {
       role="slider"
       tabIndex={enabled ? 0 : -1}
       aria-label={t('player.seek')}
+      aria-describedby={preview.target?.keyboard ? preview.target.descriptionId : undefined}
       aria-disabled={!enabled || undefined}
       aria-valuemin={0}
       aria-valuemax={Math.round(duration)}
@@ -141,14 +185,23 @@ export function SeekBar(props: SeekBarProps) {
       data-dragging={dragging || undefined}
       data-reach={props.reach}
       {...{ [PLAYER_KEY_ATTR]: 'seek' }}
-      onPointerDown={gesture.press}
+      onPointerDownCapture={preview.press}
+      onPointerDown={(event) => {
+        gesture.press(event);
+        preview.pressed();
+      }}
+      onFocus={preview.focus}
+      onBlur={preview.blur}
       onPointerMove={hover}
       onPointerLeave={() => props.onHover?.(null, 0)}
     >
       {line}
+      {props.preview?.(preview.target)}
     </div>
   ) : (
-    <div className={`${styles.passive} ${outer}`}>{line}</div>
+    <div ref={attachHit} className={`${styles.passive} ${outer}`}>
+      {line}
+    </div>
   );
   if (!clock) return bar;
   // 两边按总长的位数留宽：播到 10:00 这类进位时左边不变宽，线也就不挪位，拖动中按下时量的盒子一直对。

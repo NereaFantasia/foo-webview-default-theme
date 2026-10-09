@@ -3,6 +3,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import {
   DEFAULT_LYRICS_DISPLAY,
   LYRICS_DISPLAY_KEY,
+  LYRICS_TYPOGRAPHY_KEY,
   lyricsProcessConfig,
   parseLyricsDisplay,
   startLyricsDisplay,
@@ -41,6 +42,10 @@ describe('歌词显示设置', () => {
     const next = {
       ...DEFAULT_LYRICS_DISPLAY,
       fontSize: 28,
+      fontFamily: 'Noto Sans',
+      translationFontSize: 18,
+      showTranslation: false,
+      showRomanization: false,
       autoSeek: false,
       overscan: 500,
       backgroundLast: true,
@@ -56,7 +61,14 @@ describe('歌词显示设置', () => {
     };
     expect(await service.update(next)).toBe(true);
     const saved = host.config.get(LYRICS_DISPLAY_KEY);
-    expect(saved).toEqual(next);
+    const { fontFamily, translationFontSize, showTranslation, showRomanization, ...base } = next;
+    expect(saved).toEqual(base);
+    expect(host.config.get(LYRICS_TYPOGRAPHY_KEY)).toEqual({
+      fontFamily,
+      translationFontSize,
+      showTranslation,
+      showRomanization,
+    });
     expect(lyricsProcessConfig(parseLyricsDisplay(saved))).toEqual({
       optimizeOptions: next.optimize,
       maskMode: next.maskMode,

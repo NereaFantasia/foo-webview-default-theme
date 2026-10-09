@@ -137,6 +137,8 @@ const DEFAULT_PLAYLIST: PlaylistInfo = {
  * `config.set` 与宿主一样把顶层的 null 当作没传，答 INVALID_PARAMS。
  */
 export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
+  const shared = new Map<string, ConfigValue>();
+  let zoom = 1;
   return {
     artwork: {
       getFb2kUrlByPath: (params) => ({
@@ -148,6 +150,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
       }),
     },
     config: {
+      getComponents: { success: true, count: 0, components: [] },
       getVersionInfo: {
         success: true,
         version: 'foobar2000 v2.25',
@@ -374,6 +377,18 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
     system: {
       getLocale: { success: true, locale: 'zh-CN', language: 'zh', country: 'CN' },
     },
+    state: {
+      get: (params) => {
+        const key = stringParam(params, 'key');
+        return { success: true, exists: shared.has(key), value: shared.get(key) ?? null };
+      },
+      set: (params) => {
+        const value = params['value'];
+        if (value === null || !isConfigValue(value)) return hostFailure('INVALID_PARAMS');
+        shared.set(stringParam(params, 'key'), value);
+        return { success: true };
+      },
+    },
     titleformat: {
       // 没装 foo_playcount 的样子：各首一律答空串。
       evalBatch: (params) => {
@@ -417,6 +432,37 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
       setCloseToTray: OK,
     },
     window: {
+      setBackdropPolicy: (params) => {
+        const policy = params['backdropPolicy'];
+        if (!isRecord(policy)) return hostFailure('INVALID_PARAMS');
+        const effect = policy['activeEffect'];
+        if (
+          effect !== 'inherit' &&
+          effect !== 'none' &&
+          effect !== 'mica' &&
+          effect !== 'mica-alt' &&
+          effect !== 'acrylic'
+        )
+          return hostFailure('INVALID_PARAMS');
+        return {
+          success: true,
+          windowId: 'main',
+          backdropPolicy: {},
+          resolvedBackdropPolicy: {
+            activeEffect: effect,
+            inactiveEffect: 'inherit',
+            darkMode: policy['darkMode'] === true,
+            reapplyOnActivate: false,
+          },
+        };
+      },
+      getZoom: () => ({ success: true, zoom }),
+      setZoom: (params) => {
+        const next = numberParam(params, 'zoom');
+        if (next === undefined) return hostFailure('INVALID_PARAMS');
+        zoom = next;
+        return { success: true, zoom };
+      },
       getMode: { success: true, mode: 'standalone', panelMode: false, windowId: 'main' },
       getCurrentWindowId: { success: true, windowId: 'main' },
       getState: {

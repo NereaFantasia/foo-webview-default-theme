@@ -24,8 +24,9 @@
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: var(--detail-top-inset) var(--detail-side-inset)
+  padding: calc(var(--detail-top-inset) + var(--nav-inset, 0px)) var(--detail-side-inset)
     calc(var(--spacingVerticalL) + var(--player-inset, 0px));
+  scroll-padding-top: var(--nav-inset, 0px);
   outline: none;
 }
 
@@ -40,6 +41,7 @@
 
 /* 背景随页头和工具行的高度收尾，在列头之前完全透明。 */
 .root > .glow {
+  translate: 0 calc(var(--detail-scroll-y, 0px) * var(--header-background-scroll, 1));
   overflow: clip;
   mask-image: linear-gradient(
     to bottom,

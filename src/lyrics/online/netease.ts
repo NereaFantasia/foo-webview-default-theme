@@ -19,6 +19,7 @@ import type { LyricsCandidate, LyricsQuery, LyricsSource } from './lyricsSource.
 
 const SEARCH_URL = 'https://music.163.com/api/search/get/web';
 const LYRIC_URL = 'https://music.163.com/api/song/lyric/v1';
+const DETAIL_URL = 'https://music.163.com/api/song/detail/';
 /** 照网页客户端的请求头。 */
 const HEADERS = { Referer: 'https://music.163.com/', Cookie: 'appver=1.5.0.75771' };
 const SEARCH_LIMIT = 10;
@@ -27,6 +28,7 @@ function candidateOf(item: unknown): LyricsCandidate | null {
   const id = asNumber(field(item, 'id'));
   const title = asText(field(item, 'name'));
   if (!id || !title) return null;
+  const coverUrl = asText(field(field(item, 'album'), 'picUrl'));
   return {
     source: 'netease',
     ref: String(id),
@@ -36,6 +38,7 @@ function candidateOf(item: unknown): LyricsCandidate | null {
       .filter(Boolean),
     album: asText(field(field(item, 'album'), 'name')),
     durationMs: asNumber(field(item, 'duration')),
+    ...(coverUrl ? { coverUrl } : {}),
   };
 }
 
@@ -80,6 +83,17 @@ export function createNeteaseSource(host: LyricsHttpHost): LyricsSource {
       return asList(field(field(data, 'result'), 'songs')).flatMap(
         (item) => candidateOf(item) ?? [],
       );
+    },
+    async cover(ref, signal) {
+      if (!/^\d+$/.test(ref)) return '';
+      const params = new URLSearchParams({ ids: `[${ref}]` });
+      const answer = await lyricsGet(host, `${DETAIL_URL}?${params.toString()}`, HEADERS, signal);
+      const data = lyricsJson(answer);
+      if (answer?.status !== 200 || asNumber(field(data, 'code')) !== 200) return '';
+      const song = asList(field(data, 'songs')).find(
+        (item) => String(asNumber(field(item, 'id'))) === ref,
+      );
+      return asText(field(field(song, 'album'), 'picUrl'));
     },
     async fetch(candidate: LyricsCandidate, signal?: AbortSignal) {
       // lv、kv、tv、rv 要逐行词、卡拉 OK 词、译文、音译；yv、ytv、yrv 要 YRC 与配它的译文、音译。

@@ -52,10 +52,10 @@ export function cnbClient({ token, repo, fetch = globalThis.fetch }) {
     },
     /**
      * 标签不存在时由 CNB 按 main 的最新提交创建。
-     * @param {{ tag: string, body: string, prerelease?: boolean }} input
+     * @param {{ tag: string, body: string, prerelease?: boolean, latest?: boolean }} input
      * @returns {Promise<CnbRelease>}
      */
-    async createRelease({ tag, body, prerelease = false }) {
+    async createRelease({ tag, body, prerelease = false, latest = !prerelease }) {
       const response = await api('POST', '/-/releases', {
         tag_name: tag,
         name: tag,
@@ -63,7 +63,7 @@ export function cnbClient({ token, repo, fetch = globalThis.fetch }) {
         target_commitish: 'main',
         draft: false,
         prerelease,
-        make_latest: prerelease ? 'false' : 'true',
+        make_latest: latest ? 'true' : 'false',
       });
       if (response.status !== 201) throw await failure(response, '创建发行版');
       return response.json();

@@ -15,7 +15,7 @@ import type { TerrainPainter, TerrainPaintSettings, TerrainSurfaceKind } from '.
 
 /** `Canvas` 是随 `init` 转移过去的对象；接 `terrainWorker.ts` 时必须是 `OffscreenCanvas`，泛型只为让端口能换实现。 */
 export type TerrainWorkerMessage<Canvas = OffscreenCanvas> =
-  | { type: 'init'; canvas: Canvas; settings: TerrainPaintSettings }
+  | { type: 'init'; canvas: Canvas; settings: TerrainPaintSettings; gpu: boolean }
   | {
       type: 'rows';
       rows: number;
@@ -33,13 +33,16 @@ export type TerrainWorkerMessage<Canvas = OffscreenCanvas> =
 
 export type TerrainRowsMessage = Extract<TerrainWorkerMessage, { type: 'rows' }>;
 
-/** Worker 发回主线程的消息。 */
-export interface TerrainWorkerReply {
+/** Worker 每个统计窗发回的绘制计时。 */
+interface TerrainWorkerStats {
   type: 'paintStats';
   stats: PaintStats;
   /** Worker 里画山脊图的上下文是哪一种。 */
   surface: TerrainSurfaceKind;
 }
+
+export type TerrainWorkerReply =
+  TerrainWorkerStats | { type: 'ready'; surface: TerrainSurfaceKind };
 
 const MESSAGE_TYPES: ReadonlySet<unknown> = new Set([
   'init',
@@ -63,8 +66,8 @@ export function isTerrainWorkerReply(value: unknown): value is TerrainWorkerRepl
   return (
     typeof value === 'object' &&
     value !== null &&
-    Reflect.get(value, 'type') === 'paintStats' &&
-    isPaintStats(Reflect.get(value, 'stats')) &&
+    (Reflect.get(value, 'type') === 'ready' ||
+      (Reflect.get(value, 'type') === 'paintStats' && isPaintStats(Reflect.get(value, 'stats')))) &&
     SURFACE_KINDS.has(Reflect.get(value, 'surface'))
   );
 }
@@ -83,20 +86,25 @@ export function mirrorRows(mirror: SpectrumHistory, message: TerrainRowsMessage)
 export interface TerrainWorkerPort<Canvas = OffscreenCanvas> {
   postMessage(message: TerrainWorkerMessage<Canvas>, transfer: Transferable[]): void;
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
   terminate(): void;
 }
 
 export function createWorkerTerrainPainter<Canvas extends Transferable = OffscreenCanvas>(
   port: TerrainWorkerPort<Canvas>,
   canvas: Canvas,
-  history: () => SpectrumHistory,
+  source: () => SpectrumHistory,
   initial: TerrainPaintSettings,
+  gpu = true,
+  onSurface?: (surface: TerrainSurfaceKind) => void,
 ): TerrainPainter {
   let mirrored: SpectrumHistory | null = null;
   let mirroredCount = 0;
   let cap: number | null = null;
   let report: ((stats: PaintStats, surface: TerrainSurfaceKind) => void) | null = null;
   let disposed = false;
+  let history: (() => SpectrumHistory) | null = source;
+  let ready = onSurface;
 
   function syncCap(): void {
     const current = paintFpsCap();
@@ -106,6 +114,7 @@ export function createWorkerTerrainPainter<Canvas extends Transferable = Offscre
   }
 
   function syncRows(arrived: boolean): void {
+    if (!history) return;
     const source = history();
     const reset = source !== mirrored;
     const fresh = Math.max(0, Math.min(source.rows, source.count - (reset ? 0 : mirroredCount)));
@@ -123,11 +132,14 @@ export function createWorkerTerrainPainter<Canvas extends Transferable = Offscre
     );
   }
 
-  port.addEventListener('message', (event) => {
+  const onMessage = (event: MessageEvent<unknown>) => {
     const reply = event.data;
-    if (!disposed && isTerrainWorkerReply(reply)) report?.(reply.stats, reply.surface);
-  });
-  port.postMessage({ type: 'init', canvas, settings: { ...initial } }, [canvas]);
+    if (disposed || !isTerrainWorkerReply(reply)) return;
+    if (reply.type === 'ready') ready?.(reply.surface);
+    else report?.(reply.stats, reply.surface);
+  };
+  port.addEventListener('message', onMessage);
+  port.postMessage({ type: 'init', canvas, settings: { ...initial }, gpu }, [canvas]);
   syncCap();
   syncRows(false);
 
@@ -151,7 +163,15 @@ export function createWorkerTerrainPainter<Canvas extends Transferable = Offscre
     dispose() {
       if (disposed) return;
       disposed = true;
-      port.terminate();
+      history = null;
+      mirrored = null;
+      report = null;
+      ready = undefined;
+      try {
+        port.removeEventListener('message', onMessage);
+      } finally {
+        port.terminate();
+      }
     },
   };
 }

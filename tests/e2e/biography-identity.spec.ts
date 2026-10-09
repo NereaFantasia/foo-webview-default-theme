@@ -164,13 +164,17 @@ test('Last.fm key：在线关着时不能填，格式不对就地提示；填对
 }) => {
   const player = await start(page, QUEEN);
   const input = page.getByLabel('Last.fm API 密钥');
+  await page.getByRole('button', { name: '在线艺人简介', exact: true }).click();
   await expect(input).toBeDisabled();
   await expect(page.getByText('在线内容未开启')).toBeVisible();
   await enableOnline(page);
   await input.fill('abc');
   await input.press('Enter');
   await expect(
-    page.getByRole('status').filter({ hasText: '密钥须包含 32 个十六进制字符' }),
+    page
+      .locator('[data-settings-row]')
+      .getByRole('status')
+      .filter({ hasText: '密钥须包含 32 个十六进制字符' }),
   ).toHaveCount(1);
   await input.fill(KEY.toUpperCase());
   await input.press('Enter');

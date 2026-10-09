@@ -1,4 +1,4 @@
-import type { BuiltinTag } from '../i18n/translate.ts';
+import type { LocaleState } from '../i18n/locale.ts';
 import {
   PLUGIN_COMPONENT,
   compareVersions,
@@ -193,10 +193,14 @@ export interface EntryNotes {
   readonly language: string | null;
 }
 
-/** 整页取一种语言，不逐项混用：先取界面语言，缺的话改用另一种内置语言，再缺就取第一种写了的语言。 */
-export function notesFor(item: ChangelogEntry, tag: BuiltinTag): EntryNotes {
-  const other: BuiltinTag = tag === 'en' ? 'zh-CN' : 'en';
-  for (const language of [tag, other, ...Object.keys(item.notes)]) {
+/** 整页取一种语言：当前界面语言缺失时，依次回退到基准语言、另一种内置语言和首个可用语言。 */
+export function notesFor(
+  item: ChangelogEntry,
+  locale: Pick<LocaleState, 'active' | 'base'>,
+): EntryNotes {
+  const active = canonicalLanguage(locale.active) ?? locale.active;
+  const other = locale.base === 'en' ? 'zh-CN' : 'en';
+  for (const language of [active, locale.base, other, ...Object.keys(item.notes)]) {
     const found = item.notes[language];
     if (found) return { notes: found, language };
   }

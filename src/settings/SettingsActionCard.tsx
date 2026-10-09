@@ -5,6 +5,7 @@ import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import { SettingsCard } from './SettingsCard.tsx';
 import { useHostAbsent } from './useHostAbsent.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export interface SettingsActionCardProps {
   readonly icon: ReactElement;
@@ -33,6 +34,7 @@ export function SettingsActionCard({
   failedText,
   run,
 }: SettingsActionCardProps) {
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const absent = useHostAbsent();
   const [failed, setFailed] = useState(false);
@@ -42,6 +44,7 @@ export function SettingsActionCard({
     <SettingsCard icon={icon} title={title} description={shown} error={failed && !absent}>
       {({ labelId, descriptionId }) => (
         <Button
+          className={viewControls.field}
           id={buttonId}
           icon={buttonIcon}
           iconPosition="after"

@@ -30,6 +30,8 @@ export interface WindowShellState {
   /** 连接态只记本轮初始化的结果。 */
   readonly status: 'connecting' | 'connected' | 'disconnected';
   readonly maximized: boolean;
+  /** null 表示活动快照尚未取得或已失效，此时 active 不能用于资源调度。 */
+  readonly minimized: boolean | null;
   /** 窗口是不是前台窗口；读到之前按是。 */
   readonly active: boolean;
   /**
@@ -50,6 +52,7 @@ export interface ButtonRect {
 const INITIAL: WindowShellState = {
   status: 'connecting',
   maximized: false,
+  minimized: null,
   active: true,
   snapLayouts: false,
 };
@@ -62,6 +65,8 @@ export const TITLEBAR_HEIGHT_RANGE = { min: 24, max: 100 } as const;
 
 export interface WindowShellService {
   readonly ready: Promise<void>;
+  /** 恢复时先使旧活动快照失效，再回读当前窗口；失败时不恢复旧快照。 */
+  refreshState(): Promise<void>;
   minimize(): Promise<void>;
   toggleMaximize(): Promise<void>;
   close(): Promise<void>;
@@ -113,11 +118,19 @@ export function startWindowShell(
   const connected = () => !disposed && store.get(stateAtom).status === 'connected';
 
   // 连着来的几次重读只认最后一次；单次读失败不说明宿主断了，保留上次的状态。
-  async function readState(): Promise<void> {
+  async function readState(invalidate = false): Promise<void> {
+    if (!connected()) return;
     const mine = ++reads;
+    if (invalidate || !host.isAvailable()) update({ minimized: null });
+    if (!host.isAvailable()) return;
     const answer = await settle(() => host.ui.getState());
-    if (disposed || mine !== reads || !answer || answer.success === false) return;
-    update({ maximized: answer.maximized, active: answer.focused });
+    if (disposed || mine !== reads) return;
+    if (!host.isAvailable()) {
+      update({ minimized: null });
+      return;
+    }
+    if (!answer || answer.success === false) return;
+    update({ maximized: answer.maximized, active: answer.focused, minimized: answer.minimized });
   }
 
   function sendHeight(): void {
@@ -175,6 +188,7 @@ export function startWindowShell(
 
   return {
     ready: connect(),
+    refreshState: () => readState(true),
     minimize: () => command(() => host.ui.minimize()),
     toggleMaximize: () => command(() => host.ui.toggleMaximize()),
     close: () => command(() => host.ui.close()),
@@ -187,9 +201,11 @@ export function startWindowShell(
       sendRegion();
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       waiter.cancel();
       for (const off of offs.splice(0)) off();
+      store.set(stateAtom, { ...store.get(stateAtom), minimized: null });
     },
   };
 }

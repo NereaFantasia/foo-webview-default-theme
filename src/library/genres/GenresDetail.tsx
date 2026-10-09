@@ -1,4 +1,12 @@
-import { Button, Dropdown, Option, Spinner, makeStyles, tokens } from '@fluentui/react-components';
+import {
+  mergeClasses,
+  Button,
+  Dropdown,
+  Option,
+  Spinner,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { Play20Filled, ArrowShuffle20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useCallback, useState, type RefObject } from 'react';
@@ -21,6 +29,7 @@ import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 import { albumsKey } from '../albumServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   actions: { flexShrink: 0 },
@@ -38,6 +47,7 @@ const groupHeight = () => GENRE_GROUP_HEIGHT;
 const numberText = (track: TableTrack) => String(track.trackNumber || '');
 
 export function GenresDetail(props: GenresDetailProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const genres = useService(genresKey);
   const albumList = useService(albumListKey);
@@ -107,7 +117,7 @@ export function GenresDetail(props: GenresDetailProps) {
             {t('genres.play')}
           </Button>
           <Button
-            className={classes.actions}
+            className={mergeClasses(classes.actions, controls.field)}
             icon={<ArrowShuffle20Regular />}
             disabled={!playable}
             onClick={() =>
@@ -122,7 +132,7 @@ export function GenresDetail(props: GenresDetailProps) {
       {genresQuery(keys) === null && <p className={classes.warning}>{t('genres.unsupported')}</p>}
       <div className={styles.tools}>
         <Dropdown
-          className={classes.group}
+          className={mergeClasses(classes.group, controls.field)}
           size="small"
           value={t(`genres.group.${model.group}`)}
           selectedOptions={[model.group]}
@@ -141,6 +151,7 @@ export function GenresDetail(props: GenresDetailProps) {
           ))}
         </Dropdown>
         <Button
+          className={controls.icon}
           size="small"
           appearance="subtle"
           disabled={model.groups.length === 0}
@@ -149,6 +160,7 @@ export function GenresDetail(props: GenresDetailProps) {
           {t('genres.expand')}
         </Button>
         <Button
+          className={controls.icon}
           size="small"
           appearance="subtle"
           disabled={model.groups.length === 0}
@@ -157,6 +169,7 @@ export function GenresDetail(props: GenresDetailProps) {
           {t('genres.collapse')}
         </Button>
         <Button
+          className={controls.icon}
           size="small"
           appearance="subtle"
           disabled={genresQuery(keys) === null}
@@ -168,7 +181,9 @@ export function GenresDetail(props: GenresDetailProps) {
       {current && model.rows.status === 'failed' && (
         <div role="alert" className={styles.notice}>
           {t('genres.rowsFailed')}
-          <Button onClick={() => void genres.rows.retry()}>{t('genres.retry')}</Button>
+          <Button className={controls.field} onClick={() => void genres.rows.retry()}>
+            {t('genres.retry')}
+          </Button>
         </div>
       )}
       {(!current || model.rows.status === 'loading') && (

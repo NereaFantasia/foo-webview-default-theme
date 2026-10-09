@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Accordion,
   AccordionItem,
   Button,
@@ -44,6 +45,7 @@ import {
 } from './trackInfoModel.ts';
 import { infoSectionNotice, trackInfoRows } from './trackInfoRows.ts';
 import styles from './TrackInfoPanel.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   header: {
@@ -93,12 +95,13 @@ function CopyInfoButton({
   readonly t: Translate;
   readonly disabled?: boolean;
 }) {
+  const controls = useViewControlStyles();
   const classes = useStyles();
   return (
     <span className={styles.copy}>
       <Tooltip content={t('trackInfo.copy')} relationship="label">
         <Button
-          className={classes.icon}
+          className={mergeClasses(classes.icon, controls.icon)}
           appearance="subtle"
           size="small"
           icon={<Copy16Regular />}
@@ -119,6 +122,7 @@ function TagList({
   readonly service: TrackInfoService;
   readonly t: Translate;
 }) {
+  const controls = useViewControlStyles();
   const classes = useStyles();
   const [search, setSearch] = useState('');
   const tags = state.metadata.status === 'ready' ? infoTags(state.metadata.value.tags) : [];
@@ -128,7 +132,7 @@ function TagList({
     <div className={styles.tags}>
       <div className={styles.tools}>
         <Input
-          className={classes.search}
+          className={mergeClasses(classes.search, controls.field)}
           size="small"
           contentBefore={<Search16Regular />}
           aria-label={t('trackInfo.search')}
@@ -138,7 +142,7 @@ function TagList({
         />
         <Tooltip content={t('trackInfo.copyTags')} relationship="label">
           <Button
-            className={classes.icon}
+            className={mergeClasses(classes.icon, controls.icon)}
             appearance="subtle"
             icon={<Copy16Regular />}
             disabled={tags.length === 0}
@@ -147,7 +151,7 @@ function TagList({
         </Tooltip>
         <Tooltip content={t('trackInfo.refresh')} relationship="label">
           <Button
-            className={classes.icon}
+            className={mergeClasses(classes.icon, controls.icon)}
             appearance="subtle"
             icon={<ArrowSync16Regular />}
             disabled={
@@ -207,6 +211,7 @@ function InfoSectionContent({
   readonly t: Translate;
   readonly locale: string;
 }) {
+  const controls = useViewControlStyles();
   const notice = infoSectionNotice(state, section);
   const rows = trackInfoRows(state, section, t, locale);
   const classes = useStyles();
@@ -270,7 +275,7 @@ function InfoSectionContent({
           appearance="subtle"
           size="small"
           icon={<FolderOpen16Regular />}
-          className={classes.returning}
+          className={mergeClasses(classes.returning, controls.icon)}
           disabled={
             !state.track ||
             !infoFilePath(state.track) ||
@@ -294,6 +299,7 @@ export function TrackInfoPanel({
   renderCover,
   onTrackMenu,
 }: TrackInfoPanelProps) {
+  const controls = useViewControlStyles();
   const state = useAtomValueRawSync(service.state);
   const sections = useAtomValueRawSync(service.sections);
   const source = useAtomValueRawSync(target.source);
@@ -382,7 +388,7 @@ export function TrackInfoPanel({
       <div className={styles['identity-actions']}>
         <Tooltip content={toggleLabel} relationship="label">
           <Button
-            className={classes.icon}
+            className={mergeClasses(classes.icon, controls.icon)}
             appearance="subtle"
             size="small"
             icon={expanded ? <ChevronUp16Regular /> : <ChevronDown16Regular />}
@@ -395,7 +401,7 @@ export function TrackInfoPanel({
         {onTrackMenu && (
           <Tooltip content={t('trackInfo.trackMenu')} relationship="label">
             <Button
-              className={classes.icon}
+              className={mergeClasses(classes.icon, controls.icon)}
               appearance="subtle"
               size="small"
               icon={<MoreHorizontal16Regular />}
@@ -463,7 +469,7 @@ export function TrackInfoPanel({
       {source === 'preview' && (
         <div className={styles.return}>
           <Button
-            className={classes.returning}
+            className={mergeClasses(classes.returning, controls.icon)}
             appearance="subtle"
             size="small"
             icon={<ArrowLeft16Regular />}

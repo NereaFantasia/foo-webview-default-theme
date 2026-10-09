@@ -29,10 +29,12 @@ let painter: TerrainPainter | null = null;
  * CPU 光栅把这份活留在 Worker 线程里。
  * WebGL 上下文丢了，下一次 `draw` 时抛错，按上面 Worker 出错的路子退回主线程。
  */
-function openDrawer(canvas: OffscreenCanvas): TerrainDrawer {
-  const gpu = openTerrainGpu(canvas, () => {
-    throw new Error('山脊图的 WebGL 上下文丢了');
-  });
+function openDrawer(canvas: OffscreenCanvas, tryGpu: boolean): TerrainDrawer {
+  const gpu = tryGpu
+    ? openTerrainGpu(canvas, () => {
+        throw new Error('山脊图的 WebGL 上下文丢了');
+      })
+    : null;
   if (gpu) return gpu;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) throw new Error('山脊图离屏画布拿不到 2D 上下文');
@@ -44,7 +46,9 @@ addEventListener('message', (event) => {
   if (!isTerrainWorkerMessage(message)) return;
   switch (message.type) {
     case 'init': {
-      painter = createTerrainPainter(openDrawer(message.canvas), () => history, message.settings);
+      const drawer = openDrawer(message.canvas, message.gpu);
+      painter = createTerrainPainter(drawer, () => history, message.settings);
+      postMessage({ type: 'ready', surface: drawer.kind } satisfies TerrainWorkerReply);
       break;
     }
     case 'rows':

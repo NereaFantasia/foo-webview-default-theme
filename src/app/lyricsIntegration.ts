@@ -6,6 +6,7 @@ import { startLyricLog } from '../immersive/lyrics/lyricLog.ts';
 import { historyAtom } from '../nav/navHistory.ts';
 import { startLocalLyrics } from '../lyrics/lyricsLocal.ts';
 import { startLyricsMotion } from '../lyrics/lyricsMotion.ts';
+import { startLyricsArchive } from '../lyrics/lyricsArchive.ts';
 import { startLyricsDisplay } from '../lyrics/lyricsDisplay.ts';
 import { startLyricsPrefs } from '../lyrics/lyricsPrefs.ts';
 import { startLyrics, type LyricsTarget } from '../lyrics/lyricsService.ts';
@@ -69,15 +70,39 @@ export function startLyricsIntegration(
   const motion = startLyricsMotion(store, host, configWriter);
   const display = startLyricsDisplay(store, host, configWriter);
   const local = startLocalLyrics(store, { host, track, connected: playbackConnectedAtom });
+  const archive = startLyricsArchive(store, track, host, configWriter);
   const service = startLyrics(store, {
     host,
     track,
     active: wanted,
+    visible,
     connected: playbackConnectedAtom,
     prefs,
     local,
+    archive,
   });
-  const immersive = startLyricLog(store, { lyrics: service, active: immersiveActive });
+  const immersive = startLyricLog(store, {
+    lyrics: service,
+    active: immersiveActive,
+    offset: service.offset,
+    display: display.display,
+  });
+  const history = rightCard.card.history;
+  const stopSubjects = (
+    ['lyricsSearch', 'lyricsCandidate', 'lyricsDetails', 'lyricsTiming'] as const
+  ).map((id) =>
+    history.registerSubject(id, { exists: (subject) => subject === store.get(service.subject) }),
+  );
+  const stopSubject = store.sub(service.subject, () => {
+    const place = store.get(rightCard.card.navigation).place;
+    if (
+      place.id.startsWith('lyrics') &&
+      place.subject &&
+      place.subject !== store.get(service.subject)
+    )
+      history.replace({ id: 'lyrics' });
+    history.subjectsChanged();
+  });
   const clock = new PlaybackClock();
   const stopActive = store.sub(active, () => {
     if (store.get(active)) void clock.resync();
@@ -87,6 +112,7 @@ export function startLyricsIntegration(
     prefs,
     motion,
     display,
+    archive,
     clock,
     active,
     track,
@@ -98,15 +124,18 @@ export function startLyricsIntegration(
         !store.get(playbackCanSeekAtom)
       )
         return;
-      await playback.seek(seconds);
+      await playback.seek(service.seekTime(seconds));
       if (!disposed) await clock.resync();
     },
     dispose() {
       disposed = true;
       document.removeEventListener('visibilitychange', updateVisibility);
       stopActive();
+      stopSubject();
+      stopSubjects.forEach((stop) => stop());
       immersive.dispose();
       service.dispose();
+      archive.dispose();
       local.dispose();
       prefs.dispose();
       motion.dispose();

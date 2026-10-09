@@ -1,4 +1,4 @@
-import { Button, Tooltip, makeStyles } from '@fluentui/react-components';
+import { mergeClasses, Button, Tooltip, makeStyles } from '@fluentui/react-components';
 import { ChevronLeft16Regular, ChevronRight16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../i18n/locale.ts';
@@ -6,6 +6,7 @@ import { roleVar } from '../theme/roles.ts';
 import { historyAtom, historyKey } from '../nav/navHistory.ts';
 import { usePlaceName } from './usePlaceName.ts';
 import { useService } from '../kit/useService.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export interface NavButtonsProps {
   className?: string;
@@ -24,6 +25,7 @@ const useStyles = makeStyles({
  * 悬停提示写要去的那一处的名字，已跳过主体不在的记录。
  */
 export function NavButtons({ className, round = true, divided = false }: NavButtonsProps) {
+  const viewControls = useViewControlStyles();
   const classes = useStyles();
   const t = useAtomValueRawSync(translateAtom);
   const { previous, next } = useAtomValueRawSync(historyAtom);
@@ -37,7 +39,7 @@ export function NavButtons({ className, round = true, divided = false }: NavButt
         <Button
           appearance="subtle"
           shape={round ? 'circular' : 'rounded'}
-          className={className}
+          className={mergeClasses(className, viewControls.icon)}
           icon={<ChevronLeft16Regular />}
           disabled={!previous}
           data-nav="back"
@@ -49,7 +51,7 @@ export function NavButtons({ className, round = true, divided = false }: NavButt
         <Button
           appearance="subtle"
           shape={round ? 'circular' : 'rounded'}
-          className={className}
+          className={mergeClasses(className, viewControls.icon)}
           icon={<ChevronRight16Regular />}
           disabled={!next}
           data-nav="forward"

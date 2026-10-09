@@ -9,18 +9,20 @@ import { playButtonStyleAtom } from './playButtonStyle.ts';
 
 const useStyles = makeStyles({
   colored: {
-    backgroundColor: 'var(--play-button-bg)',
-    color: 'var(--play-button-fg)',
-    '& .fui-Button__icon': { color: 'var(--play-button-icon)' },
-    ':hover': {
-      backgroundColor: 'var(--play-button-hover-bg)',
-      color: 'var(--play-button-hover-fg)',
-      '& .fui-Button__icon': { color: 'var(--play-button-hover-icon)' },
-    },
-    ':active': {
-      backgroundColor: 'var(--play-button-pressed-bg)',
-      color: 'var(--play-button-pressed-fg)',
-      '& .fui-Button__icon': { color: 'var(--play-button-pressed-icon)' },
+    '@media (forced-colors: none)': {
+      backgroundColor: 'var(--play-button-bg)',
+      color: 'var(--play-button-fg)',
+      '& .fui-Button__icon': { color: 'var(--play-button-icon)' },
+      ':hover': {
+        backgroundColor: 'var(--play-button-hover-bg)',
+        color: 'var(--play-button-hover-fg)',
+        '& .fui-Button__icon': { color: 'var(--play-button-hover-icon)' },
+      },
+      ':active, :hover:active, :active:focus-visible': {
+        backgroundColor: 'var(--play-button-pressed-bg)',
+        color: 'var(--play-button-pressed-fg)',
+        '& .fui-Button__icon': { color: 'var(--play-button-pressed-icon)' },
+      },
     },
   },
 });

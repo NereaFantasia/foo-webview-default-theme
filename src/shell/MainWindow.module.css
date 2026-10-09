@@ -1,6 +1,7 @@
-/* 标题栏与底部通栏按内容高，播放栏不在底部时最后一行是空的；侧边栏的列宽随形态变，写在行内；内容区右、
-   下各留 8，与侧边栏之间隔 8，分栏握柄就在这条缝里。 */
+/* 标题栏与底部通栏按内容高，播放栏不在底部时最后一行是空的；侧边栏的列宽随形态变，写在行内。
+   内容区左右留 16，底部随播放栏收紧，容纳阴影的柔化尾部；分栏握柄骑在主内容卡的边线上。 */
 .root {
+  --content-bottom-gap: var(--spacingVerticalL);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
@@ -9,14 +10,30 @@
   background: var(--bg-app);
 }
 
-/* 换形态的动画里内容区会整个往右挪出窗口，窗格会往左滑出窗口，这里裁掉；用 clip 不用 hidden，免得它
-   成了能被聚焦滚动带着走的滚动容器。窄窗的浮层按它定位。 */
+/* 换形态时裁掉移出的内容，但为上下阴影留出绘制余量；窗口边界仍由全局裁剪。
+   用 clip 避免聚焦滚动带动整层；浮层由内容区内的容器定位。 */
 .body {
+  --panel-top: var(--spacingVerticalS);
+  --panel-bottom: var(--spacingVerticalS);
+  --panel-inset: var(--spacingHorizontalS);
   position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
   overflow: clip;
+  overflow-clip-margin: var(--spacingHorizontalL);
+}
+
+.body[data-panel-nav] {
+  --panel-top: calc(var(--spacingVerticalM) + 36px + var(--spacingVerticalS));
+}
+
+.body[data-panel-player] {
+  --panel-bottom: calc(64px + var(--spacingVerticalL) + var(--spacingVerticalS));
+}
+
+.body[data-panel-compact] {
+  --panel-inset: var(--spacingHorizontalXS);
 }
 
 /* 两列的位置写死：侧边栏不显示时第一列宽 0、侧边栏也不渲染，内容区照样落在第二列。收起与藏起来的动画里
@@ -38,29 +55,38 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  padding: 0 var(--spacingHorizontalS) var(--spacingVerticalS);
+  padding: 0 var(--spacingHorizontalL) var(--content-bottom-gap);
 }
 
-/* 导航行按内容高，余下的给页面。胶囊按卡片定位；卡片自成一层，胶囊的层级不越过窄窗的侧边栏浮层。
-   --player-inset 是胶囊盖住的高度（胶囊 64 加离底 16），页面的滚动区按它在底部让位；没有胶囊时为 0。 */
+.root[data-bottom-player] {
+  --content-bottom-gap: var(--spacingVerticalS);
+}
+
+/* 悬浮控件按卡片定位。整页滚动时首部空间随内容滚走，固定工具栏保持原位；尾部空间放进滚动内容。
+   卡片自成一层，播放栏与导航键的层级不越过窄窗的侧边栏浮层。 */
 .card {
   --player-inset: 0px;
+  --nav-inset: 0px;
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: var(--strokeWidthThin) solid transparent;
   border-radius: var(--radius-card);
-  background: var(--bg-pane);
+  box-shadow: var(--reading-shadow);
 }
 
 /* 没有导航行（播放栏在底部）时整张卡给页面；页面自己的上内边距 16，再加 4，页头离卡片上缘 20。 */
 .card:not([data-with-nav-row]) {
-  grid-template-rows: minmax(0, 1fr);
   padding-top: var(--spacingVerticalXS);
+}
+
+.card[data-with-nav-row] {
+  --nav-inset: calc(36px + var(--spacingVerticalM));
+  --header-background-scroll: 0;
 }
 
 .card:not([data-with-nav-row]):has([data-cover-glow]) {

@@ -1,5 +1,4 @@
-/* 540 × 44、圆角 6 的一条；封面贴着左缘，⋯ 贴着右缘。进度线的命中区会伸出下沿，不裁。描边画在最上面一层，
-   封面照旧铺满 44 高，左边两角由封面自己圆。 */
+/* 封面左侧圆角由封面自己画；进度线命中区伸出下沿，容器不能裁剪。 */
 .root {
   position: relative;
   display: grid;
@@ -7,20 +6,12 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   width: 540px;
-  height: 44px;
+  height: 52px;
   border-radius: var(--borderRadiusLarge);
-  background: var(--bg-elevated);
+  background: color-mix(in srgb, var(--colorNeutralBackground1) 65%, transparent);
+  box-shadow: var(--shadow4);
   -webkit-app-region: no-drag;
   app-region: no-drag;
-}
-
-.root::after {
-  position: absolute;
-  inset: 0;
-  border: var(--strokeWidthThin) solid var(--line);
-  border-radius: inherit;
-  content: '';
-  pointer-events: none;
 }
 
 /* 两行文字靠上排，上 5、左右 12，进度线贴底另放、与文字同宽（`ScrubSeek.module.css`）。 */

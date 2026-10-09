@@ -84,7 +84,7 @@ function strokeOf(
  */
 export const StereoScope = memo(function StereoScope({ size }: { readonly size: number }) {
   const store = useStore();
-  const { stereo } = useViewServices();
+  const { stereo, active, visible } = useViewServices();
   const stageScale = useContext(StageScaleContext);
   const ramp = useAtomValueRawSync(accentRampAtom);
   const scheme = useAtomValueRawSync(colorSchemeAtom);
@@ -95,19 +95,17 @@ export const StereoScope = memo(function StereoScope({ size }: { readonly size: 
   // ramp 与深浅档只作重跑的依赖：颜色在这里按变量名重读。
   useEffect(() => {
     const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!canvas || !context) return;
+    if (!canvas) return;
+    let context: CanvasRenderingContext2D | null = null;
+    let stroke: CanvasGradient | string = '';
     const ratio = canvasRatio(stageScale);
-    canvas.width = Math.round(size * ratio);
-    canvas.height = Math.round(size * ratio);
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
     // 线宽（CSS 像素）取整数个物理像素：分数像素宽的线会被抗锯齿抹成一片灰。
     const lineWidth = Math.max(1, Math.round(ratio)) / ratio;
-    const stroke = strokeOf(canvas, context, size);
     const trail = trailRef.current;
     if (!stereo) trail.windows = [];
 
     const paint = (now: number): void => {
+      if (!store.get(active) || !context) return;
       const reduced = store.get(reducedMotionAtom);
       const latest = trail.windows.at(-1);
       // 减弱动效下队里只有最近一窗，按它放完的那一刻算：整窗都已放出，只有窗内先后的深浅，不随时间变。
@@ -141,6 +139,7 @@ export const StereoScope = memo(function StereoScope({ size }: { readonly size: 
     // 取数每换一次点叫一次；只认换了的那份，读数单独变时不另起一窗。
     let lastPoints: readonly StereoPoint[] | null = stereo?.points() ?? null;
     const onPoints = (): void => {
+      if (!store.get(active)) return;
       const points = stereo?.points() ?? [];
       if (points === lastPoints) return;
       lastPoints = points;
@@ -158,6 +157,7 @@ export const StereoScope = memo(function StereoScope({ size }: { readonly size: 
 
     // 与此刻的播放状态对齐；重跑时再调一次也不会重复定格或重复挪时刻。
     const syncPaused = (): void => {
+      if (!store.get(active)) return;
       const now = performance.now();
       const { frozenAt } = trail;
       if (store.get(pausedAtom)) {
@@ -171,16 +171,42 @@ export const StereoScope = memo(function StereoScope({ size }: { readonly size: 
       frames.schedule();
     };
 
+    const syncActivity = (): void => {
+      frames.cancel();
+      if (!store.get(active)) {
+        trail.windows = [];
+        trail.frozenAt = null;
+        lastPoints = null;
+        context = null;
+        stroke = '';
+        if (!store.get(visible)) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+        return;
+      }
+      canvas.width = Math.round(size * ratio);
+      canvas.height = Math.round(size * ratio);
+      context = canvas.getContext('2d');
+      context?.setTransform(ratio, 0, 0, ratio, 0, 0);
+      if (context) stroke = strokeOf(canvas, context, size);
+      onPoints();
+      syncPaused();
+      frames.schedule();
+    };
+    const offActive = store.sub(active, syncActivity);
+    const offVisible = store.sub(visible, syncActivity);
     const offPoints = stereo?.subscribe(onPoints);
     const offPaused = store.sub(pausedAtom, syncPaused);
-    syncPaused();
-    frames.schedule();
+    syncActivity();
     return () => {
+      offActive();
+      offVisible();
       offPoints?.();
       offPaused();
       frames.cancel();
     };
-  }, [store, stereo, size, stageScale, ramp, scheme]);
+  }, [store, stereo, active, visible, size, stageScale, ramp, scheme]);
 
   const center = size / 2;
   return (

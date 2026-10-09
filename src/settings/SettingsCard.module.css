@@ -10,7 +10,7 @@
   padding: var(--spacingVerticalMNudge) var(--spacingHorizontalL);
   border: var(--strokeWidthThin) solid var(--line);
   border-radius: var(--radius-control);
-  background-color: var(--bg-surface);
+  background-color: var(--bg-view-control);
 }
 
 /* 控件换到标题下面，与文字左对齐、占满一行。 */

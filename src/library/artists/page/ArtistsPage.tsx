@@ -28,6 +28,20 @@ interface ArtistsSnapshot {
   readonly detailTop: number;
 }
 const SLOT = createSnapshotSlot<ArtistsSnapshot>();
+
+interface ArtistMenuState {
+  readonly names: readonly string[];
+  readonly x: number;
+  readonly y: number;
+  readonly inDrawer: boolean;
+}
+
+interface ArtistRenameState {
+  readonly names: readonly string[];
+  readonly target: string;
+  readonly inDrawer: boolean;
+}
+
 function ArtistsContent() {
   const services = useArtists();
   const t = useAtomValueRawSync(translateAtom);
@@ -46,8 +60,8 @@ function ArtistsContent() {
   const [text, setText] = useState('');
   const [tidy, setTidy] = useState(false);
   const [focus, setFocus] = useState<string | null>(subject);
-  const [menu, setMenu] = useState<{ names: readonly string[]; x: number; y: number } | null>(null);
-  const [rename, setRename] = useState<{ names: readonly string[]; target: string } | null>(null);
+  const [menu, setMenu] = useState<ArtistMenuState | null>(null);
+  const [rename, setRename] = useState<ArtistRenameState | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const listTop = useRef(0);
   const listSelection = useRef(emptySelection<string>());
@@ -57,6 +71,11 @@ function ArtistsContent() {
   useEffect(() => {
     if (!split.compact || !active) setDirectoryOpen(false);
   }, [split.compact, active]);
+  useEffect(() => {
+    if (!directoryOpen || !split.compact || !active) {
+      setMenu((current) => (current?.inDrawer ? null : current));
+    }
+  }, [directoryOpen, split.compact, active]);
   useEffect(() => {
     if (subject === previous.current) return;
     previous.current = subject;
@@ -94,9 +113,21 @@ function ArtistsContent() {
     restoring.current = null;
   }, [catalog.loaded, detail, subject, text, tidy]);
   const selected = all.find((row) => row.name === subject);
-  const openMenu = (names: readonly string[], x: number, y: number) => {
-    setMenu({ names, x, y });
+  const openMenu = (names: readonly string[], x: number, y: number, inDrawer = false) => {
+    setMenu({ names, x, y, inDrawer });
   };
+  const contextMenu = menu && (
+    <ArtistMenu
+      names={menu.names}
+      at={menu}
+      onClose={() => setMenu(null)}
+      onAbout={() => {
+        scroll.current?.querySelector('[data-artist-about]')?.scrollIntoView({ block: 'start' });
+      }}
+      onRename={(names, target) => setRename({ names, target, inDrawer: menu.inDrawer })}
+    />
+  );
+  const renameDialog = rename && <ArtistRenameDialog {...rename} onClose={() => setRename(null)} />;
   const navigator = (
     <ArtistsList
       text={text}
@@ -110,7 +141,7 @@ function ArtistsContent() {
       onText={setText}
       onTidy={setTidy}
       onFocus={setFocus}
-      onMenu={openMenu}
+      onMenu={(names, x, y) => openMenu(names, x, y, split.compact)}
       onSelect={() => setDirectoryOpen(false)}
     />
   );
@@ -195,25 +226,16 @@ function ArtistsContent() {
           open={directoryOpen && active}
           title={t('artists.directory')}
           closeLabel={t('artists.closeDirectory')}
-          onOpenChange={setDirectoryOpen}
+          onOpenChange={(open) => {
+            if (open || !rename?.inDrawer) setDirectoryOpen(open);
+          }}
         >
           {navigator}
+          {menu?.inDrawer && contextMenu}
         </LibraryDrawer>
       )}
-      {menu && (
-        <ArtistMenu
-          names={menu.names}
-          at={menu}
-          onClose={() => setMenu(null)}
-          onAbout={() => {
-            scroll.current
-              ?.querySelector('[data-artist-about]')
-              ?.scrollIntoView({ block: 'start' });
-          }}
-          onRename={(names, target) => setRename({ names, target })}
-        />
-      )}
-      {rename && <ArtistRenameDialog {...rename} onClose={() => setRename(null)} />}
+      {!menu?.inDrawer && contextMenu}
+      {renameDialog}
     </section>
   );
 }

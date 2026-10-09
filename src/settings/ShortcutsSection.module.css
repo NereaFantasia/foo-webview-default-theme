@@ -61,21 +61,23 @@
   font-size: var(--fontSizeBase200);
 }
 
-/* 22 高的小方块，字等宽；单个字符的键也不窄于高度。 */
+/* 键名沿用界面字体，避免中英文键名混用等宽字体时字形不一致。 */
 .key-cap {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--spacingHorizontalSNudge);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--spacingHorizontalS);
   border: var(--strokeWidthThin) solid var(--line);
+  border-bottom-width: var(--strokeWidthThick);
   border-radius: var(--radius-control);
   background-color: var(--bg-elevated);
   color: var(--text-secondary);
-  font-family: var(--fontFamilyMonospace);
+  font-family: var(--fontFamilyBase);
   font-size: var(--fontSizeBase200);
-  line-height: 1;
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
   white-space: nowrap;
 }

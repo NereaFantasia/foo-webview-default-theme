@@ -1,4 +1,10 @@
-import { makeStyles, Nav, tokens, useArrowNavigationGroup } from '@fluentui/react-components';
+import {
+  makeStyles,
+  mergeClasses,
+  Nav,
+  tokens,
+  useArrowNavigationGroup,
+} from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useRef } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -46,7 +52,7 @@ const PANE_ONLY = { [PANE_ONLY_ATTR]: true };
  * 搜索框内的方向键归搜索建议，其他位置的上下方向键在各项之间移动焦点。图标态（`SidebarRail`）里两种形态都有的
  * 项摆在同样的高度，换形态时不跳。
  */
-export function Sidebar() {
+export function Sidebar({ className }: { readonly className?: string }) {
   const slots = useShellSlots();
   const t = useAtomValueRawSync(translateAtom);
   const { place } = useAtomValueRawSync(historyAtom);
@@ -86,7 +92,7 @@ export function Sidebar() {
       ref={root}
       role="navigation"
       aria-label={t('sidebar.label')}
-      className={classes.nav}
+      className={mergeClasses(classes.nav, className)}
       selectedValue={selected ?? ''}
       {...arrows}
     >

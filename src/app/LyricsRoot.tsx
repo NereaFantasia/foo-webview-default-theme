@@ -5,9 +5,13 @@ import { translateAtom } from '../i18n/locale.ts';
 import { bindService } from '../kit/serviceKey.ts';
 import { ServicesContext, serviceMap, useService } from '../kit/useService.ts';
 import { lyricsKey } from '../lyrics/lyricsService.ts';
-import { lyricsPrefsKey, LYRICS_PREFS_KEY } from '../lyrics/lyricsPrefs.ts';
+import { lyricsPrefsKey, LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY } from '../lyrics/lyricsPrefs.ts';
 import { lyricsMotionKey, LYRICS_MOTION_KEY } from '../lyrics/lyricsMotion.ts';
-import { lyricsDisplayKey, LYRICS_DISPLAY_KEY } from '../lyrics/lyricsDisplay.ts';
+import {
+  lyricsDisplayKey,
+  LYRICS_DISPLAY_KEY,
+  LYRICS_TYPOGRAPHY_KEY,
+} from '../lyrics/lyricsDisplay.ts';
 import { currentTrackAtom, playbackTrackStatusAtom } from '../playback/playback.ts';
 import { playbackCanSeekAtom, playbackConnectedAtom } from '../playback/playerAtoms.ts';
 import { RightCardLyricsContext } from '../shell/right-card/rightCardContext.ts';
@@ -37,7 +41,14 @@ function LyricsContent({
 }) {
   const t = useAtomValueRawSync(translateAtom);
   const track = useAtomValueRawSync(currentTrackAtom);
-  const cover = useAtomValueRawSync(services.rightCard.deps.cover);
+  const prefSaves = useAtomValueRawSync(integration.prefs.persistence.state);
+  const displaySaves = useAtomValueRawSync(integration.display.persistence.state);
+  const archiveSaves = useAtomValueRawSync(integration.archive.persistence.state);
+  const saveFailed = [
+    ...prefSaves.values(),
+    ...displaySaves.values(),
+    ...archiveSaves.values(),
+  ].some((state) => state.status === 'failed');
   const active = useAtomValueRawSync(integration.active);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const trackStatus = useAtomValueRawSync(playbackTrackStatusAtom);
@@ -47,7 +58,8 @@ function LyricsContent({
       <LyricsPage
         title={track?.title ?? ''}
         artist={track?.artist ?? ''}
-        cover={cover}
+        album={track?.album ?? ''}
+        saveFailed={saveFailed}
         active={active}
         connected={connected}
         trackStatus={trackStatus}
@@ -57,10 +69,20 @@ function LyricsContent({
         onSeek={(key, seconds) => void integration.seek(key, seconds)}
         onRetryPlayback={services.playback.retry}
         saveNotice={
-          <SettingsSaveNotice
-            persistence={integration.prefs.persistence}
-            keys={[LYRICS_PREFS_KEY]}
-          />
+          <>
+            <SettingsSaveNotice
+              persistence={integration.prefs.persistence}
+              keys={[LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY]}
+            />
+            <SettingsSaveNotice
+              persistence={integration.display.persistence}
+              keys={[LYRICS_DISPLAY_KEY, LYRICS_TYPOGRAPHY_KEY]}
+            />
+            <SettingsSaveNotice
+              persistence={integration.archive.persistence}
+              keys={[...archiveSaves.keys()]}
+            />
+          </>
         }
         onOpenSettings={onOpenSettings}
       />
@@ -90,12 +112,16 @@ function LyricsSettingsContent({
       saveNotice={
         <>
           <SettingsSaveNotice
+            persistence={integration.prefs.persistence}
+            keys={[LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY]}
+          />
+          <SettingsSaveNotice
             persistence={integration.motion.persistence}
             keys={[LYRICS_MOTION_KEY]}
           />
           <SettingsSaveNotice
             persistence={integration.display.persistence}
-            keys={[LYRICS_DISPLAY_KEY]}
+            keys={[LYRICS_DISPLAY_KEY, LYRICS_TYPOGRAPHY_KEY]}
           />
         </>
       }

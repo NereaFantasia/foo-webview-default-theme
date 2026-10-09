@@ -27,6 +27,7 @@ import { useService } from '../../../kit/useService.ts';
 import { albumsKey } from '../../albumServices.ts';
 import { playbackKey } from '../../../playback/playbackContract.ts';
 import { albumDetailKey } from '../../album-detail/albumDetail.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({ spinner: { alignSelf: 'center' } });
 
@@ -62,6 +63,7 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
   const { album, onMenu } = props;
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const plural = useAtomValueRawSync(pluralAtom);
   const albums = useService(albumsKey);
   const playback = useService(playbackKey);
@@ -123,6 +125,7 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
             />
             <Button
               appearance="subtle"
+              className={controls.icon}
               shape="circular"
               size="large"
               icon={<MoreHorizontal20Regular />}
@@ -135,6 +138,7 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
             />
             <Button
               appearance="subtle"
+              className={controls.icon}
               shape="circular"
               size="large"
               icon={opening ? <Spinner size="extra-tiny" /> : <ChevronRight20Regular />}

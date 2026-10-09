@@ -6,7 +6,7 @@
   padding: 0 var(--spacingHorizontalS);
   border: none;
   border-radius: var(--radius-control);
-  background: var(--bg-hover);
+  background: var(--bg-view-control);
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--fontSizeBase200);
@@ -14,11 +14,19 @@
   cursor: pointer;
 }
 .toggle:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
+}
+.toggle:active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
 .toggle[aria-expanded='true'] {
-  background: var(--bg-selected);
+  background-color: var(--bg-selected);
   color: var(--text-primary);
+}
+@media (forced-colors: active) {
+  .toggle[aria-expanded='true'] {
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
 }
 .toggle:focus-visible {
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
@@ -77,7 +85,7 @@
   cursor: pointer;
 }
 .growKey:hover {
-  background: var(--bg-hover);
+  background: var(--state-hover);
   color: var(--text-primary);
 }
 .growKey:focus-visible {

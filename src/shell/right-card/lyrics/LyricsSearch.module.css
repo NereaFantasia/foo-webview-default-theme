@@ -28,19 +28,93 @@
 }
 
 .candidate {
+  position: relative;
+  isolation: isolate;
   display: grid;
-  gap: var(--spacingVerticalXXS);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--spacingVerticalXS);
+  column-gap: var(--spacingHorizontalM);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+  margin: var(--spacingVerticalS) var(--spacingHorizontalM);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--radius-card);
   overflow-wrap: anywhere;
 }
-
-.candidate > span {
-  font-size: var(--fontSizeBase200);
-  color: var(--colorNeutralForeground2);
+@media (forced-colors: active) {
+  .candidate {
+    border-color: CanvasText;
+  }
 }
-
-.actions {
+.heading {
+  grid-column: 2;
   justify-content: space-between;
+}
+.cover {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: start;
+}
+.byline {
+  grid-column: 2;
+}
+.heading strong {
+  min-width: 0;
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+}
+.byline,
+.metadata {
+  display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  min-width: 0;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalM);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+.field > svg {
+  flex: none;
+  width: var(--fontSizeBase400);
+  height: var(--fontSizeBase400);
+  margin-top: calc((var(--lineHeightBase200) - var(--fontSizeBase400)) / 2);
+}
+.field {
+  display: inline-flex;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--spacingHorizontalXS);
+}
+.field > span {
+  min-width: 0;
+}
+.footer {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+.use {
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0;
+  pointer-events: none;
+}
+.candidate:hover .use,
+.candidate:focus-within .use {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .use {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.actions {
   padding: var(--spacingVerticalS) var(--spacingHorizontalM);
   border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
 }

@@ -18,6 +18,10 @@
   padding-bottom: var(--spacingVerticalS);
 }
 
+.section {
+  min-width: 0;
+}
+
 .section + .section {
   margin-top: var(--spacingVerticalS);
 }
@@ -34,11 +38,13 @@
 
 .label {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: baseline;
   gap: var(--spacingHorizontalS);
   color: var(--text-primary);
   font-size: var(--fontSizeBase200);
   font-weight: var(--fontWeightSemibold);
+  white-space: nowrap;
 }
 
 .count {

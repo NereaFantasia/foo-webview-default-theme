@@ -106,11 +106,11 @@ export function AlbumDetailPage({ place }: PageProps) {
       glow.style.height = `${intro.offsetTop + intro.offsetHeight}px`;
     };
     const scroll = () => {
-      glow.style.translate = `0 ${-scroller.scrollTop}px`;
+      glow.style.setProperty('--detail-scroll-y', `${-scroller.scrollTop}px`);
     };
     resize();
     scroll();
-    // 背景位于滚动区外，才能覆盖滚动条预留区；高度与偏移仍跟随内容。
+    // 背景位于滚动区外，覆盖滚动条预留区；悬浮导航形态由外壳固定背景，正文仍照常滚动。
     const observer = new ResizeObserver(resize);
     observer.observe(intro);
     observer.observe(scroller);
@@ -205,7 +205,13 @@ export function AlbumDetailPage({ place }: PageProps) {
         data-narrow={narrow || undefined}
       >
         {album && <CoverGlow ref={background} className={styles.glow} />}
-        <div ref={setScroller} className={styles.scroller} tabIndex={-1} data-detail-scroller>
+        <div
+          ref={setScroller}
+          className={styles.scroller}
+          tabIndex={-1}
+          data-detail-scroller
+          data-page-scrolls-header
+        >
           <div ref={setIntro} className={styles.intro} data-detail-intro>
             {album ? (
               <AlbumDetailHeader

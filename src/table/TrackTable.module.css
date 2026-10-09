@@ -11,7 +11,7 @@
 
 /* 外部滚动时由页面留尾部空间；自己滚动时调用方可指定浮层遮住的高度。 */
 .scroller:not([data-page-scroll]) {
-  padding-bottom: var(--table-bottom-inset, 0px);
+  padding-bottom: var(--table-bottom-inset, var(--player-inset, 0px));
 }
 
 /* 贴住视口的一层与层里整条平移的行带：快速拖动滚动条时行不跟着容器走，不露白。 */

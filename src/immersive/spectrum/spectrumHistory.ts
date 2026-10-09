@@ -115,7 +115,7 @@ export interface SpectrumHistoryOptions {
 }
 
 export interface SpectrumHistoryService {
-  /** 频谱柱的环形缓冲，每行 `SPECTRUM_BARS` 个柱高；闸关上不清，旧曲的柱自己滚出去。 */
+  /** 频谱柱的环形缓冲，每行 `SPECTRUM_BARS` 个柱高；闸关上即撤销底层缓冲引用。 */
   readonly history: SpectrumHistory;
   /** 最新一帧宿主频点，山脊图整形链的输入；没收过帧或山脊图关着时是 `null`。 */
   frame(): BinsFrame | null;
@@ -123,7 +123,7 @@ export interface SpectrumHistoryService {
   version(): number;
   /** 实测帧距（毫秒），开拉时按拉取帧率起步；画面据它在两帧之间插值。 */
   interval(): number;
-  /** 每收一帧叫一次 `listener`，这时缓冲、`frame()`、`version()` 与 `interval()` 都已更新；返回退订函数。 */
+  /** 收帧或清空缓冲时通知；清空不增加版本号。返回退订函数。 */
   subscribe(listener: () => void): () => void;
   dispose(): void;
 }
@@ -180,6 +180,8 @@ export function startSpectrumHistory(
    * 免得混进另一个窗长的帧。`terrain` 为假时不放 `frame`：那不是山脊图要的长窗。
    */
   function onFrame(payload: unknown, barsSource: BarsPull | null, terrain: boolean): void {
+    if (disposed || visibility.hidden()) return;
+    const mine = generation;
     const frame = binsFrameOf(payload);
     if (!frame) return;
     const at = now();
@@ -193,21 +195,31 @@ export function startSpectrumHistory(
     latest = terrain ? frame : null;
     // 采样率未知时宿主报 0：留着上一次的上沿，不让横轴在两种来源之间来回跳。
     setMaxFrequency(maxFrequencyOf(payload) ?? store.get(maxFrequencyAtom));
+    if (mine !== generation) return;
     if (delta > 0 && delta < 1000) interval += (delta - interval) * INTERVAL_EMA;
     version += 1;
     setStatus('live');
+    if (mine !== generation) return;
     armSilent();
     for (const listener of [...listeners]) listener();
   }
 
   function stop(): void {
     generation += 1;
-    feed?.close();
+    const previous = feed;
     feed = undefined;
     clearSilent();
     lastFrameAt = Number.NaN;
+    latest = null;
+    history.release();
+    bars.fill(0);
     setMaxFrequency(null);
     setStatus('idle');
+    try {
+      previous?.close();
+    } finally {
+      for (const listener of [...listeners]) listener();
+    }
   }
 
   async function start(terrain: boolean): Promise<void> {
@@ -218,7 +230,7 @@ export function startSpectrumHistory(
     }
     // 问不到就当没有：与宿主明确答否同一条路。
     const answer = await settle(() => host.audio.isVisualizationAvailable());
-    if (mine !== generation) return;
+    if (mine !== generation || disposed || visibility.hidden()) return;
     if (answer === null || answer.success !== true || !answer.available) {
       setStatus('unavailable');
       return;
@@ -248,7 +260,7 @@ export function startSpectrumHistory(
     if (gate?.open === open && gate.terrain === terrain) return;
     gate = { open, terrain };
     stop();
-    if (open) void start(terrain);
+    if (open && !disposed && !visibility.hidden()) void start(terrain);
   }
 
   const offVisibility = visibility.subscribe(sync);

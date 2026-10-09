@@ -5,15 +5,18 @@ import styles from './BackgroundImageLayers.module.css';
 export function BackgroundImageLayers({
   url,
   reduced,
+  onReady,
 }: {
   readonly url: string;
   readonly reduced: boolean;
+  readonly onReady?: () => void;
 }) {
   const [layers, setLayers] = useState({ current: '', previous: '' });
   const currentUrl = layers.current;
   useEffect(() => {
     if (!url) {
       setLayers({ current: '', previous: '' });
+      onReady?.();
       return;
     }
     let active = true;
@@ -23,19 +26,22 @@ export function BackgroundImageLayers({
       active = false;
       clearTimeout(timeout);
       setLayers({ current: '', previous: '' });
+      onReady?.();
     };
     const timeout = setTimeout(failed, 10_000);
     image.src = url;
     void image.decode().then(() => {
       clearTimeout(timeout);
-      if (active)
+      if (active) {
         setLayers((old) => ({ current: url, previous: old.current === url ? '' : old.current }));
+        onReady?.();
+      }
     }, failed);
     return () => {
       active = false;
       clearTimeout(timeout);
     };
-  }, [url]);
+  }, [url, onReady]);
   useEffect(() => {
     if (!currentUrl) return;
     const timer = setTimeout(

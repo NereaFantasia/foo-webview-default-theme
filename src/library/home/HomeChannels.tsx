@@ -25,8 +25,10 @@ import { useHomeServices } from './homeContext.ts';
 import { HomeChannelDialog } from './HomeChannelDialog.tsx';
 import { HOME_CHANNEL_TEMPLATES, type HomeChannelDraft } from './homeChannelTemplates.ts';
 import styles from './HomeChannels.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export function HomeChannels() {
+  const viewControls = useViewControlStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const channels = useAtomValueRawSync(home.channels.state);
@@ -42,6 +44,7 @@ export function HomeChannels() {
       <header className={styles.header}>
         <h2>{t('home.channels')}</h2>
         <Button
+          className={viewControls.field}
           icon={<Add20Regular />}
           disabled={channels.status !== 'ready' || channels.saving || channels.items.length >= 100}
           onClick={() => {
@@ -64,6 +67,7 @@ export function HomeChannels() {
             relationship="description"
           >
             <Button
+              className={viewControls.field}
               icon={<Add20Regular />}
               disabledFocusable={
                 channels.status !== 'ready' ||
@@ -84,7 +88,9 @@ export function HomeChannels() {
       {channels.status === 'failed' && (
         <p role="alert">
           {t('home.channelsFailed')}{' '}
-          <Button onClick={() => void home.channels.retry()}>{t('album.retry')}</Button>
+          <Button className={viewControls.field} onClick={() => void home.channels.retry()}>
+            {t('album.retry')}
+          </Button>
         </p>
       )}
       {channels.status === 'loading' && <p role="status">{t('album.loading')}</p>}
@@ -108,6 +114,8 @@ export function HomeChannels() {
             </div>
             <Tooltip content={t('menu.more')} relationship="label">
               <Button
+                appearance="subtle"
+                className={viewControls.icon}
                 icon={<MoreHorizontal20Regular />}
                 aria-label={t('menu.more')}
                 onClick={(event) => {

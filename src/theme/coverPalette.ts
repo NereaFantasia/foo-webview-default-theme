@@ -18,6 +18,11 @@ export interface CoverTone extends CoverSeed {
   readonly tone: number;
 }
 
+export interface CoverSwatch {
+  readonly color: CoverTone;
+  readonly population: number;
+}
+
 export interface CoverProfile {
   readonly accent: CoverTone | null;
   readonly dominant: CoverTone | null;
@@ -26,6 +31,8 @@ export interface CoverProfile {
   readonly pixelCount: number;
   /** 有效原像素的 HCT tone，范围 0 到 100；透明图没有统计。 */
   readonly lightness: { readonly min: number; readonly max: number; readonly mean: number } | null;
+  /** 按面积降序保留的颜色；旧版存档没有这一项。 */
+  readonly palette?: readonly CoverSwatch[];
 }
 
 function isTone(value: unknown): value is CoverTone {
@@ -73,6 +80,25 @@ export function isCoverProfile(value: unknown): value is CoverProfile {
   )
     return false;
   if (!('lightness' in value)) return false;
+  if ('palette' in value) {
+    if (!Array.isArray(value.palette) || value.palette.length > 16) return false;
+    let population = 0;
+    for (const swatch of value.palette) {
+      if (
+        typeof swatch !== 'object' ||
+        swatch === null ||
+        !('color' in swatch) ||
+        !isTone(swatch.color) ||
+        !('population' in swatch) ||
+        typeof swatch.population !== 'number' ||
+        !Number.isInteger(swatch.population) ||
+        swatch.population <= 0
+      )
+        return false;
+      population += swatch.population;
+    }
+    if (population > value.pixelCount) return false;
+  }
   if (value.pixelCount === 0) {
     return (
       value.lightness === null &&
@@ -134,6 +160,7 @@ export function profileFromPixels(data: Uint8ClampedArray): CoverProfile {
       gray: true,
       pixelCount: 0,
       lightness: null,
+      palette: [],
     };
   }
   let min = 100;
@@ -146,6 +173,10 @@ export function profileFromPixels(data: Uint8ClampedArray): CoverProfile {
     sum += tone * count;
   }
   const colors = QuantizerCelebi.quantize(pixels, 64);
+  const palette = [...colors]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 16)
+    .map(([color, population]) => ({ color: toneOf(color), population }));
   let qualified = 0;
   let gray = true;
   let dominant: CoverTone | null = null;
@@ -174,5 +205,6 @@ export function profileFromPixels(data: Uint8ClampedArray): CoverProfile {
     gray,
     pixelCount: pixels.length,
     lightness: { min, max, mean: Math.max(min, Math.min(max, sum / pixels.length)) },
+    palette,
   };
 }

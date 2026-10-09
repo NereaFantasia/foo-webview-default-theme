@@ -1,4 +1,4 @@
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
+import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { Dismiss16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { memo, useEffect, useState, type CSSProperties } from 'react';
@@ -12,6 +12,7 @@ import type { MenuPoint } from '../../albumMenu.ts';
 import { albumKeyOf, type Album } from '../../../host/libraryContract.ts';
 import type { FoldSlotView } from './wallFold.ts';
 import { dropdownReflowKey, REFLOW_KEY_ATTR } from '../wallReflow.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 /** 同一行点了另一张，它的曲目过了这么久还没到，毫秒：旧内容压暗、头部转圈。 */
 const DIM_AFTER_MS = 300;
@@ -48,6 +49,7 @@ export const AlbumDropdown = memo(function AlbumDropdown(props: AlbumDropdownPro
   const { view, row } = props;
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const [shown, setShown] = useState({ album: view.album, column: props.column });
   const [previous, setPrevious] = useState<{ album: Album; column: number } | null>(null);
   /** 最近一次换内容时箭头往哪边走；新内容挂上时按它滑入，只播这一次。 */
@@ -124,7 +126,7 @@ export const AlbumDropdown = memo(function AlbumDropdown(props: AlbumDropdownPro
           />
         </div>
         <Button
-          className={classes.close}
+          className={mergeClasses(classes.close, controls.icon)}
           appearance="subtle"
           shape="circular"
           icon={<Dismiss16Regular />}

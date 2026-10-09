@@ -10,11 +10,22 @@ export const ROLE_VALUES = {
   // 窗口底与内容卡是 Mica 的透出层，必须可透，不能取不透明的中性底。
   'bg-app': 'transparent',
   'bg-pane': tokens.colorNeutralBackgroundAlpha2,
-  // 标题栏、浮层、菜单是上层，用不透明中性底，否则文字压在桌面底纹上。
+  // 直接坐在窗口背景上的控件使用固定浓度，不跟随主视图的内容浓度。
+  'bg-window-control': `color-mix(in srgb, ${tokens.colorNeutralBackground1} 42%, transparent)`,
+  // 主视图里的工具控件只叠一层轻微中性底，不把阅读面的内容浓度再套一遍。
+  'bg-view-control': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 8%, transparent)`,
+  // 控件状态层用自适应前景色混出，深色档是浅色高亮，浅色档保持低对比度。
+  'state-hover': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
+  'state-pressed': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 14%, transparent)`,
+  // 播放栏直接坐在窗口背景上，未播放轨道固定使用浅白半透明，不随深浅档反色。
+  'player-rail': `color-mix(in srgb, ${tokens.colorNeutralForegroundStaticInverted} 28%, transparent)`,
+  // 菜单与浮层使用不透明中性底；主窗标题栏直接露出窗口背景。
   'bg-titlebar': tokens.colorNeutralBackground3Selected,
   'bg-surface': tokens.colorNeutralBackground2,
   'bg-elevated': tokens.colorNeutralBackground1,
+  'bg-panel-overlay': tokens.colorNeutralBackground1,
   'bg-menu': tokens.colorNeutralBackground1,
+  'bg-player-overlay': tokens.colorNeutralBackground1,
   'bg-hover': tokens.colorSubtleBackgroundSelected,
   // 品牌着色的选中底。不用 colorBrandBackground2：青绿 ramp 下它落到 ramp 的两端档，选中态几乎看不出。
   'bg-selected': `color-mix(in oklab, ${tokens.colorBrandStroke1} 18%, transparent)`,

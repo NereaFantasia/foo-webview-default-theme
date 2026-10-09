@@ -2,7 +2,7 @@ English | [中文](./GUIDE.zh-CN.md)
 
 # Default Theme User Guide
 
-Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.1.0.
+Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.2.0.
 
 ## Installation
 
@@ -14,14 +14,14 @@ After installing the plugin, select `Webview2 UI` as the user interface in fooba
 
 ### Install the theme
 
-1. Download `foo-webview-default-theme-0.1.0.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
+1. Download `foo-webview-default-theme-0.2.0.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
 2. Open `File > Preferences > Display > WebView2 UI`. Use template management to create a new template for the theme, then open its folder.
 3. Extract the installation package into that folder, replacing the new template's placeholder page. Keep `index.html` directly inside the template folder, not an extra subfolder.
 4. Select that template in preferences, apply the settings and restart foobar2000.
 
 Template folders are stored under `<profile>\webview-ui\<template>\`. Opening the folder from the plugin preferences helps avoid placing files in another foobar2000 installation's profile.
 
-`fe-0.1.0.zip` is an update package, not a first-install package. GitHub's `Source code` archives are not installable themes either.
+`fe-0.2.0.zip` contains the frontend update, `be-0.2.0.zip` contains the local service, and runtime parts provide its execution environment. The updater handles these files; they are not first-install packages. GitHub's `Source code` archives are not installable themes either.
 
 ## First Launch
 
@@ -68,11 +68,13 @@ Open **Settings > Appearance**:
 
 Cover-based accent colors and the window background are independent. When no cover color is available, the accent uses your selected base color.
 
+Background brightness, saturation and frosted effects can be adjusted separately for light and dark modes. On Windows 10 or when native materials are unavailable, material backgrounds use the theme color background. Covers, images and the flowing palette remain available.
+
 ## Lyrics
 
 ### Local lyrics
 
-Open **Lyrics** from the navigation area or select the right panel's lyrics tab. The theme reads local lyrics first, including embedded lyrics and lyrics files.
+Open **Lyrics** from the navigation area or select the right panel's lyrics tab. Local lyrics, including embedded lyrics and lyrics files, have priority by default. Under **Settings > Lyrics**, adjust the priority of local, online word-synced, line-synced and plain-text lyrics.
 
 - Word-timed lyrics support word-by-word highlighting.
 - Line-timed lyrics follow the current line. Translations are shown when included in the lyrics.
@@ -80,17 +82,17 @@ Open **Lyrics** from the navigation area or select the right panel's lyrics tab.
 
 ### Online search
 
-**Online lyrics** is off by default. Enable it to search automatically when no local lyrics are found.
+**Online lyrics** is off by default. When enabled, automatic selection follows your lyric preferences. With the default local-first order, online sources are searched when local lyrics are missing. Giving an online type higher priority can trigger a search even when local lyrics are available.
 
-To choose a result manually, click the magnifying-glass **Search lyrics** button at the bottom of the lyrics page. Enable online lyrics, enter keywords and select **Use lyrics** on a result. The **Search online lyrics** button shown when local lyrics are missing enables online search; it does not open the manual results list.
+To choose a result manually, open **Search lyrics** from the lyrics page, enable online lyrics and enter keywords. Use a result directly or preview its text first. Select the option to save it as the track's default lyrics before using it to remember your choice. Use **Restore automatic selection** in the lyrics menu to return to automatic selection. Candidate cover art is shown when supplied by the source.
 
 Online sources include NetEase Music, Kugou Music, AMLL TTML DB, LRCLIB and lrcmux. Searches use information such as the track title, artist, album and duration, not local file paths. Third-party services can see your IP address.
 
 ### Display and seeking
 
-For timed lyrics, switch to **Full text** to see the complete lyrics. When the track supports seeking, click a line to jump to its time. This is not available for lyrics without timestamps.
+For timed lyrics, switch to **Preview** to see the complete lyrics. When the track supports seeking, click a line to jump to its time. This is not available for lyrics without timestamps. You can also hover over or drag the progress bar to preview timed lyrics near the target position.
 
-Font size, AMLL / WinUI 3 / Custom motion presets and lyric processing options are under **Settings > Lyrics**.
+Use **Timing adjustment** to move lyrics earlier or later, replay the current line or restore the original timing. Fonts, sizes, translations, romanization, AMLL / WinUI 3 / Custom motion presets and lyric processing options are under **Settings > Lyrics**.
 
 ## Immersive View
 
@@ -132,6 +134,12 @@ A prepared update takes effect the next time foobar2000 starts. You can also cli
 Downloads are checked using signatures and hashes. If a new version fails to confirm startup three times in a row, the next launch tries an available older version. Rollback handles startup failures; it is not triggered by ordinary interface problems or a preference for the older version.
 
 Do not share one theme folder between multiple foobar2000 instances. Automatic updates pause when sharing is detected.
+
+### Local service
+
+After 0.2.0 starts, it downloads the Node runtime and matching local-service files from CNB as needed, verifies them and starts the service. You do not need to install Node or npm yourself. Installed files that pass verification can be reused offline. Preparing these components is separate from checking for theme updates; **Check manually** does not disable component preparation.
+
+Check the status under **Settings > About > Local service**. If it is not ready, view diagnostic details or retry; music playback and the theme remain available. No new plugin version accompanies this release, and the theme does not replace the plugin or foobar2000 automatically.
 
 ## Troubleshooting
 

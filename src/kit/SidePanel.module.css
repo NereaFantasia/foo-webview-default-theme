@@ -1,0 +1,41 @@
+.host {
+  /* 越过内容区外留白与面板内缩，再给阴影留出一份外留白。 */
+  --panel-slide-offset: calc(2 * var(--spacingHorizontalL) + var(--panel-inset));
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  top: var(--panel-top);
+  bottom: var(--panel-bottom);
+  z-index: 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100% - 2 * var(--panel-inset));
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAlpha);
+  border-radius: var(--radius-overlay);
+  background-color: var(--bg-panel-overlay);
+  box-shadow: var(--shadow16);
+}
+
+.panel[data-side-panel='start'] {
+  /* 左侧还需移过侧栏列；列宽由主窗口提供，极窄时为零。 */
+  --surface-slide-offset: calc(var(--panel-slide-offset) + var(--sidebar-column-width));
+  left: var(--panel-inset);
+}
+
+.panel[data-side-panel='end'] {
+  --surface-slide-offset: var(--panel-slide-offset);
+  right: var(--panel-inset);
+}
+
+.host[data-side-panel-compact] > .panel {
+  left: var(--panel-inset);
+  right: var(--panel-inset);
+  width: auto;
+}

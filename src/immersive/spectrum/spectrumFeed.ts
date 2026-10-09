@@ -80,8 +80,9 @@ export function openSpectrumFeed(options: SpectrumFeedOptions): SpectrumFeed {
   // SDK 的退订函数每调一次就给宿主发一次退订，柱那份可能先因被拒退过，这里只退一次。
   let barsOpen = bars !== null;
   const closeBars = (): void => {
-    if (barsOpen) bars?.();
+    const wasOpen = barsOpen;
     barsOpen = false;
+    if (wasOpen) bars?.();
   };
   let barsId: string | null = null;
   let barsFrame: BinsFrame | null = null;
@@ -91,8 +92,13 @@ export function openSpectrumFeed(options: SpectrumFeedOptions): SpectrumFeed {
     open = false;
     pull?.stop();
     pull = undefined;
-    main();
-    closeBars();
+    barsId = null;
+    barsFrame = null;
+    try {
+      main();
+    } finally {
+      closeBars();
+    }
   }
 
   void bars?.ready.then((outcome) => {
@@ -116,7 +122,7 @@ export function openSpectrumFeed(options: SpectrumFeedOptions): SpectrumFeed {
           host.getSpectrum({ subscriptionId }),
           id === null ? null : settle(() => host.getSpectrum({ subscriptionId: id })),
         ]);
-        barsFrame = extra?.success === true ? binsFrameOf(extra) : null;
+        if (open) barsFrame = extra?.success === true ? binsFrameOf(extra) : null;
         return answer;
       },
       intervalMs: options.intervalMs,

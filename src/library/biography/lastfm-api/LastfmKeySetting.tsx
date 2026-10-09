@@ -1,4 +1,4 @@
-import { Button, Input, makeStyles } from '@fluentui/react-components';
+import { mergeClasses, Button, Input, makeStyles } from '@fluentui/react-components';
 import { Eye16Regular, EyeOff16Regular, Open16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useState } from 'react';
@@ -6,6 +6,7 @@ import { useExternalLinks } from '../../../kit/external-link/ExternalLinkProvide
 import type { BiographyTranslate } from '../BiographyPanel.tsx';
 import type { LastfmKeyCheck, LastfmKeyService } from './lastfmKey.ts';
 import styles from './LastfmKeySetting.module.css';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 /** Last.fm 发 API key 的页面。 */
 const APPLY_URL = 'https://www.last.fm/api/account/create';
@@ -29,6 +30,7 @@ export function LastfmKeySetting({
   descriptionId,
   t,
 }: LastfmKeySettingProps) {
+  const viewControls = useViewControlStyles();
   const classes = useStyles();
   const links = useExternalLinks();
   const key = useAtomValueRawSync(service.key);
@@ -48,7 +50,7 @@ export function LastfmKeySetting({
       }}
     >
       <Input
-        className={classes.input}
+        className={mergeClasses(classes.input, viewControls.field)}
         type={shown ? 'text' : 'password'}
         value={draft ?? key}
         disabled={!online}
@@ -61,6 +63,7 @@ export function LastfmKeySetting({
         onBlur={commit}
         contentAfter={
           <Button
+            className={viewControls.icon}
             appearance="transparent"
             size="small"
             icon={shown ? <EyeOff16Regular /> : <Eye16Regular />}
@@ -71,7 +74,12 @@ export function LastfmKeySetting({
           />
         }
       />
-      <Button icon={<Open16Regular />} iconPosition="after" onClick={() => links.open(APPLY_URL)}>
+      <Button
+        className={viewControls.field}
+        icon={<Open16Regular />}
+        iconPosition="after"
+        onClick={() => links.open(APPLY_URL)}
+      >
         {t('biography.getKey')}
       </Button>
     </form>

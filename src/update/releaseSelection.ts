@@ -18,7 +18,7 @@ export interface SelectionContext {
 }
 /**
  * 没能直接升到最新版的原因：plugin 是插件版本不够；stone 是当前版本低于最新版的 upgradeFrom，
- * loader 是引导页版本低于它的要求，这两种都先升到垫脚石，重启后再继续；manual 是最新版要求
+ * loader 是引导页版本低于它的要求，这两种都先升到符合先决条件版本，重启后再继续；manual 是最新版要求
  * 本更新器核对不了的组件。
  */
 export type SelectionLimit = 'plugin' | 'stone' | 'loader' | 'manual';

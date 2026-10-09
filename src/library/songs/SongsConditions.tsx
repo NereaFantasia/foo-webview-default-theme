@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Menu,
   MenuButton,
@@ -25,6 +26,7 @@ import type { SongsFilter } from './songsFilter.ts';
 import { songsConditions, type SongsCondition } from './songsLabels.ts';
 import { useService } from '../../kit/useService.ts';
 import { songsKey } from './songsServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   tags: {
@@ -42,6 +44,7 @@ const useStyles = makeStyles({
  * 页头下面的条件行：只在有条件时出，列出勾上的预设与分面，✕ 去掉一个，末尾「清除条件」只清条件、不动框里的字。
  */
 export function SongsConditions({ filter }: { readonly filter: SongsFilter }) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const songs = useService(songsKey);
   const classes = useStyles();
@@ -71,7 +74,7 @@ export function SongsConditions({ filter }: { readonly filter: SongsFilter }) {
             <OverflowItem key={condition.key} id={condition.key}>
               <Tag
                 key={condition.key}
-                className={classes.tag}
+                className={mergeClasses(classes.tag, controls.tag)}
                 primaryText={{ className: classes.text }}
                 title={condition.label}
                 value={condition.key}
@@ -80,6 +83,7 @@ export function SongsConditions({ filter }: { readonly filter: SongsFilter }) {
                   'aria-label': t('songs.conditionRemove', { condition: condition.label }),
                 }}
                 data-songs-condition={condition.key.replace('\n', ':')}
+                appearance="outline"
               >
                 {condition.label}
               </Tag>
@@ -88,7 +92,12 @@ export function SongsConditions({ filter }: { readonly filter: SongsFilter }) {
           <ConditionsOverflow conditions={conditions} offered={offered} remove={remove} />
         </TagGroup>
       </Overflow>
-      <Button size="small" appearance="subtle" onClick={() => songs.filter.clearConditions()}>
+      <Button
+        className={controls.icon}
+        size="small"
+        appearance="subtle"
+        onClick={() => songs.filter.clearConditions()}
+      >
         {t('songs.conditionsClear')}
       </Button>
     </div>
@@ -102,6 +111,7 @@ interface ConditionsOverflowProps {
 }
 
 function ConditionsOverflow({ conditions, offered, remove }: ConditionsOverflowProps) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const { ref, isOverflowing, overflowCount } = useOverflowMenu<HTMLButtonElement>();
   const extra = conditions.length - offered.length;
@@ -109,7 +119,13 @@ function ConditionsOverflow({ conditions, offered, remove }: ConditionsOverflowP
   return (
     <Menu surfaceMotion={MENU_SURFACE_MOTION}>
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton ref={ref} size="small" appearance="subtle" data-songs-condition-overflow>
+        <MenuButton
+          className={controls.field}
+          ref={ref}
+          size="small"
+          appearance="subtle"
+          data-songs-condition-overflow
+        >
           {t('songs.conditionsMore', { count: overflowCount + extra })}
         </MenuButton>
       </MenuTrigger>

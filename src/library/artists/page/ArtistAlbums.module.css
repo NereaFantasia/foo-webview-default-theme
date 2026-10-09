@@ -33,7 +33,10 @@
   cursor: pointer;
 }
 .album:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background: var(--state-hover);
+}
+.album:active {
+  background: var(--state-pressed);
 }
 .album:focus-visible {
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);

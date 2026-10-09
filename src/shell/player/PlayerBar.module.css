@@ -1,10 +1,10 @@
-/* 高 92：上下各 8、左右各 16，进度一行 16、隔 4、主行 56。与标题栏一样直接放在窗口材质上，不铺底。 */
+/* 高 88：上 4、下 8、左右各 16，进度一行 16、隔 4、主行 56。整条透出窗口背景，与周围留白连续。 */
 .root {
   display: grid;
   grid-template-rows: 16px 56px;
   row-gap: var(--spacingVerticalXS);
   min-width: 0;
-  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalL) var(--spacingVerticalS);
 }
 
 .progress {

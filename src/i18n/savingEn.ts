@@ -24,5 +24,12 @@ export const savingEn = {
   'info.libraryNotConfigured': 'The media library has no folders configured',
   'info.libraryDetail': 'Add your music folders in foobar2000 preferences.',
   'info.retry': 'Check again',
+  'info.windowEffectsLimited': 'Some window effects are unavailable',
+  'info.windowEffectsWindows10':
+    'On Windows 10, Mica, Mica Alt and window Acrylic use the theme color background, and the tray menu uses a solid color. Native windows keep square corners, and the maximize button has no Snap layouts. Covers, images and the flowing palette remain available.',
+  'info.windowEffectsUnknown':
+    'Window material support could not be determined. Native materials are replaced by the theme color background for now. The tray menu uses a solid color. Covers, images and the flowing palette remain available.',
+  'info.windowEffectsFailed':
+    'The window material could not be applied. Material backgrounds use the theme color background for now. Your material selection is kept. Covers, images and the flowing palette remain available.',
   'info.dismiss': 'Do not remind me again',
 } as const;

@@ -1,7 +1,8 @@
 /* 高 64、圆角 32，离卡底 16、水平居中；宽窗 680、641–1007 宽 600，卡片窄到放不下时撑满卡宽、左右各留 16。
-   封面离外缘 8、键组离外缘 14（描边画在盒子里面，内边距扣掉它），三块之间隔 12。不透明的菜单底加描边与
-   阴影，压在页面内容上面。 */
+   封面离外缘 8、键组离外缘 14（边框画在盒子里面，内边距扣掉它），三块之间隔 12。自绘背景下隐藏描边，
+   半透明磨砂底与阴影将播放栏和页面内容分开。 */
 .root {
+  isolation: isolate;
   position: absolute;
   bottom: var(--spacingVerticalL);
   left: 50%;
@@ -14,11 +15,42 @@
   height: 64px;
   padding: 0 calc(var(--spacingHorizontalM) + var(--spacingHorizontalXXS) - var(--strokeWidthThin))
     0 calc(var(--spacingHorizontalS) - var(--strokeWidthThin));
-  border: var(--strokeWidthThin) solid var(--line);
+  border: var(--strokeWidthThin) solid var(--surface-stroke);
   border-radius: var(--borderRadiusCircular);
-  background: var(--bg-menu);
+  background: var(--bg-player-overlay);
+  backdrop-filter: var(--capsule-filter);
   box-shadow: var(--shadow8);
   translate: -50% 0;
+  opacity: 1;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    background-color var(--motion-fast) var(--motion-curve-backdrop),
+    backdrop-filter var(--motion-fast) var(--motion-curve-backdrop),
+    border-color var(--motion-fast) var(--motion-curve-backdrop);
+}
+
+.root:not([data-visible]) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@starting-style {
+  .root {
+    opacity: 0;
+  }
+}
+
+.root::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url('/cover-grain.png');
+  opacity: var(--capsule-grain);
+  transition: opacity var(--motion-fast) var(--motion-curve-backdrop);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  content: '';
 }
 
 .root[data-tier='wide'] {

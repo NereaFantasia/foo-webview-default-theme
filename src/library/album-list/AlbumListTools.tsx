@@ -23,6 +23,7 @@ import { SECTION_ORDERS } from './listSort.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumListKey } from './albumList.ts';
 import { albumsKey } from '../albumServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 // 列表形态页头的两件：展开 / 折叠键、分节（依据与节的顺序）。排序在 ListSortMenu.tsx。
 
@@ -35,12 +36,18 @@ export function ListExpandMenu() {
   const t = useAtomValueRawSync(translateAtom);
   const { dimension } = useAtomValueRawSync(browserPrefsAtom);
   const albumList = useService(albumListKey);
+  const controls = useViewControlStyles();
   const sectioned = dimension !== 'album';
   return (
     <Menu>
       <MenuTrigger disableButtonEnhancement>
         <Tooltip content={t('albumList.expand')} relationship="label">
-          <Button appearance="subtle" icon={<ChevronUpDown20Regular />} data-album-tool="expand" />
+          <Button
+            appearance="subtle"
+            className={controls.icon}
+            icon={<ChevronUpDown20Regular />}
+            data-album-tool="expand"
+          />
         </Tooltip>
       </MenuTrigger>
       <MenuPopover>
@@ -74,6 +81,7 @@ export function ListDimensionMenu() {
   const { sectionOrder } = useAtomValueRawSync(listPrefsAtom);
   const albums = useService(albumsKey);
   const albumList = useService(albumListKey);
+  const controls = useViewControlStyles();
   return (
     <Menu
       checkedValues={{ dimension: [dimension], order: [sectionOrder] }}
@@ -88,7 +96,7 @@ export function ListDimensionMenu() {
       }}
     >
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton data-album-tool="dimension">
+        <MenuButton appearance="subtle" className={controls.field} data-album-tool="dimension">
           {t('album.dimensionValue', { value: t(DIMENSION_LABELS[dimension]) })}
         </MenuButton>
       </MenuTrigger>

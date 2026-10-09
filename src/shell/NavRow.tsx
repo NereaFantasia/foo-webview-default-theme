@@ -5,18 +5,27 @@ import styles from './NavRow.module.css';
 import { SidebarKey } from '../nav/sidebar/SidebarKey.tsx';
 
 // 胶囊里的键 40 × 30，悬停底也是胶囊；侧边栏键 30 见方，悬停底是圆。键的四周离描边内侧都是 2，悬停底的
-// 圆角就与外框同心。
+// 圆角就与外框同心。图标与标题栏的导航键一样，都是 20。
 const useStyles = makeStyles({
-  key: { minWidth: '40px', width: '40px', height: '30px', padding: '0' },
-  round: { minWidth: '30px', width: '30px', height: '30px', padding: '0' },
-  // 队列只有 20 的线框图标，缩到与其余键一样的 16。
-  glyph: { width: '16px', height: '16px' },
+  key: {
+    minWidth: '40px',
+    width: '40px',
+    height: '30px',
+    padding: '0',
+    '& svg': { width: '20px', height: '20px' },
+  },
+  round: {
+    minWidth: '30px',
+    width: '30px',
+    height: '30px',
+    padding: '0',
+    '& svg': { width: '20px', height: '20px' },
+  },
 });
 
 /**
- * 内容卡顶部的导航行，只有播放栏在标题栏这一种形态有（另两种形态这几个键在标题栏）。固定一条，页面在它
- * 下面开始、切换动效也只作用在它下面。左边是「后退 前进」胶囊（两键之间一道竖线）与侧边栏键，右边是
- * 「歌词 队列」胶囊：队列键开合右侧卡的队列页；歌词页还没做，置灰但照样能聚焦、悬停提示写明即将推出。
+ * 标题栏播放形态的悬浮导航键；页面切换不带着按钮移动。左边是后退、前进与侧边栏，右边是歌词与队列。
+ * 整页滚动的内容在页首让位，滚动后可进入按钮下方；固定工具栏保持原位，按钮组之间的空白不拦截页面操作。
  */
 export function NavRow() {
   const classes = useStyles();
@@ -32,12 +41,7 @@ export function NavRow() {
       </div>
       <div className={styles.capsule}>
         <LyricsKey shape="circular" className={classes.key} marks={{ 'data-nav': 'lyrics' }} />
-        <QueueKey
-          shape="circular"
-          className={classes.key}
-          glyphClassName={classes.glyph}
-          marks={{ 'data-nav': 'queue' }}
-        />
+        <QueueKey shape="circular" className={classes.key} marks={{ 'data-nav': 'queue' }} />
       </div>
     </div>
   );

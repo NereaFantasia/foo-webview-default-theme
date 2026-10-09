@@ -78,7 +78,7 @@ export function PaperSpectrum() {
   const ramp = useAtomValueRawSync(accentRampAtom);
   const scheme = useAtomValueRawSync(colorSchemeAtom);
   const stageScale = useContext(StageScaleContext);
-  const { spectrum } = useViewServices();
+  const { spectrum, active, visible } = useViewServices();
   const jumps = usePlaybackJumps();
   const [motion] = useState(createSpectrumMotion);
   const [holding, setHolding] = useState(false);
@@ -100,6 +100,7 @@ export function PaperSpectrum() {
     let height = 0;
     let fill: CanvasGradient | string = '';
     const smooth = (): boolean => !store.get(reducedMotionAtom);
+    const running = (): boolean => store.get(active);
 
     const input = (): SpectrumInput => {
       const history = spectrum?.history;
@@ -132,7 +133,7 @@ export function PaperSpectrum() {
     }
 
     function paint(): void {
-      if (!ctx || width === 0 || height === 0) return;
+      if (!running() || !ctx || width === 0 || height === 0) return;
       const smoothNow = smooth();
       const more = motion.step(performance.now(), input(), smoothNow);
       draw(smoothNow);
@@ -141,6 +142,7 @@ export function PaperSpectrum() {
 
     const frames = createFrameScheduler(paint);
     const schedule = (): void => {
+      if (!running()) return;
       motion.touch(performance.now());
       frames.schedule();
     };
@@ -178,13 +180,12 @@ export function PaperSpectrum() {
     // 重设 canvas 的物理尺寸会清空它：在这一回调里当场补画，不留一帧空白。
     const observer = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
-      if (!box) return;
+      if (!box || !running()) return;
       resize(box.width, box.height);
       recolor();
       motion.touch(performance.now());
       paint();
     });
-    observer.observe(canvas);
 
     const readPhase = (): Phase => {
       const status = store.get(spectrumStatusAtom);
@@ -193,6 +194,7 @@ export function PaperSpectrum() {
     };
     let last = readPhase();
     const sync = (): void => {
+      if (!running()) return;
       const next = readPhase();
       if (next.status === last.status && next.on === last.on && next.paused === last.paused) return;
       const now = performance.now();
@@ -206,22 +208,51 @@ export function PaperSpectrum() {
       setHolding(motion.holding());
     };
 
+    const syncActivity = (): void => {
+      if (running()) {
+        last = readPhase();
+        observer.observe(canvas);
+        schedule();
+        return;
+      }
+      observer.disconnect();
+      frames.cancel();
+      motion.release();
+      motion.step(
+        performance.now(),
+        { live: false, playing: false, interval: 0, latest: null },
+        false,
+      );
+      motion.peaks.fill(0);
+      motion.soften(performance.now(), 0);
+      setHolding(false);
+      ctx = null;
+      fill = '';
+      if (!store.get(visible)) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    };
     const offs = [
+      store.sub(active, syncActivity),
+      store.sub(visible, syncActivity),
       store.sub(spectrumStatusAtom, sync),
       store.sub(playStateAtom, sync),
       store.sub(reducedMotionAtom, schedule),
       jumps.subscribe(soften),
       spectrum?.subscribe(() => {
+        if (!running()) return;
         motion.frameArrived(performance.now());
         schedule();
       }),
     ];
+    syncActivity();
     return () => {
       observer.disconnect();
       for (const off of offs) off?.();
       frames.cancel();
     };
-  }, [store, motion, jumps, spectrum, stageScale, ramp, scheme]);
+  }, [store, motion, jumps, spectrum, active, visible, stageScale, ramp, scheme]);
 
   return (
     <div className={styles.spectrum} data-state={live ? 'live' : 'empty'}>

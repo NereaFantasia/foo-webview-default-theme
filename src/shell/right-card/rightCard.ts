@@ -1,10 +1,11 @@
 import { atom, type Atom } from 'jotai/vanilla';
 import { defineLocalPref, storedRecord, type PrefStorage } from '../../kit/localPref.ts';
 import type { Store } from '../../kit/store.ts';
+import { startHistory, type HistoryState, type HistoryService } from '../../nav/historyStack.ts';
 
 /**
- * 右侧卡：内容卡右边的第二张卡，放队列、歌词、信息与简介四页。它不是地点，开合、换页、拖宽、收起封面
- * 都不进历史。
+ * 右侧卡：内容卡右边的第二张卡，放队列、歌词、信息与简介四页。换页使用独立历史；开合、拖宽、收起封面
+ * 不新增记录，也不改变主视图历史。
  *
  * 用户定的样子存 localStorage（与侧边栏同一类界面偏好）：宽窗里开没开、停在哪一页、宽度、封面收没收。
  * 窗口窄于 1008 时卡不占位，改成盖在内容卡上的浮层：浮层开合只在内存里，不改存档，窗口变宽回来照存的摆；
@@ -14,13 +15,37 @@ export type RightCardPage = 'queue' | 'lyrics' | 'info' | 'bio';
 
 export const RIGHT_CARD_PAGES: readonly RightCardPage[] = ['queue', 'lyrics', 'info', 'bio'];
 
+export interface RightCardLocation {
+  readonly id:
+    RightCardPage | 'lyricsSearch' | 'lyricsCandidate' | 'lyricsDetails' | 'lyricsTiming';
+  /** 歌词子页绑定曲目身份；信息页可绑定手动选中的曲目。 */
+  readonly subject?: string;
+  readonly candidate?: string;
+}
+
+export type RightCardTransition = 'tab' | 'step';
+export type RightCardNavigation = HistoryState<RightCardLocation, RightCardTransition>;
+export type RightCardHistory = HistoryService<RightCardLocation, RightCardTransition>;
+
+export function rightCardPageOf(location: RightCardLocation): RightCardPage {
+  return RIGHT_CARD_PAGES.find((page) => page === location.id) ?? 'lyrics';
+}
+
+const navigationAtom = atom<RightCardNavigation>({
+  entry: { key: 0 },
+  place: { id: 'queue' },
+  previous: null,
+  next: null,
+  arrival: null,
+});
+
 /** 做好了、能停上去的几页；其余几页在分页栏里置灰。 */
 export const READY_PAGES: ReadonlySet<RightCardPage> = new Set(['queue', 'bio', 'info', 'lyrics']);
 
 export const RIGHT_CARD_STORAGE_KEY = 'default-theme.right-card.v1';
 
 /** 宽度的范围与缺省，CSS 像素；内容卡至少留 `CONTENT_MIN`，不够时右侧卡让宽。 */
-export const RIGHT_CARD_WIDTH = { min: 300, max: 480, initial: 320 } as const;
+export const RIGHT_CARD_WIDTH = { min: 280, max: 480, initial: 320 } as const;
 export const CONTENT_MIN = 480;
 
 export interface RightCardPrefs {
@@ -84,6 +109,8 @@ export interface RightCardDeps {
 
 export interface RightCardService {
   readonly view: Atom<RightCardView>;
+  readonly navigation: Atom<RightCardNavigation>;
+  readonly history: RightCardHistory;
   /** 卡开着、又正停在这一页时收起；否则开到这一页。还没做好的页不理。 */
   toggle(page: RightCardPage): void;
   /** 分页栏换页：卡照开着，只换页。 */
@@ -102,6 +129,19 @@ export function startRightCard(
 ): RightCardService {
   prefsPref.load(store, storage);
   store.set(overlayAtom, false);
+  const history = startHistory<RightCardLocation, RightCardTransition>(
+    store,
+    navigationAtom,
+    { id: store.get(prefsAtom).page },
+    {
+      same: (left, right) =>
+        left.id === right.id &&
+        left.subject === right.subject &&
+        left.candidate === right.candidate,
+      transition: (location) =>
+        RIGHT_CARD_PAGES.some((page) => page === location.id) ? 'tab' : 'step',
+    },
+  );
   const view = atom<RightCardView>((get) => {
     const prefs = get(prefsAtom);
     if (get(deps.wide)) return { prefs, form: prefs.open ? 'docked' : 'none' };
@@ -113,17 +153,27 @@ export function startRightCard(
     prefsPref.set(store, next, storage);
   }
 
+  const stopHistory = store.sub(navigationAtom, () => {
+    const page = rightCardPageOf(store.get(navigationAtom).place);
+    const prefs = store.get(prefsAtom);
+    if (page !== prefs.page) save({ ...prefs, page });
+  });
+
   const stopWide = store.sub(deps.wide, () => {
     if (store.get(deps.wide)) store.set(overlayAtom, false);
   });
 
   return {
     view,
+    navigation: atom((get) => get(navigationAtom)),
+    history,
     toggle(page) {
       if (!READY_PAGES.has(page)) return;
       const prefs = store.get(prefsAtom);
       const shown = store.get(view).form !== 'none';
       const closing = shown && prefs.page === page;
+      if (!closing && rightCardPageOf(store.get(navigationAtom).place) !== page)
+        history.navigate({ id: page });
       if (store.get(deps.wide)) save({ ...prefs, open: !closing, page });
       else {
         if (prefs.page !== page) save({ ...prefs, page });
@@ -131,8 +181,7 @@ export function startRightCard(
       }
     },
     select(page) {
-      const prefs = store.get(prefsAtom);
-      if (READY_PAGES.has(page) && prefs.page !== page) save({ ...prefs, page });
+      if (READY_PAGES.has(page)) history.navigate({ id: page });
     },
     close() {
       if (!store.get(deps.wide)) {
@@ -151,6 +200,9 @@ export function startRightCard(
       const prefs = store.get(prefsAtom);
       save({ ...prefs, coverCollapsed: !prefs.coverCollapsed });
     },
-    dispose: stopWide,
+    dispose() {
+      stopHistory();
+      stopWide();
+    },
   };
 }

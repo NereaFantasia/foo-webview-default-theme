@@ -21,6 +21,42 @@ const themeRoot = (page: Page) => page.locator('#root > .fui-FluentProvider');
 const stored = (page: Page, key: string) =>
   page.evaluate((name) => localStorage.getItem(name), key);
 
+test('动效选择保存并跟随系统', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const settings = await openSettings(page);
+  await expect(settings.card('动效')).toContainText('当前：完整动效');
+  await settings.choose('动效', '减弱');
+  await expect.poll(() => stored(page, 'default-theme.motion.v1')).toBe('reduce');
+  await page.reload();
+  await enterSettings(page);
+  await expect(settings.select('动效')).toHaveText('减弱');
+  await settings.choose('动效', '跟随系统');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(settings.card('动效')).toContainText('当前：减弱');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(settings.card('动效')).toContainText('当前：完整动效');
+  expect(settings.errors).toEqual([]);
+});
+
+test('界面缩放保存并跨页面重载恢复默认值，失败时显示实际档位', async ({ page }) => {
+  const settings = await openSettings(page);
+  await expect(settings.select('界面缩放')).toHaveText('跟随 foobar2000 首选项');
+  await settings.choose('界面缩放', '150%');
+  await expect.poll(() => stored(page, 'default-theme.zoom.v1')).toBe('150');
+  await expect.poll(() => settings.host.callsTo('window.setZoom').at(-1)).toEqual({ zoom: 1.5 });
+  await page.reload();
+  await enterSettings(page);
+  await expect(settings.select('界面缩放')).toHaveText('150%');
+  await settings.choose('界面缩放', '跟随 foobar2000 首选项');
+  await expect.poll(() => settings.host.callsTo('window.setZoom').at(-1)).toEqual({ zoom: 1 });
+  settings.host.answer('window.setZoom', hostFailure('OPERATION_FAILED'));
+  await settings.choose('界面缩放', '200%');
+  await expect(settings.card('界面缩放')).toContainText('未能设置窗口缩放');
+  await expect(settings.select('界面缩放')).toHaveText('跟随 foobar2000 首选项');
+  expect(await stored(page, 'default-theme.zoom.v1')).toBe('0');
+  expect(settings.errors).toEqual([]);
+});
+
 /** 最近一次下发的材质与深浅；线上的参数把它们包在 `backdropPolicy` 里。 */
 function lastPolicy(settings: SettingsPage): Readonly<Record<string, unknown>> {
   const policy = settings.host.callsTo('window.setBackdropPolicy').at(-1)?.['backdropPolicy'];

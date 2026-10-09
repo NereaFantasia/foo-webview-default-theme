@@ -1,6 +1,6 @@
 import type { Track } from 'foo-webview-sdk';
 import { atom } from 'jotai/vanilla';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import type { BeatTrack } from '../../../../src/immersive/tempo/beatTracker.ts';
 import type { PcmPiece } from '../../../../src/immersive/waveform/segmentedBands.ts';
 import {
@@ -64,6 +64,7 @@ async function setup(
     wanted?: boolean;
     segmentSeconds?: number;
     beats?: TrackAnalysisDeps['beats'];
+    render?: TrackAnalysisDeps['render'];
     player?: PlayingTrack;
     first?: Track | null;
   } = {},
@@ -75,8 +76,13 @@ async function setup(
   const service = startTrackAnalysis(player.store, {
     wanted,
     source,
-    deps: { render, segmentSeconds: options.segmentSeconds ?? 60, beats: options.beats },
+    deps: {
+      render: options.render ?? render,
+      segmentSeconds: options.segmentSeconds ?? 60,
+      beats: options.beats,
+    },
   });
+  onTestFinished(() => service.dispose());
   return {
     ...player,
     service,
@@ -215,7 +221,7 @@ describe('startTrackAnalysis', () => {
     source.answer(0, 0.5);
     await flush();
     expect(model().bands).toBeNull();
-    expect(model().status).toBe('loading');
+    expect(model().status).toBe('idle');
   });
 
   test('同一次分析也交出节拍：起音曲线按曲长与帧长对齐，这首取不了时没有节拍', async () => {
@@ -272,5 +278,111 @@ describe('startTrackAnalysis', () => {
     runs[0]?.finish();
     await flush();
     expect(model().beats).toBeNull();
+  });
+
+  test('休眠同步中止解码；晚到结果不渲染，恢复重新取而不记失败', async () => {
+    const source = controlledSource();
+    const draw = vi.fn(render);
+    const x = await setup(source.source, { render: draw });
+    x.want(false);
+    expect(source.calls[0]?.signal.aborted).toBe(true);
+    expect(x.model().status).toBe('idle');
+    source.answer(0, 0.5);
+    await flush();
+    expect(draw).not.toHaveBeenCalled();
+    x.want(true);
+    source.answer(1, 0.25);
+    await flush();
+    expect(x.model().status).toBe('ready');
+    expect(draw).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([false, true])(
+    '离线分频结束前不重复启动，过期段不推进后续分析：失败=%s',
+    async (fail) => {
+      const source = controlledSource();
+      let finish = () => {};
+      const x = await setup(source.source, {
+        segmentSeconds: 5,
+        render: (audio) =>
+          new Promise<BandSignals>((resolve, reject) => {
+            finish = () =>
+              fail ? reject(new Error('render failed')) : void render(audio).then(resolve);
+          }),
+      });
+      source.answer(0, 0.5);
+      await flush();
+      x.want(false);
+      x.want(true);
+      x.want(false);
+      x.play(OTHER);
+      x.want(true);
+      expect(source.calls).toHaveLength(1);
+      finish();
+      await flush();
+      expect(source.calls).toHaveLength(2);
+      expect(source.calls[1]?.track).toEqual(OTHER);
+      expect(source.calls[1]?.range.start).toBe(0);
+      expect(x.model()).toEqual({ status: 'loading', bands: null, beats: null });
+    },
+  );
+
+  test('休眠不清除不支持记忆，释放清空完整结果', async () => {
+    const source = vi.fn(async () => {
+      throw new PcmUnavailableError();
+    });
+    const x = await setup(source);
+    await flush();
+    x.want(false);
+    x.want(true);
+    expect(x.model().status).toBe('unavailable');
+    expect(source).toHaveBeenCalledTimes(1);
+    const y = await setup(async (_track, range) => pieceOf(0.5, range));
+    await flush();
+    expect(y.model().status).toBe('ready');
+    y.service.dispose();
+    expect(y.model()).toEqual({ status: 'idle', bands: null, beats: null });
+  });
+
+  test('释放后离线渲染晚到不重启等待中的任务', async () => {
+    let finish = () => {};
+    const source = vi.fn(async (_track: PcmTrack, range: { start: number; end: number }) =>
+      pieceOf(0.5, range),
+    );
+    const x = await setup(source, {
+      render: (audio) =>
+        new Promise<BandSignals>((resolve) => {
+          finish = () => void render(audio).then(resolve);
+        }),
+    });
+    await flush();
+    x.want(false);
+    x.want(true);
+    x.service.dispose();
+    finish();
+    await flush();
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(x.model()).toEqual({ status: 'idle', bands: null, beats: null });
+  });
+
+  test('离开后立即重建也等待旧实例的离线渲染，不让旧结果覆盖新状态', async () => {
+    let finish = () => {};
+    const x = await setup(async (_track, range) => pieceOf(0.5, range), {
+      render: (audio) =>
+        new Promise<BandSignals>((resolve) => {
+          finish = () => void render(audio).then(resolve);
+        }),
+    });
+    await flush();
+    x.service.dispose();
+    const source = vi.fn(async (_track: PcmTrack, range: { start: number; end: number }) =>
+      pieceOf(0.25, range),
+    );
+    const y = await setup(source, { player: x });
+    expect(source).not.toHaveBeenCalled();
+    finish();
+    await flush();
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(y.model().bands?.low[0]).toBe(0.25);
   });
 });

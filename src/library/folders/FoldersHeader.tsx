@@ -24,6 +24,7 @@ import type { FoldersView } from './detail/useFoldersView.ts';
 import styles from './FoldersHeader.module.css';
 import { useService } from '../../kit/useService.ts';
 import { foldersKey } from './foldersServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   title: { margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -37,6 +38,7 @@ export function FoldersHeader({ model, onMenu }: FoldersHeaderProps) {
   const folders = useService(foldersKey);
   const { available } = useAtomValueRawSync(playStatsAtom);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const input = useRef<HTMLInputElement>(null);
   const [queryOpen, setQueryOpen] = useState(false);
   const [width, setWidth] = useState(1000);
@@ -107,6 +109,8 @@ export function FoldersHeader({ model, onMenu }: FoldersHeaderProps) {
         </div>
         <Tooltip content={t('folders.facets')} relationship="label">
           <ToggleButton
+            className={controls.icon}
+            appearance="subtle"
             checked={prefs.facetsOpen}
             icon={<Options20Regular />}
             onClick={() => folders.prefs.change({ facetsOpen: !prefs.facetsOpen })}
@@ -125,12 +129,18 @@ export function FoldersHeader({ model, onMenu }: FoldersHeaderProps) {
           </Button>
         </Tooltip>
         <Tooltip content={t('folders.shuffle')} relationship="label">
-          <Button icon={<ArrowShuffle20Regular />} disabled={!playable} onClick={() => play(true)}>
+          <Button
+            className={controls.field}
+            icon={<ArrowShuffle20Regular />}
+            disabled={!playable}
+            onClick={() => play(true)}
+          >
             {tier === 'wide' ? t('folders.shuffle') : undefined}
           </Button>
         </Tooltip>
         <Tooltip content={t('folders.more')} relationship="label">
           <Button
+            className={controls.icon}
             appearance="transparent"
             icon={<MoreHorizontal20Regular />}
             disabled={!playable}
@@ -153,7 +163,7 @@ export function FoldersHeader({ model, onMenu }: FoldersHeaderProps) {
           >
             {t('songs.queryHelp')}
           </Link>
-          <Button size="small" onClick={folders.results.flush}>
+          <Button className={controls.field} size="small" onClick={folders.results.flush}>
             {t('folders.retry')}
           </Button>
         </div>

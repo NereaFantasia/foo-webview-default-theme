@@ -56,7 +56,9 @@ export function startPlayingCover(
       );
       if (disposed || mine !== generation) return;
       const url = answer && answer.success !== false && answer.available ? answer.dataUrl : '';
-      const profile = url ? await analysis.read(url) : null;
+      // 原图解码与像素分析独立，取色失败不能撤掉仍可显示的封面。
+      store.set(backgroundCoverAtom, { url, profile: store.get(coverProfileAtom) });
+      const profile = url ? await analysis.read(url).catch(() => null) : null;
       if (!disposed && mine === generation) publish(profile, url);
     } catch {
       if (!disposed && mine === generation) publish(null);

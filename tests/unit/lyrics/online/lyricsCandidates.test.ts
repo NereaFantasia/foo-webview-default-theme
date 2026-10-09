@@ -32,10 +32,10 @@ describe('手动歌词候选搜索', () => {
       new AbortController().signal,
     );
     expect(result).toEqual({ candidates: [poor], failed: ['netease'] });
-    expect(fallback.search).not.toHaveBeenCalled();
+    expect(fallback.search).toHaveBeenCalled();
   });
 
-  it('主来源没有候选时才问备选，提前中止不发请求', async () => {
+  it('合并所有启用来源的候选，提前中止不发请求', async () => {
     const fallbackCandidate = { ...CANDIDATE, source: 'lrcmux' as const };
     const sources = [source('lrclib', []), source('lrcmux', [fallbackCandidate])];
     expect(await findLyricsCandidates(QUERY, sources, new AbortController().signal)).toEqual({

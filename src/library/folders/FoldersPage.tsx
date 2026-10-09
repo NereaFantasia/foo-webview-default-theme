@@ -31,6 +31,7 @@ import { useService } from '../../kit/useService.ts';
 import { AddFoldersAction } from '../AddFoldersAction.tsx';
 
 interface OpenMenu {
+  readonly inDrawer: boolean;
   readonly target: FoldersTarget;
   readonly point: TablePoint;
   readonly isCurrent: () => boolean;
@@ -54,7 +55,7 @@ export function FoldersPage({ place }: PageProps) {
   const split = useLibrarySplit('folders', 252);
   const model = useFoldersView(sort);
   useAtomValueRawSync(model.selection.state);
-  function showMenu(target: FoldersTarget, point: TablePoint) {
+  function showMenu(target: FoldersTarget, point: TablePoint, inDrawer = false) {
     const generation = store.get(foldersTreeAtom).generation;
     const subject = store.get(foldersFocusAtom);
     const selected = store.get(model.selection.state);
@@ -63,6 +64,7 @@ export function FoldersPage({ place }: PageProps) {
       .tracks.map((track) => track.handle)
       .join('\n');
     setMenu({
+      inDrawer,
       target,
       point,
       isCurrent: () => {
@@ -105,12 +107,23 @@ export function FoldersPage({ place }: PageProps) {
       setDirectoryOpen(false);
     }
   }, [catalog.status, active, split.compact]);
+  useEffect(() => {
+    if (!directoryOpen) setMenu((current) => (current?.inDrawer ? null : current));
+  }, [directoryOpen]);
+  const contextMenu = menu && (
+    <FoldersMenu
+      target={menu.target}
+      point={menu.point}
+      isCurrent={menu.isCurrent}
+      onClose={() => setMenu(null)}
+    />
+  );
   const navigator = (
     <FoldersNavigator
       active={active}
       scroll={tree}
       handle={treeHandle}
-      onMenu={(nodes, point) => showMenu({ nodes }, point)}
+      onMenu={(nodes, point) => showMenu({ nodes }, point, split.compact)}
       onPlay={(node) => void folders.actions.run({ nodes: [node] }, 'play')}
     />
   );
@@ -171,16 +184,10 @@ export function FoldersPage({ place }: PageProps) {
           onOpenChange={setDirectoryOpen}
         >
           {navigator}
+          {menu?.inDrawer && contextMenu}
         </LibraryDrawer>
       )}
-      {menu && (
-        <FoldersMenu
-          target={menu.target}
-          point={menu.point}
-          isCurrent={menu.isCurrent}
-          onClose={() => setMenu(null)}
-        />
-      )}
+      {!menu?.inDrawer && contextMenu}
       {active && <FoldersTrashDialog />}
     </section>
   );

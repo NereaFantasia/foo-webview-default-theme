@@ -45,7 +45,7 @@ test('参数钳位与坏存档回退，不接受非有限数或 CSS 注入', () 
     blur: 120,
     shade: 25,
     inactive: 0,
-    content: 70,
+    content: 88,
   });
   chooseBackgroundParameter(store, 'dark', 'shade', NaN, null);
   expect(store.get(backgroundPreferencesAtom).dark.shade).toBe(25);

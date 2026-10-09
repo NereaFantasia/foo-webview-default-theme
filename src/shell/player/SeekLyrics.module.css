@@ -1,0 +1,101 @@
+.inline {
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  pointer-events: none;
+}
+
+.inline[data-visible] {
+  opacity: 1;
+}
+
+.lines {
+  display: grid;
+  overflow: hidden;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.row {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+/* 动画取消与旧节点卸载之间也保持透明，避免退场文字短暂恢复。 */
+.outgoing {
+  opacity: 0;
+}
+
+.main {
+  overflow: hidden;
+  min-height: var(--lineHeightBase300);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightMedium);
+  line-height: var(--lineHeightBase300);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  overflow: hidden;
+  height: var(--lineHeightBase200);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightRegular);
+  line-height: var(--lineHeightBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popover {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+  width: min(
+    calc(320px - 2 * var(--spacingHorizontalM) - 2 * var(--strokeWidthThin)),
+    calc(100vw - 4 * var(--spacingHorizontalM) - 2 * var(--strokeWidthThin))
+  );
+  text-align: left;
+}
+
+.popover:not([data-synced]) {
+  width: auto;
+}
+
+.popover:not([data-synced]) .lines {
+  display: none;
+}
+
+.popover .main {
+  color: var(--colorNeutralForeground1);
+  display: -webkit-box;
+  max-height: calc(2 * var(--lineHeightBase300));
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.popover .sub {
+  margin-top: var(--spacingVerticalXXS);
+  color: var(--colorNeutralForeground2);
+}
+
+.popover:not([data-sub]) .sub {
+  display: none;
+}
+
+.time {
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  font-variant-numeric: tabular-nums;
+}
+
+.anchor,
+.description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}

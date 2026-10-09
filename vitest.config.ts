@@ -5,7 +5,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      include: ['tests/unit/**/*.test.{ts,tsx}'],
+      include: ['tests/unit/**/*.test.{ts,tsx}', 'backend/tests/**/*.test.ts'],
       server: { deps: { inline: ['@material/material-color-utilities'] } },
     },
   }),

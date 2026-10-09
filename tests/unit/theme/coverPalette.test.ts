@@ -57,3 +57,34 @@ test('不完整、非有限数值和不合法统计不能作为档案', () => {
     false,
   );
 });
+
+test('背景色保留面积，透明像素不计入；旧档案仍可读取', () => {
+  const profile = profileFromPixels(
+    pixels(solid(128, 128, 128, 95), solid(255, 0, 0, 5), solid(0, 0, 255, 20, 0)),
+  );
+  expect(profile.palette?.map(({ population }) => population)).toEqual([95, 5]);
+  expect(profile.palette?.[0].color.argb).toBe(argbFromRgb(128, 128, 128));
+  const { palette, ...legacy } = profile;
+  expect(isCoverProfile(legacy)).toBe(true);
+  expect(isCoverProfile(profile)).toBe(true);
+  const color = palette?.[0].color;
+  for (const population of [-1, 0, 1.5, 101, Infinity]) {
+    expect(isCoverProfile({ ...profile, palette: [{ color, population }] })).toBe(false);
+  }
+  expect(
+    isCoverProfile({
+      ...profile,
+      palette: [
+        { color, population: 60 },
+        { color, population: 60 },
+      ],
+    }),
+  ).toBe(false);
+  expect(isCoverProfile({ ...profile, palette: [{ color: null, population: 1 }] })).toBe(false);
+  expect(
+    isCoverProfile({
+      ...profile,
+      palette: Array.from({ length: 17 }, () => ({ color, population: 1 })),
+    }),
+  ).toBe(false);
+});

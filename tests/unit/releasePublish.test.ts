@@ -36,6 +36,7 @@ afterEach(() => {
 async function artifacts(
   change: (files: Record<string, Uint8Array>) => void = () => {},
   changeFirst: (files: Record<string, Uint8Array>) => void = () => {},
+  withBackend = false,
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'publish-'));
   temporary.push(dir);
@@ -46,6 +47,15 @@ async function artifacts(
     { path: 'assets/app.js', bytes: text('console.log(1)') },
     { path: 'changelog.json', bytes: CHANGELOG },
   ];
+  const be = zipEntries([{ path: 'server.cjs', bytes: text('服务') }]);
+  const backend = {
+    format: 1 as const,
+    version: '0.2.0',
+    protocol: 1 as const,
+    backend: { url: downloadUrl('0.2.0', 'be-0.2.0.zip'), size: be.length, sha256: sha256(be) },
+    runtime: { url: 'https://example.com/runtime.json', size: 100, sha256: 'a'.repeat(64) },
+  };
+  if (withBackend) frontend.push({ path: 'backend.json', bytes: text(JSON.stringify(backend)) });
   const fe = zipEntries(frontend);
   const release = releaseManifest({
     version: '0.2.0',
@@ -54,6 +64,7 @@ async function artifacts(
     loader: 1,
     notes: { 'zh-CN': '说明' },
     zip: { size: fe.length, sha256: sha256(fe) },
+    ...(withBackend ? { backend } : {}),
   });
   const releaseBytes = text(JSON.stringify(release));
   const releaseSha256 = sha256(releaseBytes);
@@ -93,12 +104,21 @@ async function artifacts(
     'manifest.json': text(manifest),
     'changelog.json': CHANGELOG,
   };
+  if (withBackend) files['be-0.2.0.zip'] = be;
   change(files);
   for (const [name, bytes] of Object.entries(files)) writeFileSync(join(dir, name), bytes);
   return { dir, keys: [{ keyId: 'k1', spki: publicSpki(pem) }] };
 }
 
 describe('分发物核对', () => {
+  it('附带后端的发行物可经前端安装标记追溯，并将后端列入上传附件', async () => {
+    const { dir, keys } = await artifacts(undefined, undefined, true);
+    const verified = await verifyArtifacts(dir, keys);
+    expect(verified.assets.map((asset) => asset.name)).toContain('be-0.2.0.zip');
+    expect(verified.runtime).toMatchObject({ url: 'https://example.com/runtime.json', size: 100 });
+    writeFileSync(join(dir, 'be-0.2.0.zip'), text('损坏'));
+    await expect(verifyArtifacts(dir, keys)).rejects.toThrow('后端附件');
+  });
   it('一致的分发物通过，交回附件与序号', async () => {
     const { dir, keys } = await artifacts();
     const verified = await verifyArtifacts(dir, keys);

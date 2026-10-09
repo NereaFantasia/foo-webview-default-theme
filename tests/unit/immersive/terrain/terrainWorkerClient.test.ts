@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { setPaintFpsCap } from '../../../../src/immersive/frame/frameScheduler.ts';
 import type { PaintStats } from '../../../../src/immersive/perf/paintMeter.ts';
 import {
@@ -36,10 +36,11 @@ const SETTINGS: TerrainPaintSettings = {
 function fakePort() {
   const sent: { message: TerrainWorkerMessage<ArrayBuffer>; transfer: Transferable[] }[] = [];
   let terminated = 0;
-  const listeners: ((event: MessageEvent<unknown>) => void)[] = [];
+  const listeners = new Set<(event: MessageEvent<unknown>) => void>();
   return {
     sent,
     terminated: () => terminated,
+    listeners,
     /** 假装 Worker 发回一条消息。 */
     reply: (data: unknown) => {
       for (const listener of listeners) listener(new MessageEvent('message', { data }));
@@ -49,7 +50,10 @@ function fakePort() {
         sent.push({ message, transfer });
       },
       addEventListener: (_type: 'message', listener: (event: MessageEvent<unknown>) => void) => {
-        listeners.push(listener);
+        listeners.add(listener);
+      },
+      removeEventListener: (_type: 'message', listener: (event: MessageEvent<unknown>) => void) => {
+        listeners.delete(listener);
       },
       terminate: () => {
         terminated += 1;
@@ -67,6 +71,25 @@ const frameOf = (bands: number, n: number) => new Array<number>(bands).fill(n / 
 afterEach(() => setPaintFpsCap(null));
 
 describe('createWorkerTerrainPainter', () => {
+  test('初始化透传 GPU 探测开关，独立回报后端；销毁后不再回报', () => {
+    const { port, sent, reply } = fakePort();
+    const ready = vi.fn();
+    const painter = createWorkerTerrainPainter(
+      port,
+      new ArrayBuffer(8),
+      () => createSpectrumHistory(4, 3),
+      SETTINGS,
+      false,
+      ready,
+    );
+    expect(sent[0]?.message).toMatchObject({ type: 'init', gpu: false });
+    reply({ type: 'ready', surface: '2d' });
+    reply({ type: 'ready', surface: 'other' });
+    expect(ready).toHaveBeenCalledExactlyOnceWith('2d');
+    painter.dispose();
+    reply({ type: 'ready', surface: 'webgl' });
+    expect(ready).toHaveBeenCalledOnce();
+  });
   test('init 带设置、canvas 进 transfer；挂载时存量行按从旧到新补发，不算新到的帧；空缓冲也发一次 reset', () => {
     const history = createSpectrumHistory(4, 3);
     for (let n = 1; n <= 2; n += 1) history.push(frameOf(3, n));
@@ -179,7 +202,7 @@ describe('createWorkerTerrainPainter', () => {
   });
 
   test('dispose 终止 Worker 一次，之后不再发消息；判别字段之外的消息 Worker 不认', () => {
-    const { port, sent, terminated } = fakePort();
+    const { port, sent, terminated, listeners } = fakePort();
     const history = createSpectrumHistory(4, 2);
     const painter = createWorkerTerrainPainter(port, new ArrayBuffer(8), () => history, SETTINGS);
     const before = sent.length;
@@ -189,6 +212,7 @@ describe('createWorkerTerrainPainter', () => {
     painter.frameArrived();
     painter.update({ lineColor: 'blue' });
     expect(terminated()).toBe(1);
+    expect(listeners.size).toBe(0);
     expect(sent).toHaveLength(before);
 
     expect(isTerrainWorkerMessage({ type: 'rows' })).toBe(true);

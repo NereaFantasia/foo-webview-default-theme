@@ -23,6 +23,7 @@ import styles from './ChannelPage.module.css';
 import { useService } from '../../kit/useService.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 import { albumDetailKey } from '../album-detail/albumDetail.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const CHANNEL_SLOT = createSnapshotSlot<TableView<string>>();
 
@@ -42,6 +43,7 @@ function ChannelContent({
   readonly id: string;
   readonly query: ChannelQueryService;
 }) {
+  const viewControls = useViewControlStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
@@ -53,9 +55,7 @@ function ChannelContent({
   const library = useAtomValueRawSync(libraryTracksAtom);
   const [editing, edit] = useState(false);
   const handle = useRef<TrackTableHandle>(null);
-  useEffect(() => {
-    albumList.tracks.want();
-  }, [query, albumList]);
+  useEffect(() => albumList.tracks.want(), [albumList]);
   useEffect(() => {
     query.setQuery(channel?.query ?? '', channel?.sort ?? 'album', true);
   }, [query, channel?.query, channel?.sort]);
@@ -109,7 +109,9 @@ function ChannelContent({
     return (
       <section>
         <p role="alert">{t('home.channelsFailed')}</p>
-        <Button onClick={() => void home.channels.retry()}>{t('album.retry')}</Button>
+        <Button className={viewControls.field} onClick={() => void home.channels.retry()}>
+          {t('album.retry')}
+        </Button>
       </section>
     );
   if (!channel) return <p>{t('home.channelMissing')}</p>;
@@ -133,6 +135,7 @@ function ChannelContent({
             </PrimaryPlayButton>
           </Tooltip>
           <Button
+            className={viewControls.field}
             icon={<ArrowClockwise20Regular />}
             onClick={() => {
               query.retry();
@@ -143,6 +146,8 @@ function ChannelContent({
           </Button>
           <Tooltip content={t('home.editChannel')} relationship="label">
             <Button
+              appearance="subtle"
+              className={viewControls.icon}
               icon={<Edit20Regular />}
               aria-label={t('home.editChannel')}
               onClick={() => edit(true)}

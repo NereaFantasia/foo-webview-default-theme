@@ -7,9 +7,10 @@ import { TEXTBOX_KEYS } from '../../kit/textboxKeys.ts';
 import { useCommand } from '../../nav/useCommand.ts';
 import { SEARCH_TAB_KEYS, useSearchSession } from './searchContext.ts';
 import { searchOptionId } from './searchSuggestions.ts';
+import { roleVar } from '../../theme/roles.ts';
 
 const useStyles = makeStyles({
-  root: { width: '100%', minWidth: 0 },
+  root: { width: '100%', minWidth: 0, backgroundColor: roleVar('bg-window-control') },
   hidden: { visibility: 'hidden', pointerEvents: 'none' },
   clear: { minWidth: '24px', width: '24px', height: '24px' },
 });

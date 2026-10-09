@@ -4,6 +4,9 @@ import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { FakePlaylists } from '../fixtures/fakePlaylists.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
 import { DEFAULT_LISTS } from '../fixtures/sidebarPage.ts';
+import { choosePlayerBar } from '../fixtures/playerPage.ts';
+
+test.use({ screenshot: 'off' });
 
 // 侧边栏的拖拽折叠、图标态与窄窗浮层：握柄的拖动吸附、Esc、双击与键盘，窗口宽度三档，导航行的侧边栏键
 // （宽档隐藏与摆回、窄档浮层），两种形态的图标对齐，图标态的列表浮层与小圆点，换形态的动画。
@@ -151,21 +154,21 @@ test('拖过收起线吸成图标态，拖回过展开线展开到 200 再跟手
   page,
 }) => {
   const shell = await openShell(page);
-  // 指针横坐标减去握柄半宽 4 就是侧边栏宽度。
-  await dragTo(page, shell, [154]);
+  // 握柄中心骑在内容卡边线上，离侧边栏右缘有 16px 的留白。
+  await dragTo(page, shell, [166]);
   await expect(shell.body).toHaveAttribute('data-sidebar', 'expanded');
   expect(await shell.columnWidth()).toBe(200);
-  await page.mouse.move(118, 400, { steps: 2 });
+  await page.mouse.move(130, 400, { steps: 2 });
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   expect(await shell.columnWidth()).toBe(48);
   // 滞回带里来回不切。
-  await page.mouse.move(134, 400);
-  await page.mouse.move(124, 400);
+  await page.mouse.move(146, 400);
+  await page.mouse.move(136, 400);
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
-  await page.mouse.move(140, 400);
+  await page.mouse.move(152, 400);
   await expect(shell.body).toHaveAttribute('data-sidebar', 'expanded');
   expect(await shell.columnWidth()).toBe(200);
-  await page.mouse.move(304, 400, { steps: 3 });
+  await page.mouse.move(316, 400, { steps: 3 });
   await page.mouse.up();
   expect(await shell.columnWidth()).toBe(300);
   expect(await shell.saved()).toMatchObject({ rail: false, width: 300 });
@@ -179,7 +182,7 @@ test('拖动中按 Esc 回到拖动之前的形态与宽度，之后再挪指针
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   await page.keyboard.press('Escape');
   await expect(shell.body).toHaveAttribute('data-sidebar', 'expanded');
-  expect(await shell.saved()).toMatchObject({ rail: false, width: 320 });
+  await expect.poll(shell.saved).toMatchObject({ rail: false, width: 320 });
   await page.mouse.move(220, 400);
   await page.mouse.up();
   expect(await shell.columnWidth()).toBe(320);
@@ -302,7 +305,7 @@ test('窗口缩到 1000 强制图标态、没有握柄；拉回 1280 恢复用�
   expect(shell.errors).toEqual([]);
 });
 
-test('641–1007：侧边栏键从图标条原地展开整张侧边栏，宽度用存的值；点外面、Esc 关，拉过 1008 立刻关', async ({
+test('641–1007：侧边栏从内容区左侧滑入，宽度用存的值；点外面、Esc 关，拉过 1008 立刻关', async ({
   page,
 }) => {
   const shell = await openShell(page, { width: 900, prefs: { rail: false, width: 280 } });
@@ -332,6 +335,7 @@ test('641–1007：侧边栏键从图标条原地展开整张侧边栏，宽度�
 test('≤ 640：不显示侧边栏，标题栏留着 ⋯，导航行留着后退、前进与展开键；从浮层里点一项就去那里并关掉浮层', async ({
   page,
 }) => {
+  await choosePlayerBar(page, 'titlebar');
   const shell = await openShell(page, { width: 600 });
   await expect(shell.body).toHaveAttribute('data-sidebar', 'none');
   await expect(page.locator('aside')).toHaveCount(0);
@@ -528,7 +532,7 @@ test('拖过收起线吸成图标态：窗格从拖动中停住的 200 起步收
   page,
 }) => {
   const shell = await openShell(page, { prefs: { rail: false, width: 260 } });
-  await dragTo(page, shell, [154]);
+  await dragTo(page, shell, [166]);
   expect(await shell.columnWidth()).toBe(200);
   await takeMotion(page);
   await page.mouse.move(110, 400, { steps: 2 });

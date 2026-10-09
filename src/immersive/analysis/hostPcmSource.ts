@@ -52,11 +52,13 @@ function decodeTrack(
 export function createHostPcmSource(host: PcmHost = fb): PcmSource {
   return async (track, range, signal) => {
     if (!isLocalMedia(track.path)) return null;
+    signal.throwIfAborted();
     const pcm = await decodeTrack(host, track, range, signal, {
       sampleRate: ANALYSIS_SAMPLE_RATE,
       mono: true,
     });
     try {
+      signal.throwIfAborted();
       return { audio: pcm.toAudioBuffer(), start: pcm.start };
     } finally {
       pcm.release();
@@ -71,13 +73,20 @@ export function createHostPcmSource(host: PcmHost = fb): PcmSource {
 export function createHostFullRatePcm(host: PcmHost = fb): PlanesSource {
   return async (track, range, signal) => {
     if (!isLocalMedia(track.path)) return null;
+    signal.throwIfAborted();
     const pcm = await decodeTrack(host, track, range, signal, {});
-    return {
-      sampleRate: pcm.sampleRate,
-      frames: pcm.frames,
-      planes: Array.from({ length: pcm.channels }, (_, channel) => pcm.getChannelView(channel)),
-      release: () => pcm.release(),
-    };
+    try {
+      signal.throwIfAborted();
+      return {
+        sampleRate: pcm.sampleRate,
+        frames: pcm.frames,
+        planes: Array.from({ length: pcm.channels }, (_, channel) => pcm.getChannelView(channel)),
+        release: () => pcm.release(),
+      };
+    } catch (error) {
+      pcm.release();
+      throw error;
+    }
   };
 }
 

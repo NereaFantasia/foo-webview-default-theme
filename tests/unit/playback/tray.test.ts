@@ -9,6 +9,8 @@ import {
   type TrayDeps,
 } from '../../../src/playback/tray.ts';
 import { watchColorScheme } from '../../../src/theme/colorScheme.ts';
+import { startBackdrop } from '../../../src/theme/backdrop.ts';
+import { themeFor } from '../../../src/theme/themes.ts';
 import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
 import { fakeMedia } from '../../fixtures/fakeMedia.ts';
 import { hostFailure, isRecord } from '../../fixtures/hostAnswers.ts';
@@ -17,6 +19,7 @@ import { installFakeHost, type UnitHost } from '../../fixtures/unitHost.ts';
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 const DARK = '(prefers-color-scheme: dark)';
@@ -24,7 +27,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const TRAY_METHODS = ['tray.create', 'tray.setMenuZones', 'tray.setTooltip', 'tray.destroy'];
 
 /** 同时起播放服务与托盘，不等就绪：扣留宿主应答的测试要在中途插手。 */
-function launch(host: UnitHost, visible = true) {
+function launch(host: UnitHost) {
   const store = createStore();
   const media = fakeMedia({ [DARK]: false });
   watchColorScheme(store, media.matchMedia);
@@ -33,7 +36,6 @@ function launch(host: UnitHost, visible = true) {
   const deps: TrayDeps = {
     playback: { setOrder: vi.fn(async () => {}), setVolume: vi.fn(async () => {}) },
     icon: () => undefined,
-    visible: () => visible,
     configWriter: createMemoryConfigWriter(host.fb),
   };
   const tray = startTray(store, deps, host.fb);
@@ -42,8 +44,8 @@ function launch(host: UnitHost, visible = true) {
   return { store, tray, deps, media, ready, trayCalls };
 }
 
-async function start(host: UnitHost, visible = true) {
-  const launched = launch(host, visible);
+async function start(host: UnitHost) {
+  const launched = launch(host);
   await launched.ready;
   await settle();
   return launched;
@@ -61,6 +63,34 @@ function zonesOf(params: Record<string, unknown> | undefined): Record<string, st
 }
 
 describe('startTray', () => {
+  it.each(['10.0.0', '13.0.0'])(
+    '平台版本 %s 的托盘材质跟随系统检测结果',
+    async (platformVersion) => {
+      const host = installFakeHost();
+      vi.stubGlobal('navigator', {
+        userAgentData: {
+          platform: 'Windows',
+          getHighEntropyValues: async () => ({ platformVersion }),
+        },
+      });
+      const { store, tray } = await start(host);
+      expect(host.callsTo('tray.setMenuZones').at(-1)?.['config']).toMatchObject({
+        backdrop: 'none',
+      });
+      const backdrop = startBackdrop(store, host.fb, null);
+      await backdrop.ready;
+      await new Promise((resolve) => setTimeout(resolve, MENU_COALESCE_MS + 30));
+      expect(host.callsTo('tray.setMenuZones').at(-1)?.['config']).toMatchObject({
+        backdrop: platformVersion === '10.0.0' ? 'none' : 'acrylic',
+        css: expect.stringContaining(
+          `background: ${platformVersion === '10.0.0' ? themeFor('light').colorNeutralBackground1 : themeFor('light').colorNeutralBackgroundAlpha2}`,
+        ),
+      });
+      backdrop.dispose();
+      tray.dispose();
+    },
+  );
+
   it('图标最先建，再下发两只开关与菜单：三区与配置一次替换', async () => {
     const host = installFakeHost();
     const { trayCalls } = await start(host);
@@ -195,20 +225,34 @@ describe('startTray', () => {
     expect(deps.playback.setVolume).toHaveBeenCalledWith(dbOf(70, 'perceptual'), false);
   });
 
-  it('左键单击图标：页面可见时收起主窗', async () => {
-    const host = installFakeHost();
-    await start(host, true);
-    host.emit('tray:click', { button: 0, x: 0, y: 0 });
-    await settle();
-    expect(host.callsTo('window.minimize')).toHaveLength(1);
-  });
+  it.each(['visible', 'hidden'] as const)(
+    '页面为 %s 时，图标单击与双击均不由主题发起窗口命令',
+    async (visibilityState) => {
+      vi.stubGlobal('document', { visibilityState });
+      const host = installFakeHost();
+      await start(host);
+      host.emit('tray:click', { button: 0, x: 0, y: 0 });
+      host.emit('tray:doubleClick', { x: 0, y: 0 });
+      await settle();
+      expect(host.calls.filter(({ method }) => method.startsWith('window.'))).toEqual([]);
+    },
+  );
 
-  it('左键单击图标：页面不可见时不动', async () => {
+  it('页面恢复后再收到隐藏期间的图标点击，不会重新最小化', async () => {
+    const page = { visibilityState: 'hidden' };
+    vi.stubGlobal('document', page);
     const host = installFakeHost();
-    await start(host, false);
-    host.emit('tray:click', { button: 0, x: 0, y: 0 });
+    await start(host);
+    const pendingClicks = [
+      { button: 0, x: 10, y: 20 },
+      { button: 0, x: 10, y: 20 },
+    ];
+
+    // 页面挂起期间的点击，在原生恢复窗口、页面重新可见之后才送达。
+    page.visibilityState = 'visible';
+    for (const click of pendingClicks) host.emit('tray:click', click);
     await settle();
-    expect(host.callsTo('window.minimize')).toEqual([]);
+    expect(host.calls.filter(({ method }) => method.startsWith('window.'))).toEqual([]);
   });
 
   it('释放时销毁建过的图标', async () => {
@@ -230,7 +274,7 @@ describe('startTray', () => {
     await ready;
     await settle();
     expect(trayCalls().map((call) => call.method)).toEqual(['tray.create', 'tray.destroy']);
-    expect(host.listenerCount('tray:click')).toBe(0);
+    expect(host.listenerCount('tray:menuItemClicked')).toBe(0);
   });
 
   it('释放后合并窗口里的变化不再下发', async () => {

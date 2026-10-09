@@ -17,6 +17,7 @@ import { startColorIntegration } from '../../../src/app/colorIntegration.ts';
 import type { PlayingCoverOptions } from '../../../src/covers/playingCover.ts';
 import { profileFromPixels } from '../../../src/theme/coverPalette.ts';
 import { SAMPLE_SIZE, seedFromPixels, type CoverSeed } from '../../../src/theme/coverColor.ts';
+import { backgroundCoverAtom } from '../../../src/theme/background/windowBackground.ts';
 import { coverUrl, defer, foundCover, noCover } from '../../fixtures/coverArt.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
@@ -279,6 +280,26 @@ describe('播放封面跟随', () => {
     late.resolve(BLUE);
     await flush();
     expect(ramp()).toStrictEqual(rampFrom(RED));
+  });
+
+  test('取色未完成时原图地址已可用；失败保留原图，迟到失败不能清掉新封面', async () => {
+    const host = installFakeHost();
+    answerByPath(host);
+    const pending = defer<CoverSeed | null>();
+    const { store, play, ramp } = await start(host, (url) =>
+      url === coverUrl(FEATHER.handle) ? pending.promise : Promise.resolve(RED),
+    );
+    await play(FEATHER);
+    expect(store.get(backgroundCoverAtom).url).toBe(coverUrl(FEATHER.handle));
+    await play(LUV);
+    pending.reject(new Error('analysis'));
+    await flush();
+    expect(store.get(backgroundCoverAtom).url).toBe(coverUrl(LUV.handle));
+    expect(ramp()).toStrictEqual(rampFrom(RED));
+    await play(FEATHER);
+    expect(store.get(backgroundCoverAtom).url).toBe(coverUrl(FEATHER.handle));
+    expect(store.get(backgroundCoverAtom).profile).toBeNull();
+    expect(ramp()).toBe(tealBrand);
   });
 
   test.each([

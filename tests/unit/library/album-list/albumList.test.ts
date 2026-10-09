@@ -24,7 +24,6 @@ const TRACKS: LibraryTrack[] = ALBUMS.map((album) =>
   trackRow(album.name, `${album.name} 1`, { albumArtist: album.albumArtist }),
 );
 
-/** 探测与取统计都答：播放次数答得出，就是装了 foo_playcount。 */
 function evalAnswer(params: HostParams) {
   const paths: unknown = params['paths'];
   const list = Array.isArray(paths) ? paths.map(String) : [];
@@ -32,7 +31,7 @@ function evalAnswer(params: HostParams) {
   const results = list.map((path) => ({
     path,
     success: true,
-    result: pattern.startsWith('$if2(%added%') ? '2024-01-01 00:00:00|||3' : '0',
+    result: '2024-01-01 00:00:00|||3',
   }));
   const total = results.length;
   return { success: true as const, pattern, total, successCount: total, errorCount: 0, results };
@@ -50,6 +49,11 @@ async function setup() {
     limit: TRACK_LIMIT,
   });
   host.answer('titleformat.evalBatch', evalAnswer);
+  host.answer('config.getComponents', {
+    success: true,
+    count: 1,
+    components: [{ name: '播放统计信息', version: '3.1.10', filename: 'foo_playcount' }],
+  });
   const store = createStore();
   const prefs = startBrowserPrefs(store, host.fb, createMemoryConfigWriter(host.fb));
   const browse = startAlbumBrowse(store, host.fb, createMemoryConfigWriter(host.fb));
@@ -115,10 +119,11 @@ describe('播放统计', () => {
     list.syncStats();
     await vi.waitFor(() => expect(store.get(playStatsAtom).available).toBe(true));
     list.syncStats();
-    expect(host.callsTo('titleformat.evalBatch')).toHaveLength(1);
+    expect(host.callsTo('config.getComponents')).toEqual([{}]);
+    expect(host.callsTo('titleformat.evalBatch')).toEqual([]);
     list.prefs.setField('playCount');
     list.syncStats();
     await vi.waitFor(() => expect(store.get(playStatsAtom).byHandle?.size).toBe(3));
-    expect(host.callsTo('titleformat.evalBatch')).toHaveLength(2);
+    expect(host.callsTo('titleformat.evalBatch')).toHaveLength(1);
   });
 });

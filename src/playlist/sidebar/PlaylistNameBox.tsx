@@ -1,7 +1,8 @@
-import { Input, makeStyles } from '@fluentui/react-components';
+import { mergeClasses, Input, makeStyles } from '@fluentui/react-components';
 import { useLayoutEffect, useRef, type ReactElement } from 'react';
 import { TEXTBOX_KEYS } from '../../kit/textboxKeys.ts';
 import styles from './PlaylistNameBox.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export interface PlaylistNameBoxProps {
   /** 行首的状态图标。 */
@@ -29,6 +30,7 @@ const DOUBLE_CLICK_MS = 500;
  * 挂上就聚焦并全选。
  */
 export function PlaylistNameBox(props: PlaylistNameBoxProps) {
+  const viewControls = useViewControlStyles();
   const { icon, name, label, guid, readOnly = false, onBlur } = props;
   const classes = useStyles();
   const input = useRef<HTMLInputElement>(null);
@@ -50,7 +52,7 @@ export function PlaylistNameBox(props: PlaylistNameBoxProps) {
       <span className={styles.icon}>{icon}</span>
       <Input
         ref={input}
-        className={classes.input}
+        className={mergeClasses(classes.input, viewControls.windowField)}
         size="small"
         defaultValue={name}
         readOnly={readOnly}

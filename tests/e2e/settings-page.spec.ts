@@ -60,7 +60,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
       await page.setViewportSize({ width: 1280, height: 800 });
       const settings = await openSettings(page);
       await expect(settings.nav).toHaveAttribute('data-settings-nav', 'directory');
-      const groups = ['常规', '外观', '播放', '在线内容', '快捷键', '关于'];
+      const groups = ['常规', '外观', '播放', '沉浸视图', '歌词', '在线内容', '快捷键', '关于'];
       await expect(settings.nav.getByRole('button')).toHaveText(groups);
       for (const name of groups) {
         await expect(settings.nav.getByRole('button', { name, exact: true })).toBeVisible();
@@ -97,7 +97,8 @@ for (const colorScheme of ['dark', 'light'] as const) {
       expect(Math.abs(language.indent)).toBeLessThan(1);
       expect(language.rightGap).toBe(17);
       // 开关不换行，仍在标题右边。
-      const title = await box(settings.card('最小化到托盘').getByText('最小化到托盘'));
+      await settings.expand('托盘');
+      const title = await box(settings.row('最小化到托盘').getByText('最小化到托盘'));
       const toggle = await box(page.getByRole('switch', { name: '最小化到托盘' }));
       expect(toggle.x).toBeGreaterThan(title.x + title.width);
       expect(settings.errors).toEqual([]);

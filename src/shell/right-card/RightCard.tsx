@@ -1,3 +1,4 @@
+import { createSnapshotSlot } from '../../nav/historyStack.ts';
 import {
   Button,
   Menu,
@@ -6,8 +7,8 @@ import {
   MenuPopover,
   MenuTrigger,
   Tab,
-  TabList,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -31,7 +32,18 @@ import {
   RightCardInformationContext,
   RightCardLyricsContext,
   useRightCard,
+  useRightCardSnapshot,
 } from './rightCardContext.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
+import { LyricsPreviewContext, useLyricsPreview } from './lyrics/useLyricsPreview.ts';
+import { TabList } from '../../motion/Surfaces.tsx';
+import { RightCardNavigation } from './RightCardNavigation.tsx';
+
+const SNAPSHOT = createSnapshotSlot<{
+  scroll: number;
+  infoScroll: number;
+  focusedRow: string | null;
+}>();
 
 const PAGE_LABELS: Readonly<Record<RightCardPage, MessageKey>> = {
   queue: 'rightCard.page.queue',
@@ -55,14 +67,67 @@ export function RightCard() {
   const t = useAtomValueRawSync(translateAtom);
   const { card, deps } = useRightCard();
   const classes = useStyles();
+  const controls = useViewControlStyles();
   const biography = useContext(RightCardBiographyContext);
   const information = useContext(RightCardInformationContext);
   const lyrics = useContext(RightCardLyricsContext);
   const { page, coverCollapsed } = useAtomValueRawSync(card.view).prefs;
+  const preview = useLyricsPreview(page === 'lyrics');
   const source = useAtomValueRawSync(deps.source);
   const playbackState = useAtomValueRawSync(deps.playbackState);
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const status = useRef<HTMLSpanElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const { entry, arrival } = useAtomValueRawSync(card.navigation);
+  useRightCardSnapshot(
+    SNAPSHOT,
+    {
+      capture: () => ({
+        scroll: content.current?.scrollTop ?? 0,
+        infoScroll:
+          content.current?.querySelector('[data-track-info] > div:last-child')?.scrollTop ?? 0,
+        focusedRow:
+          document.activeElement instanceof HTMLElement
+            ? (document.activeElement.closest<HTMLElement>('[data-queue-row]')?.dataset.queueRow ??
+              null)
+            : null,
+      }),
+      restore: (snapshot) => {
+        if (!content.current) return;
+        content.current.scrollTop = snapshot.scroll;
+        const info = content.current.querySelector('[data-track-info] > div:last-child');
+        if (info) info.scrollTop = snapshot.infoScroll;
+        const row = [...content.current.querySelectorAll<HTMLElement>('[data-queue-row]')].find(
+          (element) => element.dataset.queueRow === snapshot.focusedRow,
+        );
+        row?.focus({ preventScroll: true });
+      },
+    },
+    page !== 'lyrics',
+  );
+  useLayoutEffect(() => {
+    if (arrival && document.activeElement === document.body)
+      preview.root.current?.focus({ preventScroll: true });
+    if (!arrival || !content.current) return;
+    const from = arrival.direction === 'back' ? -20 : 20;
+    const animations = [
+      content.current.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: motionDuration(DURATION_MS.faster, reduced),
+        easing: CURVE.linear.timing,
+      }),
+      content.current.animate(
+        [
+          { transform: arrival.kind === 'step' ? `translateX(${from}px)` : 'translateY(20px)' },
+          { transform: 'none' },
+        ],
+        {
+          duration: motionDuration(DURATION_MS.normal, reduced),
+          easing: CURVE.decelerateMid.timing,
+        },
+      ),
+    ];
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [entry, arrival, reduced, preview.root]);
   const StatusIcon =
     playbackState === 'paused'
       ? Pause12Regular
@@ -79,56 +144,28 @@ export function RightCard() {
   const [reviewSlot, setReviewSlot] = useState<HTMLDivElement | null>(null);
   const [historySlot, setHistorySlot] = useState<HTMLDivElement | null>(null);
   return (
-    <section className={styles.root} aria-label={t('rightCard.region')} data-right-card>
-      {page === 'info' && information ? (
-        information.toolbar
-      ) : (
-        <div className={styles.toolbar}>
-          <span
-            ref={status}
-            className={styles.following}
-            data-right-card-playback-state={playbackState}
-            aria-live="polite"
-          >
-            <StatusIcon className={styles.followingIcon} />
-            {t(
-              playbackState === 'paused'
-                ? 'rightCard.paused'
-                : playbackState === 'stopped'
-                  ? 'rightCard.idle'
-                  : 'rightCard.following',
-            )}
-          </span>
-          <div className={styles.toolbarActions}>
-            <div ref={setReviewSlot} />
-            <Menu surfaceMotion={MENU_SURFACE_MOTION}>
-              <MenuTrigger disableButtonEnhancement>
-                <Button
-                  className={classes.more}
-                  appearance="subtle"
-                  size="small"
-                  icon={<MoreHorizontal16Regular />}
-                  aria-label={t('rightCard.more')}
-                />
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  {page === 'queue' && (
-                    <MenuItem onClick={() => card.toggleCover()}>
-                      {t(coverCollapsed ? 'rightCard.showCover' : 'rightCard.hideCover')}
-                    </MenuItem>
-                  )}
-                  <MenuItem disabled={!source} onClick={() => deps.openSource()}>
-                    {t('rightCard.openSource')}
-                  </MenuItem>
-                  <MenuItem onClick={() => card.close()}>{t('rightCard.close')}</MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
-          </div>
-        </div>
-      )}
-      <div className={styles.tabs}>
+    <section
+      ref={preview.root}
+      className={styles.root}
+      aria-label={t('rightCard.region')}
+      data-right-card
+      data-lyrics-preview={page === 'lyrics' || undefined}
+      data-controls-visible={preview.visible || undefined}
+      tabIndex={page === 'lyrics' ? 0 : -1}
+      onPointerMove={preview.pointer}
+      onPointerEnter={preview.pointer}
+      onPointerDown={preview.pointer}
+      onFocusCapture={preview.focus}
+      onBlurCapture={preview.blur}
+    >
+      <div
+        ref={preview.tabs}
+        className={styles.tabs}
+        data-lyrics-preview-controls
+        inert={!preview.visible}
+        aria-hidden={!preview.visible || undefined}
+      >
+        <RightCardNavigation scope={preview.root} />
         <TabList
           size="small"
           selectedValue={page}
@@ -157,15 +194,75 @@ export function RightCard() {
           })}
         </TabList>
       </div>
+      {page === 'info' && information ? (
+        information.toolbar
+      ) : page === 'lyrics' ? null : (
+        <div
+          ref={preview.toolbar}
+          className={styles.toolbar}
+          data-lyrics-preview-controls
+          inert={!preview.visible}
+          aria-hidden={!preview.visible || undefined}
+        >
+          <span
+            ref={status}
+            className={styles.following}
+            data-right-card-playback-state={playbackState}
+            aria-live="polite"
+          >
+            <StatusIcon className={styles.followingIcon} />
+            {t(
+              playbackState === 'paused'
+                ? 'rightCard.paused'
+                : playbackState === 'stopped'
+                  ? 'rightCard.idle'
+                  : 'rightCard.following',
+            )}
+          </span>
+          <div className={styles.toolbarActions}>
+            <div ref={setReviewSlot} />
+            <Menu
+              surfaceMotion={MENU_SURFACE_MOTION}
+              onOpenChange={(_, data) => preview.setMenuOpen(data.open)}
+            >
+              <MenuTrigger disableButtonEnhancement>
+                <Button
+                  className={mergeClasses(classes.more, controls.icon)}
+                  appearance="subtle"
+                  size="small"
+                  icon={<MoreHorizontal16Regular />}
+                  aria-label={t('rightCard.more')}
+                />
+              </MenuTrigger>
+              <MenuPopover data-right-card-surface>
+                <MenuList>
+                  {page === 'queue' && (
+                    <MenuItem onClick={() => card.toggleCover()}>
+                      {t(coverCollapsed ? 'rightCard.showCover' : 'rightCard.hideCover')}
+                    </MenuItem>
+                  )}
+                  <MenuItem disabled={!source} onClick={() => deps.openSource()}>
+                    {t('rightCard.openSource')}
+                  </MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
+          </div>
+        </div>
+      )}
       <div ref={setHistorySlot} className={styles.history} />
-      <div className={styles.content} data-page={page}>
+      <div ref={content} className={styles.content} data-page={page}>
         {/* 插槽就位后才挂队列页：历史区挂上时就要拿得到自己的列表，滚动监听与按键才接得上。 */}
         {page === 'queue' && historySlot && (
           <QueuePage reviewSlot={reviewSlot} historySlot={historySlot} />
         )}
         {page === 'bio' && biography}
         {page === 'info' && information?.content}
-        {page === 'lyrics' && lyrics}
+        {page === 'lyrics' && (
+          <LyricsPreviewContext value={{ visible: preview.visible, pin: preview.pin }}>
+            {lyrics}
+          </LyricsPreviewContext>
+        )}
       </div>
     </section>
   );

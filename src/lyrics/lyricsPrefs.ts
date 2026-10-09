@@ -10,7 +10,25 @@ import type { Store } from '../kit/store.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 import { LYRICS_SOURCE_IDS, type LyricsSourceId } from './online/lyricsSource.ts';
 
+export const LYRICS_PRIORITY = ['local', 'word', 'line', 'plain'] as const;
+export type LyricsPriority = (typeof LYRICS_PRIORITY)[number];
+export const WORD_FIRST: readonly LyricsPriority[] = ['word', 'local', 'line', 'plain'];
+
+export function parseLyricsPriority(raw: unknown): LyricsPriority[] | undefined {
+  if (!Array.isArray(raw) || raw.length !== LYRICS_PRIORITY.length) return undefined;
+  const order = raw.flatMap((value: unknown) => LYRICS_PRIORITY.filter((known) => known === value));
+  return new Set(order).size === LYRICS_PRIORITY.length ? order : undefined;
+}
+
+const PRIORITY_PREF = defineConfigPref(
+  'defaultTheme.lyrics.priority',
+  [...LYRICS_PRIORITY],
+  parseLyricsPriority,
+);
+export const LYRICS_PRIORITY_KEY = PRIORITY_PREF.key;
+
 export interface LyricsPrefs {
+  readonly order?: readonly LyricsPriority[];
   readonly enabled: boolean;
   /** null 表示尚未选择首次预设；空数组表示不使用任何来源。 */
   readonly sources: readonly LyricsSourceId[] | null;
@@ -53,6 +71,8 @@ export interface LyricsPrefsService {
   readonly ready: Promise<void>;
   readonly persistence: ConfigPersistence;
   setEnabled(enabled: boolean, locale: string): Promise<boolean>;
+  setOrder(order: readonly LyricsPriority[]): Promise<boolean>;
+  setSources(sources: readonly LyricsSourceId[]): Promise<boolean>;
   dispose(): void;
 }
 
@@ -63,9 +83,9 @@ export function startLyricsPrefs(
   host?: ConfigPrefFace,
   writer?: Pick<ConfigWriter, 'set'>,
 ): LyricsPrefsService {
-  const prefs = startConfigPrefs(store, [ONLINE_PREF], host, writer);
+  const prefs = startConfigPrefs(store, [ONLINE_PREF, PRIORITY_PREF], host, writer);
   return {
-    pref: atom((get) => get(ONLINE_PREF.atom)),
+    pref: atom((get) => ({ ...get(ONLINE_PREF.atom), order: get(PRIORITY_PREF.atom) })),
     ready: prefs.ready,
     persistence: prefs,
     setEnabled(enabled, locale) {
@@ -79,6 +99,9 @@ export function startLyricsPrefs(
           : null);
       return prefs.set(ONLINE_PREF, { version: 1, enabled, sources });
     },
+    setOrder: (order) => prefs.set(PRIORITY_PREF, [...order]),
+    setSources: (sources) =>
+      prefs.set(ONLINE_PREF, { ...store.get(ONLINE_PREF.atom), sources: [...sources] }),
     dispose: prefs.dispose,
   };
 }

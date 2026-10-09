@@ -54,13 +54,10 @@ export function createLrcmuxSource(host: LyricsHttpHost): LyricsSource {
   return {
     id: 'lrcmux',
     async search(query: LyricsQuery, signal?: AbortSignal) {
-      const params = new URLSearchParams({ title: query.keywords ?? query.title });
-      if (!query.keywords) {
-        if (query.artists[0]) params.set('artist', query.artists[0]);
-        if (query.album) params.set('album', query.album);
-        if (query.durationMs > 0)
-          params.set('duration', String(Math.round(query.durationMs / 1000)));
-      }
+      if (query.keywords || !query.title.trim() || !query.artists[0]?.trim()) return [];
+      const params = new URLSearchParams({ title: query.title, artist: query.artists[0] });
+      if (query.album) params.set('album', query.album);
+      if (query.durationMs > 0) params.set('duration', String(Math.round(query.durationMs / 1000)));
       const answer = await lyricsGet(
         host,
         `${GET_URL}?${params.toString()}`,
@@ -75,6 +72,8 @@ export function createLrcmuxSource(host: LyricsHttpHost): LyricsSource {
       const title = asText(field(track, 'title'));
       if (!title) return [];
       const artist = asText(field(track, 'artist'));
+      const cover = field(track, 'cover');
+      const coverUrl = asText(field(cover, 'medium')) || asText(field(cover, 'small'));
       const content =
         field(meta, 'instrumental') === true
           ? null
@@ -87,6 +86,7 @@ export function createLrcmuxSource(host: LyricsHttpHost): LyricsSource {
           artists: splitArtistField(artist),
           album: asText(field(track, 'album')),
           durationMs: asNumber(field(track, 'duration')) * 1000,
+          ...(coverUrl ? { coverUrl } : {}),
           ...(content ? { content } : {}),
         },
       ];

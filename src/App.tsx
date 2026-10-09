@@ -1,5 +1,5 @@
 import { Provider } from 'jotai/react';
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { CommandsContext } from './nav/useCommand.ts';
 import { PlayingMark } from './track/PlayingMark.tsx';
 import { trackKeyOf } from './playback/playbackContract.ts';
@@ -21,6 +21,13 @@ import { UpdateRoot } from './app/UpdateRoot.tsx';
 import { OnboardingDialog } from './settings/onboarding/OnboardingDialog.tsx';
 import { WindowRoot } from './app/WindowRoot.tsx';
 import { LyricsRoot } from './app/LyricsRoot.tsx';
+import { ImmersiveSettingsContext } from './settings/immersiveSettingsContext.ts';
+
+const ImmersiveSettings = lazy(() =>
+  import('./app/ImmersiveSettings.tsx').then(({ ImmersiveSettings }) => ({
+    default: ImmersiveSettings,
+  })),
+);
 
 export interface AppProps {
   services: AppServices;
@@ -52,13 +59,21 @@ export function App({ services }: AppProps) {
                       <VideoRoot services={services}>
                         <HomeRoot services={services}>
                           <UpdateRoot>
-                            <ShellSlotsContext value={SHELL_SLOTS}>
-                              <WindowRoot>
-                                <MainWindow />
-                              </WindowRoot>
-                            </ShellSlotsContext>
-                            <AppToasts />
-                            <OnboardingDialog />
+                            <ImmersiveSettingsContext
+                              value={
+                                <Suspense fallback={null}>
+                                  <ImmersiveSettings />
+                                </Suspense>
+                              }
+                            >
+                              <ShellSlotsContext value={SHELL_SLOTS}>
+                                <WindowRoot>
+                                  <MainWindow />
+                                </WindowRoot>
+                              </ShellSlotsContext>
+                              <AppToasts />
+                              <OnboardingDialog />
+                            </ImmersiveSettingsContext>
                           </UpdateRoot>
                         </HomeRoot>
                       </VideoRoot>

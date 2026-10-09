@@ -35,11 +35,11 @@
 }
 
 .toggle:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background: var(--state-hover);
 }
 
 .toggle:active {
-  background: var(--colorSubtleBackgroundPressed);
+  background: var(--state-pressed);
 }
 
 .toggle:focus-visible {

@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Button,
   Input,
   Dropdown,
@@ -26,6 +27,7 @@ import { useGenresList } from './useGenresList.ts';
 import styles from './GenresList.module.css';
 import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   input: { width: '100%' },
@@ -50,6 +52,7 @@ export interface GenresListProps {
 }
 
 export function GenresList(props: GenresListProps) {
+  const controls = useViewControlStyles();
   const genres = useService(genresKey);
   const t = useAtomValueRawSync(translateAtom);
   const prefs = useAtomValueRawSync(genresPrefsAtom);
@@ -106,7 +109,7 @@ export function GenresList(props: GenresListProps) {
     >
       <div className={styles.tools}>
         <Input
-          className={classes.input}
+          className={mergeClasses(classes.input, controls.field)}
           value={props.text}
           onChange={(_, data) => props.onText(data.value)}
           placeholder={t('genres.filter')}
@@ -123,7 +126,7 @@ export function GenresList(props: GenresListProps) {
         </TabList>
         <div className={styles.sort}>
           <Dropdown
-            className={classes.sort}
+            className={mergeClasses(classes.sort, controls.field)}
             size="small"
             value={t(`genres.sort.${prefs.sort}`)}
             selectedOptions={[prefs.sort]}
@@ -139,8 +142,9 @@ export function GenresList(props: GenresListProps) {
             <Option value="albums">{t('genres.sort.albums')}</Option>
           </Dropdown>
           <Button
+            className={controls.icon}
             size="small"
-            appearance={prefs.descending ? 'primary' : 'subtle'}
+            appearance="subtle"
             aria-pressed={prefs.descending}
             onClick={() => genres.prefs.update({ descending: !prefs.descending })}
           >
@@ -210,6 +214,7 @@ export function GenresList(props: GenresListProps) {
                 >
                   {props.compact ? (
                     <Button
+                      className={controls.icon}
                       appearance="subtle"
                       tabIndex={-1}
                       icon={<ChevronRight20Regular />}
@@ -219,7 +224,7 @@ export function GenresList(props: GenresListProps) {
                   ) : (
                     <>
                       <Button
-                        className={classes.action}
+                        className={mergeClasses(classes.action, controls.icon)}
                         appearance="subtle"
                         tabIndex={-1}
                         disabled={disabled}
@@ -228,7 +233,7 @@ export function GenresList(props: GenresListProps) {
                         onClick={() => void genres.actions.play([entry.key], name)}
                       />
                       <Button
-                        className={classes.action}
+                        className={mergeClasses(classes.action, controls.icon)}
                         appearance="subtle"
                         tabIndex={-1}
                         disabled={disabled}
@@ -237,7 +242,7 @@ export function GenresList(props: GenresListProps) {
                         onClick={() => void genres.actions.send([entry.key], name, true)}
                       />
                       <Button
-                        className={classes.action}
+                        className={mergeClasses(classes.action, controls.icon)}
                         appearance="subtle"
                         tabIndex={-1}
                         icon={<MoreHorizontal20Regular />}

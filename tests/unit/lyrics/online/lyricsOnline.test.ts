@@ -74,22 +74,25 @@ describe('在线歌词来源装配', () => {
     );
   });
 
-  it('lrcmux 即使排在前面也只作备选，主来源已取到逐行词就不问它', async () => {
+  it('lrcmux 遵循来源顺序，同格式时采用排在前面的来源', async () => {
     const http = installLyricsHttp(ROUTES);
     const result = await createLyricsOnline(http.host)(
       QUERY,
       { enabled: true, sources: ['lrcmux', 'lrclib'] },
       new AbortController().signal,
     );
-    expect(result).toMatchObject({ source: 'lrclib' });
-    expect(http.requests().map(({ url }) => url.origin)).toStrictEqual(['https://lrclib.net']);
+    expect(result).toMatchObject({ source: 'lrcmux' });
+    expect(http.requests().map(({ url }) => url.origin)).toStrictEqual([
+      'https://api.lrcmux.dev',
+      'https://lrclib.net',
+    ]);
   });
 
-  it('主来源没词时才问备选', async () => {
+  it('前一来源没词时继续下一来源', async () => {
     const http = installLyricsHttp({ ...ROUTES, [LRCLIB]: json([]) });
     const result = await createLyricsOnline(http.host)(
       QUERY,
-      { enabled: true, sources: ['lrcmux', 'lrclib'] },
+      { enabled: true, sources: ['lrclib', 'lrcmux'] },
       new AbortController().signal,
     );
     expect(result).toMatchObject({

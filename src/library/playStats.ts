@@ -2,6 +2,7 @@ import type { LibraryTrack } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { settle } from '../host/hostCall.ts';
+import { hasPlaycountComponent } from '../host/playcountComponent.ts';
 import type { Store } from '../kit/store.ts';
 import { trackPathOf } from '../host/libraryContract.ts';
 import type { TrackStats } from './album-list/listSort.ts';
@@ -14,17 +15,14 @@ export const FIRST_BATCH = 200;
 export const BATCH_TARGET_MS = 40;
 export const BATCH_MIN = 100;
 export const BATCH_MAX = 4000;
-/** 探 foo_playcount 装没装时求值几首。 */
-export const PROBE_COUNT = 20;
 
 /**
  * 四个字段拼成一个串求值，按竖线切开：添加时间（没有就退到文件修改时间）、最近播放、首次播放、播放次数。
  * 时间与次数里都不会有竖线。不用 `evalFieldsBatch`：它的行在 SDK 的声明里与字段表交叉成了 `never`，读不出
- * 类型可靠的值。没装 foo_playcount 时 `%play_count%` 不存在，`$if2` 答空串，探测靠这一点。
+ * 类型可靠的值。
  */
 const PATTERN =
   '$if2(%added%,%last_modified%)|[%last_played%]|[%first_played%]|$if2(%play_count%,0)';
-const PROBE = '$if2(%play_count%,)';
 
 export interface PlayStatsState {
   /** 装没装 foo_playcount；null 是还没探过或探不出。 */
@@ -41,18 +39,19 @@ const stateAtom = atom<PlayStatsState>(INITIAL);
 
 export const playStatsAtom: Atom<PlayStatsState> = atom((get) => get(stateAtom));
 
-/** 确认读不到播放统计（没装 foo_playcount）：信息中心据此提醒。还没核对完时不算。 */
+/** 组件清单确认未安装 foo_playcount 时提醒；尚未读取或读取失败时不下结论。 */
 export const playcountMissingAtom: Atom<boolean> = atom(
   (get) => get(stateAtom).available === false,
 );
 
 export interface PlayStatsFace {
+  config: Pick<typeof fb.config, 'getComponents'>;
   titleformat: Pick<typeof fb.titleformat, 'evalBatch'>;
 }
 
 export interface PlayStatsService {
-  /** 曲目头一次到手时探一次装没装 foo_playcount；探过了不再探。 */
-  probe(tracks: readonly LibraryTrack[]): Promise<void>;
+  /** 安装状态与曲目无关；组件清单读成功后复用结果，失败后可重试。 */
+  probe(): Promise<void>;
   /** 按播放统计排序了：取这一份曲目的统计。同一代次取过或正在取就不再取；新的一代让旧的作废。 */
   fetch(tracks: readonly LibraryTrack[], generation: number): Promise<void>;
   dispose(): void;
@@ -76,17 +75,16 @@ export function startPlayStats(
     store.set(stateAtom, { ...store.get(stateAtom), ...change });
 
   return {
-    async probe(tracks) {
-      if (probed || disposed || tracks.length === 0) return;
+    async probe() {
+      if (probed || disposed) return;
       probed = true;
-      const paths = tracks.slice(0, PROBE_COUNT).map(trackPathOf);
-      const answer = await settle(() => host.titleformat.evalBatch(PROBE, paths));
+      const answer = await settle(() => host.config.getComponents());
       if (disposed) return;
       if (!answer || answer.success === false) {
         probed = false;
         return;
       }
-      update({ available: answer.results.some((row) => row.success && !!row.result) });
+      update({ available: hasPlaycountComponent(answer.components) });
     },
     async fetch(tracks, generation) {
       if (disposed || generation === asked) return;

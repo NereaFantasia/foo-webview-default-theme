@@ -11,8 +11,14 @@
   grid-area: 1 / 1;
   min-width: 0;
   min-height: 0;
+  padding-top: var(--nav-inset, 0px);
   /* 当前层盖在离场层上面：层的先后不随切换重排，接回来的旧层在 DOM 里可能排在前面。 */
   z-index: 1;
+}
+
+/* 整页滚动时，首部空间放进页面自己的滚动内容；固定工具栏的页面保持原位。 */
+.layer:has([data-page-scrolls-header]) {
+  padding-top: 0;
 }
 
 .exiting {

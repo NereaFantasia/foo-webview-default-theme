@@ -1,12 +1,21 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react';
 import {
   SEEK_IDLE,
   SEEK_SETTLE_MS,
+  keySeek,
   secondsAt,
   settleWith,
   type SeekDraft,
 } from '../../playback/seekDraft.ts';
 import { swallowNextContextMenu } from '../../kit/swallowContextMenu.ts';
+import type { SeekMotionIntent, SeekMotionKind } from './seekMotion.ts';
 
 /** `PointerEvent.buttons` 里右键那一位。 */
 const RIGHT_BUTTON = 2;
@@ -17,21 +26,30 @@ export interface SeekGestureOptions {
   readonly duration: number;
   /** 宿主报的位置，秒。 */
   readonly position: number;
-  /** 这一首的身份；换了一首，拖到一半的与等着交还的都作废。 */
-  readonly trackKey: string;
-  seek(seconds: number): void;
+  /** 播放轮次改变时，旧拖动与等待交还的位置都作废，包括同一首重播。 */
+  readonly generation: number;
+  seek(seconds: number): Promise<void>;
   /** 拖动开始与结束（含放弃）。 */
   onDragChange?(dragging: boolean): void;
 }
 
 export interface SeekGesture {
   readonly draft: SeekDraft;
+  readonly intent: SeekMotionIntent | null;
   /** 按下左键开始拖；松手才 seek。已经 preventDefault 的按下不接。 */
   press(event: PointerEvent<HTMLElement>): void;
   /** 拖动中就放弃这一次，答放没放弃。 */
   cancel(): boolean;
-  /** 直接跳到某处（键盘），交还规则同松手。 */
-  seekTo(seconds: number): void;
+  /** 按键从最近的操作目标累加，不从尚未到位的动画位置计算。 */
+  seekKey(key: string): void;
+}
+
+interface GestureFrame {
+  readonly generation: number;
+  readonly draft: SeekDraft;
+  readonly intent: SeekMotionIntent | null;
+  readonly acknowledged: boolean;
+  readonly origin: number;
 }
 
 /**
@@ -40,8 +58,18 @@ export interface SeekGesture {
  * 宽，拖动中不再量：拖着的时候版式不变。
  */
 export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
-  const { enabled, duration, position, trackKey } = options;
-  const [draft, setDraft] = useState<SeekDraft>(SEEK_IDLE);
+  const { enabled, duration, position, generation } = options;
+  const [frame, setFrame] = useState<GestureFrame>({
+    generation,
+    draft: SEEK_IDLE,
+    intent: null,
+    acknowledged: true,
+    origin: position,
+  });
+  // 事件连续到达时React可能尚未重画，按键的下一步仍从刚才写入的目标计算。
+  const current = useRef(frame);
+  const sequence = useRef(0);
+  const active = useRef(true);
   const cancelDrag = useRef<(() => void) | null>(null);
   const latest = useRef(options);
   // 右键取消拖动后，吞掉随后那次右键菜单的监听；卸下时摘掉。
@@ -50,34 +78,77 @@ export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
     latest.current = options;
   });
 
-  // 宿主报来的位置落到拖到的位置附近就交还；渲染中调整，不多等一帧。
-  const settled = settleWith(draft, position);
-  if (settled !== draft) setDraft(settled);
+  const replace = useCallback((next: GestureFrame) => {
+    current.current = next;
+    setFrame(next);
+  }, []);
+  const change = useCallback(
+    (draft: SeekDraft, kind?: SeekMotionKind) => {
+      replace({
+        generation: latest.current.generation,
+        draft,
+        intent: kind ? { sequence: ++sequence.current, kind } : current.current.intent,
+        acknowledged: draft.phase !== 'settling',
+        origin: latest.current.position,
+      });
+    },
+    [replace],
+  );
+
+  // 轮次在渲染中收窄，旧目标不能在新曲目上短暂显示；宿主确认只交还数值，不重启正在播的定位动画。
+  let visible = frame;
+  if (frame.generation !== generation) {
+    visible = { generation, draft: SEEK_IDLE, intent: null, acknowledged: true, origin: position };
+    replace(visible);
+  } else {
+    // 跳转前的旧位置可能就在容差内，只有本次回读完成且位置已更新，才用它确认目标。
+    const canSettle =
+      frame.acknowledged &&
+      (position !== frame.origin ||
+        (frame.draft.phase === 'settling' && position === frame.draft.seconds));
+    const settled = canSettle ? settleWith(frame.draft, position) : frame.draft;
+    if (settled !== frame.draft) {
+      visible = { ...frame, draft: settled };
+      replace(visible);
+    }
+  }
+  const { draft } = visible;
 
   useEffect(() => {
     if (draft.phase !== 'settling') return;
-    const timer = setTimeout(() => setDraft(SEEK_IDLE), SEEK_SETTLE_MS);
+    const timer = setTimeout(() => {
+      if (current.current.draft === draft) change(SEEK_IDLE, 'return');
+    }, SEEK_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [draft]);
+  }, [draft, change]);
 
   useLayoutEffect(() => {
     cancelDrag.current?.();
-    setDraft(SEEK_IDLE);
-  }, [trackKey]);
+  }, [generation]);
   useLayoutEffect(() => {
     if (!enabled) cancelDrag.current?.();
   }, [enabled]);
-  useLayoutEffect(
-    () => () => {
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
       cancelDrag.current?.();
       unswallow.current?.();
-    },
-    [],
-  );
+    };
+  }, []);
 
-  const seekTo = (seconds: number) => {
-    setDraft({ phase: 'settling', seconds });
-    latest.current.seek(seconds);
+  const seekTo = (seconds: number, kind?: SeekMotionKind) => {
+    const target: SeekDraft = { phase: 'settling', seconds };
+    change(target, kind);
+    void latest.current.seek(seconds).then(
+      () => {
+        if (active.current && current.current.draft === target)
+          replace({ ...current.current, acknowledged: true });
+      },
+      () => {
+        if (active.current && current.current.draft === target) change(SEEK_IDLE, 'return');
+      },
+    );
   };
 
   const press = (event: PointerEvent<HTMLElement>) => {
@@ -92,7 +163,7 @@ export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
     event.preventDefault();
     element.focus();
     element.setPointerCapture(pointerId);
-    setDraft({ phase: 'dragging', seconds });
+    change({ phase: 'dragging', seconds }, 'click');
     latest.current.onDragChange?.(true);
     const move = (moved: globalThis.PointerEvent) => {
       // 按着左键再按右键是取消：浏览器不为第二个键另发 pointerdown，只在 pointermove 里报多出来的键。
@@ -102,8 +173,9 @@ export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
         end(false);
         return;
       }
+      if (moved.clientX === event.clientX && current.current.intent?.kind === 'click') return;
       seconds = at(moved.clientX);
-      setDraft({ phase: 'dragging', seconds });
+      change({ phase: 'dragging', seconds }, 'drag');
     };
     const end = (commit: boolean) => {
       element.removeEventListener('pointermove', move);
@@ -112,8 +184,9 @@ export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
       element.removeEventListener('lostpointercapture', drop);
       if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
       cancelDrag.current = null;
-      if (commit) seekTo(seconds);
-      else setDraft(SEEK_IDLE);
+      if (generation !== latest.current.generation) change(SEEK_IDLE);
+      else if (commit) seekTo(seconds);
+      else change(SEEK_IDLE, 'return');
       latest.current.onDragChange?.(false);
     };
     const up = () => end(true);
@@ -127,12 +200,20 @@ export function useSeekGesture(options: SeekGestureOptions): SeekGesture {
 
   return {
     draft,
+    intent: visible.intent,
     press,
     cancel() {
       if (!cancelDrag.current) return false;
       cancelDrag.current();
       return true;
     },
-    seekTo,
+    seekKey(key) {
+      const state = current.current;
+      const source = state.draft.phase === 'idle' ? latest.current.position : state.draft.seconds;
+      const seconds = keySeek(key, source, latest.current.duration);
+      if (seconds === null || !latest.current.enabled) return;
+      cancelDrag.current?.();
+      seekTo(seconds, key === 'Home' ? 'home' : 'key');
+    },
   };
 }

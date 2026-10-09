@@ -57,6 +57,7 @@ export interface Diagnostics {
   readonly isPortable: boolean;
   readonly pluginName: string;
   readonly pluginVersion: string;
+  readonly windowEffects?: string;
 }
 
 export function diagnosticsOf(info: ConfigGetVersionInfoSuccess): Diagnostics {
@@ -70,7 +71,7 @@ export function diagnosticsOf(info: ConfigGetVersionInfoSuccess): Diagnostics {
 }
 
 /**
- * 「复制诊断信息」复制的文字，两行：fb2k 的版本与构建，组件的版本与主题要求的下限。不随界面语言变：
+ * 「复制诊断信息」包含版本、构建与可用的窗口效果诊断。不随界面语言变：
  * 贴进问题报告里给维护者看，一种写法好认。
  */
 export function diagnosticText(diagnostics: Diagnostics): string {
@@ -80,5 +81,6 @@ export function diagnosticText(diagnostics: Diagnostics): string {
   return [
     `${diagnostics.foobar2000} (${build.join(', ')})`,
     `${plugin} (requires ${REQUIRED_HOST_VERSION} or later)`,
+    ...(diagnostics.windowEffects ? [diagnostics.windowEffects] : []),
   ].join('\n');
 }

@@ -21,20 +21,28 @@ import styles from './TitleBar.module.css';
 import { useService } from '../kit/useService.ts';
 import { windowShellKey } from '../host/windowShell.ts';
 
-// 放着播放栏或只有 ⋯ 时键是 28 × 36；左段放导航键时四个键各 40 × 32、彼此隔 2。图标都是 16，与窗口三键
-// 一样大；Fluent 的中号图标键是 32 见方，宽高要另设。
+// 主菜单与导航键共用 40 × 32 的尺寸，彼此隔 2；480px 以下宽 28、不留间隙。
+// Fluent 的中号图标键是 32 见方，宽高要另设；工具栏内统一图标尺寸，不影响共用按钮在其他位置的图标。
 const useStyles = makeStyles({
-  toolbar: { padding: '0' },
-  navTools: { gap: tokens.spacingHorizontalXXS },
-  tool: { minWidth: '28px', width: '28px', height: '36px' },
-  navTool: { minWidth: '40px', width: '40px', height: '32px' },
-  // 队列只有 20 的线框图标，缩到与其余键一样的 16。
-  glyph: { width: '16px', height: '16px' },
+  toolbar: {
+    padding: '0',
+    '& svg': { width: '20px', height: '20px' },
+  },
+  navTools: {
+    gap: tokens.spacingHorizontalXXS,
+    '@media (max-width: 480px)': { gap: '0' },
+  },
+  navTool: {
+    minWidth: '40px',
+    width: '40px',
+    height: '32px',
+    '@media (max-width: 480px)': { minWidth: '28px', width: '28px' },
+  },
 });
 
 /**
- * 标题栏，按播放栏的形态三种排法（`playerShellOf`）。各键的图标都与窗口三键一样是 16。播放栏放在标题栏、
- * 且窗口是宽窗（与侧边栏同一条线，≥ 1008）时高 56，左起 ⋯、播放控制组与音量键（同胶囊里那一枚，浮层朝下开），
+ * 标题栏，按播放栏的形态三种排法（`playerShellOf`）。播放栏放在标题栏、
+ * 且窗口是宽窗（与侧边栏同一条线，≥ 1008）时高 64，左起 ⋯、播放控制组与音量键（同胶囊里那一枚，浮层朝下开），
  * 正中是正在播放条（在窗口居中），右端窗口三键。音量不做悬停展开的面板：展开的那一截落在标题栏的拖动区上，指针移过去就被窗口当成标题栏。
  * 没有当前曲目时正在播放条不出，那一块仍是拖动区；控制组与音量键留着，高度不变。
  * 播放栏在底部或是胶囊时高 48，左段是 ⋯、后退、前进与侧边栏键，窗口三键左边是歌词与队列两个右侧卡的入口
@@ -74,7 +82,7 @@ export function TitleBar() {
             aria-label={t('titlebar.tools')}
             className={mergeClasses(classes.toolbar, navTools && classes.navTools)}
           >
-            <MainMenuButton className={navTools ? classes.navTool : classes.tool} />
+            <MainMenuButton className={classes.navTool} />
             {navTools && (
               <>
                 <NavButtons className={classes.navTool} round={false} />
@@ -86,7 +94,7 @@ export function TitleBar() {
         {withPlayer && (
           <div className={styles.player}>
             {videoEntry}
-            <PlaybackControls titlebar />
+            <PlaybackControls />
             {/* 窄到换成胶囊时这一枚随标题栏的播放部分一起卸下，焦点要跟走。 */}
             <span ref={handOffPlayerFocus} className={styles.volume}>
               <CapsuleVolume below />
@@ -114,7 +122,7 @@ export function TitleBar() {
               className={mergeClasses(classes.toolbar, classes.navTools)}
             >
               {tier !== 'hidden' && <LyricsKey className={classes.navTool} />}
-              <QueueKey className={classes.navTool} glyphClassName={classes.glyph} />
+              <QueueKey className={classes.navTool} />
             </Toolbar>
           </div>
         )}

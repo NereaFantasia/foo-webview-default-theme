@@ -3,6 +3,7 @@ import { Apps20Regular, TextBulletList20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../../i18n/locale.ts';
 import type { SearchView } from './searchView.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 export function SearchViewSwitch({
   view,
@@ -12,6 +13,7 @@ export function SearchViewSwitch({
   onChange(view: SearchView): void;
 }) {
   const t = useAtomValueRawSync(translateAtom);
+  const controls = useViewControlStyles();
   return (
     <Toolbar
       aria-label={t('search.view')}
@@ -23,6 +25,8 @@ export function SearchViewSwitch({
     >
       <Tooltip content={t('search.list')} relationship="label">
         <ToolbarRadioButton
+          appearance="subtle"
+          className={controls.icon}
           name="view"
           value="list"
           icon={<TextBulletList20Regular />}
@@ -31,6 +35,8 @@ export function SearchViewSwitch({
       </Tooltip>
       <Tooltip content={t('search.grid')} relationship="label">
         <ToolbarRadioButton
+          appearance="subtle"
+          className={controls.icon}
           name="view"
           value="grid"
           icon={<Apps20Regular />}

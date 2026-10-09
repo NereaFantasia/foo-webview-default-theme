@@ -57,6 +57,9 @@ export function startExternalLinkGate(
     prompt: atom((get) => get(prompt)),
     ready: prefs.ready,
     persistence: prefs,
+    setConfirmation(enabled: boolean): void {
+      if (!disposed) prefs.set(EXTERNAL_LINK_CONFIRM, enabled);
+    },
     open(value: string): void {
       const url = externalHttpUrl(value);
       if (disposed || !url || launching) return;

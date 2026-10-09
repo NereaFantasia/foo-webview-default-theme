@@ -10,7 +10,7 @@ export function PlaceholderPage({ place }: PageProps) {
   const t = useAtomValueRawSync(translateAtom);
   const placeName = usePlaceName();
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-page-scrolls-header>
       <Subtitle1>{t('page.placeholder', { place: placeName(place) })}</Subtitle1>
     </div>
   );

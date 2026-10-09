@@ -1,4 +1,5 @@
 import {
+  mergeClasses,
   Menu,
   MenuButton,
   MenuDivider,
@@ -16,6 +17,7 @@ import { translateAtom } from '../i18n/locale.ts';
 import { MENU_SURFACE_MOTION } from '../motion/MenuMotion.tsx';
 import { QUERY_SCOPES, type QueryScope } from './trackQuery.ts';
 import styles from './QueryScopeMenu.module.css';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 const SCOPE_LABELS: Readonly<Record<QueryScope, MessageKey>> = {
   all: 'query.scopeAll',
@@ -37,6 +39,7 @@ export function QueryScopeMenu(props: {
   readonly scope: QueryScope;
   readonly onScope: (scope: QueryScope) => void;
 }) {
+  const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
   return (
@@ -54,7 +57,7 @@ export function QueryScopeMenu(props: {
           relationship="label"
         >
           <MenuButton
-            className={classes.control}
+            className={mergeClasses(classes.control, controls.icon)}
             size="small"
             appearance="subtle"
             aria-label={`${t('query.scope')}: ${t(SCOPE_LABELS[props.scope])}`}

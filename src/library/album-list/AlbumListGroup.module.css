@@ -9,8 +9,11 @@
 }
 
 .head:hover {
-  background: var(--bg-hover);
+  background: var(--state-hover);
   border-radius: var(--radius-control);
+}
+.head:active {
+  background: var(--state-pressed);
 }
 
 /* 节头的字比专辑分组头大一档。 */

@@ -1,4 +1,5 @@
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { atom } from 'jotai/vanilla';
 import {
   PENDING_DELAY_MS,
   WAVEFORM_RESOLUTION,
@@ -60,8 +61,16 @@ function fakeTimers(): void {
 
 async function setup(fake = fakeWaveform(), player?: PlayingTrack) {
   const playing = player ?? (await startPlayingTrack());
-  const service = startFullWaveform(playing.store, { host: fake.host });
-  return { ...playing, fake, service, state: () => playing.store.get(fullWaveformAtom) };
+  const active = atom(true);
+  const service = startFullWaveform(playing.store, { host: fake.host, active });
+  onTestFinished(() => service.dispose());
+  return {
+    ...playing,
+    fake,
+    service,
+    state: () => playing.store.get(fullWaveformAtom),
+    activate: (value: boolean) => playing.store.set(active, value),
+  };
 }
 
 describe('startFullWaveform', () => {
@@ -75,7 +84,11 @@ describe('startFullWaveform', () => {
     expect(fake.calls).toStrictEqual([
       {
         path: 'E:/Music/a.cue|subsong:2',
-        options: { resolution: WAVEFORM_RESOLUTION, method: 'rms' },
+        options: {
+          resolution: WAVEFORM_RESOLUTION,
+          method: 'rms',
+          signal: expect.any(AbortSignal),
+        },
       },
     ]);
     expect(state()).toStrictEqual({ status: 'ready', rms: POINTS });
@@ -145,6 +158,7 @@ describe('startFullWaveform', () => {
     play(A);
     await flush();
     play(B);
+    expect(fake.calls[0]?.options?.signal?.aborted).toBe(true);
     await flush();
     vi.advanceTimersByTime(PENDING_DELAY_MS);
     expect(fake.calls.map((call) => call.path)).toStrictEqual([A.handle, B.handle]);
@@ -186,6 +200,7 @@ describe('startFullWaveform', () => {
     play(A);
     await flush();
     service.dispose();
+    expect(fake.calls[0]?.options?.signal?.aborted).toBe(true);
     vi.advanceTimersByTime(PENDING_DELAY_MS);
     fake.release();
     await flush();
@@ -204,5 +219,60 @@ describe('startFullWaveform', () => {
       fake.calls.map((call) => [call.options?.method, call.options?.resolution]),
     ).toStrictEqual([['rms', WAVEFORM_RESOLUTION]]);
     expect(state()).toStrictEqual({ status: 'ready', rms: POINTS });
+  });
+
+  test('休眠同步取消生成和 pending 计时；恢复只取当前曲目，取消不记失败', async () => {
+    const fake = fakeWaveform();
+    fake.set('hold');
+    const x = await setup(fake);
+    fakeTimers();
+    x.play(A);
+    x.activate(false);
+    expect(fake.calls[0]?.options?.signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(x.state().status).toBe('idle');
+    x.play(B);
+    fake.release();
+    await flush();
+    expect(fake.calls).toHaveLength(1);
+    expect(x.state().status).toBe('idle');
+    x.activate(true);
+    expect(fake.calls.map((call) => call.path)).toEqual([A.handle, B.handle]);
+    fake.release();
+    await flush();
+    expect(x.state().status).toBe('ready');
+  });
+
+  test.each(['ready', 'fail'] as const)('休眠保留完整结果与失败记忆：%s', async (mode) => {
+    const fake = fakeWaveform();
+    fake.set(mode);
+    const x = await setup(fake);
+    x.play(A);
+    await flush();
+    const last = x.state();
+    x.activate(false);
+    x.activate(true);
+    await flush();
+    expect(fake.calls).toHaveLength(1);
+    expect(x.state()).toBe(last);
+    x.service.dispose();
+    expect(x.state()).toEqual({ status: 'idle', rms: [] });
+  });
+
+  test('失败后停止再播放同一首，仍按原规则重试', async () => {
+    const fake = fakeWaveform();
+    fake.set('fail');
+    const x = await setup(fake);
+    x.play(A);
+    await flush();
+    x.activate(false);
+    x.stop();
+    await flush();
+    fake.set('ready');
+    x.play(A);
+    x.activate(true);
+    await flush();
+    expect(fake.calls).toHaveLength(2);
+    expect(x.state()).toEqual({ status: 'ready', rms: POINTS });
   });
 });
