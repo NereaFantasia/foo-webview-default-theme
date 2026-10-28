@@ -264,12 +264,18 @@ describe('首页统计服务', () => {
     const probe = host.hold('config.getComponents');
     service.activate();
     await vi.advanceTimersByTimeAsync(0);
-    host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
     probe.respond(0);
     const held = host.hold('playcount.getBatch');
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(held.pending).toHaveLength(1);
-    host.emit('library:itemsModified', { count: 1, timestamp: 2 });
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      fromHook: false,
+      timestamp: 2,
+    });
     held.respond(0, {
       success: true,
       count: rows.length,
@@ -294,7 +300,7 @@ describe('首页统计服务', () => {
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
     const previous = state().statistics;
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 1 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 1 });
     expect(state().statistics).toBe(previous);
     expect(state().dirty).toBe(true);
     host.answer('playcount.getBatch', hostFailure('OPERATION_FAILED'));

@@ -6,21 +6,21 @@ export interface GroupAnchorOptions<G> {
   readonly rowHeight: number;
   readonly groupHeight: (item: TableGroupItem<G>) => number;
   readonly scroller: RefObject<HTMLElement | null>;
-  /** 表体顶边在滚动内容里的纵坐标，见 `ScrollFrame.margin`。 */
+  /** 表体顶边在滚动内容里的纵坐标，见 `ScrollFrame.margin` */
   readonly margin: number;
 }
 
-/** 开合第 `index` 个条目所在的分组，前后让这个条目在视口里的位置不变。`run` 不给时什么也不做。 */
+/** 开合第 `index` 个条目所在的分组，前后让这个条目在视口里的位置不变。`run` 不给时什么也不做 */
 export type GroupAnchor = (index: number, run: ((index: number) => void) | undefined) => void;
 
 interface Pending<G> {
   readonly key: string;
-  /** 这个条目的顶边离视口顶边多远，CSS 像素。 */
+  /** 这个条目的顶边离视口顶边多远，CSS 像素 */
   readonly offset: number;
   readonly items: readonly TableItem<G>[];
 }
 
-/** 第 `index` 个条目在条目流里的起点。高度的算法要与 `useTrackTableRows` 交给虚拟化器的一致。 */
+/** 第 `index` 个条目在条目流里的起点。高度的算法要与 `useTrackTableRows` 交给虚拟化器的一致 */
 function itemOffset<G>(
   items: readonly TableItem<G>[],
   index: number,
@@ -38,9 +38,9 @@ function itemOffset<G>(
 /**
  * 分组开合时的滚动补偿。开合一组会让它下面的条目整体上移或下移，展开同级时它上面的也会变高；滚动位置靠后时
  * 新的总高撑不住原来的滚动量，浏览器把它夹回去，整屏跟着跳。所以开合之前记下那个条目在视口里的位置，
- * 条目流换好之后把滚动量补回去；到了末尾仍受最大滚动量限制，补不满就停在能到的地方。
+ * 条目流换好之后把滚动量补回去；到了末尾仍受最大滚动量限制，补不满就停在能到的地方
  *
- * 调用方要是在这一帧里没换条目流（没接开合、或者开合是异步的），记下的位置到下一帧作废，不留到以后误用。
+ * 调用方要是在这一帧里没换条目流（没接开合、或者开合是异步的），记下的位置到下一帧作废，不留到以后误用
  */
 export function useGroupAnchor<G>(options: GroupAnchorOptions<G>): GroupAnchor {
   const latest = useRef(options);

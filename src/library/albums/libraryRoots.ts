@@ -11,11 +11,11 @@ import { waitForHost, type HostReadyFace } from '../../host/waitForHost.ts';
 import type { Store } from '../../kit/store.ts';
 
 export interface LibraryRootsState {
-  /** 各库根的绝对路径；没取到是空的，「媒体库一级目录」分节于是全落「未知」节。 */
+  /** 各库根的绝对路径；没取到是空的，「媒体库一级目录」分节于是全落「未知」节 */
   readonly roots: readonly string[];
-  /** 便携安装下 `file-relative://` 的基准目录；非便携安装的曲目路径本就是绝对的，用不上它。 */
+  /** 便携安装下 `file-relative://` 的基准目录；非便携安装的曲目路径本就是绝对的，用不上它 */
   readonly relativeBase: string | null;
-  /** 第一次读取做完了，读失败也算；「媒体库一级目录」分节据此不再等。 */
+  /** 第一次读取做完了，读失败也算；「媒体库一级目录」分节据此不再等 */
   readonly loaded: boolean;
 }
 
@@ -44,7 +44,7 @@ function rootsOf(answer: RootsAnswer | null): readonly string[] | null {
 /**
  * 库根与 profile 目录，只为「按媒体库一级目录分节」。改库根要经 fb2k 的首选项，改完媒体库会发变更事件：
  * 事件停下 `LIBRARY_COALESCE_MS` 之后重取库根（扫描期间事件不停，每次重取都会重建宿主的目录索引，
- * 所以等它停下）。重取失败留着上一次的库根。profile 目录运行期间不变，只取一次。
+ * 所以等它停下）。重取失败留着上一次的库根。profile 目录运行期间不变，只取一次
  */
 export function startLibraryRoots(store: Store, host: LibraryRootsFace = fb): LibraryRootsService {
   store.set(stateAtom, INITIAL);
@@ -80,7 +80,7 @@ export function startLibraryRoots(store: Store, host: LibraryRootsFace = fb): Li
     ]);
     if (disposed) return;
     store.set(stateAtom, (state) => ({
-      // 第一次读回来之前已经因变更重取过，以重取的为准。
+      // 第一次读回来之前已经因变更重取过，以重取的为准
       roots: ticket === generation ? (rootsOf(roots) ?? []) : state.roots,
       relativeBase:
         profile && profile.success !== false && profile.path ? relativeBaseOf(profile.path) : null,

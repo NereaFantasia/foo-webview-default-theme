@@ -15,16 +15,16 @@ import { MENU_HANDLES_LIMIT } from './albumMenu.ts';
 import { trackPathOf } from '../host/libraryContract.ts';
 import { readSendTargets, type SendTarget } from '../track/trackListActions.ts';
 
-/** 曲目菜单此刻针对的那一批：列表形态里右键曲目行时选中的行。 */
+/** 曲目菜单此刻针对的那一批：列表形态里右键曲目行时选中的行 */
 export interface TrackMenuState {
-  /** 作用对象，按显示顺序。 */
+  /** 作用对象，按显示顺序 */
   readonly tracks: readonly LibraryTrack[];
-  /** 右键落在的那一首：「转到专辑」去它的专辑。没给时取作用对象的第一首。 */
+  /** 右键落在的那一首：「转到专辑」去它的专辑。没给时取作用对象的第一首 */
   readonly anchor: LibraryTrack | null;
   readonly ratingStamp: number;
-  /** 「发送到」子菜单的目标。 */
+  /** 「发送到」子菜单的目标 */
   readonly targets: readonly SendTarget[];
-  /** 「更多命令」：宿主对这批曲目的上下文命令树；还没读到或过了上限是空树。 */
+  /** 「更多命令」：宿主对这批曲目的上下文命令树；还没读到或过了上限是空树 */
   readonly tree: ContextTree;
 }
 
@@ -46,7 +46,7 @@ export interface TrackMenuFace extends Pick<HostReadyFace, 'isAvailable'>, Conte
 export interface TrackMenuService {
   /**
    * 菜单打开前调：定下作用对象，再读「发送到」的目标与「更多命令」树，都到手时兑现。曲目本来就在手上，
-   * 播放、入队、发送不用等。连着打开两次时，先打开的那一批晚到的结果丢掉。
+   * 播放、入队、发送不用等。连着打开两次时，先打开的那一批晚到的结果丢掉
    */
   prepare(
     tracks: readonly LibraryTrack[],

@@ -1,12 +1,13 @@
 import { fb } from 'foo-webview-sdk/bridge';
-import { settle } from '../../../host/hostCall.ts';
+import { settleDetailed } from '../../../host/hostCall.ts';
+import { classifyHostHttpFailure } from '../../../host/hostHttpFailure.ts';
 import { biographyFreshness, biographyRetryAt } from '../biographyCacheFormat.ts';
 import type { BiographyProblem } from '../biographyModel.ts';
 
 export const LASTFM_API_URL = 'https://ws.audioscrobbler.com/2.0/';
-/** 应答体上限，超出按无法解析处理。 */
+/** 应答体上限，超出按无法解析处理 */
 const BODY_LIMIT = 1_000_000;
-/** 服务端暂时出错：8 操作失败、11 服务下线、16 临时错误，过一会儿可以重试。 */
+/** 服务端暂时出错：8 操作失败、11 服务下线、16 临时错误，过一会儿可以重试 */
 const RETRY_CODES = new Set([8, 11, 16]);
 
 export type LastfmApiResult =
@@ -17,7 +18,13 @@ export type LastfmApiResult =
       readonly expiresAt: number;
     }
   | { readonly kind: 'missing'; readonly store: boolean; readonly expiresAt: number }
-  | { readonly kind: 'failed'; readonly problem: BiographyProblem; readonly retryAt: number };
+  | {
+      readonly kind: 'failed';
+      readonly problem: BiographyProblem;
+      readonly retryAt: number;
+      /** 传输失败的宿主原文；HTTP 层失败（403、429 等）没有原文 */
+      readonly detail?: string | null;
+    };
 
 function readJson(body: unknown): Readonly<Record<string, unknown>> | null {
   if (typeof body !== 'string' || body.length > BODY_LIMIT) return null;
@@ -33,7 +40,7 @@ function readJson(body: unknown): Readonly<Record<string, unknown>> | null {
 
 /**
  * 调一次 Last.fm API（只读方法，不需要签名）。错误码按 https://www.last.fm/api/errorcodes 分类；
- * 出错时 Last.fm 有时回 200、有时回 4xx，所以先看应答体里的 `error`，再看 HTTP 状态。
+ * 出错时 Last.fm 有时回 200、有时回 4xx，所以先看应答体里的 `error`，再看 HTTP 状态
  */
 export async function requestLastfmApi(
   method: string,
@@ -42,7 +49,7 @@ export async function requestLastfmApi(
   host: Pick<typeof fb, 'http'> = fb,
 ): Promise<LastfmApiResult> {
   const query = new URLSearchParams({ method, ...params, api_key: apiKey, format: 'json' });
-  const answer = await settle(() =>
+  const called = await settleDetailed(() =>
     host.http.request(`${LASTFM_API_URL}?${query.toString()}`, {
       timeout: 12_000,
       redirect: 'error',
@@ -53,17 +60,24 @@ export async function requestLastfmApi(
     }),
   );
   const now = Date.now();
-  const headers = answer?.headers ?? {};
-  const fail = (problem: BiographyProblem, delay: number): LastfmApiResult => ({
+  const headers = called.answer?.headers ?? {};
+  const fail = (
+    problem: BiographyProblem,
+    delay: number,
+    detail: string | null = null,
+  ): LastfmApiResult => ({
     kind: 'failed',
     problem,
     retryAt: biographyRetryAt(headers, now, delay),
+    detail,
   });
-  if (!answer) return fail('network', 30_000);
+  if (called.failure)
+    return fail(classifyHostHttpFailure(called.failure) ?? 'network', 30_000, called.failure.text);
+  const answer = called.answer;
   const data = readJson(answer.body);
   const code = data?.['error'];
   if (typeof code === 'number') {
-    // 6 是参数无效；调用方总会带齐必填参数，这里它只表示查无此人。
+    // 6 是参数无效；调用方总会带齐必填参数，这里它只表示查无此人
     if (code === 6) return { kind: 'missing', ...biographyFreshness(headers, now) };
     if (code === 10) return fail('keyInvalid', 15 * 60_000);
     if (code === 26) return fail('keySuspended', 60 * 60_000);

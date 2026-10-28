@@ -53,10 +53,31 @@ describe('startAlbumSearchHits', () => {
     expect(host.callsTo('library.search')).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     expect(host.callsTo('library.search')).toEqual([
-      { query: '"blue"', limit: HIT_LIMIT, fields: ['album', 'albumArtists', 'artists'] },
+      {
+        query: '"blue"',
+        limit: HIT_LIMIT,
+        fields: ['album', 'albumArtists', 'artists', 'albumId'],
+      },
     ]);
     expect(state().pending).toBe(false);
     expect([...(state().hits ?? [])]).toEqual(['Blue\0Joni Mitchell', 'Kind of Blue\0Miles Davis']);
+  });
+
+  it('搜索命中保留 albumId，不合并显示名称相同的异常专辑与正常专辑', async () => {
+    const host = installFakeHost();
+    const normal = { album: '\uFFFD', albumArtists: ['X'], artists: ['X'] };
+    host.answer(
+      'library.search',
+      searchAnswer([
+        Object.assign({}, normal, { albumId: 'album1:b90058' }),
+        Object.assign({}, normal, { albumId: 'album1:ba0058' }),
+        normal,
+      ]),
+    );
+    const { service, state } = setup(host);
+    service.search('song');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect([...(state().hits ?? [])]).toEqual(['album1:b90058', 'album1:ba0058', '\uFFFD\0X']);
   });
 
   it('album artist 有多个值时按首值折，首值本身带「, 」也不拆', async () => {

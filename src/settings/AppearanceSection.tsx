@@ -35,9 +35,13 @@ import {
 import { SettingsCard } from './SettingsCard.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
+import { SettingsChoice, type SettingsChoiceOption } from './SettingsChoice.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
+import { ColorModeThumb } from './thumbnails/ColorModeThumb.tsx';
+import { MiniWindow } from './thumbnails/MiniWindow.tsx';
 import { AccentExpander, useAccentSourceName } from './AccentExpander.tsx';
 import { BackdropExpander } from './BackdropExpander.tsx';
+import { chooseSurfaceTint, surfaceTintAtom, SURFACE_TINT_KEY } from '../theme/surfaceTint.ts';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
 import { useService } from '../kit/useService.ts';
 import {
@@ -145,7 +149,7 @@ const STYLE_LABELS: Readonly<Record<PlayerBarStyle, MessageKey>> = {
   capsule: 'settings.playerBarCapsule',
 };
 
-/** 深浅模式。跟随系统时说明行写出此刻实际是哪一档；手选了一档就不必再写。 */
+/** 深浅模式。跟随系统时说明行写出此刻实际是哪一档；手选了一档就不必再写 */
 export function ColorModeCard() {
   const t = useAtomValueRawSync(translateAtom);
   const mode = useAtomValueRawSync(colorModeAtom);
@@ -159,12 +163,16 @@ export function ColorModeCard() {
       description={
         mode === 'system' ? t('settings.current', { name: t(MODE_LABELS[scheme]) }) : undefined
       }
-      field
+      block
     >
       {(ids) => (
-        <SettingsSelect
+        <SettingsChoice
           {...ids}
-          options={COLOR_MODES.map((value) => ({ value, label: t(MODE_LABELS[value]) }))}
+          options={COLOR_MODES.map((value) => ({
+            value,
+            label: t(MODE_LABELS[value]),
+            preview: <ColorModeThumb mode={value} />,
+          }))}
           value={mode}
           onChange={(value) => chooseColorMode(store, value)}
         />
@@ -173,44 +181,56 @@ export function ColorModeCard() {
   );
 }
 
-/** 播放栏放在窗口底部、标题栏里，还是浮在内容卡底部的胶囊，换了即时生效。 */
+/** 播放栏位置的三张缩略图单选项；设置页与新人引导共用 */
+export function usePlayerBarOptions(): readonly SettingsChoiceOption<PlayerBarStyle>[] {
+  const t = useAtomValueRawSync(translateAtom);
+  return PLAYER_BAR_STYLES.map((value) => ({
+    value,
+    label: t(STYLE_LABELS[value]),
+    preview: <MiniWindow bar={value} />,
+  }));
+}
+
+/** 播放栏放在窗口底部、标题栏里，还是浮在内容卡底部的胶囊，换了即时生效 */
 function PlayerBarCard() {
   const t = useAtomValueRawSync(translateAtom);
   const style = useAtomValueRawSync(playerBarStyleAtom);
   const blur = useAtomValueRawSync(capsuleBlurAtom);
+  const options = usePlayerBarOptions();
   const store = useStore();
   return (
-    <SettingsExpander
+    <SettingsCard
       icon={<PanelBottom20Regular />}
       title={t('settings.playerBar')}
-      field
-      defaultOpen={false}
+      block
       feedback={<LocalSaveNotice keys={[PLAYER_BAR_STORAGE_KEY, CAPSULE_BLUR_STORAGE_KEY]} />}
-      control={(ids) => (
-        <SettingsSelect
+      footer={
+        style !== 'bottom' && (
+          <SettingsRow title={t('settings.capsuleBlur')}>
+            {({ labelId }) => (
+              <Switch
+                checked={blur}
+                aria-labelledby={labelId}
+                onChange={(_, data) => chooseCapsuleBlur(store, data.checked)}
+              />
+            )}
+          </SettingsRow>
+        )
+      }
+    >
+      {(ids) => (
+        <SettingsChoice
           {...ids}
-          options={PLAYER_BAR_STYLES.map((value) => ({ value, label: t(STYLE_LABELS[value]) }))}
+          options={options}
           value={style}
           onChange={(value) => choosePlayerBarStyle(store, value)}
         />
       )}
-    >
-      {style !== 'bottom' && (
-        <SettingsRow title={t('settings.capsuleBlur')} field>
-          {({ labelId }) => (
-            <Switch
-              checked={blur}
-              aria-labelledby={labelId}
-              onChange={(_, data) => chooseCapsuleBlur(store, data.checked)}
-            />
-          )}
-        </SettingsRow>
-      )}
-    </SettingsExpander>
+    </SettingsCard>
   );
 }
 
-/** 跟随封面取色单独成卡，说明行写此刻取自哪里；新人引导用，设置页里它是强调色卡的一行。 */
+/** 跟随封面取色单独成卡，说明行写此刻取自哪里；新人引导用，设置页里它是强调色卡的一行 */
 export function CoverAccentCard() {
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
@@ -235,13 +255,47 @@ export function CoverAccentCard() {
   );
 }
 
-/** 外观偏好即时生效；本地颜色偏好在未连接宿主时也能修改。 */
+function SurfaceTintCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const tint = useAtomValueRawSync(surfaceTintAtom);
+  const store = useStore();
+  return (
+    <SettingsExpander
+      icon={<Color20Regular />}
+      title={t('settings.surfaceTint')}
+      defaultOpen={false}
+      feedback={<LocalSaveNotice keys={[SURFACE_TINT_KEY]} />}
+    >
+      <SettingsRow title={t('settings.menuTint')}>
+        {({ labelId }) => (
+          <Switch
+            checked={tint.menus}
+            aria-labelledby={labelId}
+            onChange={(_, data) => chooseSurfaceTint(store, 'menus', data.checked)}
+          />
+        )}
+      </SettingsRow>
+      <SettingsRow title={t('settings.panelTint')}>
+        {({ labelId }) => (
+          <Switch
+            checked={tint.panels}
+            aria-labelledby={labelId}
+            onChange={(_, data) => chooseSurfaceTint(store, 'panels', data.checked)}
+          />
+        )}
+      </SettingsRow>
+    </SettingsExpander>
+  );
+}
+
+/** 外观偏好即时生效；本地颜色偏好在未连接宿主时也能修改 */
 export function AppearanceSection() {
   return (
     <>
       <ColorModeCard />
       <AccentExpander />
       <BackdropExpander />
+      <SurfaceTintCard />
       <PlayerBarCard />
       <MotionCard />
       <ZoomCard />

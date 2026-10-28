@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openVideo } from '../fixtures/videoPage.ts';
+import { openVideo, routeVideoSample } from '../fixtures/videoPage.ts';
 import { choosePlayerBar } from '../fixtures/playerPage.ts';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
@@ -154,7 +154,8 @@ test('来源读取失败与播放失败分开提示，重试重新读取来源',
     attachments: [],
   });
   await page.getByRole('button', { name: '重新加载', exact: true }).click();
-  await expect(page.getByText('此曲目没有视频', { exact: true })).toBeVisible();
+  // 没有视频时只留入口按钮，状态写在占位画面的分组名上，不另写说明文字
+  await expect(page.getByRole('group', { name: '此曲目没有视频', exact: true })).toBeVisible();
   await expect(page.getByText('视频来源读取失败', { exact: true })).toHaveCount(0);
 });
 
@@ -265,4 +266,76 @@ test('深浅主题下视频浮层有底色、工具栏模糊及按钮位置正�
   await expect
     .poll(() => controls.evaluate((el) => getComputedStyle(el.parentElement!).transitionDuration))
     .toBe('0.001s, 0.001s, 0s');
+});
+
+test('音轨可读但画面解不了的文件不黑屏，提示不支持并释放媒体元素', async ({ page }) => {
+  await openVideo(page);
+  await routeVideoSample(page, 'video-undecodable.mp4', 'video/mp4');
+  await page.reload();
+  await page.locator('[data-video-entry]').click();
+  await expect(page.getByText('无法播放这种视频格式')).toBeVisible();
+  const video = page.locator('video');
+  await expect(video).not.toHaveAttribute('data-visible');
+  await expect(video).not.toHaveAttribute('src');
+  await expect(page.getByRole('button', { name: '全窗口', exact: true })).toBeDisabled();
+  await expect(
+    page.locator('[data-video-controls]').getByRole('button', { name: '播放', exact: true }),
+  ).toBeEnabled();
+});
+
+test('宿主不认的封装仍有入口，提示封装名且不提供重试', async ({ page }) => {
+  const fixture = await openVideo(page);
+  fixture.host.answer('media.getContainerInfo', {
+    success: true,
+    recognized: false,
+    tracks: [],
+    attachments: [],
+  });
+  fixture.state.track = makeTrack({ path: 'E:\\clip.avi', handle: 'E:\\clip.avi', subsong: 0 });
+  await fixture.host.emit('playback:trackChanged', fixture.state.track);
+  await expect(page.getByText('暂不支持 AVI 格式的视频', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '重新加载' })).toHaveCount(0);
+  await expect(page.locator('[data-video-entry]')).toBeVisible();
+  await expect(page.locator('video')).not.toHaveAttribute('data-visible');
+});
+
+test('章节子曲目从章节起点出画面，同一文件换章节沿用已加载的资源', async ({ page }) => {
+  const chapters = [
+    { start: 0, end: 20, subsong: 1 },
+    { start: 20, end: 60, subsong: 2 },
+  ];
+  const fixture = await openVideo(page, 1280, 2, chapters);
+  const time = () =>
+    page.locator('video').evaluate((element: HTMLVideoElement) => element.currentTime);
+  await expect.poll(time).toBeCloseTo(25, 0);
+  // 测试入口包了 StrictMode，挂载会重复一遍，所以比较换章节前后的次数，不写死绝对值
+  const issued = fixture.host.callsTo('media.getStreamUrl').length;
+  const probed = fixture.host.callsTo('media.getContainerInfo').length;
+  fixture.state.track = makeTrack({
+    title: 'Video sample',
+    path: 'E:\\video.webm',
+    handle: 'E:\\video.webm|subsong:1',
+    subsong: 1,
+    duration: 20,
+  });
+  fixture.host.answer('playback.getPosition', () => ({
+    success: true,
+    position: fixture.state.position,
+    duration: 20,
+    path: 'E:\\video.webm',
+    subsong: 1,
+    hostTime: Date.now(),
+  }));
+  await fixture.host.emit('playback:trackChanged', fixture.state.track);
+  // 换曲后时钟把位置归零，等宿主下一次推送才有真实位置
+  await fixture.host.emit('playback:stateChanged', {
+    state: 'paused',
+    position: 5,
+    duration: 20,
+    canSeek: true,
+    hostTime: Date.now(),
+  });
+  await expect.poll(time).toBeCloseTo(5, 0);
+  expect(fixture.host.callsTo('media.getStreamUrl')).toHaveLength(issued);
+  expect(fixture.host.callsTo('media.getContainerInfo')).toHaveLength(probed);
 });

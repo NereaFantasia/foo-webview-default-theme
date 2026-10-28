@@ -5,9 +5,7 @@ import {
   type Album,
   type AlbumKey,
 } from '../../host/libraryContract.ts';
-
-/** 标签不能包含 NUL，保留此主体表示没有流派的曲目。 */
-export const EMPTY_GENRE = '\0';
+import { EMPTY_GENRE } from '../../nav/places.ts';
 
 export interface GenreEntry {
   readonly key: string;
@@ -24,7 +22,7 @@ export type GenreSort = 'name' | 'tracks' | 'albums';
 const canonical = (name: string) =>
   name.normalize('NFKC').toLocaleLowerCase().replace(/[\s-]/g, '');
 
-/** 每首在一个流派里只算一次；同张专辑属于几个流派时，各边都保留。 */
+/** 每首在一个流派里只算一次；同张专辑属于几个流派时，各边都保留 */
 export function buildGenres(
   tracks: readonly LibraryTrack[],
   values: ReadonlyMap<string, readonly string[]>,
@@ -109,7 +107,7 @@ export function filterGenres(
     });
 }
 
-/** IS 中的通配符与引号不能作为字面值转义；这类名字仍可浏览，不拼成另一串条件。 */
+/** IS 中的通配符与引号不能作为字面值转义；这类名字仍可浏览，不拼成另一串条件 */
 export function genresQuery(keys: readonly string[]): string | null {
   if (
     keys.length === 0 ||

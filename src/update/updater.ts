@@ -23,7 +23,15 @@ import {
 import { installFrontend } from './frontendInstall.ts';
 import { pluginMaintenanceActive } from './pluginMaintenance.ts';
 import { confirmedStartupAtom, type ConfirmedStartup } from './loaderConfirmation.ts';
-import { json, marker, pendingPointer, versionRef } from './loaderContract.ts';
+import {
+  json,
+  marker,
+  pendingPointer,
+  sameVersion,
+  versionRef,
+  type LoaderSession,
+  type Pointer,
+} from './loaderContract.ts';
 import { fetchText, fetchVerified, type ReleaseHttp } from './releaseFetch.ts';
 import { selectRelease, type SelectionLimit } from './releaseSelection.ts';
 import { cleanVersions, type CleanupHost } from './versionCleanup.ts';
@@ -45,39 +53,41 @@ import {
 } from './updateState.ts';
 
 /**
- * 前端自动更新：只在主窗口确认成功之后运行。检查、下载、安装与改指针一次只跑一轮；新版本装进新目录，
- * 最后原子写指针的 pending，下次启动由引导页接手。从不降级，也不自动重启。
+ * 前端自动更新调度：限定主窗口启动确认后激活
+ * 检查、下载、安装与指针写入串行执行且单例排队；新版本写入独立版本目录并原子更新 pending 指针，
+ * 禁止静默降级或自动重启宿主
  */
 
-/** 旧版的自动更新开关，只读不删：新的模式键没有值时，它为 true 视为 auto，其余视为 off。 */
+/** 兼容旧版布尔更新开关；未配置新版模式键时，布尔真回退为 auto，其余回退为 off */
 export const AUTO_UPDATE = defineConfigPref('defaultTheme.update.auto', false, (value) =>
   typeof value === 'boolean' ? value : undefined,
 );
 export const UPDATE_MODES = ['off', 'notify', 'auto'] as const;
-/** off 只在用户检查时查；notify 定时检查，有新版只提示；auto 定时检查并下载安装。都不自动重启。 */
+/** 更新策略模式：off 仅手动触发，notify 定时检查仅提示，auto 定时检查并就绪下载；均不执行自动重启 */
 export type UpdateMode = (typeof UPDATE_MODES)[number];
-/** 没存过时为 null，按旧开关推算。 */
+/** 未显式持久化时为 null，根据旧版配置推算回退值 */
 export const UPDATE_MODE = defineConfigPref<UpdateMode | null>(
   'defaultTheme.update.mode',
   null,
   oneOf(UPDATE_MODES),
 );
-const MODE = atom<UpdateMode>(
+/** 生效的更新模式：显式配置优先，没有时由旧版布尔开关推算 */
+export const EFFECTIVE_UPDATE_MODE = atom<UpdateMode>(
   (get) => get(UPDATE_MODE.atom) ?? (get(AUTO_UPDATE.atom) ? 'auto' : 'off'),
 );
-/** scheduled 是定时检查；manual 是用户点检查；install 是用户点下载并安装；reset 是重置后的检查。 */
+/** 触发检查的动作语义：包含定时轮询、手动检查、即时安装与状态重置恢复 */
 type CheckKind = 'scheduled' | 'manual' | 'install' | 'reset';
 
 export type UpdateStatus =
   | { readonly phase: 'maintenance' }
-  /** 这个窗口不运行更新器：还没确认、确认失败、弹窗或不受支持的来源。 */
+  /** 更新器休眠阶段：未完成启动确认、确认异常或运行于非支持环境 */
   | { readonly phase: 'off'; readonly reason?: 'storage' }
   | {
       readonly phase: 'idle';
-      /** 最近一次取到根清单（成败都算）的时间，毫秒。 */
+      /** 最近一次拉取根清单的时间戳（毫秒），包含成功与网络错误 */
       readonly checkedAt: number | null;
       readonly failure: UpdateFailure | null;
-      /** 同一版本因同一原因失败到上限，自动检查不再重试它，手动检查仍会重试。 */
+      /** 同一版本遭遇连续相同错误达到上限时，定时检查阻断重试，仅允许手动操作触发 */
       readonly gaveUp: boolean;
     }
   | { readonly phase: 'checking' }
@@ -90,7 +100,7 @@ export type UpdateStatus =
       readonly limit: SelectionLimit | null;
       readonly pluginRange: string | null;
     }
-  /** 查到可装的版本，但这一轮不下载：notify 与 off 档，等用户点「下载并安装」。 */
+  /** 发现可用版本但未自动下载：适用于仅通知或手动模式，等待用户主动确认安装 */
   | {
       readonly phase: 'available';
       readonly version: string;
@@ -104,13 +114,15 @@ export type UpdateStatus =
       readonly limit: SelectionLimit;
       readonly pluginRange: string | null;
     }
-  /** 只有更新状态损坏可就地重置；其他原因需手动处理，不清除坏版本记录。 */
+  /** 仅状态损坏时允许就地重置；其余限制须由用户手动修复且保留故障版本记录 */
   | {
       readonly phase: 'manual';
       readonly reason: 'format' | 'updater' | 'trust' | UpdateStateError['reason'];
     }
-  /** 这次运行之后另有一个 foobar2000 在用这个模板目录：检查与清理都停下，直到下次启动。 */
-  | { readonly phase: 'shared' };
+  /** 检测到多实例共用模板目录：挂起检查与版本清理直至下次启动 */
+  | { readonly phase: 'shared' }
+  /** 运行期间主题文件被外部覆盖，指针版本与本次启动的版本不一致：停止写入指针并等待重启生效 */
+  | { readonly phase: 'replaced' };
 
 export interface UpdaterHost extends ConfigPrefFace {
   readonly http: ReleaseHttp;
@@ -131,7 +143,7 @@ export interface UpdaterOptions {
 export interface UpdaterService {
   readonly status: Atom<UpdateStatus>;
   readonly mode: Atom<UpdateMode>;
-  /** 自带副本或远端累计日志；两边都没有时为 null。 */
+  /** 本地内置副本或远端聚合变更日志；均不可用时为 null */
   readonly changelog: Atom<Changelog | null>;
   readonly changelogLoading: Atom<boolean>;
   readonly changelogFailed: Atom<boolean>;
@@ -139,16 +151,16 @@ export interface UpdaterService {
   readonly persistence: ConfigPersistence;
   readonly publication: Atom<UpdatePublication | null>;
   /**
-   * 在主题检查、指针提交与清理的同一队列里执行组件维护；执行期间状态为 `maintenance`，`restart` 返回 false。
-   * 当前启动未确认、存储不可用，或已有未结束、读不懂的插件维护记录时拒绝执行。
+   * 执行组件维护事务，与主题检查、指针写入及版本清理共享串行队列；
+   * 执行中标记为 maintenance 阶段且禁止重启；未确认启动、存储不可用或存在冲突事务时拒绝受理
    */
   maintain(action: () => Promise<void>): Promise<void>;
   setMode(mode: UpdateMode): Promise<boolean>;
-  /** 手动检查：不看失败上限，auto 档接着下载安装，另两档只检查；正在检查时共用同一轮。 */
+  /** 用户手动检查：忽略失败次数上限，自动模式继续下载安装，并发检查复用同一次拉取 */
   check(): Promise<void>;
-  /** 下载并安装：等正在跑的一轮结束后检查，查到新版就下载，不看模式与失败上限。 */
+  /** 用户确认下载安装：排队等待当前任务完成后检查，发现可用版本即刻开始下载安装 */
   install(): Promise<void>;
-  /** 更新状态损坏时由用户发起：写回初始状态后立刻手动检查一次。 */
+  /** 恢复损坏的更新状态：重置本地状态记录并立即发起一次前台检查 */
   reset(): Promise<void>;
   restart(): Promise<boolean>;
   dispose(): void;
@@ -162,13 +174,18 @@ export interface UpdatePublication {
 
 const FIRST_CHECK_MS = 60_000;
 const INTERVAL_MS = 6 * 60 * 60_000;
-/** 定时检查前后各浮动一成，避免大量客户端在同一时刻请求。 */
+/** 定时轮询周期叠加正负 10% 随机抖动，平抑并发请求洪峰 */
 const JITTER = 0.1;
 const ROOT_LIMIT = 2 * 1024 * 1024;
 const RELEASE_LIMIT = 1024 * 1024;
 const WRITE_PAUSE_MS = 30;
-/** 清理放在启动约 10 分钟后：这时共用检测至少已经比对过一次。 */
+/** 历史版本清理延迟至启动 10 分钟后执行，确保多实例探测与初始运行状态已稳定 */
 const CLEANUP_DELAY_MS = 10 * 60_000;
+
+/** 校验主题是否被外部覆盖安装；启动确认后当前运行版本应与指针指向一致 */
+function replaced(pointer: Pointer, session: LoaderSession): boolean {
+  return !sameVersion(versionRef(pointer.frontend.version), session.version);
+}
 
 function randomSuffix(): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -194,7 +211,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
   const publication = atom<UpdatePublication | null>(null);
   let disposed = false;
   let running: Promise<void> | undefined;
-  /** 检查与清理排在同一条队列里：清理算保留集时不能有安装进行到一半。 */
+  /** 串行化检查、安装与清理任务，避免计算历史保留集时并发执行新版本解压 */
   let queue: Promise<void> = Promise.resolve();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -212,7 +229,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
   function idle(failure: UpdateFailure | null, gaveUp = false): void {
     show(presence?.shared() ? { phase: 'shared' } : { phase: 'idle', checkedAt, failure, gaveUp });
   }
-  /** 记下这个版本的失败；记不下来不影响本次提示，下次照样重试。 */
+  /** 记录版本故障计数；持久化失败不阻断状态展示，后续周期继续重试 */
   async function fail(
     files: TemplateFiles,
     state: UpdateState,
@@ -231,7 +248,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
 
   async function run(startup: ConfirmedStartup, kind: CheckKind): Promise<void> {
     const manual = kind !== 'scheduled';
-    const download = kind === 'install' || store.get(MODE) === 'auto';
+    const download = kind === 'install' || store.get(EFFECTIVE_UPDATE_MODE) === 'auto';
     if (presence?.shared()) return show({ phase: 'shared' });
     const files = templateFiles(host.file, startup.directory, alive);
     store.set(catalog, null);
@@ -239,6 +256,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
       show({ phase: 'maintenance' });
       return;
     }
+    if (replaced(await loadPointer(files), startup.session)) return show({ phase: 'replaced' });
     show({ phase: 'checking' });
     store.set(publication, null);
     if (kind === 'reset') {
@@ -255,11 +273,11 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     if (decision.kind === 'manual') return show({ phase: 'manual', reason: decision.reason });
     if (decision.kind !== 'accepted') return idle(decision.kind);
     state = { ...state, trust: decision.state };
-    // 序号、信任集与撤回表先整体落盘，之后才按这份清单选版本、下载。
+    // 根清单先原子落盘更新信任集与撤回表，随后按已校验清单执行版本筛选与下载
     await saveUpdateState(files, state);
     const { payload } = decision;
     store.set(publication, { text: root.value, payload, revokedKeys: decision.state.revokedKeys });
-    // 日志排在这一轮之后拉取，不拖慢检查。
+    // 变更日志后置拉取，避免非关键网络请求阻塞检查流程
     queue = queue.then(() => feed.refresh(host.http, payload.changelog));
 
     let pending = versionRef((await loadPointer(files)).frontend.pending);
@@ -343,8 +361,10 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
     );
     alive();
     if (!result.ok) return fail(files, state, candidate.version, result.problem);
-    // 安装期间指针可能被启动确认之外的写入改过，提交前重新读一次。
-    const pointer = pendingPointer(await loadPointer(files), result.version);
+    // 外部写入可能在解压期间改写指针，写入 pending 前重新校验指针与当前运行版本的一致性
+    const latest = await loadPointer(files);
+    if (replaced(latest, startup.session)) return show({ phase: 'replaced' });
+    const pointer = pendingPointer(latest, result.version);
     if (await pluginMaintenanceActive(files)) {
       show({ phase: 'maintenance' });
       return;
@@ -364,7 +384,7 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
       disposed ||
       options.storageAvailable === false ||
       !startup ||
-      (kind === 'scheduled' && store.get(MODE) === 'off')
+      (kind === 'scheduled' && store.get(EFFECTIVE_UPDATE_MODE) === 'off')
     )
       return Promise.resolve();
     const task = queue.then(() =>
@@ -390,18 +410,18 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
         if (await pluginMaintenanceActive(files)) return;
         await cleanVersions(files, host, startup.session.version, await presence.stale(), alive);
       } catch {
-        // 清理失败不影响使用，下次启动再删。
+        // 清理异常不阻断本次运行，未能删除的历史目录留待下次启动清理
       }
     });
   }
 
-  /** 页面被挂起时定时器跟着停，恢复后过期的那一次会立刻触发，不需要另外补查。 */
+  /** 宿主挂起恢复后自动补发已超期的定时检查，无需额外注入补偿事件 */
   function plan(delay: number): void {
     if (timer !== undefined) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = undefined;
       void check('scheduled').finally(() => {
-        if (!disposed && !presence?.shared() && store.get(MODE) !== 'off')
+        if (!disposed && !presence?.shared() && store.get(EFFECTIVE_UPDATE_MODE) !== 'off')
           plan(INTERVAL_MS * (1 - JITTER + 2 * JITTER * random()));
       });
     }, delay);
@@ -426,20 +446,20 @@ export function startUpdater(store: Store, options: UpdaterOptions = {}): Update
       cleanupTimer = setTimeout(() => clean(startup), CLEANUP_DELAY_MS);
     }
     if (startup && store.get(status).phase === 'off') idle(null);
-    if (startup && !presence?.shared() && store.get(MODE) !== 'off') {
-      // 有检查在跑也要排上：手动检查结束时不会替自动检查续排。
+    if (startup && !presence?.shared() && store.get(EFFECTIVE_UPDATE_MODE) !== 'off') {
+      // 即使当前检查正在执行仍排入队列，避免前台手动检查结束后丢失自动轮询调度
       if (timer === undefined) plan(FIRST_CHECK_MS);
     } else if (timer !== undefined) {
       clearTimeout(timer);
       timer = undefined;
     }
   }
-  const offs = [store.sub(confirmedStartupAtom, sync), store.sub(MODE, sync)];
+  const offs = [store.sub(confirmedStartupAtom, sync), store.sub(EFFECTIVE_UPDATE_MODE, sync)];
   sync();
 
   return {
     status: atom((get) => get(status)),
-    mode: MODE,
+    mode: EFFECTIVE_UPDATE_MODE,
     changelog: feed.changelog,
     changelogLoading: feed.loading,
     changelogFailed: feed.failed,

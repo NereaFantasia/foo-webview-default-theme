@@ -104,8 +104,14 @@ test('入队与发送到：加入队列按路径接到队尾，下一首播放�
   expect(errors).toEqual([]);
 });
 
-test('宿主的几项：开菜单时按宿主选中重读命令树，评分一档与属性按编号执行', async ({ page }) => {
-  const { host, row, errors } = await openPlaylist(page, 'Mix');
+test('宿主的几项：开菜单时按宿主选中重读命令树，属性按编号执行；评分一档直接写评分，不走命令树', async ({
+  page,
+}) => {
+  // 评分一档的勾按选中曲目自己的评分画，不看宿主命令树里的 radioChecked
+  const tracks = Array.from({ length: 8 }, (_, at) =>
+    makeRow('Mix', at, at === 4 ? { rating: 3 } : {}),
+  );
+  const { host, row, errors } = await openPlaylist(page, 'Mix', tracks);
   host.answer('menu.getContextMenu', {
     success: true,
     mode: 'selection',
@@ -114,6 +120,12 @@ test('宿主的几项：开菜单时按宿主选中重读命令树，评分一�
     withAvailability: true,
     items: TREE,
   });
+  host.answer('rating.set', (params) => ({
+    success: true,
+    path: String(params['path']),
+    rating: Number(params['rating']),
+    storage: 'file',
+  }));
   await row('Mix 5').click({ button: 'right' });
   await expect
     .poll(() => host.callsTo('menu.getContextMenu'))
@@ -121,14 +133,13 @@ test('宿主的几项：开菜单时按宿主选中重读命令树，评分一�
   await menuOf(page).locator('[data-action="rating"]').click();
   await expect(page.getByRole('menuitemradio', { name: '3 星' })).toBeChecked();
   await page.getByRole('menuitemradio', { name: '5 星' }).click();
-  await expect
-    .poll(() => host.callsTo('menu.runContextCommandById'))
-    .toMatchObject([{ id: 25, mode: 'selection' }]);
+  await expect.poll(() => host.callsTo('rating.set')).toMatchObject([{ rating: 5 }]);
+  expect(host.callsTo('menu.runContextCommandById')).toEqual([]);
 
   await row('Mix 5').click({ button: 'right' });
   await menuOf(page).locator('[data-action="properties"]').click();
   await expect
     .poll(() => host.callsTo('menu.runContextCommandById'))
-    .toMatchObject([{ id: 25 }, { id: 7, mode: 'selection' }]);
+    .toMatchObject([{ id: 7, mode: 'selection' }]);
   expect(errors).toEqual([]);
 });

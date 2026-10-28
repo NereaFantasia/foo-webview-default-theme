@@ -1,0 +1,220 @@
+/* 内容区四周留 8，行自己的左右内边距再给 8，序号离卡片左缘 16，与头对齐。最小高度多出前面那一段
+   （--queue-earlier），后面几段再短也滚得到它的下缘，它整段藏在视口上方。 */
+.root {
+  position: relative;
+  display: grid;
+  align-content: start;
+  min-height: calc(100% + var(--queue-earlier, 0px));
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS) 0;
+}
+
+/* 正在播的这一首前面那几行：DOM 在最后，排到最上面（见 `QueueEarlier`）；有内容时离当前曲目卡 8 */
+.earlier {
+  order: -1;
+  min-width: 0;
+}
+
+.earlier[data-filled] {
+  padding-bottom: var(--queue-earlier-pad, var(--spacingVerticalS));
+}
+
+/* 前面的曲目文字降一档（`--queue-earlier-dim`），不铺底、不画线。下沿的内边距 `--queue-earlier-pad` 要不小于它前面
+   的留白（列的上内边距加列表自己的上内边距）：置顶时视口上缘露出的就是这一段的下沿，矮了前面的最后一行会露出来。
+   右侧卡不给这两个变量，原样 */
+.earlier .list {
+  opacity: var(--queue-earlier-dim, 1);
+}
+
+/* 不画播放历史时内容的外层，与历史区包裹层同样不撑破网格列 */
+.plain {
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+}
+
+.section + .section {
+  margin-top: var(--spacingVerticalS);
+}
+
+/* 节头 32 高：左边是段名，旁边跟次要信息（数量或来源）；「已加入队列」的数量与清空在右边（`data-lead` 的节头不分左右）。
+   段名取 `--queue-head-size`，次要信息取 `--queue-head-sub-size`，沉浸视图给大一档的字，右侧卡取缺省 */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  height: 32px;
+  padding: 0 var(--spacingHorizontalS);
+}
+
+.head[data-lead] {
+  justify-content: flex-start;
+}
+
+.label {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: var(--spacingHorizontalS);
+  color: var(--text-primary);
+  font-size: var(--queue-head-size, var(--fontSizeBase200));
+  font-weight: var(--fontWeightSemibold);
+  white-space: nowrap;
+}
+
+.count {
+  color: var(--text-muted);
+  font-size: var(--queue-head-sub-size, inherit);
+  font-weight: var(--fontWeightRegular);
+}
+
+.headActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  white-space: nowrap;
+}
+
+.clear {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.clear:focus-visible {
+  border-radius: var(--radius-control);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+/* 来源紧跟在节名后面，是次要信息：强调色、常规字重，比段名小一档；放不下时截断，完整来源保留在提示和可访问名称里 */
+.source {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--queue-head-sub-size, var(--fontSizeBase200));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.source:hover {
+  text-decoration: underline;
+}
+
+.source:focus-visible {
+  border-radius: var(--borderRadiusSmall);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+/* 落点线按列表定位，副本另挂到浮层以免被滚动区裁剪 */
+.list {
+  position: relative;
+}
+
+.virtualRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+/* 行带不设 will-change：单独成合成层后按小数偏移摆放，125% 这类缩放下文字发虚 */
+.strip {
+  position: relative;
+}
+
+.placeholder {
+  --row-cover: calc(var(--queue-row-height, 48px) - 2 * var(--spacingVerticalXS));
+
+  display: grid;
+  grid-template-columns: max(20px, var(--queue-number-width, 2ch)) var(--row-cover) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  height: 100%;
+  padding: 0 var(--spacingHorizontalS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+}
+
+.placeholderCover {
+  width: var(--row-cover);
+  height: var(--row-cover);
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorNeutralBackgroundAlpha);
+}
+
+.placeholderText {
+  display: grid;
+  gap: var(--spacingVerticalSNudge);
+}
+
+.placeholderText span {
+  height: 10px;
+  width: 75%;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorNeutralBackgroundAlpha);
+}
+
+.placeholderText span + span {
+  width: 50%;
+}
+
+.dropLine {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--accent);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 宽度和抓取偏移沿用原行，描边不改变内部各槽的位置 */
+.ghost {
+  position: fixed;
+  z-index: 2;
+  outline: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow16);
+  pointer-events: none;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--spacingVerticalS);
+  min-height: 240px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}
+
+.emptyIcon {
+  width: 36px;
+  height: 36px;
+  color: var(--text-muted);
+}

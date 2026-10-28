@@ -51,6 +51,24 @@ test('浏览、列排序与起播使用当前顺序，节点切换进入历史',
   await expect(env.grid.getByText('Blue', { exact: true })).toBeVisible();
   expect(env.errors).toEqual([]);
 });
+test('命令栏的排序菜单与列头记号同步，回到目录顺序时去掉记号', async ({ page }) => {
+  const env = await openFolders(page);
+  await env.folder('Alpha').click();
+  const menu = env.view.locator('[data-sort-menu]');
+  const title = env.grid.getByRole('columnheader', { name: '标题', exact: true });
+  await expect(menu).toHaveText('排序');
+  await menu.click();
+  await page.locator('[data-sort-field="title"]').click();
+  await expect(title).toHaveAttribute('aria-sort', 'ascending');
+  await menu.click();
+  await page.getByRole('menuitemradio', { name: '降序', exact: true }).click();
+  await expect(title).toHaveAttribute('aria-sort', 'descending');
+  await menu.click();
+  await page.locator('[data-sort-field="default"]').click();
+  await expect(menu).toHaveText('排序');
+  await expect(title).not.toHaveAttribute('aria-sort', /ascending|descending/);
+  expect(env.errors).toEqual([]);
+});
 test('多选、右键对象、键盘展开与过滤恢复', async ({ page }) => {
   const env = await openFolders(page);
   await env.folder('Alpha').click();

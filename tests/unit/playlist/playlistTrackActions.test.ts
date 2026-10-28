@@ -66,7 +66,7 @@ describe('createPlaylistTrackActions', () => {
   it('裁剪先等选中落地，再确认这张是活动列表，才发主菜单的裁剪命令', async () => {
     const host = installFakeHost();
     const { actions, failed } = await setup(host);
-    host.answer('menu.runMainMenuCommand', { success: true });
+    host.answer('menu.runMainMenuCommand', { success: true, completion: 'unknown' });
     expect(await actions.crop(MAIN)).toBe(true);
     expect(host.callsTo('menu.runMainMenuCommand').at(-1)).toMatchObject({
       command: MAIN_COMMANDS.cropSelection,
@@ -129,7 +129,12 @@ describe('createPlaylistTrackActions', () => {
     const held = host.hold('playlist.getTracks');
     const pending = actions.queueNext(MAIN, span(0, 2));
     await vi.waitFor(() => expect(held.pending).toHaveLength(1));
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 10 });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 10,
+      contentVersion: '1',
+    });
     held.release();
     expect(await pending).toBe(false);
     expect(host.callsTo('queue.insertNext')).toEqual([]);

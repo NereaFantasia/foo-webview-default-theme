@@ -3,7 +3,7 @@ import { isWordLevel, type LyricsContent } from '../lyricsText.ts';
 import { levelRank, rankCandidates, type MatchLevel, type MatchResult } from './lyricsMatch.ts';
 import type { LyricsCandidate, LyricsQuery, LyricsSource, LyricsSourceId } from './lyricsSource.ts';
 
-/** 一家取到的词。 */
+/** 一家取到的词 */
 export interface FoundLyrics {
   readonly content: LyricsContent;
   readonly source: LyricsSourceId;
@@ -13,10 +13,10 @@ export interface FoundLyrics {
 
 export type SourceOutcome = FoundLyrics | 'missing' | 'failed';
 
-/** 同一家里最多试几条候选：前一条取词答「没有」时换下一条。 */
+/** 同一家里最多试几条候选：前一条取词答「没有」时换下一条 */
 const FETCH_ATTEMPTS = 2;
 
-/** 在一家里找：搜索、按档排候选、依次取词。中止答 null，其他抛错按失败处理。 */
+/** 在一家里找：搜索、按档排候选、依次取词。中止答 null，其他抛错按失败处理 */
 export async function searchSource(
   source: LyricsSource,
   query: LyricsQuery,
@@ -50,7 +50,7 @@ const lineTexts = (content: LyricsContent): string[] =>
     ? [...content.lines]
     : content.lines.map((line) => line.words.map((word) => word.word).join(''));
 
-/** 被打成星号的字数；酷狗等会把粗口换成 `*`。 */
+/** 被打成星号的字数；酷狗等会把粗口换成 `*` */
 const censoredCount = (content: LyricsContent) =>
   lineTexts(content).reduce((sum, text) => sum + (text.match(/\*/g)?.length ?? 0), 0);
 
@@ -61,8 +61,8 @@ const hasTranslation = (content: LyricsContent) =>
   content.kind === 'synced' && content.lines.some((line) => line.translatedLyric);
 
 /**
- * 几家都取到时只留与最高匹配档相差不超过一档的，再按类别偏好选取。
- * 同类别优先屏蔽字少、带译文的内容；仍相同时按来源顺序。
+ * 几家都取到时只留与最高匹配档相差不超过一档的，再按类别偏好选取
+ * 同类别优先屏蔽字少、带译文的内容；仍相同时按来源顺序
  */
 export function pickLyrics(
   found: readonly FoundLyrics[],
@@ -89,26 +89,26 @@ export function pickLyrics(
   );
 }
 
-/** 按顺序找时，取到首选在线类别且没有屏蔽字，就不再问后面的来源。 */
+/** 按顺序找时，取到首选在线类别且没有屏蔽字，就不再问后面的来源 */
 const satisfies = (item: FoundLyrics, priority: readonly LyricsPriority[]) =>
   lyricsCategory(item.content) === priority.find((value) => value !== 'local') &&
   censoredCount(item.content) === 0;
 
 export interface OnlineSearchOptions {
   readonly priority?: readonly LyricsPriority[];
-  /** `parallel` 同时问所有来源，取最好的；`sequential` 按来源顺序逐个问，够好就停。 */
+  /** `parallel` 同时问所有来源，取最好的；`sequential` 按来源顺序逐个问，够好就停 */
   readonly mode: 'parallel' | 'sequential';
   readonly minimum: MatchLevel;
   /**
-   * 备选来源，同样按顺序排：前面的来源一份都没取到时才问它们，取到了也不与前面的比。
-   * 用于自己再去问别家、只回一份的聚合服务，它交回的曲目信息不是出词那家的。
+   * 备选来源，同样按顺序排：前面的来源一份都没取到时才问它们，取到了也不与前面的比
+   * 用于自己再去问别家、只回一份的聚合服务，它交回的曲目信息不是出词那家的
    */
   readonly fallbacks?: readonly LyricsSource[];
-  /** 换曲时中止：已发出的请求收不回，但不再发新的请求，结果答 null。 */
+  /** 换曲时中止：已发出的请求收不回，但不再发新的请求，结果答 null */
   readonly signal?: AbortSignal;
 }
 
-/** 按 `mode` 问一组来源，中止时答 null。 */
+/** 按 `mode` 问一组来源，中止时答 null */
 async function askSources(
   query: LyricsQuery,
   sources: readonly LyricsSource[],
@@ -145,7 +145,7 @@ const bestOf = (
 
 /**
  * 在几家里找一首的词。`sources` 的顺序就是用户排的优先级。一份都没取到时：问过的来源全部失败答 `failed`，
- * 稍后可以再试；否则答 `missing`。
+ * 稍后可以再试；否则答 `missing`
  */
 export async function searchOnline(
   query: LyricsQuery,

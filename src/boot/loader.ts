@@ -49,7 +49,7 @@ export function cookieName(id: string): string {
   return `${COOKIE_PREFIX}${id || 'initial'}`;
 }
 
-/** frontend 的三个槽永久保持含义，其余字段与 schema 的后续取值不参与选版。 */
+/** frontend 的三个槽永久保持含义，其余字段与 schema 的后续取值不参与选版 */
 export function candidates(value: unknown): readonly VersionRef[] | null {
   if (
     !record(value) ||
@@ -133,7 +133,7 @@ export function setAttempts(
   };
 }
 
-/** 完整标记至少包含入口文件的哈希；发行身份由发行包的安装过程补入。 */
+/** 完整标记至少包含入口文件的哈希；发行身份由发行包的安装过程补入 */
 export function installed(value: unknown, ref: VersionRef): boolean {
   return (
     record(value) &&

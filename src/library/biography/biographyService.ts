@@ -25,7 +25,7 @@ export interface BiographyDeps {
   readonly enabled: Atom<boolean>;
   readonly active: Atom<boolean>;
   readonly input: Atom<BiographyInput | null>;
-  /** 取正文的来源；缺省走网页采集。 */
+  /** 取正文的来源；缺省走网页采集 */
   readonly fetchText?: (artist: string, language: BiographyLanguage) => Promise<LastfmFetchResult>;
   readonly sourceKey?: Atom<string>;
   readonly resources?: Pick<
@@ -53,6 +53,7 @@ const EMPTY: BiographyState = {
   refreshing: false,
   stale: false,
   problem: null,
+  problemDetail: null,
   cacheFailed: false,
 };
 export const BIOGRAPHY_DEBOUNCE_MS = 300;
@@ -99,6 +100,7 @@ export function startBiography(
       details: previous ?? null,
       detailsLoading: !valid,
       detailsProblem: null,
+      detailsProblemDetail: null,
     });
     if (valid) return;
     const fetch = () => fetchDetails(entry.artist, entry.language, host);
@@ -118,8 +120,9 @@ export function startBiography(
           ...store.get(state),
           detailsLoading: false,
           detailsProblem: result.problem,
+          detailsProblemDetail: result.detail,
         });
-      // 旧目标的失败不改当前显示，但限流仍约束后续请求。
+      // 旧目标的失败不改当前显示，但限流仍约束后续请求
       backoff.record(result, key);
       return;
     }
@@ -129,6 +132,7 @@ export function startBiography(
       details: result.details,
       detailsLoading: false,
       detailsProblem: null,
+      detailsProblemDetail: null,
     });
     if (persist) {
       const saved = await cache.save(entry.artist, entry.language, {
@@ -168,7 +172,7 @@ export function startBiography(
     const current = () => !disposed && generation === mine && !!selected();
     const cached = cache.get(artist, language);
     if (cached && !fresh && cached.expiresAt > Date.now()) {
-      // 空结果只说明这一种语言没有正文，不能阻断其他语言的读取。
+      // 空结果只说明这一种语言没有正文，不能阻断其他语言的读取
       if (!cached.document && language !== 'en') return load(input, mine, fresh, 'en');
       store.set(state, {
         ...EMPTY,
@@ -217,6 +221,7 @@ export function startBiography(
         document: old,
         stale: !!old,
         problem: result.problem,
+        problemDetail: result.detail,
         details: cached?.details ?? store.get(state).details,
       });
       return;
@@ -246,7 +251,7 @@ export function startBiography(
     if (running || !connected || disposed || clearing) return;
     running = true;
     try {
-      // 一个请求在途时只保留最新输入，连续切换不会堆积整列联网任务。
+      // 一个请求在途时只保留最新输入，连续切换不会堆积整列联网任务
       while (pending && !disposed) {
         pending = false;
         const input = selected();

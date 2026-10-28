@@ -11,7 +11,7 @@ function prefix(path: string): string | null {
     ? `${normalized}\\`
     : null;
 }
-/** 嵌套库根独立归属；目录查询必须显式排除，不能把父根当作磁盘的递归目录。 */
+/** 嵌套库根独立归属；目录查询必须显式排除，不能把父根当作磁盘的递归目录 */
 export function foldersQuery(
   nodes: readonly FolderNode[],
   roots: readonly FolderNode[],
@@ -32,7 +32,7 @@ export function foldersQuery(
   return clauses.length ? clauses.join(' OR ') : null;
 }
 
-/** 先将查询成员与目录树的完整句柄逐一核对；便携路径或归档映射不一致时不创建自动列表。 */
+/** 先将查询成员与目录树的完整句柄逐一核对；便携路径或归档映射不一致时不创建自动列表 */
 export async function createFoldersAutoplaylist(
   host: Pick<typeof fb, 'library' | 'playlist'>,
   query: string,

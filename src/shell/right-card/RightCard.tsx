@@ -1,10 +1,10 @@
+import { Menu } from '../../motion/Surfaces.tsx';
+import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
 import { createSnapshotSlot } from '../../nav/historyStack.ts';
 import {
   Button,
-  Menu,
   MenuItem,
   MenuList,
-  MenuPopover,
   MenuTrigger,
   Tab,
   makeStyles,
@@ -24,7 +24,8 @@ import { CURVE, DURATION_MS, motionDuration } from '../../motion/timing.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import type { MessageKey } from '../../i18n/en.ts';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
-import { QueuePage } from './queue/QueuePage.tsx';
+import { QueueList } from '../../playback/queue/QueueList.tsx';
+import { RightCardHead } from './RightCardHead.tsx';
 import { READY_PAGES, RIGHT_CARD_PAGES, type RightCardPage } from './rightCard.ts';
 import styles from './RightCard.module.css';
 import {
@@ -59,9 +60,9 @@ const useStyles = makeStyles({
 });
 
 /**
- * 工具条、分页栏固定；信息页在内容区内单独管理固定身份与滚动分组。
+ * 工具条、分页栏固定；信息页在内容区内单独管理固定身份与滚动分组
  * 未启用的页面在分页栏里置灰，读屏时念作即将推出。队列页的播放历史挂在分页栏与内容区之间的插槽里，
- * 不随内容区滚动。
+ * 不随内容区滚动
  */
 export function RightCard() {
   const t = useAtomValueRawSync(translateAtom);
@@ -149,12 +150,16 @@ export function RightCard() {
       className={styles.root}
       aria-label={t('rightCard.region')}
       data-right-card
+      data-queue-bounds
       data-lyrics-preview={page === 'lyrics' || undefined}
       data-controls-visible={preview.visible || undefined}
+      data-scrollbars-visible={preview.scrollbarsVisible || undefined}
       tabIndex={page === 'lyrics' ? 0 : -1}
+      onScrollCapture={preview.scroll}
       onPointerMove={preview.pointer}
       onPointerEnter={preview.pointer}
       onPointerDown={preview.pointer}
+      onPointerLeave={preview.pointerLeave}
       onFocusCapture={preview.focus}
       onBlurCapture={preview.blur}
     >
@@ -254,7 +259,10 @@ export function RightCard() {
       <div ref={content} className={styles.content} data-page={page}>
         {/* 插槽就位后才挂队列页：历史区挂上时就要拿得到自己的列表，滚动监听与按键才接得上。 */}
         {page === 'queue' && historySlot && (
-          <QueuePage reviewSlot={reviewSlot} historySlot={historySlot} />
+          <QueueList
+            review={{ toggle: reviewSlot, history: historySlot }}
+            head={(onMenu) => <RightCardHead onMenu={onMenu} />}
+          />
         )}
         {page === 'bio' && biography}
         {page === 'info' && information?.content}

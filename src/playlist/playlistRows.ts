@@ -15,33 +15,32 @@ import type { RowSpan } from './rowPages.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
 export interface PlaylistRowsDeps {
-  /** 评分服务的戳，见 `TrackRatingsService.stamp`：每个取页请求发出之前拿一次。 */
+  /** 评分服务时间戳生成器（对应 `TrackRatingsService.stamp`）：每次拉取页面数据前生成时间戳 */
   readonly stamp: () => number;
-  /** 评分事件没报全时变的信号（`ratingsRefetchAtom`）：变了就把正在看的列表重取。 */
+  /** 评分事件未完整回报的重拉信号（`ratingsRefetchAtom`）：信号变化时刷新当前可视列表 */
   readonly refetch: Atom<number>;
 }
 
 export interface PlaylistRowsService {
   readonly ready: Promise<void>;
-  /** 一张列表的行状态；同一 GUID 总是同一个原子，没有页面要它时是 `idle`。 */
+  /** 列表行状态原子；同一 GUID 对应唯一原子引用，无页面订阅时处于 idle 状态 */
   stateOf(guid: string): Atom<PlaylistRowsState>;
-  /** 页面挂上时调，开始取这张列表的行；返回的函数在页面卸下时调，调几次都只算一次。 */
+  /** 页面挂载时调用以订阅该列表数据；返回取消订阅的回调（多次调用幂等） */
   acquire(guid: string): () => void;
-  /** 缓存里的一行，不触发取数；没取到时为 undefined，作废后还没取回时是旧的那一行。 */
+  /** 读取缓存行数据（不触发网络/IPC 请求）；未就绪返回 undefined，刷新过渡期返回旧快照 */
   rowAt(guid: string, row: number): PlaylistRow | undefined;
   /**
-   * 这一行取数之前拿的评分戳，问 `TrackRatingsService.ratingOf` 时带上；没取到时为 undefined。各页取数的时刻
-   * 不同，戳按页各有一个，旧页留着显示时仍是它自己的戳。
+   * 获取对应行拉取时绑定的评分时间戳，供 `TrackRatingsService.ratingOf` 校验；
+   * 各分页拉取时点不同，时间戳按分页独立维护
    */
   stampAt(guid: string, row: number): number | undefined;
   /**
-   * 这一行取到了，而且取回之后宿主没有增删、重排过行，行号与行对得上。旧页留着显示时行号可能已经挪了：
-   * 按行号与分组游程、封面采样点配对的先问它。
+   * 校验缓存行是否严格匹配最新宿主版本（未发生增删或重排）；供分组游程与封面采样点安全对齐
    */
   currentAt(guid: string, row: number): boolean;
-  /** 视口里是这几段行（见 `RowPages.view`）：取缺的页并往两头预取。 */
+  /** 视口请求指定行区间（`RowPages.view`）：拉取缺失分页并双向预取邻近页 */
   want(guid: string, spans: readonly RowSpan[]): void;
-  /** 再试一次取失败的页。 */
+  /** 重试拉取失败的分页 */
   retry(guid: string): void;
   dispose(): void;
 }
@@ -57,14 +56,11 @@ interface Held {
 }
 
 /**
- * 播放列表页的行：哪几张列表有页面在看，宿主的事件落到哪一张。每张的取数与缓存归 `PlaylistRowSource`。
+ * 播放列表行数据调度服务：管理活跃列表订阅，将宿主事件分发至对应的 `PlaylistRowSource`
  *
- * 内容事件只带列表序号，按此刻的清单换回 GUID；建、删、重排列表之后到清单读回之前，序号对不上，这期间的内容
- * 事件当作命中每一张正在看的列表。改标签没有列表事件，看 `metadb:changed`：报的曲目在缓存里、或者没报全
- * （一次至多报 50 首），就重取，但不算行的增删。列表在不在以宿主为准：清单读回后不在里面的去重取一次，宿主
- * 答不存在才记成已删除，刚建好、清单还没带回的列表不会被误判。
- *
- * 同一张列表同时被几个页面要（切换动画里离场与入场的两层）时共用一份，都放手后丢掉。
+ * 内容事件仅携带列表索引，依据当前清单映射为 GUID；在增删重排列表至清单重新读回的过渡期内，
+ * 广播事件按全量命中处理。元数据变更依据 `metadb:changed` 触发重拉缓存
+ * 同一列表若被多个视图共享（如转场动画），共用同一份缓存实例；所有视图注销后释放
  */
 export function startPlaylistRows(
   store: Store,
@@ -74,9 +70,9 @@ export function startPlaylistRows(
   let disposed = false;
   let connected = false;
   let unreachable = false;
-  // 清单读到这一版为止序号不可信：还没读过，或者读完之后又建、删、重排过列表。
+  // 清单读到这一版为止序号不可信：还没读过，或者读完之后又建、删、重排过列表
   let untrustedUpTo = 0;
-  // 已经按哪一版清单核对过各列表在不在；清单的失败标记等变了而版本没动时不再核对。
+  // 已经按哪一版清单核对过各列表在不在；清单的失败标记等变了而版本没动时不再核对
   let checkedRevision = 0;
   const slots = new Map<string, Slot>();
   const held = new Map<string, Held>();
@@ -95,7 +91,7 @@ export function startPlaylistRows(
   }
   const sources = () => [...held.values()].map((entry) => entry.source);
 
-  /** 内容事件命中了哪些列表：序号可信时按清单认那一张，不可信时算全部。 */
+  /** 内容事件命中了哪些列表：序号可信时按清单认那一张，不可信时算全部 */
   function sourcesAt(index: number): PlaylistRowSource[] {
     const lists = store.get(playlistsAtom);
     if (lists.revision <= untrustedUpTo) return sources();
@@ -136,7 +132,7 @@ export function startPlaylistRows(
     const onStructure = () => {
       untrustedUpTo = store.get(playlistsAtom).revision;
     };
-    // 先订阅再取行，两者之间的变化才不会漏。
+    // 先订阅再取行，两者之间的变化才不会漏
     offs.push(
       host.on('playlist:itemsAdded', onContent),
       host.on('playlist:itemsRemoved', onContent),
@@ -179,7 +175,7 @@ export function startPlaylistRows(
         if (!holding) return;
         holding = false;
         entry.holders -= 1;
-        // 晚一个微任务再丢：页面在同一次提交里卸下又挂上（StrictMode 的二次 effect）时缓存留着。
+        // 晚一个微任务再丢：页面在同一次提交里卸下又挂上（StrictMode 的二次 effect）时缓存留着
         queueMicrotask(() => {
           if (disposed || entry.holders > 0 || held.get(guid) !== entry) return;
           held.delete(guid);

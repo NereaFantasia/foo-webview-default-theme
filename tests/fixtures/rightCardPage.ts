@@ -1,18 +1,17 @@
 import { expect, type Page } from '@playwright/test';
+import type { PageHost } from './pageHost.ts';
 import { openPlayer } from './playerPage.ts';
 import { makeTrack } from './tracks.ts';
 
 export const QUEUE_LIST_GUID = '{11111111-1111-1111-1111-111111111111}';
 
-/** 大列表只按被读页生成曲目，避免替身自己先为几十万首分配对象。`name` 是在播那张表的名字。 */
-export async function openLargeQueue(
-  page: Page,
-  total = 120000,
+/** 让宿主答出一张在播的大列表：只按被读页生成曲目，避免替身自己先为几十万首分配对象。`name` 是那张表的名字。 */
+export function answerLargeQueue(
+  host: PageHost,
+  total: number,
   delayMs = 0,
   name = '完整播放来源',
 ) {
-  const player = await openPlayer(page);
-  const { host } = player;
   host.answer('playlist.getAll', {
     success: true,
     count: 1,
@@ -62,6 +61,18 @@ export async function openLargeQueue(
     },
     { delayMs },
   );
+}
+
+/** 打开右侧卡的队列页，在播的是那张大列表的第 0 首 */
+export async function openLargeQueue(
+  page: Page,
+  total = 120000,
+  delayMs = 0,
+  name = '完整播放来源',
+) {
+  const player = await openPlayer(page);
+  const { host } = player;
+  answerLargeQueue(host, total, delayMs, name);
   await host.waitForListener('playback:trackChanged');
   await host.waitForListener('playback:followCursorChanged');
   await host.emit('playback:followCursorChanged', { enabled: false });

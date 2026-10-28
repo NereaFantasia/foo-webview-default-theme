@@ -1,40 +1,41 @@
+import { Slider } from '@fluentui/react-components';
 import {
-  Button,
-  CounterBadge,
-  Label,
-  MenuButton,
-  MenuItem,
-  MenuItemCheckbox,
-  MenuItemRadio,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
-  PopoverSurface,
-  PopoverTrigger,
-  Slider,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-  tokens,
-} from '@fluentui/react-components';
-import { Menu, Popover } from '../../motion/Surfaces.tsx';
-import { MoreHorizontal20Regular, ResizeImage20Regular } from '@fluentui/react-icons';
+  ChevronDownUp20Regular,
+  ChevronUpDown20Regular,
+  TextCollapse20Regular,
+  TextExpand20Regular,
+} from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useId } from 'react';
 import type { MessageKey } from '../../i18n/en.ts';
 import { translateAtom } from '../../i18n/locale.ts';
-import { GRID_STYLES, type GridStyle } from '../album-wall/albumGridLayout.ts';
-import styles from './AlbumPageTools.module.css';
-import {
-  ALBUM_SORTS,
-  SECTION_DIMENSIONS,
-  type AlbumSort,
-  type SectionDimension,
-} from '../albumSections.ts';
-import { browserPrefsAtom, TILE_SIZE_MAX, TILE_SIZE_MIN, TILE_SIZE_STEP } from './browserPrefs.ts';
+import { SegmentedTabs } from '../../kit/SegmentedTabs.tsx';
+import { SortMenu as SharedSortMenu } from '../../kit/SortMenu.tsx';
 import { useService } from '../../kit/useService.ts';
+import {
+  FORM_ICONS,
+  ViewDirection,
+  ViewGrouping,
+  ViewPanel,
+  ViewPanelActions,
+  ViewPanelButton,
+  ViewSection,
+} from '../../kit/ViewPanel.tsx';
+import { GRID_STYLES, type GridStyle } from '../album-wall/albumGridLayout.ts';
+import { albumListKey } from '../album-list/albumList.ts';
+import { listPrefsAtom } from '../album-list/listPrefs.ts';
+import { SECTION_ORDERS } from '../album-list/listSort.ts';
+import { SECTION_DIMENSIONS, type SectionDimension } from '../albumSections.ts';
 import { albumsKey } from '../albumServices.ts';
-import { useViewControlStyles } from '../../theme/controlStyles.ts';
+import { playStatsAtom } from '../playStats.ts';
+import { albumSortOptions } from './albumSortOptions.ts';
+import {
+  ALBUM_FORMS,
+  browserPrefsAtom,
+  wallSortAtom,
+  TILE_SIZE_MAX,
+  TILE_SIZE_MIN,
+  TILE_SIZE_STEP,
+} from './browserPrefs.ts';
 
 export const DIMENSION_LABELS: Readonly<Record<SectionDimension, MessageKey>> = {
   album: 'album.dimAlbum',
@@ -45,20 +46,6 @@ export const DIMENSION_LABELS: Readonly<Record<SectionDimension, MessageKey>> = 
   libraryRoot: 'album.dimLibraryRoot',
 };
 
-const SORT_LABELS: Readonly<Record<AlbumSort, MessageKey>> = {
-  name: 'album.sortName',
-  artist: 'album.sortArtist',
-  year: 'album.sortYear',
-  trackCount: 'album.sortTrackCount',
-};
-
-/** 键上写短名：长名里的「新在前」「多在前」只在菜单里说明方向。 */
-const SORT_SHORT: Readonly<Record<AlbumSort, MessageKey>> = {
-  ...SORT_LABELS,
-  year: 'album.sortYearShort',
-  trackCount: 'album.sortTrackCountShort',
-};
-
 const STYLE_LABELS: Readonly<Record<GridStyle, MessageKey>> = {
   grid: 'album.styleGrid',
   compact: 'album.styleCompact',
@@ -66,187 +53,163 @@ const STYLE_LABELS: Readonly<Record<GridStyle, MessageKey>> = {
   gridNoText: 'album.styleGridNoText',
 };
 
-const useStyles = makeStyles({
-  more: { position: 'relative' },
-  badge: { position: 'absolute', top: 0, right: 0, pointerEvents: 'none' },
-  size: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
-    minWidth: '220px',
-  },
-});
-
-/** 菜单里勾中的值只认这一组里有的：Fluent 答的是字符串，别处写进来的不认。 */
-function pick<T extends string>(values: readonly T[], checked: readonly string[]): T | undefined {
-  return values.find((value) => checked.includes(value));
-}
-
-/** 分节依据：单选菜单，键上写当前那一档。 */
-export function DimensionMenu() {
+/** 封面墙的排序：字段、随机与方向，命令栏里文字固定 */
+export function SortMenu({ labelled }: { readonly labelled: boolean }) {
   const t = useAtomValueRawSync(translateAtom);
-  const { dimension } = useAtomValueRawSync(browserPrefsAtom);
+  const { sort } = useAtomValueRawSync(wallSortAtom);
+  const { available } = useAtomValueRawSync(playStatsAtom);
   const albums = useService(albumsKey);
-  const controls = useViewControlStyles();
   return (
-    <Menu
-      checkedValues={{ dimension: [dimension] }}
-      onCheckedValueChange={(_, data) => {
-        const next = pick(SECTION_DIMENSIONS, data.checkedItems);
-        if (next) albums.prefs.setDimension(next);
+    <SharedSortMenu
+      buttonAttributes={{ 'data-album-tool': 'sort' }}
+      tool={{ labelled }}
+      groups={albumSortOptions(t, available)}
+      field={sort.field}
+      descending={sort.descending}
+      onField={albums.prefs.setWallField}
+      onDescending={(descending) => albums.prefs.setWallSort({ ...sort, descending })}
+      shuffle={{
+        value: 'random',
+        label: t('albumList.random'),
+        run: () => albums.prefs.setWallField('random'),
       }}
-    >
-      <MenuTrigger disableButtonEnhancement>
-        <MenuButton appearance="subtle" className={controls.field} data-album-tool="dimension">
-          {t('album.dimensionValue', { value: t(DIMENSION_LABELS[dimension]) })}
-        </MenuButton>
-      </MenuTrigger>
-      <MenuPopover>
-        <MenuList aria-label={t('album.dimension')}>
-          {SECTION_DIMENSIONS.map((value) => (
-            <MenuItemRadio key={value} name="dimension" value={value}>
-              {t(DIMENSION_LABELS[value])}
-            </MenuItemRadio>
-          ))}
-        </MenuList>
-      </MenuPopover>
-    </Menu>
+    />
   );
 }
 
-export function SortMenu() {
+/**
+ * 专辑页的视图面板：版式与分节两种形态共用。封面墙另有封面大小与样式，大小与 Shift + 滚轮改的是同一个偏好，
+ * 夹取与落盘归偏好服务；列表形态另有分节顺序与展开、折叠的几种批量操作
+ */
+export function AlbumViewPanel({ labelled }: { readonly labelled: boolean }) {
   const t = useAtomValueRawSync(translateAtom);
-  const { sort } = useAtomValueRawSync(browserPrefsAtom);
+  const { form, dimension, style, tileSize } = useAtomValueRawSync(browserPrefsAtom);
+  const { sectionOrder, sectionDescending, albumGroups } = useAtomValueRawSync(listPrefsAtom);
   const albums = useService(albumsKey);
-  const controls = useViewControlStyles();
+  const albumList = useService(albumListKey);
+  const listForm = form === 'list';
+  const sectioned = dimension !== 'album';
   return (
-    <Menu
-      checkedValues={{ sort: [sort] }}
-      onCheckedValueChange={(_, data) => {
-        const next = pick(ALBUM_SORTS, data.checkedItems);
-        if (next) albums.prefs.setSort(next);
-      }}
+    <ViewPanel
+      labelled={labelled}
+      form={listForm ? 'list' : 'grid'}
+      buttonAttributes={{ 'data-album-tool': 'view' }}
     >
-      <MenuTrigger disableButtonEnhancement>
-        <MenuButton appearance="subtle" className={controls.field} data-album-tool="sort">
-          {t('album.sortValue', { value: t(SORT_SHORT[sort]) })}
-        </MenuButton>
-      </MenuTrigger>
-      <MenuPopover>
-        <MenuList aria-label={t('album.sort')}>
-          {ALBUM_SORTS.map((value) => (
-            <MenuItemRadio key={value} name="sort" value={value}>
-              {t(SORT_LABELS[value])}
-            </MenuItemRadio>
-          ))}
-        </MenuList>
-      </MenuPopover>
-    </Menu>
-  );
-}
-
-/** 封面大小：一个图标键，点开一条滑块。与 Shift + 滚轮改的是同一个偏好，夹取与落盘归偏好服务。 */
-export function TileSizeButton() {
-  const t = useAtomValueRawSync(translateAtom);
-  const { tileSize } = useAtomValueRawSync(browserPrefsAtom);
-  const albums = useService(albumsKey);
-  const classes = useStyles();
-  const controls = useViewControlStyles();
-  const sliderId = useId();
-  return (
-    <Popover positioning="below-end" trapFocus>
-      <PopoverTrigger disableButtonEnhancement>
-        <Tooltip content={t('album.tileSize')} relationship="label">
-          <Button
-            appearance="subtle"
-            className={controls.icon}
-            icon={<ResizeImage20Regular />}
-            data-album-tool="tile-size"
-          />
-        </Tooltip>
-      </PopoverTrigger>
-      <PopoverSurface className={classes.size}>
-        <div className={styles['size-head']}>
-          <Label htmlFor={sliderId}>{t('album.tileSize')}</Label>
-          <span>{t('album.tileSizeValue', { size: tileSize })}</span>
-        </div>
-        <Slider
-          id={sliderId}
-          min={TILE_SIZE_MIN}
-          max={TILE_SIZE_MAX}
-          step={TILE_SIZE_STEP}
-          value={tileSize}
-          onChange={(_, data) => albums.prefs.setTileSize(data.value)}
+      <ViewSection label={t('album.form')}>
+        <SegmentedTabs
+          label={t('album.form')}
+          value={form}
+          options={ALBUM_FORMS.map((value) => ({
+            value,
+            label: t(value === 'list' ? 'album.formList' : 'album.formWall'),
+            icon: value === 'list' ? FORM_ICONS.list : FORM_ICONS.grid,
+          }))}
+          onChange={albums.prefs.setForm}
         />
-      </PopoverSurface>
-    </Popover>
-  );
-}
-
-export interface PageMenuProps {
-  readonly facetsOpen: boolean;
-  readonly onFacetsOpenChange: (open: boolean) => void;
-  /** 勾着的筛选值有几个。筛选条收起时角上写这个数：那是筛选还在生效的唯一痕迹。 */
-  readonly facetCount: number;
-}
-
-/** 页头最右的 ⋯：显示样式（四档单选，只管封面墙，列表形态里不出）与筛选条的开关。 */
-export function PageMenu({ facetsOpen, onFacetsOpenChange, facetCount }: PageMenuProps) {
-  const t = useAtomValueRawSync(translateAtom);
-  const { style, form } = useAtomValueRawSync(browserPrefsAtom);
-  const albums = useService(albumsKey);
-  const classes = useStyles();
-  const controls = useViewControlStyles();
-  return (
-    <Menu
-      checkedValues={{ facets: facetsOpen ? ['open'] : [] }}
-      onCheckedValueChange={(_, data) => {
-        if (data.name === 'facets') onFacetsOpenChange(data.checkedItems.includes('open'));
-      }}
-    >
-      <MenuTrigger disableButtonEnhancement>
-        <Tooltip content={t('album.pageMenu')} relationship="label">
-          <Button
-            className={mergeClasses(classes.more, controls.icon)}
-            appearance="subtle"
-            icon={<MoreHorizontal20Regular />}
-            data-album-tool="page-menu"
+      </ViewSection>
+      <ViewGrouping
+        label={t('album.dimension')}
+        value={dimension}
+        options={SECTION_DIMENSIONS.map((value) => ({
+          value,
+          label: t(DIMENSION_LABELS[value]),
+        }))}
+        onChange={albums.prefs.setDimension}
+      />
+      {listForm && sectioned && (
+        <ViewSection label={t('albumList.sectionOrder')}>
+          <SegmentedTabs
+            label={t('albumList.sectionOrder')}
+            value={sectionOrder}
+            options={SECTION_ORDERS.map((value) => ({
+              value,
+              label: t(value === 'name' ? 'albumList.orderName' : 'albumList.orderCount'),
+            }))}
+            onChange={albumList.prefs.setSectionOrder}
+          />
+          <ViewDirection
+            label={t('albumList.sectionDirection')}
+            descending={sectionDescending ?? sectionOrder === 'count'}
+            onChange={albumList.prefs.setSectionDescending}
+          />
+        </ViewSection>
+      )}
+      {listForm && (
+        <ViewSection label={t('albumList.albumGroups')}>
+          <SegmentedTabs
+            label={t('albumList.albumGroups')}
+            value={albumGroups ? 'album' : 'none'}
+            options={[
+              { value: 'album', label: t('albumList.byAlbum') },
+              { value: 'none', label: t('albumList.ungrouped') },
+            ]}
+            onChange={(group) => albumList.prefs.setAlbumGroups(group === 'album')}
+          />
+        </ViewSection>
+      )}
+      {!listForm && (
+        <>
+          <ViewSection
+            label={t('album.tileSize')}
+            value={t('album.tileSizeValue', { size: tileSize })}
           >
-            {!facetsOpen && facetCount > 0 && (
-              <CounterBadge className={classes.badge} size="small" count={facetCount} />
-            )}
-          </Button>
-        </Tooltip>
-      </MenuTrigger>
-      <MenuPopover>
-        <MenuList>
-          {form === 'wall' && (
-            <Menu
-              checkedValues={{ style: [style] }}
-              onCheckedValueChange={(_, data) => {
-                const next = pick(GRID_STYLES, data.checkedItems);
-                if (next) albums.prefs.setStyle(next);
-              }}
+            <Slider
+              aria-label={t('album.tileSize')}
+              min={TILE_SIZE_MIN}
+              max={TILE_SIZE_MAX}
+              step={TILE_SIZE_STEP}
+              value={tileSize}
+              onChange={(_, data) => albums.prefs.setTileSize(data.value)}
+            />
+          </ViewSection>
+          <ViewSection label={t('album.style')}>
+            <SegmentedTabs
+              label={t('album.style')}
+              value={style}
+              options={GRID_STYLES.map((value) => ({ value, label: t(STYLE_LABELS[value]) }))}
+              onChange={albums.prefs.setStyle}
+            />
+          </ViewSection>
+        </>
+      )}
+      {listForm && (albumGroups || sectioned) && (
+        <ViewPanelActions>
+          <ViewPanelButton
+            icon={<ChevronUpDown20Regular />}
+            data-action="expand-all"
+            onClick={() => albumList.batch('expandAll')}
+          >
+            {t('albumList.expandAll')}
+          </ViewPanelButton>
+          {sectioned && albumGroups && (
+            <ViewPanelButton
+              icon={<TextExpand20Regular />}
+              data-action="only-sections"
+              onClick={() => albumList.batch('onlySections')}
             >
-              <MenuTrigger disableButtonEnhancement>
-                <MenuItem>{t('album.style')}</MenuItem>
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  {GRID_STYLES.map((value) => (
-                    <MenuItemRadio key={value} name="style" value={value}>
-                      {t(STYLE_LABELS[value])}
-                    </MenuItemRadio>
-                  ))}
-                </MenuList>
-              </MenuPopover>
-            </Menu>
+              {t('albumList.onlySections', { dimension: t(DIMENSION_LABELS[dimension]) })}
+            </ViewPanelButton>
           )}
-          <MenuItemCheckbox name="facets" value="open" data-album-tool="facets">
-            {t('album.showFacets')}
-          </MenuItemCheckbox>
-        </MenuList>
-      </MenuPopover>
-    </Menu>
+          {albumGroups && (
+            <ViewPanelButton
+              icon={<TextCollapse20Regular />}
+              data-action="collapse-albums"
+              onClick={() => albumList.batch('collapseAlbums')}
+            >
+              {t('albumList.collapseAlbums')}
+            </ViewPanelButton>
+          )}
+          {sectioned && (
+            <ViewPanelButton
+              icon={<ChevronDownUp20Regular />}
+              data-action="collapse-all"
+              onClick={() => albumList.batch('collapseAll')}
+            >
+              {t('albumList.collapseAll')}
+            </ViewPanelButton>
+          )}
+        </ViewPanelActions>
+      )}
+    </ViewPanel>
   );
 }

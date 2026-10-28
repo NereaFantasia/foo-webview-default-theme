@@ -6,7 +6,7 @@ import {
   readLastfmKey,
   startLastfmKey,
 } from '../../../../../src/library/biography/lastfm-api/lastfmKey.ts';
-import type { ConfigValue } from '../../../../fixtures/hostAnswers.ts';
+import { hostFailure, type ConfigValue } from '../../../../fixtures/hostAnswers.ts';
 import { installFakeHost } from '../../../../fixtures/unitHost.ts';
 
 const KEY = '0123456789abcdef0123456789abcdef';
@@ -25,6 +25,7 @@ async function setup(saved?: ConfigValue) {
     service,
     key: () => store.get(service.key),
     check: () => store.get(service.check),
+    checkDetail: () => store.get(service.checkDetail),
     saved: async () => {
       const answer = await host.fb.config.get(LASTFM_KEY_PREF.key);
       return answer.success && answer.found ? answer.value : undefined;
@@ -100,6 +101,21 @@ describe('Last.fm key', () => {
     expect(offline.check()).toBe('idle');
     await vi.waitFor(async () => expect(await offline.saved()).toBe(KEY));
     expect(offline.host.callsTo('http.get')).toHaveLength(0);
+  });
+
+  it('连不上时留下宿主原文，重新提交或取数报告 key 出错后清掉', async () => {
+    const env = await setup();
+    env.host.answer(
+      'http.get',
+      hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'),
+    );
+    env.service.commit(KEY, true);
+    await vi.waitFor(() => expect(env.check()).toBe('unverified'));
+    expect(env.checkDetail()).toBe('Send failed: DNS name not resolved');
+    env.service.report('keyInvalid');
+    expect(env.checkDetail()).toBeNull();
+    env.service.commit('', true);
+    expect(env.checkDetail()).toBeNull();
   });
 
   it('晚到的校验结果不盖过后来的输入与取数时的报告', async () => {

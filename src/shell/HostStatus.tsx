@@ -18,7 +18,7 @@ const useStyles = makeStyles({
 /**
  * 宿主版本核对，放在标题栏里：读不到版本、版本低于 `REQUIRED_HOST_VERSION` 时显示一行提示；版本满足、
  * 等不到宿主（普通浏览器里打开）时什么都不显示。提示区常在、平时是空的，核对还没有结果时标
- * `aria-busy`，读屏在结果出来后才念。
+ * `aria-busy`，读屏在结果出来后才念
  */
 export function HostStatus() {
   const t = useAtomValueRawSync(translateAtom);

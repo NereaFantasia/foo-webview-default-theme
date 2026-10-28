@@ -6,7 +6,9 @@ import {
   type MotionCurve,
 } from './timing.ts';
 
-export type SurfaceKind = 'flyout' | 'dialog' | 'start' | 'end';
+import { createMenuTransition } from './menuTransition.ts';
+
+export type SurfaceKind = 'flyout' | 'dialog' | 'start' | 'end' | 'menu' | 'submenu';
 
 export interface SurfaceTransition {
   play(visible: boolean, reduced: boolean): Promise<boolean>;
@@ -31,7 +33,7 @@ function progress(leg: Leg | undefined, fallback: number): number {
   return leg.from + (leg.to - leg.from) * leg.curve.ease(ratio);
 }
 
-/** Fluent 的方向变量带 px；乘以半边尺寸即可得到裁剪长度，不把长度当无单位数相除。 */
+/** Fluent 的方向变量带 px；乘以半边尺寸即可得到裁剪长度，不把长度当无单位数相除 */
 function flyoutFrame(element: HTMLElement, value: number): Keyframe {
   const away = 1 - value;
   const x = 'var(--fui-positioning-slide-direction-x, 0px)';
@@ -54,7 +56,7 @@ function shapeFrame(element: HTMLElement, kind: SurfaceKind, value: number): Key
   const sign = kind === 'start' ? -1 : 1;
   const style = getComputedStyle(element);
   const direction = style.direction === 'rtl' ? -sign : sign;
-  // 浮动面板需要越过容器边缘留白；普通抽屉没有额外余量，沿用自身宽度。
+  // 浮动面板需要越过容器边缘留白；普通抽屉没有额外余量，沿用自身宽度
   const offset = style.getPropertyValue('--surface-slide-offset').trim();
   const distance = direction * (1 - value);
   return {
@@ -62,11 +64,13 @@ function shapeFrame(element: HTMLElement, kind: SurfaceKind, value: number): Key
   };
 }
 
-/** 浮层的位置与透明度分别保留进度，反向前先取当前值，再取消旧动画。 */
+/** 浮层的位置与透明度分别保留进度，反向前先取当前值，再取消旧动画 */
 export function createSurfaceTransition(
   element: HTMLElement,
   kind: SurfaceKind,
 ): SurfaceTransition {
+  if (kind === 'menu' || kind === 'submenu')
+    return createMenuTransition(element, kind === 'submenu');
   const drawer = kind === 'start' || kind === 'end';
   const curve = drawer ? CURVE.decelerateMax : CURVE.decelerateMid;
   let shape: Leg | undefined;
@@ -138,7 +142,7 @@ export function createSurfaceTransition(
         () => {
           if (mine !== generation) return false;
           settled = to;
-          // 进场结束撤掉裁剪，让阴影与溢出内容正常绘制；退场保持终帧，直到卸载或再次打开。
+          // 进场结束撤掉裁剪，让阴影与溢出内容正常绘制；退场保持终帧，直到卸载或再次打开
           if (visible) cancel();
           return true;
         },

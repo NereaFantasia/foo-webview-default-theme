@@ -21,10 +21,10 @@ describe('过滤框里的词', () => {
 });
 
 describe('词拼成查询', () => {
-  it('全部字段：每个词在六个字段上 HAS、用 OR 连，词与词 AND', () => {
+  it('全部字段：每个词在八个字段上 HAS、用 OR 连，词与词 AND', () => {
     expect(wordsQuery(['love', 'live'], 'all')).toBe(
-      '(title HAS "love" OR artist HAS "love" OR "album artist" HAS "love" OR album HAS "love" OR genre HAS "love" OR date HAS "love")' +
-        ' AND (title HAS "live" OR artist HAS "live" OR "album artist" HAS "live" OR album HAS "live" OR genre HAS "live" OR date HAS "live")',
+      '(title HAS "love" OR artist HAS "love" OR "album artist" HAS "love" OR album HAS "love" OR genre HAS "love" OR date HAS "love" OR %filename% HAS "love" OR comment HAS "love")' +
+        ' AND (title HAS "live" OR artist HAS "live" OR "album artist" HAS "live" OR album HAS "live" OR genre HAS "live" OR date HAS "live" OR %filename% HAS "live" OR comment HAS "live")',
     );
   });
 

@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { buildGenreGroups, genreTableItems } from '../../../../src/library/genres/genresGroups.ts';
+import {
+  arrangeGenreTracks,
+  buildGenreGroups,
+  genreTableItems,
+} from '../../../../src/library/genres/genresGroups.ts';
 import { albumRow, trackRow } from '../../../fixtures/libraryRows.ts';
 
 const tracks = [1, 2, 3].map((n) =>
@@ -47,4 +51,46 @@ it('四个碟号组头都折叠时，以真实高度补足封面，不能盖住�
     .reduce((total, item) => total + (item.kind === 'group' ? 36 : 40), 0);
   expect(height).toBeGreaterThanOrEqual(160);
   expect(height).toBeLessThan(200);
+});
+
+it('降序只在组内倒主键不同的段，碟序固定；组序另有升降，不分组时没有组序', () => {
+  const [x1, x2, x3, y1] = [
+    trackRow('X', 'x1', { albumArtist: 'A', discNumber: 1 }),
+    trackRow('X', 'x2', { albumArtist: 'A', discNumber: 1 }),
+    trackRow('X', 'x3', { albumArtist: 'A', discNumber: 2 }),
+    trackRow('Y', 'y1', { albumArtist: 'A', discNumber: 1 }),
+  ];
+  const fromHost = [x1, x2, x3, y1];
+  const desc = { column: 'title' as const, descending: true };
+  const titles = (list: readonly { readonly title: string }[]) => list.map((track) => track.title);
+  expect(titles(arrangeGenreTracks(fromHost, 'album', null, false))).toEqual([
+    'x1',
+    'x2',
+    'x3',
+    'y1',
+  ]);
+  expect(titles(arrangeGenreTracks(fromHost, 'album', desc, false))).toEqual([
+    'x3',
+    'x2',
+    'x1',
+    'y1',
+  ]);
+  expect(titles(arrangeGenreTracks(fromHost, 'album', null, true))).toEqual([
+    'y1',
+    'x1',
+    'x2',
+    'x3',
+  ]);
+  expect(titles(arrangeGenreTracks(fromHost, 'albumDisc', desc, false))).toEqual([
+    'x2',
+    'x1',
+    'x3',
+    'y1',
+  ]);
+  expect(titles(arrangeGenreTracks(fromHost, 'none', desc, true))).toEqual([
+    'y1',
+    'x3',
+    'x2',
+    'x1',
+  ]);
 });

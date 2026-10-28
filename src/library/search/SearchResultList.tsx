@@ -1,12 +1,19 @@
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useCommand } from '../../nav/useCommand.ts';
 import { useScrollFrame } from '../../table/useScrollFrame.ts';
 import { useStickyViewport } from '../../table/useStickyViewport.ts';
 import type { TablePoint } from '../../table/tableItems.ts';
-import type { SearchView } from './results/searchView.ts';
-import { searchHitKey, type SearchHit } from './searchQuery.ts';
-import { SearchResultRow } from './SearchResultRow.tsx';
 import { searchOptionId } from './searchSuggestions.ts';
 import styles from './SearchResultList.module.css';
 import {
@@ -18,34 +25,69 @@ import {
   type Modifiers,
 } from '../../kit/keyedSelection.ts';
 
-export interface SearchResultListProps {
-  readonly hits: readonly SearchHit[];
-  readonly scroller: HTMLElement | null;
-  readonly label: string;
-  readonly active: string | null;
-  readonly view: SearchView;
-  onActive(key: string | null): void;
-  onActivate(hit: SearchHit, play: boolean): void;
-  onMenu(hit: SearchHit, at: TablePoint, selection: readonly SearchHit[]): void;
-  onAll(): Promise<readonly SearchHit[] | null>;
+/** 列表交给每一项的状态与回调；项自己决定画成行还是图块 */
+export interface SearchListItemProps<T> {
+  readonly id: string;
+  readonly selected: boolean;
+  readonly focused: boolean;
+  readonly position: number;
+  readonly total: number;
+  onActivate(item: T, play: boolean): void;
+  onSelect(item: T, modifiers: Modifiers): void;
+  onMenu(item: T, at: TablePoint): void;
 }
 
-export function SearchResultList({
-  hits,
+export interface SearchResultListProps<T> {
+  readonly items: readonly T[];
+  keyOf(item: T): string;
+  /**
+   * 一格的宽与高，像素。`width` 为 null 时每行一项；否则按宽度能放几格就分几列，`stretch` 时各列平分整行，
+   * 不然每列就是这个宽度、靠左排
+   */
+  readonly cell: {
+    readonly width: number | null;
+    readonly height: number;
+    readonly stretch: boolean;
+  };
+  /** 回车时是起播还是打开 */
+  playsOnEnter(item: T): boolean;
+  renderItem(item: T, props: SearchListItemProps<T>): ReactNode;
+  readonly scroller: HTMLElement | null;
+  readonly label: string;
+  /** 写进 `data-search-view`：列表、图块或在线结果的哪一类 */
+  readonly view: string;
+  readonly active: string | null;
+  onActive(key: string | null): void;
+  onActivate(item: T, play: boolean): void;
+  onMenu(item: T, at: TablePoint, selection: readonly T[]): void;
+  onAll(): Promise<readonly T[] | null>;
+  /**
+   * 列头：行跟着页面滚时吸在滚动元素的顶上，行的可见区从它下面开始，行不会从它底下透出来，所以它不用铺底
+   */
+  readonly header?: ReactNode;
+}
+
+export function SearchResultList<T>({
+  items: hits,
+  keyOf,
+  cell,
+  playsOnEnter,
+  renderItem,
   scroller,
   label,
-  active,
   view,
+  active,
   onActive,
   onActivate,
   onMenu,
   onAll,
-}: SearchResultListProps) {
+  header,
+}: SearchResultListProps<T>) {
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const strip = useRef<HTMLDivElement>(null);
-  const order = useMemo(() => hits.map(searchHitKey), [hits]);
+  const order = useMemo(() => hits.map(keyOf), [hits, keyOf]);
   const [stored, setSelection] = useState(() => emptySelection<string>());
   const selection = pruneSelection(stored, order);
   if (selection !== stored) setSelection(selection);
@@ -73,16 +115,16 @@ export function SearchResultList({
     return () => observer.disconnect();
   }, [scroller]);
   const id = useId();
-  const index = hits.findIndex((hit) => searchHitKey(hit) === active);
-  const columns = view === 'grid' ? Math.max(1, Math.floor(size.width / 160)) : 1;
-  const rowHeight = view === 'grid' ? 208 : 56;
+  const index = hits.findIndex((hit) => keyOf(hit) === active);
+  const columns = cell.width === null ? 1 : Math.max(1, Math.floor(size.width / cell.width));
+  const rowHeight = cell.height;
   const virtual = useVirtualizer({
     count: Math.ceil(hits.length / columns),
     getScrollElement: () => scroller,
     estimateSize: () => rowHeight,
     getItemKey: (at) => {
       const hit = hits[at * columns];
-      return hit ? searchHitKey(hit) : at;
+      return hit ? keyOf(hit) : at;
     },
     scrollMargin: frame.margin,
     scrollPaddingStart: frame.stickyTop,
@@ -116,28 +158,28 @@ export function SearchResultList({
     height: Math.max(0, size.height - frame.stickyTop),
   });
   const activate = useCallback(
-    (hit: SearchHit, play: boolean) => {
+    (hit: T, play: boolean) => {
       request.current++;
-      onActive(searchHitKey(hit));
+      onActive(keyOf(hit));
       root.current?.focus({ preventScroll: true });
       onActivate(hit, play);
     },
-    [onActive, onActivate],
+    [onActive, onActivate, keyOf],
   );
   const select = useCallback(
-    (hit: SearchHit, modifiers: Modifiers) => {
+    (hit: T, modifiers: Modifiers) => {
       request.current++;
-      const key = searchHitKey(hit);
+      const key = keyOf(hit);
       setSelection(activateSelection(selection, order, key, modifiers));
       onActive(key);
       root.current?.focus({ preventScroll: true });
     },
-    [selection, order, onActive],
+    [selection, order, onActive, keyOf],
   );
   const menu = useCallback(
-    (hit: SearchHit, at: TablePoint) => {
+    (hit: T, at: TablePoint) => {
       request.current++;
-      const key = searchHitKey(hit);
+      const key = keyOf(hit);
       const picked = menuSelection(selection, order, key);
       const wanted = new Set(picked.targets);
       setSelection(picked.selection);
@@ -146,10 +188,10 @@ export function SearchResultList({
       onMenu(
         hit,
         at,
-        hits.filter((item) => wanted.has(searchHitKey(item))),
+        hits.filter((item) => wanted.has(keyOf(item))),
       );
     },
-    [selection, order, hits, onActive, onMenu],
+    [selection, order, hits, onActive, onMenu, keyOf],
   );
   const enabled = () =>
     document.activeElement === root.current && !root.current?.closest('[inert]');
@@ -170,7 +212,7 @@ export function SearchResultList({
       const mine = ++request.current;
       void onAll().then((all) => {
         if (!all || mine !== request.current) return;
-        const keys = all.map(searchHitKey);
+        const keys = all.map(keyOf);
         setSelection(selectAll(keys));
         if (index < 0) onActive(keys[0] ?? null);
       });
@@ -311,7 +353,7 @@ export function SearchResultList({
     enabled,
     run: () => {
       const hit = hits[index];
-      if (hit) activate(hit, hit.kind === 'track');
+      if (hit) activate(hit, playsOnEnter(hit));
     },
   });
   return (
@@ -326,8 +368,9 @@ export function SearchResultList({
       data-search-list
       data-search-view={view}
     >
+      {header && <div className={styles.head}>{header}</div>}
       <div ref={body} style={{ height: virtual.getTotalSize() }}>
-        <div ref={viewport} className={styles.viewport}>
+        <div ref={viewport} className={styles.viewport} style={{ top: frame.header }}>
           <div ref={strip} className={styles.strip}>
             {virtual.getVirtualItems().map((item) => (
               <div
@@ -336,26 +379,26 @@ export function SearchResultList({
                 style={{
                   top: item.start - frame.margin,
                   height: rowHeight,
-                  gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                  gridTemplateColumns: `repeat(${columns}, ${
+                    cell.width === null || cell.stretch ? 'minmax(0, 1fr)' : `${cell.width}px`
+                  })`,
                 }}
               >
                 {hits.slice(item.index * columns, (item.index + 1) * columns).map((hit, offset) => {
-                  const key = searchHitKey(hit);
+                  const key = keyOf(hit);
                   return (
-                    <SearchResultRow
-                      key={key}
-                      hit={hit}
-                      id={`${id}-${searchOptionId(key)}`}
-                      option
-                      tile={view === 'grid'}
-                      selected={selection.selected.has(key)}
-                      focused={key === active}
-                      position={item.index * columns + offset + 1}
-                      total={hits.length}
-                      onActivate={activate}
-                      onSelect={select}
-                      onMenu={menu}
-                    />
+                    <Fragment key={key}>
+                      {renderItem(hit, {
+                        id: `${id}-${searchOptionId(key)}`,
+                        selected: selection.selected.has(key),
+                        focused: key === active,
+                        position: item.index * columns + offset + 1,
+                        total: hits.length,
+                        onActivate: activate,
+                        onSelect: select,
+                        onMenu: menu,
+                      })}
+                    </Fragment>
                   );
                 })}
               </div>

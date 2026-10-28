@@ -7,7 +7,7 @@ import { startTrackInfo, type TrackInfoHost } from '../shell/track-info/trackInf
 import type { TrackInfoTarget } from '../shell/track-info/trackInfoTarget.ts';
 import type { TableTrack } from '../table/tableItems.ts';
 
-/** 表格省略的字段按 SDK 的未知值表示，不从合并署名反推多值标签。 */
+/** 表格省略的字段按 SDK 的未知值表示，不从合并署名反推多值标签 */
 export function infoTrackFromRow(row: TableTrack): Track {
   return {
     ...row,

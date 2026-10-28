@@ -4,7 +4,7 @@ import { MISSING, formatChannels, formatKHz, formatKbps, formatMB } from '../pap
 import { trackExtrasAtom } from './trackExtras.ts';
 import styles from './PaperFileInfo.module.css';
 
-/** 图纸右栏的文件信息 3 × 2：采样率、位深、声道、码率、文件大小、格式；缺值写 `—`。 */
+/** 图纸右栏的文件信息 3 × 2：采样率、位深、声道、码率、文件大小、格式；缺值写 `—` */
 export function PaperFileInfo() {
   const track = useAtomValueRawSync(currentTrackAtom);
   const { bitDepth } = useAtomValueRawSync(trackExtrasAtom);

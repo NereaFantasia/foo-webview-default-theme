@@ -4,45 +4,45 @@ import { FOLD_CLOSE, FOLD_OPEN } from './foldMotion.ts';
 import { reducedMotionAtom } from './reducedMotion.ts';
 import type { MotionCurve } from './timing.ts';
 
-/** 一组展开时的内容与下方条目，都是条目键。 */
+/** 记录单组展开状态下的结构范围：包含主体条目集合与下方条目集合（均存条目键） */
 export interface FoldSpan {
   readonly body: ReadonlySet<string>;
   readonly below: ReadonlySet<string>;
-  /** 内容全部展开时的总高，像素，含虚拟列表没有渲染的条目。 */
+  /** 组内条目全量展开时的理论总高度（像素），含虚拟列表当前未挂载的虚拟条目 */
   readonly height: number;
 }
 
-/** 组的开合；`loading` 是已经展开、内容还在读取。 */
+/** 组开合生命周期状态：`open`、`closed` 或 `loading`（已展开但子项异步拉取中） */
 export type FoldState = 'open' | 'closed' | 'loading';
 
 export interface VirtualFoldOptions {
-  /** 条目按内容高度排开的一层，副本框挂在这里。 */
+  /** 条目绝对定位排布的容器元素（镜像克隆挂载点） */
   readonly root: RefObject<HTMLElement | null>;
   readonly scroller: RefObject<HTMLElement | null>;
-  /** 为 false 时不监听滚动与尺寸。 */
+  /** 置 false 时注销滚动与容器尺寸变化监听 */
   readonly enabled: boolean;
-  /** 条目元素上存条目键的属性。 */
+  /** 标识 DOM 节点所属条目键的 HTML 属性名 */
   readonly keyAttribute: string;
-  /** 副本框的标记属性，值是组的键。 */
+  /** 镜像容器上标记分组键的 HTML 属性名 */
   readonly markAttribute: string;
-  /** 组头里跟内容一起开合的附属元素，比如专辑封面。 */
+  /** 组头内需随子内容联动变形缩放的伴随元素选择器（如专辑封面） */
   readonly extras?: string;
-  /** 副本保留的属性；其余 id、role、aria-*、data-* 都清掉，样式依赖的属性要列在这里。 */
+  /** 镜像克隆保留的白名单属性；其余 id、role、aria-* 与未列出的 data-* 均清空 */
   readonly keep: ReadonlySet<string>;
-  /** 末尾收起时暂留滚动空间的元素，顶边贴着滚动内容的顶边。 */
+  /** 末尾项收起时垫高占位的占位元素（其顶边贴合滚动容器顶部） */
   readonly floor: (root: HTMLElement) => HTMLElement | null;
-  /** 列表内容的版本，按 `===` 比较：没有待播的开合时它变了，说明数据刷新，停掉正在播的。 */
+  /** 列表数据版本标记（通过 `===` 校验）：无在途动画时若版本变更，立即终止动画以防布局撕裂 */
   readonly version: unknown;
-  /** 组不在列表里时为 null。 */
+  /** 查询分组状态；组不存在于列表中时返回 null */
   stateOf(key: string): FoldState | null;
-  /** 按当前的列表算这一组的范围；收起着的组内容为空。 */
+  /** 基于当前列表数据计算该组范围；已收起的分组其主体集合为空 */
   spanOf(key: string): FoldSpan;
 }
 
 export interface VirtualFold {
-  /** 用户要开合 `key` 这一组：先记下现在的样子再执行 `action`，由随后的 `commit` 在新布局上开播。 */
+  /** 触发分组折叠/展开过渡：快照当前几何布局后执行 `action`，随后的 `commit` 在新布局上启动动画 */
   run(key: string, action: () => void): void;
-  /** 每次渲染后、绘制前调用，比如 React 的布局 effect 里。 */
+  /** 布局渲染后、绘制前同步调用（通常置于 React useLayoutEffect 中） */
   commit(): void;
   stop(): void;
 }
@@ -69,7 +69,7 @@ interface Pending {
   readonly key: string;
   readonly open: boolean;
   readonly before: View;
-  /** 展开已落地、正在等内容读回。 */
+  /** 展开状态已生效，等待异步子内容拉取完毕 */
   waiting: boolean;
 }
 
@@ -87,7 +87,7 @@ interface Playing {
   readonly view: View;
 }
 
-/** 副本只参与绘制，清掉身份和操作标记，避免它被焦点、菜单或选择查询认作真实条目。 */
+/** 克隆条目快照以供动画绘制，剔除语义与交互属性，防止被可访问性树或选择器误判为真实节点 */
 function picture(
   node: HTMLElement,
   keep: ReadonlySet<string>,
@@ -123,7 +123,7 @@ function rowsIn(root: HTMLElement, attribute: string): Map<string, HTMLElement> 
   );
 }
 
-/** 组头以下、视口以内的样子；下方条目的位置一律换算成这一组收起时的位置。 */
+/** 计算组头以下且在视口内的条目快照；下方条目坐标统一换算至该组收起时的基准位置 */
 function viewOf(options: VirtualFoldOptions, key: string): View | null {
   const root = options.root.current;
   const scroller = options.scroller.current;
@@ -191,12 +191,13 @@ function valueAt(playing: Playing): number {
 }
 
 /**
- * 虚拟列表里一组的开合，形态同 `flowFold`：组头不动，内容从它下面滑出、滑回，下方条目同步让位、补位；
- * 展开 333 ms、收起 167 ms，中途反向从当前进度接着走。
+ * 虚拟列表分组展开/折叠动效（形态同 `flowFold`）：
+ * 组头保持固定，子内容从组头下方滑出或滑入，下方条目同步位移避让或复位
+ * 展开耗时 333 ms，收起耗时 167 ms；动画中途反向操作支持从当前进度无缝逆转
  *
- * 虚拟列表只渲染视口附近的条目，内容也不在文档流里，所以动的是副本：组头下沿放一个不动的框负责裁剪，
- * 框里的内容副本与下方副本只做位移，真实条目播完前隐藏。只响应经 `run` 发起的单组开合；
- * 滚动、尺寸变化和数据刷新都会停掉，真实条目照常更新。
+ * 虚拟列表仅挂载视口附近的可见条目，故动画由绝对定位镜像容器承载：
+ * 组头下沿挂载固定尺寸的裁剪视窗，内部内容镜像与下方镜像执行平移动画，真实 DOM 节点在动画完成前保持隐藏
+ * 滚动事件、尺寸改变或外部数据版本刷新时立即安全终止动画并还原真实 DOM
  */
 export function useVirtualFold(options: VirtualFoldOptions): VirtualFold {
   const reduced = useAtomValueRawSync(reducedMotionAtom);
@@ -237,7 +238,7 @@ export function useVirtualFold(options: VirtualFoldOptions): VirtualFold {
       const box = scroller.current;
       if (!node || !box) return;
       floor ??= { node, previous: node.style.minHeight };
-      // 末尾的组收起时保住组头位置；用户继续滚动或尺寸改变后再释放这段留白。
+      // 列表末尾分组收起时垫高底座以锚定组头视觉位置；用户滚动或尺寸变更后再释放该占位留白
       node.style.minHeight = `${Math.max(node.offsetHeight, box.scrollTop + box.clientHeight)}px`;
     };
     const hide = (key: string) => {
@@ -277,7 +278,7 @@ export function useVirtualFold(options: VirtualFoldOptions): VirtualFold {
         pending = { key, open: state !== 'closed', before: view, waiting: false };
         const current = pending;
         if (expires !== null) cancelAnimationFrame(expires);
-        // 开合没有在下一帧前落地（比如宿主拒绝），这次作废。
+        // 状态变更若未在下一帧前落地（如被业务拒绝），本次动画请求安全作废
         expires = requestAnimationFrame(() => {
           if (pending === current) stop();
         });
@@ -296,7 +297,7 @@ export function useVirtualFold(options: VirtualFoldOptions): VirtualFold {
         const state = options.stateOf(request.key);
         if (state === null) return;
         if (state === 'loading' && !request.open) {
-          // 展开已落地、内容还在读取：等读回再播，不按一帧作废。
+          // 展开动作已生效但子内容异步拉取中：暂存等待状态，待数据就绪后再执行动画
           request.waiting = true;
           if (expires !== null) cancelAnimationFrame(expires);
           expires = null;
@@ -304,7 +305,7 @@ export function useVirtualFold(options: VirtualFoldOptions): VirtualFold {
         }
         const open = state !== 'closed';
         if (open === request.open) {
-          // 等内容期间组被别的入口收起，这次开合作废。
+          // 异步等待期间若该组被其他途径逆向收起，作废本次开启动画
           if (request.waiting) stop();
           return;
         }

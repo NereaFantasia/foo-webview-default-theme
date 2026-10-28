@@ -1,44 +1,77 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { amplitudeOf, dbOf, positionOf } from '../../src/playback/volumeScale.ts';
 import { boxOf, choosePlayerBar, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
+import { makeTrack } from '../fixtures/tracks.ts';
 
-// 放在宽窗标题栏里的播放栏：四键、正在播放条（格式标记、进度线）、输出面板（悬停展开、滚轮、静音、滑条）。
+// 放在宽窗标题栏里的播放栏：四键与音量键、正在播放条（格式标记、进度线）、音量浮层（点开朝下、滚轮、静音、滑条）。
 // 进度与音量的换算按 SDK 的线协议断言；观感与贴靠布局只能实机看。
 
 test.beforeEach(({ page }) => choosePlayerBar(page, 'titlebar'));
 
 const key = (page: Page, name: string) => page.locator(`header [data-player-key="${name}"]`);
 const slider = (page: Page) => page.getByRole('slider', { name: '播放进度' });
-const panel = (page: Page) => page.locator('[data-output-panel]');
+const popover = (page: Page) => page.locator('[data-volume-popover]');
+// 入场动效带一段位移，播完再量
+const settled = (locator: Locator) =>
+  locator.evaluate((element) =>
+    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
 
-test('标题栏里 ⋯ 之后是四键，正中是 540 × 52 的正在播放条与 44 的方块键，两块合起来在窗口居中', async ({
+test('标题栏里 ⋯ 之后是四键与音量键，正中是 540 × 52 的正在播放条，单独在窗口居中', async ({
   page,
 }) => {
   const { errors } = await openPlayer(page);
-  expect(await boxOf(page, 'header [data-player-key="order"]')).toMatchObject({
-    x: 8 + 28 + 16,
+  expect(await boxOf(page, 'header [data-menu="main"]')).toMatchObject({
+    x: 8,
+    width: 40,
+    height: 32,
+  });
+  // 播放控制组离 ⋯ 28，组内键各宽 28、高 36，音量键离下一首 16
+  const first = 8 + 40 + 28;
+  for (const [index, name] of ['order', 'previous', 'play', 'next'].entries()) {
+    expect(await boxOf(page, `header [data-player-key="${name}"]`)).toMatchObject({
+      x: first + 28 * index,
+      width: 28,
+      height: 36,
+    });
+  }
+  expect(await boxOf(page, 'header [data-player-key="volume"]')).toMatchObject({
+    x: first + 28 * 4 + 16,
     width: 28,
     height: 36,
   });
-  for (const [index, name] of ['previous', 'play', 'next'].entries()) {
-    expect(await boxOf(page, `header [data-player-key="${name}"]`)).toMatchObject({
-      x: 52 + 28 * (index + 1),
-      width: 28,
-    });
-  }
-  const left = (1280 - (540 + 8 + 44)) / 2;
   expect(await boxOf(page, '[data-now-playing]')).toEqual({
-    x: left,
+    x: (1280 - 540) / 2,
     y: 6,
     width: 540,
     height: 52,
   });
-  expect(await boxOf(page, 'header [data-player-key="volume"]')).toEqual({
-    x: left + 548,
-    y: 6,
-    width: 44,
-    height: 44,
+  expect(errors).toEqual([]);
+});
+
+test('署名放不下时艺人、专辑各自用省略号截断，名字始终可点，字不滚动', async ({ page }) => {
+  const long = makeTrack({
+    title: 'Probe',
+    artist: 'Alpha, Beta',
+    artists: ['Alpha', 'Beta'],
+    album: 'a'.repeat(80),
   });
+  const { errors } = await openPlayer(page, { state: { track: long } });
+  const byline = page.locator('[data-now-playing] [class*="subRow"]');
+  // 两位艺人各一个可点的名字；测试里的专辑没有可跳的去向，是纯文字
+  const names = byline.locator('[class*="fui-Link"]');
+  await expect(names).toHaveCount(2);
+  // 署名不再套截断滚动的外壳；放不下的那一项出省略号，全文在它自己的 title 上
+  await expect(byline.locator('[class*="clip"]')).toHaveCount(0);
+  const album = byline.locator('[class*="value"]').last();
+  expect(await album.evaluate((el) => getComputedStyle(el).textOverflow)).toBe('ellipsis');
+  expect(await album.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expect(byline.locator('[title]').last()).toHaveAttribute('title', 'a'.repeat(80));
+  // 宽度不管卡在哪，名字都一直可点，不随形态换来换去
+  for (let at = 0; at < 10; at += 1) {
+    await page.waitForTimeout(40);
+    await expect(names).toHaveCount(2);
+  }
   expect(errors).toEqual([]);
 });
 
@@ -254,43 +287,29 @@ test('宿主说这一首不能 seek 时进度线不接点击、拖动与按键',
   expect(errors).toEqual([]);
 });
 
-test('输出面板：悬停 300 ms 展开、离开 500 ms 收回；窗口 ≥ 1212 往右展开，窄一些往左', async ({
+test('标题栏的音量键点开朝下的浮层：左缘对齐音量键、整个落在标题栏下面；悬停只出数值，Esc 收起、焦点回到音量键', async ({
   page,
 }) => {
   const { errors } = await openPlayer(page);
   const square = key(page, 'volume');
   await square.hover();
-  await page.waitForTimeout(150);
-  await expect(panel(page)).toHaveCount(0);
-  await expect(panel(page)).toBeVisible();
-  const at1280 = await boxOf(page, '[data-output-panel]');
-  const squareBox = await boxOf(page, 'header [data-player-key="volume"]');
-  expect(at1280.x).toBe(squareBox.x);
-  // 伸出方块的那一截落在标题栏的拖动区里，面板要自己退出拖动，指针移过去才还算在面板上。
-  expect(
-    await panel(page).evaluate((element) =>
-      getComputedStyle(element).getPropertyValue('-webkit-app-region'),
-    ),
-  ).toBe('no-drag');
-  // 展开动效还没露出末端就移过去，也不算离开：过了收回的 500 ms，方块键仍是展开的。
-  await page.mouse.move(at1280.x + at1280.width - 8, at1280.y + at1280.height / 2);
-  await page.waitForTimeout(600);
-  await expect(square).toHaveAttribute('aria-expanded', 'true');
-  await page.mouse.move(640, 400);
-  await page.waitForTimeout(250);
-  await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toHaveCount(0);
-
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await square.hover();
-  await expect(panel(page)).toBeVisible();
-  const at1100 = await boxOf(page, '[data-output-panel]');
-  const square1100 = await boxOf(page, 'header [data-player-key="volume"]');
-  expect(at1100.x + at1100.width).toBe(square1100.x + square1100.width);
+  await page.waitForTimeout(400);
+  await expect(popover(page)).toHaveCount(0);
+  await square.click();
+  await expect(popover(page)).toBeVisible();
+  await settled(popover(page));
+  const popBox = await boxOf(page, '[data-volume-popover]');
+  const keyBox = await boxOf(page, 'header [data-player-key="volume"]');
+  const header = await boxOf(page, 'header');
+  expect(Math.abs(popBox.x - keyBox.x)).toBeLessThanOrEqual(1);
+  expect(popBox.y).toBeGreaterThanOrEqual(header.y + header.height);
+  await page.keyboard.press('Escape');
+  await expect(popover(page)).toHaveCount(0);
+  await expect(square).toBeFocused();
   expect(errors).toEqual([]);
 });
 
-test('方块键上滚轮调音量，一格一个位置；静音键调 toggleMute，图标与名字跟着变', async ({
+test('音量键上滚轮调音量，一格一个位置；浮层里的静音键调 toggleMute，图标与名字跟着变', async ({
   page,
 }) => {
   const { host, state, calls, errors } = await openPlayer(page);
@@ -304,11 +323,11 @@ test('方块键上滚轮调音量，一格一个位置；静音键调 toggleMute
   const icon = () => square.locator('svg').evaluate((svg) => svg.innerHTML);
   const unmutedIcon = await icon();
   await square.click();
-  await expect(panel(page)).toBeVisible();
+  await expect(popover(page)).toBeVisible();
   state.muted = true;
-  await panel(page).getByRole('button', { name: '静音' }).click();
+  await popover(page).getByRole('button', { name: '静音' }).click();
   await expect.poll(() => calls('playback.toggleMute').length).toBe(1);
-  await expect(panel(page).getByRole('button', { name: '取消静音' })).toBeVisible();
+  await expect(popover(page).getByRole('button', { name: '取消静音' })).toBeVisible();
   await expect.poll(icon).not.toBe(unmutedIcon);
 
   state.muted = false;
@@ -318,19 +337,16 @@ test('方块键上滚轮调音量，一格一个位置；静音键调 toggleMute
     muted: false,
     isMuted: false,
   });
-  await expect(panel(page).getByRole('button', { name: '静音' })).toBeVisible();
+  await expect(popover(page).getByRole('button', { name: '静音' })).toBeVisible();
   await expect.poll(icon).toBe(unmutedIcon);
   expect(errors).toEqual([]);
 });
 
-test('拖音量滑条实时提交、松手回读；拖动中指针移出面板也不收', async ({ page }) => {
+test('拖音量滑条实时提交、松手回读；拖动中指针移出浮层也不收，松手后浮层留着', async ({ page }) => {
   const { calls, errors } = await openPlayer(page);
   await key(page, 'volume').click();
-  // 展开是从方块一侧裁剪露出，裁掉的那一截接不到指针；等它展开完再按。
-  await panel(page).evaluate((element) =>
-    Promise.all(element.getAnimations().map((animation) => animation.finished)),
-  );
-  const volume = panel(page).getByRole('slider', { name: '音量' });
+  await settled(popover(page));
+  const volume = popover(page).getByRole('slider', { name: '音量' });
   const box = await volume.boundingBox();
   if (!box) throw new Error('音量滑条没画出来');
   const y = box.y + box.height / 2;
@@ -338,7 +354,7 @@ test('拖音量滑条实时提交、松手回读；拖动中指针移出面板�
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.8, y + 200, { steps: 4 });
   await page.waitForTimeout(800);
-  await expect(panel(page)).toBeVisible();
+  await expect(popover(page)).toBeVisible();
   await expect(volume).toHaveAttribute('aria-valuenow', '80');
   // 拖动中的实时提交一律不回读。
   const reads = calls('playback.getVolume').length;
@@ -348,30 +364,19 @@ test('拖音量滑条实时提交、松手回读；拖动中指针移出面板�
     .poll(() => Number(calls('playback.setVolume').at(-1)?.['volume']))
     .toBeCloseTo(amplitudeOf(dbOf(80, 'perceptual')), 3);
   await expect.poll(() => calls('playback.getVolume').length).toBe(reads + 1);
-  await expect(panel(page)).toHaveCount(0);
+  await expect(popover(page)).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('焦点就在方块键上按 Esc 收起，Tab 离开再回来照样展开', async ({ page }) => {
-  const { errors } = await openPlayer(page);
-  await key(page, 'more').focus();
-  await page.keyboard.press('Tab');
-  await expect(key(page, 'volume')).toBeFocused();
-  await expect(panel(page)).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(panel(page)).toHaveCount(0);
-  await page.keyboard.press('Shift+Tab');
-  await expect(key(page, 'more')).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(key(page, 'volume')).toBeFocused();
-  await expect(panel(page)).toBeVisible();
-  expect(errors).toEqual([]);
-});
-
-test('键盘聚焦方块键展开面板，Tab 进滑条用方向键调；Esc 收起、焦点回到方块键', async ({ page }) => {
+test('键盘：Tab 顺序是四键、音量键、正在播放条、⋯；音量键上 Enter 打开浮层，滑条用方向键调；Esc 收起、焦点回到音量键', async ({
+  page,
+}) => {
   const { calls, errors } = await openPlayer(page);
   await key(page, 'next').focus();
-  // 下一首键之后是正在播放条里的封面、星（没评分时也走得到）与进度线，再到 ⋯。
+  // 下一首键之后是音量键，再是正在播放条里的封面、星（没评分时也走得到）与进度线，最后到 ⋯。
+  await page.keyboard.press('Tab');
+  await expect(key(page, 'volume')).toBeFocused();
+  await expect(popover(page)).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(key(page, 'cover')).toBeFocused();
   await page.keyboard.press('Tab');
@@ -382,19 +387,17 @@ test('键盘聚焦方块键展开面板，Tab 进滑条用方向键调；Esc 收
   await expect(slider(page)).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(key(page, 'more')).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(key(page, 'volume')).toBeFocused();
-  await expect(panel(page)).toBeVisible();
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  const volume = panel(page).getByRole('slider', { name: '音量' });
-  await expect(volume).toBeFocused();
+  await key(page, 'volume').focus();
+  await page.keyboard.press('Enter');
+  await expect(popover(page)).toBeVisible();
+  const volume = popover(page).getByRole('slider', { name: '音量' });
+  await volume.focus();
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => calls('playback.setVolume').length).toBe(1);
   await page.waitForTimeout(700);
-  await expect(panel(page)).toBeVisible();
+  await expect(popover(page)).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(panel(page)).toHaveCount(0);
+  await expect(popover(page)).toHaveCount(0);
   await expect(key(page, 'volume')).toBeFocused();
   expect(errors).toEqual([]);
 });

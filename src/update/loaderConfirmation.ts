@@ -28,14 +28,38 @@ export const loaderConfirmationAtom = atom<'waiting' | 'confirmed' | 'disabled' 
   'waiting',
 );
 
-/** 主窗口确认成功后才有值：这时安装标识已发布，页面来源、窗口模式与组件版本都满足更新器的运行条件。 */
+/** 宿主为模板目录里的页面提供的虚拟域名 */
+const VIRTUAL_HOST = 'https://foo-ui-webview2.local';
+/** 更新器认可的主题来源：都是 `<profile>\webview-ui\` 下的模板目录 */
+const TEMPLATE_SOURCES: readonly string[] = ['panelTemplate', 'activeTemplate', 'defaultTemplate'];
+
+/** 更新器不运行的原因；确认进行中和确认成功时没有 */
+export type StartupBlock =
+  /** 宿主虚拟域名上的页面不在 `/fe/<目录>/` 下：没有按完整主题包的目录结构安装，模板目录或组件目录里平铺的 dist 都在此列 */
+  | { readonly reason: 'layout' }
+  /** 来源不是模板目录：页面在开发服务器或 URL 上，或按完整主题包布局放进了组件目录 */
+  | { readonly reason: 'source' }
+  /** 插件版本低于主题要求，应用内的插件更新同样要等启动确认，只能手动更新 */
+  | { readonly reason: 'host'; readonly version: string; readonly required: string }
+  /** 确认过程出错，可以重试 */
+  | { readonly reason: 'failed' };
+export const startupBlockAtom = atom<StartupBlock | null>(null);
+
+function blockOf(source: string, plugin: string): StartupBlock | null {
+  if (!TEMPLATE_SOURCES.includes(source)) return { reason: 'source' };
+  if (!versionAtLeast(plugin, REQUIRED_HOST_VERSION))
+    return { reason: 'host', version: plugin, required: REQUIRED_HOST_VERSION };
+  return null;
+}
+
+/** 主窗口启动确认就绪状态：安装标识已发布，且运行环境、窗口形态与组件版本均满足更新契约 */
 export interface ConfirmedStartup {
-  /** 模板目录的绝对路径，不带结尾的分隔符。 */
+  /** 模板目录绝对路径，尾部不含分隔符 */
   readonly directory: string;
   readonly installId: string;
-  /** 引导页为这次启动写进 cookie 的记录：运行中的版本、引导页版本与跳过的版本。 */
+  /** 引导程序本次启动的记录，包含运行版本、引导器版本与跳过版本集 */
   readonly session: LoaderSession;
-  /** 宿主组件 foo_ui_webview2 的版本。 */
+  /** 宿主插件 foo_ui_webview2 版本信息 */
   readonly plugin: string;
 }
 export const confirmedStartupAtom = atom<ConfirmedStartup | null>(null);
@@ -54,12 +78,12 @@ export interface LoaderConfirmationOptions {
   readonly randomId?: () => string;
 }
 export interface LoaderConfirmationService {
-  /** 只能在根组件提交后调用；同一时刻的确认共用一次工作，失败可显式重试。 */
+  /** 执行启动确认；限定于根组件挂载后触发，并发调用复用单次任务，失败支持显式重试 */
   confirm(): Promise<void>;
   dispose(): void;
 }
 
-/** install-id 是引导页公开的同源资源，这次读取与 cookie 共同确定当前安装及启动标识。 */
+/** 读取引导页公开同源资源 install-id，结合 session cookie 校验安装实例与启动标记 */
 async function pageInstallId(url: URL): Promise<string> {
   let response: Response;
   try {
@@ -68,8 +92,8 @@ async function pageInstallId(url: URL): Promise<string> {
       signal: AbortSignal.timeout(5000),
     });
   } catch (error) {
-    // 虚拟主机不为缺失文件返回 404；发布新标识前仍须经宿主确认文件确实不存在。
-    if (url.origin === 'https://foo-ui-webview2.local' && error instanceof TypeError) return '';
+    // 虚拟主机缺失资源时不触发 404 响应；生成新安装标识前须由宿主文件系统校验资源缺位
+    if (url.origin === VIRTUAL_HOST && error instanceof TypeError) return '';
     throw error;
   }
   if (response.status === 404) return '';
@@ -89,7 +113,7 @@ function clearAttempts(storage: LoaderStorage, id: string, version: VersionRef):
   storage.writeAttempts(JSON.stringify(setAttempts(ledger, id, version.dir, 0)));
 }
 
-/** 面板只确认说明页已提交，不写安装标识、指针或版本文件。 */
+/** 独立面板模式启动确认：仅校验展示说明页已挂载，不持久化安装标识、版本指针或状态标记 */
 export async function clearPanelStartup(
   options: Pick<LoaderConfirmationOptions, 'storage' | 'url' | 'readId'> = {},
 ): Promise<boolean> {
@@ -127,6 +151,8 @@ export function startLoaderConfirmation(
   let running: Promise<void> | undefined;
   let proposedId: string | undefined;
   store.set(loaderConfirmationAtom, version ? 'waiting' : 'disabled');
+  if (!version)
+    store.set(startupBlockAtom, { reason: url.origin === VIRTUAL_HOST ? 'layout' : 'source' });
 
   function current(): void {
     if (disposed) throw new Error('启动确认已释放');
@@ -152,6 +178,7 @@ export function startLoaderConfirmation(
       const session = pageSession(storage, id, version);
       clearAttempts(storage, id, version);
       if (mode.panelMode || mode.mode !== 'standalone') {
+        // 面板由启动页拦下，设置页看不到这一步，不记原因
         store.set(loaderConfirmationAtom, 'disabled');
         return;
       }
@@ -162,10 +189,9 @@ export function startLoaderConfirmation(
       current();
       if (!source || source.success === false || !info || info.success === false)
         throw new Error('无法确认主题来源');
-      if (
-        !versionAtLeast(info.plugin.version, REQUIRED_HOST_VERSION) ||
-        !['panelTemplate', 'activeTemplate', 'defaultTemplate'].includes(source.source)
-      ) {
+      const block = blockOf(source.source, info.plugin.version);
+      if (block) {
+        store.set(startupBlockAtom, block);
         store.set(loaderConfirmationAtom, 'disabled');
         return;
       }
@@ -178,16 +204,31 @@ export function startLoaderConfirmation(
       if (storedId !== id) throw new Error('安装标识在确认期间变化');
       if (!marker(json(await read(`fe/${version.dir}/installed.json`)), version))
         throw new Error('当前版本不完整');
-      let currentText: string | null = null;
-      try {
-        currentText = await read('current.json');
-      } catch {
-        current();
-      }
-      const pointer =
-        readPointer(json(currentText)) ?? readPointer(json(await read('last-good.json')));
+      const readOrNull = async (relative: string) => {
+        try {
+          return await read(relative);
+        } catch {
+          current();
+          return null;
+        }
+      };
+      const currentText = await readOrNull('current.json');
+      const lastGood = readPointer(json(await readOrNull('last-good.json')));
+      const pointer = readPointer(json(currentText)) ?? lastGood;
       if (!pointer) throw new Error('没有可确认的版本指针');
-      const next = confirmedPointer(pointer, session);
+      // 当前指针缺失 previous 回退版本时（如外部解压全量包），从 last-good 检索本地完整副本作为补入目标
+      const known: VersionRef[] = [];
+      if (!versionRef(pointer.frontend.previous))
+        for (const key of ['version', 'previous']) {
+          const ref = versionRef(lastGood?.frontend[key]);
+          if (
+            ref &&
+            !sameVersion(ref, session.version) &&
+            marker(json(await readOrNull(`fe/${ref.dir}/installed.json`)), ref)
+          )
+            known.push(ref);
+        }
+      const next = confirmedPointer(pointer, session, known);
       if (!next) throw new Error('版本指针已变化');
       const skipped = session.skipped.filter((ref) =>
         pointer.refs.some((candidate) => sameVersion(candidate, ref)),
@@ -246,6 +287,7 @@ export function startLoaderConfirmation(
         plugin: info.plugin.version,
       });
       store.set(loaderConfirmationAtom, 'confirmed');
+      store.set(startupBlockAtom, null);
     }, lifetime.signal);
   }
 
@@ -256,7 +298,9 @@ export function startLoaderConfirmation(
       if (running) return running;
       running = confirm()
         .catch(() => {
-          if (!disposed) store.set(loaderConfirmationAtom, 'failed');
+          if (disposed) return;
+          store.set(startupBlockAtom, { reason: 'failed' });
+          store.set(loaderConfirmationAtom, 'failed');
         })
         .finally(() => {
           running = undefined;

@@ -1,4 +1,4 @@
-/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给。 */
+/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给 */
 .stereo {
   --scope-corner-font: 13px;
   position: relative;
@@ -7,7 +7,7 @@
   font-family: var(--fontFamilyMonospace);
 }
 
-/* 声场图贴格左上。 */
+/* 声场图贴格左上 */
 .scope {
   position: absolute;
   left: 0;
@@ -16,7 +16,7 @@
   height: 155px;
 }
 
-/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线 */
 .base > span,
 .scale-label {
   text-box-trim: trim-end;
@@ -30,7 +30,7 @@
   white-space: nowrap;
 }
 
-/* 小标 16 与实时值 20 同一基线，中间隔 8。 */
+/* 小标 16 与实时值 20 同一基线，中间隔 8 */
 .correlation-line {
   left: 172px;
   top: 10px;
@@ -52,7 +52,7 @@
   color: var(--colorPaletteRedForeground1);
 }
 
-/* 相关条照相关刻度轨的画法：框线画在盒内，三根满高刻度；游标 4 宽、上下各出 3。 */
+/* 相关条照相关刻度轨的画法：框线画在盒内，三根满高刻度；游标 4 宽、上下各出 3 */
 .scale {
   position: absolute;
   left: 180px;
@@ -90,7 +90,7 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* 附行：小标 13（弱色）与值 16 同一基线，中间隔 8，两项之间隔 24。 */
+/* 附行：小标 13（弱色）与值 16 同一基线，中间隔 8，两项之间隔 24 */
 .sub {
   left: 172px;
   top: 135px;
@@ -109,7 +109,7 @@
   font-size: 16px;
 }
 
-/* 说明居中写在空着的声场图里，左右各让 8。 */
+/* 说明居中写在空着的声场图里，左右各让 8 */
 .note {
   position: absolute;
   left: 8px;

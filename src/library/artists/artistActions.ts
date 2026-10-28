@@ -133,7 +133,7 @@ export function startArtistActions(
               paths[to] = a;
             }
           }
-        // 几位一起播时记第一位；没写艺术家的主体是空串，名字用 `artists.unknown` 那一句。
+        // 几位一起播时记第一位；没写艺术家的主体是空串，名字用 `artists.unknown` 那一句
         const subject = names[0] ?? '';
         return deps.actions.playPaths(paths, index, {
           kind: 'artist',

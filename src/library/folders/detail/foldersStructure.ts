@@ -2,7 +2,8 @@ import type { LibraryTrack } from 'foo-webview-sdk';
 import { normalizeHostPath } from '../../../host/hostPath.ts';
 import type { TableItem } from '../../../table/tableItems.ts';
 import type { TableSort } from '../../../table/TrackTableHeader.tsx';
-import { foldersSubject, type FolderNode } from '../tree/foldersModel.ts';
+import { compareFolderNames, foldersSubject, type FolderNode } from '../tree/foldersModel.ts';
+import { sortFlatTracks } from '../../../track/trackSort.ts';
 import { foldersSort } from './foldersSort.ts';
 
 export interface FolderGroup {
@@ -19,13 +20,19 @@ interface Branch {
 export interface FoldersStructure {
   readonly groups: readonly FolderGroup[];
   readonly tracks: readonly LibraryTrack[];
+  /** 不按目录分组：`tracks` 是整份曲目按所选列排好的平铺次序，`groups` 仍是目录层级，只供计数 */
+  readonly flat: boolean;
 }
 
-/** 以宿主绝对路径分层；句柄去重保留同一文件的不同 subsong。 */
+/**
+ * 以宿主绝对路径分层；句柄去重保留同一文件的不同 subsong。`grouped` 为假时排序不再限于各目录内：
+ * 目录层级照旧建好，曲目按目录树的次序摊平后整体排
+ */
 export function foldersStructure(
   nodes: readonly FolderNode[],
   tracks: readonly LibraryTrack[],
   sort: TableSort | null,
+  grouped = true,
 ): FoldersStructure {
   const roots = nodes.filter(
     (node, index) =>
@@ -79,12 +86,11 @@ export function foldersStructure(
     }
     branch.direct.push(track);
   }
-  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
   function finish(branch: Branch): FolderGroup {
     const children = [...branch.children.values()]
-      .sort((a, b) => collator.compare(a.node.name, b.node.name))
+      .sort((a, b) => compareFolderNames(a.node.name, b.node.name))
       .map(finish);
-    const direct = foldersSort(branch.direct, sort);
+    const direct = foldersSort(branch.direct, grouped ? sort : null);
     const all = [...direct, ...children.flatMap((child) => child.tracks)];
     return {
       node: { ...branch.node, count: all.length, hasChildren: children.length > 0 },
@@ -94,7 +100,10 @@ export function foldersStructure(
     };
   }
   const groups = branches.map(finish);
-  return { groups, tracks: groups.flatMap((group) => group.tracks) };
+  const tree = groups.flatMap((group) => group.tracks);
+  return grouped
+    ? { groups, tracks: tree, flat: false }
+    : { groups, tracks: sortFlatTracks(tree, sort), flat: true };
 }
 
 export interface FoldersGroupData {
@@ -108,6 +117,13 @@ export function foldersItems(
   rowHeight: number,
   covers = false,
 ): readonly TableItem<FoldersGroupData>[] {
+  if (structure.flat)
+    return structure.tracks.map((track, order) => ({
+      kind: 'row',
+      key: track.handle,
+      order,
+      track,
+    }));
   const items: TableItem<FoldersGroupData>[] = [];
   const orders = new Map(structure.tracks.map((track, index) => [track.handle, index]));
   function rows(group: FolderGroup) {

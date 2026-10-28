@@ -1,4 +1,15 @@
+/* 筛选浮层底栏右端：当前结果数与清除条件 */
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase200);
+  color: var(--text-secondary);
+}
 .root {
+  --table-inset-start: var(--spacingHorizontalM);
+  --table-inset-end: var(--spacingHorizontalL);
+  --table-bottom-inset: calc(var(--spacingVerticalL) + var(--player-inset, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--spacingVerticalS);
@@ -6,14 +17,15 @@
   min-height: 0;
   flex: 1;
   overflow: hidden;
-  padding-left: var(--spacingHorizontalM);
+  padding-inline: var(--table-inset-start) var(--table-inset-end);
 }
 .scroll {
+  margin-inline: calc(-1 * var(--table-inset-start)) calc(-1 * var(--table-inset-end));
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-bottom: var(--player-inset, 0px);
+  padding: 0 var(--table-inset-end) var(--table-bottom-inset) var(--table-inset-start);
   scrollbar-gutter: stable;
 }
 .empty {
@@ -30,7 +42,34 @@
   color: var(--colorNeutralForeground2);
 }
 @container folders (max-width: 879px) {
-  .root {
-    padding-left: 0;
+  /* 筛选浮层底栏右端：当前结果数与清除条件 */
+  .result {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
+    font-size: var(--fontSizeBase200);
+    color: var(--text-secondary);
   }
+  .root {
+    --table-inset-start: var(--spacingHorizontalL);
+  }
+}
+/* 筛选里的目录范围与媒体类型：并排排布，标签与切换器行内对齐 */
+.rangeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--spacingHorizontalL);
+  row-gap: var(--spacingVerticalXS);
+}
+.range {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+.rangeTitle {
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground2);
+  white-space: nowrap;
 }

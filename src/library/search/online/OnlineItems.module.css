@@ -1,0 +1,314 @@
+/* 曲目表：封面、标题、艺人、专辑、音质、时长；列头与行共用这一套列宽 */
+.header,
+.row {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 56px 44px;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  padding: 0 var(--spacingHorizontalM);
+}
+/* 在线列表：前面多序号，行尾多 ⋯；专辑那一种不出封面与专辑 */
+.header[data-layout='list'],
+.row[data-layout='list'] {
+  grid-template-columns:
+    28px 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr)
+    56px 44px 24px;
+}
+.header[data-layout='album'],
+.row[data-layout='album'] {
+  grid-template-columns: 28px minmax(0, 5fr) minmax(0, 3fr) 56px 44px 24px;
+}
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+}
+.row[data-playing] .number {
+  color: var(--colorBrandForeground1);
+}
+/* 行尾的 ⋯：悬停、选中或键盘停在这一行时才出现，点了在键下方打开这首的菜单 */
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  color: var(--colorNeutralForeground2);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    background-color var(--motion-faster) var(--curveLinear);
+}
+.row:hover .more,
+.row[data-selected] .more,
+.row[data-focused] .more {
+  opacity: 1;
+}
+.more:hover {
+  background-color: var(--state-hover);
+}
+.more:active {
+  background-color: var(--state-pressed);
+}
+/* 可排序的列头：字照列头的写法，悬停时变深；正在按它排的那一列带方向箭头 */
+.sortable {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.sortable.number,
+.sortable.duration {
+  justify-content: flex-end;
+}
+.sortable:hover,
+.sortable[data-active] {
+  color: var(--colorNeutralForeground1);
+}
+.sortable:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+  border-radius: var(--borderRadiusSmall);
+}
+.arrow {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.header {
+  height: 32px;
+  border-bottom: var(--strokeWidthThin) solid var(--line);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+.row {
+  height: 40px;
+  border-radius: var(--borderRadiusMedium);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  cursor: default;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+.row:hover {
+  background-color: var(--state-hover);
+}
+.row:active {
+  background-color: var(--state-pressed);
+}
+.row[data-selected] {
+  background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+}
+[role='listbox']:focus-visible .row[data-focused] {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.row .title {
+  color: var(--colorNeutralForeground1);
+}
+/* 置灰在前、正在播放在后：两者同时成立时文字写强调色，封面与徽标仍是变淡的样子，两种状态都看得出 */
+.row[data-dimmed] {
+  color: var(--colorNeutralForegroundDisabled);
+}
+.row[data-dimmed] .title,
+.row[data-dimmed] .quality {
+  color: inherit;
+}
+.row[data-dimmed] .badge {
+  border-color: var(--colorNeutralStrokeDisabled);
+  color: var(--colorNeutralForegroundDisabled);
+}
+.row[data-dimmed] .cover {
+  opacity: 0.4;
+}
+.row[data-playing],
+.row[data-playing] .title,
+.row[data-playing] .quality {
+  color: var(--colorBrandForeground1);
+}
+@media (forced-colors: active) {
+  .row[data-selected] {
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
+  .row[data-dimmed] {
+    color: GrayText;
+  }
+  .row[data-playing] .title {
+    color: Highlight;
+  }
+}
+.title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalS);
+}
+.text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.badge {
+  flex: none;
+  padding: 0 var(--spacingHorizontalXS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusSmall);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase100);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase100);
+}
+/* 补全图标与标记同一位置；只有图形，名字与说明在无障碍名称和悬停提示里 */
+.unblocked {
+  flex: none;
+  display: inline-flex;
+  color: var(--colorNeutralForeground3);
+}
+.quality {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+}
+.duration {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.cover {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--bg-hover);
+}
+.cover[data-round] {
+  border-radius: var(--borderRadiusCircular);
+}
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.placeholder {
+  width: 50%;
+  height: 50%;
+  color: var(--text-muted);
+}
+/* 最佳匹配与下拉里的在线曲目：与本地结果页的行同高，左图 40 */
+.suggestion,
+.best {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 56px;
+  gap: var(--spacingHorizontalM);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: start;
+}
+button.best {
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+button.best:hover {
+  background-color: var(--state-hover);
+}
+button.best:active {
+  background-color: var(--state-pressed);
+}
+button.best:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+.suggestion {
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+.suggestion:hover {
+  background-color: var(--state-hover);
+}
+.suggestion:active {
+  background-color: var(--state-pressed);
+}
+.suggestion[data-selected] {
+  background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+}
+@media (forced-colors: active) {
+  .suggestion[data-selected] {
+    border-block-end: var(--strokeWidthThick) solid Highlight;
+  }
+}
+.tail {
+  flex: none;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+}
+.bestLabels {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--spacingVerticalXXS);
+}
+.bestTitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightMedium);
+  line-height: var(--lineHeightBase300);
+}
+/* 艺人与专辑只占一行：通用的元数据行会折行，这里改成不折、各项按宽截断，免得压到下一行 */
+.bestFields {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  gap: var(--spacingHorizontalM);
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+@media (max-width: 640px) {
+  .header,
+  .row {
+    grid-template-columns: 32px minmax(0, 3fr) minmax(0, 2fr) 44px;
+  }
+  .header[data-layout='list'],
+  .row[data-layout='list'] {
+    grid-template-columns: 28px 32px minmax(0, 3fr) minmax(0, 2fr) 44px 24px;
+  }
+  .header[data-layout='album'],
+  .row[data-layout='album'] {
+    grid-template-columns: 28px minmax(0, 3fr) minmax(0, 2fr) 44px 24px;
+  }
+  .album,
+  .quality {
+    display: none;
+  }
+}

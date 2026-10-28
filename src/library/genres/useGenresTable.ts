@@ -1,16 +1,19 @@
+import { COLUMN_PREFS } from '../../table/columns/columnMigration.ts';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useEffect, useMemo, useState } from 'react';
 import { createColumnsModel } from '../../table/columns/columnsModel.ts';
 import { createRowSelection } from '../../table/rowSelection.ts';
-import type { ColumnId } from '../../table/columns/columns.ts';
-import type { TableLinks } from '../../table/tableItems.ts';
+import {
+  EXTENDED_COLUMNS,
+  EXTENDED_INTRODUCED,
+  type ColumnId,
+} from '../../table/columns/columns.ts';
 import { albumsAtom } from '../albums.ts';
-import { albumKeyOf, trackAlbumKeyOf } from '../../host/libraryContract.ts';
 import { buildGenreGroups, genreTableItems } from './genresGroups.ts';
 import { genresPrefsAtom } from './genresPrefs.ts';
 import { genresRowsAtom } from './genresRows.ts';
-import { useService } from '../../kit/useService.ts';
-import { albumDetailKey } from '../album-detail/albumDetail.ts';
+import { TRACK_STATS_COLUMNS } from '../../track/trackSort.ts';
+import { useTrackStats } from '../useTrackStats.ts';
 
 const COLUMNS: readonly ColumnId[] = [
   'cover',
@@ -21,26 +24,35 @@ const COLUMNS: readonly ColumnId[] = [
   'album',
   'rating',
   'duration',
+  ...EXTENDED_COLUMNS,
 ];
 
 export function useGenresTable(closed: ReadonlySet<string>) {
   const store = useStore();
-  const albumDetail = useService(albumDetailKey);
   const rows = useAtomValueRawSync(genresRowsAtom);
   const { group } = useAtomValueRawSync(genresPrefsAtom);
   const { albums } = useAtomValueRawSync(albumsAtom);
+  // 按专辑分组时封面列由组头撑起；别的分组或不分组没有这样的组头，换成每行一张的缩略图列
   const withCovers = group === 'album' || group === 'albumDisc';
   const columns = useMemo(
     () =>
       createColumnsModel(store, {
-        key: 'default-theme.genres-columns.v1',
-        offered: withCovers ? COLUMNS : COLUMNS.filter((column) => column !== 'cover'),
-        hidden: ['status', 'album'],
+        ...COLUMN_PREFS.genres,
+        offered: withCovers
+          ? COLUMNS
+          : COLUMNS.map((column) => (column === 'cover' ? 'art' : column)),
+        hidden: ['status', 'album', ...EXTENDED_COLUMNS],
         widths: { cover: 128 },
+        introduced: EXTENDED_INTRODUCED,
       }),
     [store, withCovers],
   );
-  const { coverWidth } = useAtomValueRawSync(columns.layout);
+  const { coverWidth, cells } = useAtomValueRawSync(columns.layout);
+  // 按统计排序由宿主排，这里只为显示统计列取数
+  const stats = useTrackStats(
+    rows.tracks,
+    cells.some((id) => TRACK_STATS_COLUMNS.has(id)),
+  );
   const [selection] = useState(() => createRowSelection(store, { total: 0 }));
   useEffect(() => {
     selection.clear();
@@ -51,20 +63,18 @@ export function useGenresTable(closed: ReadonlySet<string>) {
     [rows.tracks, group, albums],
   );
   const items = useMemo(
-    () => genreTableItems(rows.tracks, groups, closed, coverWidth),
-    [rows.tracks, groups, closed, coverWidth],
+    () => genreTableItems(stats.tracks, groups, closed, coverWidth),
+    [stats.tracks, groups, closed, coverWidth],
   );
-  const links = useMemo<TableLinks>(() => {
-    const index = new Map(albums.map((album) => [albumKeyOf(album), album]));
-    const tracks = new Map(rows.tracks.map((track) => [track.handle, track]));
-    return {
-      album: (track) => {
-        const full = tracks.get(track.handle);
-        const key = full ? trackAlbumKeyOf(full) : null;
-        const album = key ? index.get(key) : undefined;
-        if (album) albumDetail.open(album);
-      },
-    };
-  }, [albums, rows.tracks, albumDetail]);
-  return { rows, columns, selection, groups, items, coverWidth, links, group };
+  return {
+    rows,
+    columns,
+    selection,
+    groups,
+    items,
+    coverWidth,
+    group,
+    statsFailed: stats.failed,
+    retryStats: stats.retry,
+  };
 }

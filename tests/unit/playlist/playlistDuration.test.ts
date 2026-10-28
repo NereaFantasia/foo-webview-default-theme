@@ -50,8 +50,10 @@ async function start(host: UnitHost) {
 /** 只改了标签的通知：报的是这一首。 */
 const retagged = (track: PlaylistTrack) => ({
   tracks: [{ handle: track.handle, path: track.path, subsong: 0 }],
+  handles: [track.handle],
   count: 1,
   fromHook: false,
+  truncated: false,
   timestamp: 1,
 });
 
@@ -80,7 +82,13 @@ describe('startPlaylistDuration', () => {
       makeRow('Other', 0, { duration: 30 }),
       makeRow('Other', 1, { duration: 12 }),
     ]);
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(1), playlist: 1, start: 1, count: 1 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(1),
+      playlist: 1,
+      start: 1,
+      count: 1,
+      contentVersion: '1',
+    });
     await wait(400);
     expect(of(OTHER)).toBe(42);
     release();

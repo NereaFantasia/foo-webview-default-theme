@@ -1,5 +1,7 @@
-import { createStore } from 'jotai/vanilla';
+import { atom, createStore } from 'jotai/vanilla';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { translateAtom } from '../../../src/i18n/locale.ts';
+import { startOnlineTracks } from '../../../src/playback/onlineTracks.ts';
 import { startPlayback } from '../../../src/playback/playback.ts';
 import { chooseVolumeScale, dbOf, positionOf } from '../../../src/playback/volumeScale.ts';
 import {
@@ -27,16 +29,17 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const TRAY_METHODS = ['tray.create', 'tray.setMenuZones', 'tray.setTooltip', 'tray.destroy'];
 
 /** 同时起播放服务与托盘，不等就绪：扣留宿主应答的测试要在中途插手。 */
-function launch(host: UnitHost) {
+function launch(host: UnitHost, client?: Parameters<typeof startOnlineTracks>[1]) {
   const store = createStore();
   const media = fakeMedia({ [DARK]: false });
   watchColorScheme(store, media.matchMedia);
   chooseVolumeScale(store, 'db', null);
-  const playback = startPlayback(store, host.fb);
+  const playback = startPlayback(store, host.fb, client && startOnlineTracks(store, client));
   const deps: TrayDeps = {
     playback: { setOrder: vi.fn(async () => {}), setVolume: vi.fn(async () => {}) },
     icon: () => undefined,
     configWriter: createMemoryConfigWriter(host.fb),
+    desktopLyrics: atom({ open: false, locked: false }),
   };
   const tray = startTray(store, deps, host.fb);
   const ready = Promise.all([playback.ready, tray.ready]);
@@ -100,7 +103,7 @@ describe('startTray', () => {
     expect(zonesOf(menu)).toEqual({
       top: ['np'],
       playback: ['prev', 'playPause', 'next'],
-      bottom: ['_sys_show', 'volume', 'order', '_sys_exit'],
+      bottom: ['_sys_show', 'desktopLyrics', 'desktopLyricsLock', 'volume', 'order', '_sys_exit'],
     });
     expect(menu?.['config']).toMatchObject({ backdropDarkMode: false, showSystemItems: false });
   });
@@ -169,6 +172,61 @@ describe('startTray', () => {
     await ready;
     await settle();
     expect(host.callsTo('tray.setTooltip')).toEqual([{ tooltip: 'Nujabes - Feather' }]);
+  });
+
+  it('在线曲目的歌曲卡由主题给：展示信息到了才补上曲名、艺人与封面并重发；本地曲目之间换曲不重发', async () => {
+    const host = installFakeHost();
+    const path = 'http://127.0.0.1:51234/music/stream/wy/7.mp3?q=320k';
+    host.answer('playback.getCurrentTrack', {
+      success: true,
+      found: true,
+      track: makeTrack({ path, title: path, artist: '', artists: [] }),
+    });
+    const info = {
+      ref: { platform: 'wy', id: '7' },
+      title: '在线曲目',
+      subtitle: null,
+      artists: [{ ref: null, name: '艺人' }],
+      album: null,
+      durationMs: 1000,
+      artwork: 'https://p1.music.126.net/abc/123.jpg',
+      qualities: [],
+      access: null,
+    } as const;
+    let answer: (value: (typeof info)[]) => void = () => {};
+    const client = {
+      tracks: vi.fn(() => new Promise<(typeof info)[]>((resolve) => (answer = resolve))),
+    };
+    const { store, ready } = launch(host, client);
+    await ready;
+    await settle();
+    const top = () => host.callsTo('tray.setMenuZones').at(-1)?.['top'];
+    const unknown = store.get(translateAtom)('online.unknownTitle');
+    expect(host.callsTo('tray.setMenuZones')).toHaveLength(1);
+    expect(top()).toMatchObject([{ type: 'nowplaying', title: unknown }]);
+    expect(top()).not.toMatchObject([{ cover: expect.anything() }]);
+
+    vi.useFakeTimers();
+    answer([info]);
+    await vi.advanceTimersByTimeAsync(MENU_COALESCE_MS);
+    expect(host.callsTo('tray.setMenuZones')).toHaveLength(2);
+    expect(top()).toMatchObject([
+      {
+        type: 'nowplaying',
+        title: '在线曲目',
+        subtitle: '艺人',
+        cover: 'https://p1.music.126.net/abc/123.jpg?param=128y128',
+      },
+    ]);
+
+    // 换到本地曲目：歌曲卡回到留空，由宿主补，再换一首本地曲目不重发
+    host.emit('playback:trackChanged', makeTrack());
+    await vi.advanceTimersByTimeAsync(MENU_COALESCE_MS);
+    expect(host.callsTo('tray.setMenuZones')).toHaveLength(3);
+    expect(top()).toEqual([{ id: 'np', type: 'nowplaying', label: expect.any(String) }]);
+    host.emit('playback:trackChanged', makeTrack({ path: 'file://E:/Music/other.flac' }));
+    await vi.advanceTimersByTimeAsync(MENU_COALESCE_MS);
+    expect(host.callsTo('tray.setMenuZones')).toHaveLength(3);
   });
 
   it('提示跟着曲目走，同值不重发', async () => {

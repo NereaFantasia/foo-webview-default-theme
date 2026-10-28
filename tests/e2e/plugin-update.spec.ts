@@ -23,7 +23,11 @@ const STARTUP = {
 } as const;
 const TEXT = new TextEncoder();
 
-async function mount(page: Page, scenario: 'install' | 'stale' | 'rollback' = 'install') {
+async function mount(
+  page: Page,
+  scenario: 'install' | 'stale' | 'rollback' = 'install',
+  mode: 'notify' | 'auto' = 'auto',
+) {
   const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
   const signer = { keyId: 'plugin', privateKeyPem };
@@ -77,7 +81,7 @@ async function mount(page: Page, scenario: 'install' | 'stale' | 'rollback' = 'i
   ]);
   for (const file of files) routes.set(base + file.path, file.bytes);
   const host = await installPageHost(page);
-  host.config.set('defaultTheme.update.mode', 'auto');
+  host.config.set('defaultTheme.update.mode', mode);
   host.config.set('defaultTheme.locale', 'zh-CN');
   const disk = answerTemplateDisk(host, {
     'current.json': JSON.stringify({ schema: 1, frontend: { version: CURRENT } }),
@@ -167,7 +171,7 @@ for (const colorScheme of ['light', 'dark'] as const)
     }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      const env = await mount(page);
+      const env = await mount(page, 'install', 'notify');
       const install = page.getByRole('button', { name: /重启安装/ });
       await expect(install).toBeVisible();
       expect(env.host.callsTo('misc.exit')).toEqual([]);
@@ -191,6 +195,23 @@ for (const colorScheme of ['light', 'dark'] as const)
       });
     });
 
+test('自动模式提前下载两份 DLL，批准前不退出，批准后不再下载', async ({ page }) => {
+  const env = await mount(page);
+  const downloads = () =>
+    env.host.callsTo('http.get').filter((call) => String(call['url']).endsWith('.dll')).length;
+  await expect(page.getByText('组件 2.1.0 已下载，可重启安装')).toBeVisible();
+  expect([...env.disk.files.keys()].filter((path) => path.endsWith('.dll'))).toHaveLength(2);
+  expect(downloads()).toBe(2);
+  expect(env.host.callsTo('misc.exit')).toEqual([]);
+  await page.getByRole('button', { name: /重启安装/ }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: '重启安装', exact: true })
+    .click();
+  await expect.poll(() => env.host.callsTo('misc.exit').length).toBe(1);
+  expect(downloads()).toBe(2);
+});
+
 test('过期 ready 拒绝退出并发出取消请求', async ({ page }) => {
   const env = await mount(page, 'stale');
   await page.getByRole('button', { name: /重启安装/ }).click();
@@ -201,7 +222,7 @@ test('过期 ready 拒绝退出并发出取消请求', async ({ page }) => {
   await expect(
     page
       .locator('[data-settings-row] [aria-hidden="true"]')
-      .filter({ hasText: '未能完成插件更新' }),
+      .filter({ hasText: '未能完成组件更新' }),
   ).toBeVisible();
   expect(env.host.callsTo('misc.exit')).toEqual([]);
   const requests = await page.evaluate(async () => {
@@ -220,7 +241,7 @@ test('回滚结果显示恢复入口，只定位文件，不再推荐失败发�
   await expect(
     page
       .locator('[data-settings-row] [aria-hidden="true"]')
-      .filter({ hasText: '插件更新失败，已恢复旧插件文件' }),
+      .filter({ hasText: '组件更新失败，已恢复旧组件文件' }),
   ).toBeVisible();
   await page.getByRole('button', { name: /打开恢复文件位置/ }).click();
   await expect.poll(() => env.host.callsTo('shell.showInExplorer').length).toBe(1);

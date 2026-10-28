@@ -16,7 +16,7 @@
   height: 64px;
 }
 
-/* ⋯ 离窗口左缘 8，其后各组之间隔 16。 */
+/* ⋯ 离窗口左缘 8，其后各组之间隔 16 */
 .start {
   display: flex;
   align-self: stretch;
@@ -33,7 +33,7 @@
   app-region: no-drag;
 }
 
-/* 播放控制组离主菜单 28；音量键离下一首 16，与胶囊里控制组与音量键之间一样。 */
+/* 播放控制组离主菜单 28；音量键离下一首 16，与胶囊里控制组与音量键之间一样 */
 .player {
   display: flex;
   align-items: center;
@@ -47,7 +47,7 @@
   app-region: no-drag;
 }
 
-/* 正在播放条自己退出拖动。 */
+/* 正在播放条自己退出拖动 */
 .center {
   display: flex;
   align-items: center;
@@ -61,7 +61,7 @@
   min-width: 0;
 }
 
-/* 播放栏在底部时窗口三键左边的入口组：退出拖动区，离三键 16。 */
+/* 播放栏在底部时窗口三键左边的入口组：退出拖动区，离三键 16 */
 .entries {
   display: flex;
   align-items: center;
@@ -71,7 +71,7 @@
   app-region: no-drag;
 }
 
-/* 窄窗仍需同时容纳导航、面板入口与窗口三键。 */
+/* 窄窗仍需同时容纳导航、面板入口与窗口三键 */
 @media (max-width: 480px) {
   .entries {
     margin-right: 0;

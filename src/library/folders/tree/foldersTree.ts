@@ -9,7 +9,7 @@ import {
   type LibraryEventsFace,
 } from '../../../host/libraryContract.ts';
 import { createFoldersCache, type FoldersTreeFace } from './foldersCache.ts';
-import { foldersRoot, type FolderNode } from './foldersModel.ts';
+import { compareFolderNames, foldersRoot, type FolderNode } from './foldersModel.ts';
 
 export interface FoldersTreeState {
   readonly status: 'idle' | 'loading' | 'ready' | 'failed';
@@ -88,7 +88,12 @@ export function startFoldersTree(store: Store, host: FoldersHost = fb): FoldersT
       update({ status: 'failed' });
       return;
     }
-    const roots = answer.roots.map(foldersRoot);
+    const roots = answer.roots
+      .map(foldersRoot)
+      .sort(
+        (a, b) =>
+          compareFolderNames(a.name, b.name) || compareFolderNames(a.absolutePath, b.absolutePath),
+      );
     for (const root of roots) working.nodes.set(root.key, root);
     for (const key of expanded) {
       const node = await working.locate(key);

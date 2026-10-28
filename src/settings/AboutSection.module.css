@@ -1,0 +1,14 @@
+.versions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.versions > span {
+  align-items: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

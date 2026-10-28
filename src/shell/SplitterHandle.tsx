@@ -15,7 +15,7 @@ interface SplitterHandleProps extends Pick<
   readonly dragging: boolean;
 }
 
-/** 外壳分栏手柄共用焦点、拖动反馈与外观，定位由所属栏位决定。 */
+/** 外壳分栏手柄共用焦点、拖动反馈与外观，定位由所属栏位决定 */
 export function SplitterHandle({ className, dragging, ...props }: SplitterHandleProps) {
   return (
     <div

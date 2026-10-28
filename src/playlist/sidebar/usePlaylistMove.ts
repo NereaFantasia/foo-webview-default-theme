@@ -6,10 +6,10 @@ import { isOwnSlot, landingIndex } from './playlistReorder.ts';
 /**
  * 把一张挪到插入位，拖动松手与 Alt+↑ / Alt+↓ 共用。焦点跟着被挪的那一行走：各行按 GUID 做 key，React
  * 挪的是原来那个节点，提交后自己把焦点还给它，但同时把滚动区的 scrollTop 恢复成挪动前的值，挪到边上的
- * 那一行可能已在可见范围之外。所以记下它该落在第几位，读回的清单里它到了那儿，就把它滚进可见范围。
+ * 那一行可能已在可见范围之外。所以记下它该落在第几位，读回的清单里它到了那儿，就把它滚进可见范围
  *
  * 上一次挪动的结果读回之前不接下一次：插入位按手上的清单算，清单还是旧的；被拒的那一下也不能把上一次
- * 记下的落点冲掉。
+ * 记下的落点冲掉
  */
 export function usePlaylistMove(
   scroller: RefObject<HTMLElement | null>,

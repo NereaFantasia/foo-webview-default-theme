@@ -12,12 +12,12 @@ import { defineLocalPref, type PrefStorage } from '../kit/localPref.ts';
 import type { Store } from '../kit/store.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
-/** 用户选的窗口材质，取值同 `window.setBackdropPolicy` 的 activeEffect；`inherit` 是跟随 foobar2000 首选项。 */
+/** 用户选择的窗口原生材质；取值与 `window.setBackdropPolicy` 的 activeEffect 一致；`inherit` 跟随 foobar2000 首选项 */
 export type BackdropChoice = WindowActiveBackdropEffect;
-/** 宿主报的实际效果：`inherit` 已解析，窗口显示不了的档已回退；`system` 表示由系统绘制。 */
+/** 宿主回报的实际材质效果：`inherit` 解析完毕，不支持时自动降级回退；`system` 表示由系统承接绘制 */
 export type BackdropEffect = WindowBackdropStateChangedPayload['effect'];
 
-/** 取值表按 SDK 的类型逐项列出，宿主增删档位时这里编译不过；读回的存档只认表里的值。 */
+/** 材质枚举对照表（严格对照 SDK 类型定义）；读取的本地存档仅认表内有效值 */
 const CHOICES: Readonly<Record<BackdropChoice, true>> = {
   inherit: true,
   none: true,
@@ -26,7 +26,7 @@ const CHOICES: Readonly<Record<BackdropChoice, true>> = {
   acrylic: true,
 };
 
-/** 材质服务用到的宿主接口：只订一个事件，方法类型取自 SDK 的 `fb`。 */
+/** 材质服务依赖的宿主接口：监听材质状态变更并调用策略下发接口 */
 export interface BackdropFace extends HostReadyFace {
   on(
     event: 'window:backdropStateChanged',
@@ -50,7 +50,7 @@ async function detectPlatform(): Promise<Platform> {
     const { platformVersion } = await hints.getHighEntropyValues(['platformVersion']);
     if (typeof platformVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(platformVersion))
       return 'unknown';
-    // 这是 UniversalApiContract 的版本，非内核构建号；Windows 10 为 1–10，Windows 11 从 13 起。
+    // 基于 UniversalApiContract 版本判定（非内核构建号）：Windows 10 为 1–10，Windows 11 起步为 13
     const major = Number(platformVersion.split('.')[0]);
     if (major >= 1 && major <= 10) return 'windows10';
     return major >= 13 ? 'windows11' : 'unknown';
@@ -63,7 +63,7 @@ function isChoice(value: string): value is BackdropChoice {
   return Object.hasOwn(CHOICES, value);
 }
 
-/** 选择存 localStorage：这是窗口级外观偏好，不进宿主 config，免得与 foobar2000 首选项里的同一项互相覆盖。 */
+/** 材质配置保存在 localStorage：属于窗口级外观偏好，不存入宿主全局 config，避免与主程序首选项相互覆盖 */
 export const BACKDROP_STORAGE_KEY = 'default-theme.backdrop.v1';
 const choicePref = defineLocalPref<BackdropChoice>({
   key: BACKDROP_STORAGE_KEY,
@@ -78,13 +78,13 @@ const failureCodeAtom = atom<string | null>(null);
 const failureVisibleAtom = atom(false);
 const effectiveAtom = atom<BackdropEffect | null>(null);
 
-/** null 表示尚未取得系统版本；读取失败不会当作 Windows 10。 */
+/** 系统是否为 Windows 10（null 表示版本检测进行中；检测失败不默认判定为 Win10） */
 export const windows10Atom: Atom<boolean | null> = atom((get) => {
   const platform = get(platformAtom);
   return platform === 'windows10' ? true : platform === 'windows11' ? false : null;
 });
 
-/** 检测未知时不尝试原生材质，窗口与托盘使用同一判断。 */
+/** 仅在已确认的 Windows 11 环境下允许尝试原生亚克力/云母材质；窗口与托盘共用判定 */
 export const nativeMaterialsAllowedAtom = atom((get) => get(platformAtom) === 'windows11');
 export type BackdropFallback = 'windows10' | 'unknown' | 'failed';
 export const backdropFallbackAtom: Atom<BackdropFallback | null> = atom((get) => {
@@ -92,12 +92,12 @@ export const backdropFallbackAtom: Atom<BackdropFallback | null> = atom((get) =>
   if (platform === 'windows10' || platform === 'unknown') return platform;
   return get(applicationAtom) === 'failed' ? 'failed' : null;
 });
-/** 启动期间的失败可能随后由宿主成功事件解除，提示略后于页面的纯色保护。 */
+/** 材质应用失败提示原子：启动阶段的失败可由后续成功事件自动解除，提示略后于纯色回退保护以防闪烁 */
 export const backdropNoticeAtom = atom((get) => {
   const fallback = get(backdropFallbackAtom);
   return fallback === 'failed' && !get(failureVisibleAtom) ? null : fallback;
 });
-/** 显式主题背景与材质回退共用同一套自绘背景和阅读面参数。 */
+/** 标记是否采用纯色自绘底色（显式选择 none、降级回退或实际生效为 none 时激活） */
 export const backdropSolidAtom = atom(
   (get) =>
     get(backdropFallbackAtom) !== null ||
@@ -115,7 +115,8 @@ export const backdropDiagnosticsAtom = atom((get) =>
 export const backdropChoiceAtom: Atom<BackdropChoice> = choicePref.atom;
 
 /**
- * 系统不支持、检测未知或应用失败时使用纯色。成功应答不覆盖已报告的效果；继承值未解析时为 null。
+ * 当前生效的窗口材质效果
+ * 系统不支持、检测未知或应用失败时强制降级为 none（纯色）；成功时采用已上报效果；未完成解析的继承值返回 null
  */
 export const materialAtom: Atom<BackdropEffect | null> = atom((get) => {
   if (get(backdropSolidAtom)) return 'none';
@@ -125,16 +126,16 @@ export const materialAtom: Atom<BackdropEffect | null> = atom((get) => {
 });
 
 export interface BackdropService {
-  /** 连上宿主后的初始化（订阅、读系统版本、首次下发、取窗口 id）做完时兑现，不会拒绝；调用方不必等它。 */
+  /** 初始化完成时兑现（包括事件监听、系统版本检测、首次策略下发及窗口 ID 绑定）；调用方无需阻塞等待 */
   readonly ready: Promise<void>;
-  /** 换材质并记住。连上宿主时立即下发；没连上时只改页面这一侧。 */
+  /** 切换材质偏好并持久化；宿主连接就绪时立即下发，未就绪时先更新本地状态 */
   choose(choice: BackdropChoice): void;
   dispose(): void;
 }
 
 /**
- * 启动材质服务：读回用户的选择，连上宿主后按背景来源、材质与深浅下发，并跟着宿主报的实际效果更新 `materialAtom`。
- * 深浅取 `colorSchemeAtom`，所以要先让它跟随系统，再启动这里。
+ * 启动窗口材质服务：读取用户持久化偏好，连上宿主后根据背景来源、材质与深浅模式下发策略，
+ * 并依宿主状态变更事件同步更新 `materialAtom`。深浅模式关联 `colorSchemeAtom`
  */
 export function startBackdrop(
   store: Store,
@@ -151,9 +152,9 @@ export function startBackdrop(
   let disposed = false;
   let connected = false;
   let ownId: string | null = null;
-  // 事件广播给所有窗口，要按 windowId 认出自己；id 取回之前到的，按窗口各记最后一条，取回后补用自己那条。
+  // 材质状态事件面向所有窗口广播，需依据 windowId 过滤本窗口事件；窗口 ID 获取前收到的事件暂存，获取后对齐补放
   const early = new Map<string, { effect: BackdropEffect; revision: number; received: number }>();
-  // 最近接收的材质与深浅，挡住相同目标重复入队。
+  // 记录最近一次下发的材质与深浅参数，防止相同配置重复排队
   let sent: { choice: BackdropChoice; darkMode: boolean } | null = null;
   let offEvent: (() => void) | undefined;
   let revision = 0;
@@ -189,7 +190,7 @@ export function startBackdrop(
       queued = null;
       activeRevision = mine;
       const previousReports = reports;
-      // 隐藏窗口也会保存覆盖值，但可能暂答失败；保留它以便宿主显示窗口后继续应用，不自动重写用户请求。
+      // 隐藏窗口下发策略可能暂报失败；保留该请求以便窗口显示时继续应用，不篡改用户预期
       const answer = await settle(() =>
         host.ui.setBackdropPolicy({ activeEffect: choice, inactiveEffect: 'inherit', darkMode }),
       );
@@ -214,8 +215,7 @@ export function startBackdrop(
 
   function send(): void {
     if (disposed || !connected) return;
-    // 自绘背景需要原生 WebView 的不透明底，CSS 铺满颜色不能替代它；透明原生底会让背景模糊透出清晰内容。
-    // 只改实际下发的材质，保留用户选择，切回材质来源时恢复。
+    // 自绘背景需原生 WebView 提供不透明背景；若底层透明则自绘模糊层会穿透暴露底层内容；仅改写下发的策略材质，用户持久化偏好保持不变
     const drawn = store.get(backgroundSourceAtom) !== 'material';
     const choice =
       drawn || !store.get(nativeMaterialsAllowedAtom) ? 'none' : store.get(choicePref.atom);
@@ -225,7 +225,7 @@ export function startBackdrop(
     queued = { choice, darkMode, revision: ++revision };
     clearFailure();
     store.set(applicationAtom, 'pending');
-    // 事件不带请求标识，串行下发后才能把在途请求的成功事件与下一次选择区分开。
+    // 状态事件不带请求 ID，通过串行排队下发隔离各版本响应
     void flush();
   }
 
@@ -252,7 +252,7 @@ export function startBackdrop(
       return;
     }
     offEvent = host.on('window:backdropStateChanged', onReported);
-    // 首次下发前完成检测，避免继承首选项或旧存档短暂启用不适用的材质。
+    // 首次下发前完成平台检测，避免继承首选项或旧存档短暂应用不适用的材质
     const platform = await detectPlatform();
     if (disposed) return;
     store.set(platformAtom, platform);
@@ -264,7 +264,7 @@ export function startBackdrop(
     const report = early.get(ownId);
     early.clear();
     if (report) {
-      // 检测期间收到的旧事件可用于诊断，但不能解除后来请求的失败。
+      // 异步检测期间收到的历史事件仅供诊断，不能解除后续请求的失败状态
       store.set(reportedAtom, report.effect);
       if (
         report.revision === revision &&

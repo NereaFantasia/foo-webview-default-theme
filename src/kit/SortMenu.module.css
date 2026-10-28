@@ -1,0 +1,7 @@
+/* 字段键与方向键挨在一起，作为一组排序工具 */
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  min-width: 0;
+}

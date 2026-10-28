@@ -15,7 +15,7 @@ interface FakeClock extends LyricsClockFace {
 }
 
 /** 时钟按测试给的位置答；帧由测试一帧一帧推。 */
-function setup() {
+function setup(onError?: (error: unknown) => void) {
   const calls: string[] = [];
   const player: LyricsPlayerFace = {
     setCurrentTime: (time, isSeek) => calls.push(`time ${time}${isSeek ? ' seek' : ''}`),
@@ -44,11 +44,13 @@ function setup() {
     },
     cancel: (handle) => pending.delete(handle),
   };
-  const driver = startLyricsDriver(player, clock, frames);
+  const driver = startLyricsDriver(player, clock, frames, onError);
   return {
     calls,
     clock,
     driver,
+    player,
+    subscribed: () => listeners.size,
     pending: () => pending.size,
     tick(now: number) {
       const due = [...pending.values()];
@@ -120,5 +122,66 @@ describe('startLyricsDriver', () => {
     env.change({ reason: 'track', state: 'playing', position: 0 });
     env.tick(10);
     expect(env.calls).toStrictEqual([]);
+  });
+
+  it('逐帧更新出错时只报告一次，停止帧和订阅，后续操作不重启', () => {
+    const errors: unknown[] = [];
+    const env = setup((error) => errors.push(error));
+    const failure = new Error('更新失败');
+    env.player.update = () => {
+      throw failure;
+    };
+    env.driver.setActive(true);
+    expect(env.subscribed()).toBe(1);
+    expect(() => env.tick(16)).not.toThrow();
+    expect(errors).toEqual([failure]);
+    expect(env.pending()).toBe(0);
+    expect(env.subscribed()).toBe(0);
+    env.calls.splice(0);
+    env.driver.setActive(false);
+    env.driver.setActive(true);
+    env.driver.setOffset(1);
+    env.change({ reason: 'seek', state: 'playing', position: 20 });
+    env.driver.dispose();
+    env.driver.dispose();
+    expect(env.calls).toEqual([]);
+    expect(errors).toEqual([failure]);
+  });
+
+  it.each(['start', 'seek', 'offset', 'pause'] as const)('%s 出错也释放订阅与排定的帧', (phase) => {
+    const errors: unknown[] = [];
+    const env = setup((error) => errors.push(error));
+    const failure = new Error('播放失败');
+    const throwError = () => {
+      throw failure;
+    };
+    if (phase === 'start') env.player.resume = throwError;
+    env.driver.setActive(true);
+    if (phase === 'seek') {
+      env.player.setCurrentTime = throwError;
+      env.change({ reason: 'seek', state: 'playing', position: 20 });
+    } else if (phase === 'offset') {
+      env.player.setCurrentTime = throwError;
+      env.driver.setOffset(1);
+    } else if (phase === 'pause') {
+      env.player.pause = throwError;
+      env.driver.setActive(false);
+    }
+    expect(errors).toEqual([failure]);
+    expect(env.pending()).toBe(0);
+    expect(env.subscribed()).toBe(0);
+    expect(() => env.driver.dispose()).not.toThrow();
+  });
+
+  it('释放时即使播放器暂停失败也注销时钟监听', () => {
+    const env = setup();
+    env.driver.setActive(true);
+    env.player.pause = () => {
+      throw new Error('暂停失败');
+    };
+    expect(() => env.driver.dispose()).toThrow('暂停失败');
+    expect(env.pending()).toBe(0);
+    expect(env.subscribed()).toBe(0);
+    expect(() => env.driver.dispose()).not.toThrow();
   });
 });

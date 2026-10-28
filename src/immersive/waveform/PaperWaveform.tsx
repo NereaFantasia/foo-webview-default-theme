@@ -35,14 +35,14 @@ import {
 } from './waveformSurface.ts';
 import styles from './PaperWaveform.module.css';
 
-/** 分道画法的道名，从上往下，与 `waveformLayers` 的分道序号一致。 */
+/** 分道画法的道名，从上往下，与 `waveformLayers` 的分道序号一致 */
 const LANE_NAMES = ['HIGH', 'MID', 'LOW'] as const;
-/** 胶囊挂在竖线右侧时的最小宽（CSS 像素）；放不下时挂到左侧。 */
+/** 胶囊挂在竖线右侧时的最小宽（CSS 像素）；放不下时挂到左侧 */
 const CLOCK_WIDTH = 36;
-/** 播放头竖线宽 2，`left` 往左让 1，线心才压在播放位置上。 */
+/** 播放头竖线宽 2，`left` 往左让 1，线心才压在播放位置上 */
 const PLAYHEAD_HALF = 1;
 
-// 分析结果里的拍点与这里无关；时长、有没有曲目都派生成窄值，100 ms 一次的进度更新不叫醒整块。
+// 分析结果里的拍点与这里无关；时长、有没有曲目都派生成窄值，100 ms 一次的进度更新不叫醒整块
 const bandsAtom = atom((get) => get(trackAnalysisAtom).bands);
 const bandsStatusAtom = atom((get) => get(trackAnalysisAtom).status);
 const durationAtom = atom((get) => get(playbackAtom).duration);
@@ -56,14 +56,14 @@ function tickClass(index: number, count: number): string {
 /**
  * 图纸整轨波形：上方五等分时间轴，中间是按所选画法（`waveformModes.ts`）排的竖条，播放头左边按层取色、
  * 右边染未播色；播放头是热色竖线加 `mm:ss` 胶囊。画法开关是带右下角的按钮与带上的右键菜单（`PaperWaveformMode`），
- * 分道画法的道名挂在带左侧的边距里，随分道淡入淡出。铺满外框给的盒子，几何变量由外框按档给全。
+ * 分道画法的道名挂在带左侧的边距里，随分道淡入淡出。铺满外框给的盒子，几何变量由外框按档给全
  *
  * 它同时是 seek 目标（`useWaveformSeek`）：拖动中播放头跟指针走，松手后在宿主确认前停在目标上；不能 seek 时
  * 不响应、光标不变。播放头的位置与换数据时的形变见 `useWaveformMotion`，播放头与胶囊的字在帧回调里直接写 DOM，
- * 不经 React 状态。新数据还没到时画一条未播色的中线。
+ * 不经 React 状态。新数据还没到时画一条未播色的中线
  *
  * 条色读 `--paper-ink` / `--paper-hot` / `--paper-waveform-idle`：canvas 读不到 CSS 变量，挂载、封面 ramp 变、
- * 深浅档变、尺寸变时各现读一次。canvas 的物理尺寸按舞台缩放开，缩放变了只重开、不重排列。
+ * 深浅档变、尺寸变时各现读一次。canvas 的物理尺寸按舞台缩放开，缩放变了只重开、不重排列
  */
 export function PaperWaveform() {
   const t = useAtomValueRawSync(translateAtom);
@@ -84,7 +84,7 @@ export function PaperWaveform() {
   const clock = useRef<HTMLSpanElement>(null);
   const menu = useRef<WaveformModeMenu>(null);
   const [surface] = useState(createSurface);
-  // 画面上这组数据的层；数据还没到时为 null，画中线。尺寸变时按它重排列。
+  // 画面上这组数据的层；数据还没到时为 null，画中线。尺寸变时按它重排列
   const dataLayers = useRef<readonly WaveformLayer[] | null>(null);
   const [bandHeight, setBandHeight] = useState(0);
   const [hovered, setHovered] = useState(false);
@@ -138,13 +138,13 @@ export function PaperWaveform() {
     motion.redraw();
   }, [motion, surface]);
 
-  // 数据变了（换曲、分频到手、换画法）才形变过去；还没量到尺寸时直接换。
+  // 数据变了（换曲、分频到手、换画法）才形变过去；还没量到尺寸时直接换
   useLayoutEffect(() => {
     dataLayers.current = ready ? layers : null;
     motion.show(columnsFor(dataLayers.current, surface.width), surface.width > 0);
   }, [motion, surface, layers, ready]);
 
-  // 尺寸变了新的列直接换上，不形变；舞台缩放变了只按新的像素比重开。
+  // 尺寸变了新的列直接换上，不形变；舞台缩放变了只按新的像素比重开
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
@@ -156,7 +156,7 @@ export function PaperWaveform() {
         motion.show(columnsFor(dataLayers.current, box.width), false);
       }
       recolor();
-      // 重设尺寸清掉了画面：在这一回调里当场补画，不留一帧空白。
+      // 重设尺寸清掉了画面：在这一回调里当场补画，不留一帧空白
       motion.flush();
     });
     observer.observe(element);
@@ -164,10 +164,10 @@ export function PaperWaveform() {
   }, [motion, surface, recolor, scale]);
 
   useEffect(() => recolor(), [recolor, ramp, scheme]);
-  // 曲长变了播放头的横坐标跟着变，有没有曲目决定画不画中线：都照原样重画一帧。
+  // 曲长变了播放头的横坐标跟着变，有没有曲目决定画不画中线：都照原样重画一帧
   useEffect(() => motion.redraw(), [motion, duration, hasTrack]);
 
-  // 拖动中右键放弃时，紧跟的那次右键菜单在到这里之前已被吞掉；拿不到 PCM 时没有可选的画法，右键照常。
+  // 拖动中右键放弃时，紧跟的那次右键菜单在到这里之前已被吞掉；拿不到 PCM 时没有可选的画法，右键照常
   const openMenu = (event: MouseEvent<HTMLDivElement>): void => {
     if (event.defaultPrevented || bandsStatus === 'unavailable') return;
     event.preventDefault();

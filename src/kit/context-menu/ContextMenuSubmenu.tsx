@@ -1,4 +1,5 @@
-import { Menu, MenuItem, MenuTrigger, Tooltip, type MenuProps } from '@fluentui/react-components';
+import { MenuItem, MenuTrigger, Tooltip, type MenuProps } from '@fluentui/react-components';
+import { Menu } from '../../motion/Surfaces.tsx';
 import { ChevronRight16Regular } from '@fluentui/react-icons';
 import { useCallback, useEffect, useRef, useState, type ReactElement, type RefObject } from 'react';
 import { CONTEXT_MENU_WIDTH } from './contextMenuGeometry.ts';
@@ -19,7 +20,7 @@ export function ContextMenuSubmenu(props: ContextMenuSubmenuProps) {
   const classes = useContextMenuStyles();
   const trigger = useRef<HTMLDivElement>(null);
   const attachTrigger = useCallback((element: HTMLDivElement | null) => {
-    // 同层与级联之间切换会替换触发项，焦点留在同一条命令上。
+    // 同层与级联之间切换会替换触发项，焦点留在同一条命令上
     const previous = trigger.current;
     if (!element && previous && document.activeElement === previous) {
       queueMicrotask(() => {

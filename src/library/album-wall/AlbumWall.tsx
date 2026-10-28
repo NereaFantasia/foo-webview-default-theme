@@ -33,26 +33,28 @@ import { useAlbumWallInput } from './useAlbumWallInput.ts';
 import { useAlbumWallLayout } from './useAlbumWallLayout.ts';
 import { useAlbumWallRows } from './useAlbumWallRows.ts';
 import { useAlbumWallView, type WallView } from './useAlbumWallView.ts';
-import { useWallReflow } from './useWallReflow.ts';
-import { headerReflowKey, REFLOW_KEY_ATTR, reflowPlaces, tileReflowKey } from './wallReflow.ts';
+import { NO_KEY_SLOTS, nextKeySlots } from './tileKeySlots.ts';
+import { REFLOW_KEY_ATTR, tileReflowKey } from '../cover-tile/tileReflow.ts';
+import { useTileReflow } from '../cover-tile/useTileReflow.ts';
+import { headerReflowKey, reflowPlaces } from './wallReflow.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
 
 export interface AlbumWallProps {
-  /** 页面替封面墙记着的样子，切形态回来时交还。 */
+  /** 封面墙视图状态记忆引用，形态切换时恢复滚动与选中 */
   readonly memory: { current: WallView | null };
-  /** 专辑菜单的作用对象已经备好，该在 `point` 处打开菜单了。 */
+  /** 弹出专辑操作菜单回调函数，point 为点击坐标 */
   readonly onMenu: (point: MenuPoint) => void;
 }
 
 /**
- * 封面墙：按行虚拟滚动的网格。一个条目是一整行图块、一个节头或一条下拉；图块不嵌在行里，而是按专辑键
- * 摊成一层绝对定位的元素，换列时同一张专辑是同一个元素，`<img>` 不重建，位移也有起点（`wallReflow.ts`）。
- * 单击封面在它那一行下面开合下拉（见 `WallFold`），开合时下面的元素按 `data-fold` 分组平移。
+ * 封面墙：按行虚拟滚动的网格组件
+ * 条目流由整行图块、节头或下拉详情组成；图块作为绝对定位层统一平铺，换列时复用元素节点以保证图片不重新加载并触发位移动画（`cover-tile/tileReflow.ts`）
+ * 单击封面触发对应行下方展开下拉面板（见 `WallFold`），下方元素通过 `data-fold` 分组同步平移
  *
- * 选中与焦点分开：选中是一个集合，焦点是一块（`aria-activedescendant`、键盘起点、键盘时的焦点环）。
- * 取封面按边长上限取，不按当前边长：宿主的缩放缓存按请求尺寸分档，拖滑块时按实际边长取会一档档重抽。
+ * 选中态与键盘焦点解耦：选中维护集合状态，焦点对应单项（配合 `aria-activedescendant` 与焦点环呈现）
+ * 封面图片统一按尺寸上限请求，以稳定命中缩放缓存并避免滑块拖拽时高频重采样
  */
 export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -80,7 +82,7 @@ export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
   const layout = { ...base, items };
   const groupOf = useMemo(() => foldGroups(items), [items]);
   const rows = useAlbumWallRows(scroller, layout, reach);
-  useWallReflow({
+  useTileReflow({
     rows: dropdown.rows,
     scroller,
     places: reflowPlaces(items, rows.rows, rows.tiles, layout.row.offset),
@@ -108,7 +110,7 @@ export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
 
   const [hover, setHover] = useState<string | null>(null);
   const [keysMounted, setKeysMounted] = useState(false);
-  // 指针在图块之间的空隙上也不卸键，只挪出视口：卸掉重建的话，滚轮滚动时样式重算又会成倍上涨。
+  // 指针移动至图块间隙时不销毁按钮，仅淡出隐藏，避免频繁滚动时由于节点销毁重建导致样式重算开销
   const over = (event: PointerEvent) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('[data-tile-keys]')) return;
@@ -117,14 +119,16 @@ export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
     if (key !== null) setKeysMounted(true);
   };
   const hovered = hover === null ? undefined : rows.tiles.find((tile) => tile.key === hover);
-  const hoveredPlaying = hovered !== undefined && hovered.albumKey === playingKey;
+  const [slots, setSlots] = useState(NO_KEY_SLOTS);
+  const nextSlots = nextKeySlots(slots, hovered);
+  if (nextSlots !== slots) setSlots(nextSlots);
 
   const { row, metrics } = layout;
   const vars: CSSProperties & Record<`--${string}`, string> = {
     '--tile-size': `${row.tileSize}px`,
     '--tile-line': `${metrics.lineHeight}px`,
     '--row-inset': `${Math.round(row.offset)}px`,
-    // 图块的横坐标在样式里按这两个算（与 `placeVisible` 同一个算式），宽度变而列数不变时图块不必重新渲染。
+    // 图块横坐标通过 CSS 变量在样式中计算；列数不变仅微调宽度时无需触发图块重渲染
     '--row-offset': `${row.offset}px`,
     '--tile-pitch': `${row.tileSize + row.spacing}px`,
   };
@@ -226,29 +230,35 @@ export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
               handlers={input.handlers}
             />
           ))}
-          {keysMounted && (
-            <AlbumColorTheme album={hovered?.album ?? null}>
-              <AlbumTileKeys
-                follow={hovered ? tileReflowKey(hovered.key) : undefined}
-                x={hovered?.x ?? 0}
-                y={hovered?.y ?? 0}
-                size={row.tileSize}
-                hidden={!hovered}
-                fold={hovered ? groupOf(hovered.index) : 0}
-                state={hoveredPlaying ? (paused ? 'paused' : 'playing') : 'idle'}
-                onPlay={() => {
-                  if (!hovered) return;
-                  if (hoveredPlaying) void playback.playOrPause();
-                  else input.handlers.play(hovered.album);
-                }}
-                onMore={(point) => {
-                  if (!hovered) return;
-                  scroller.current?.focus({ preventScroll: true });
-                  input.handlers.menu(hovered.album, hovered, point);
-                }}
-              />
-            </AlbumColorTheme>
-          )}
+          {keysMounted &&
+            slots.tiles.map((keyed, slot) => {
+              if (!keyed) return null;
+              const hidden = !slots.visible || slots.current !== slot;
+              const keyedPlaying = keyed.albumKey === playingKey;
+              return (
+                <AlbumColorTheme key={slot} album={keyed.album}>
+                  <AlbumTileKeys
+                    follow={tileReflowKey(keyed.key)}
+                    x={keyed.x}
+                    y={keyed.y}
+                    size={row.tileSize}
+                    hidden={hidden}
+                    fold={groupOf(keyed.index)}
+                    state={keyedPlaying ? (paused ? 'paused' : 'playing') : 'idle'}
+                    onPlay={() => {
+                      if (hidden) return;
+                      if (keyedPlaying) void playback.playOrPause();
+                      else input.handlers.play(keyed.album);
+                    }}
+                    onMore={(point) => {
+                      if (hidden) return;
+                      scroller.current?.focus({ preventScroll: true });
+                      input.handlers.menu(keyed.album, keyed, point);
+                    }}
+                  />
+                </AlbumColorTheme>
+              );
+            })}
         </div>
       </div>
       {input.search && <TypeSearchBadge search={input.search} />}

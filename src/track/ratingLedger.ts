@@ -1,8 +1,8 @@
 import type { Track } from 'foo-webview-sdk';
 import { normalizeHostPath } from '../host/hostPath.ts';
 
-// 评分的已知偏离怎么记、怎么比新旧，不碰宿主。几个来源各记一张表，按同一个时钟记先后：自己写的（按
-// handle）、`metadb:changed` 报的（按文件）、事件之后逐首补读回来的（按 handle）。
+// 纯内存维护曲目评分的已知偏离与时序比对，不直接与宿主通信
+// 分通道记录各来源数据并对齐到统一递增时钟：本地写入（按 handle）、`metadb:changed` 广播（按文件归一路径）、事件后补读（按 handle）
 
 export type RatedTrack = Pick<Track, 'handle' | 'path' | 'absolutePath' | 'subsong' | 'rating'>;
 
@@ -12,19 +12,19 @@ export function clampRating(value: number): number {
   return Number.isFinite(value) ? Math.min(MAX_RATING, Math.max(0, Math.trunc(value))) : 0;
 }
 
-/** 按文件比对用的键：原生路径归一，不带 subsong。 */
+/** 跨平台路径归一化的文件主键（不包含 subsong 分轨号） */
 export function fileKeyOf(track: Pick<Track, 'absolutePath'>): string {
   return normalizeHostPath(track.absolutePath);
 }
 
 interface Entry {
   readonly rating: number;
-  /** 记下的先后，与 `tick()` 同一个时钟。 */
+  /** 变更记录的时序序号，与 `tick()` 统一递增时钟对齐 */
   readonly seq: number;
 }
 
 interface Own extends Entry {
-  /** 宿主还没确认时为假：确认之前这一份压过其他一切来源，包括戳更新的行。 */
+  /** 宿主确认标记：未确认前本地乐观写入优先级最高，覆盖包含更新戳在内的所有其他来源 */
   readonly confirmed: boolean;
   readonly file: string;
   readonly subsong: number;
@@ -32,23 +32,23 @@ interface Own extends Entry {
 
 interface Pending {
   readonly write: number;
-  /** 失败时回到这一份；undefined 是回到行与事件报的值。被顶掉的写入后来成功了，就换成它写成的值。 */
+  /** 写入失败时的回滚基准值；若为 undefined 则回退至行内值或事件广播值；被顶替的写入若最终成功则更新为该成功值 */
   baseline: Own | undefined;
-  /** 应答回来之前，最近一次事件报的正是这次写的值：回声比应答先到，写成时直接算确认。 */
+  /** 响应返回前若事件已回报与目标一致的值（回声早于响应），写入完成直接置为已确认 */
   echoed: boolean;
 }
 
-/** 一次写入的应答回来之后怎样了。 */
+/** 写入操作在响应返回后的决议状态 */
 export type WriteOutcome = 'accepted' | 'rolledBack' | 'superseded';
 
 export class RatingLedger {
   private clock = 0;
   private readonly own = new Map<string, Own>();
   private readonly pending = new Map<string, Pending>();
-  /** 各文件最近一次 `metadb:changed` 报的值与先后；同一个值再报也记新的先后。 */
+  /** 按文件记录最近一次 `metadb:changed` 广播的值与时序；重复值亦刷新时序 */
   private readonly byFile = new Map<string, Entry>();
   private readonly byTrack = new Map<string, Entry>();
-  /** 知道里面不止一首的文件：事件报的值不能套给其中任何一首。 */
+  /** 已知包含多个 subsong 分轨的文件集合：事件广播值不直接套用于分轨曲目 */
   private readonly multiTrack = new Set<string>();
 
   tick(): number {
@@ -56,21 +56,19 @@ export class RatingLedger {
     return this.clock;
   }
 
-  /** 这一首的值能不能直接取事件报的：整文件就是一首的才行。 */
+  /** 判定曲目是否独占整个音频文件（整文件单曲目可直接套用文件级事件广播值） */
   isWholeFile(track: Pick<Track, 'absolutePath' | 'subsong'>): boolean {
     return track.subsong === 0 && !this.multiTrack.has(fileKeyOf(track));
   }
 
-  /** 记下一个文件里不止一首。 */
+  /** 标记指定文件包含多个分轨曲目 */
   markMultiTrack(file: string): void {
     this.multiTrack.add(file);
   }
 
   /**
-   * 登记一批要显示的曲目，`stamps` 是这批行取回时的戳：整批一个，或与 `tracks` 逐首对齐的一份（分页取的行
-   * 各页取回的时刻不同）。记下哪些文件不止一首（带 subsong，或同一个文件在这一批里出现了几次，不论落在哪一
-   * 页），答出其中该逐首补读的：文件在取行与最近一次读到、写下它的值之后又来过事件。登记之前没在显示的曲目
-   * （比如折叠着），那次事件没补读到它。
+   * 登记一批可视曲目并筛选出需发起补读校验的条目。`stamps` 对应数据拉取时的时间戳
+   * 记录复合分轨文件（带 subsong 或多次出现的同一文件）；若文件在拉取后收到过新广播，返回需补读的曲目列表
    */
   register(tracks: readonly RatedTrack[], stamps: number | readonly number[]): RatedTrack[] {
     const seen = new Set<string>();
@@ -81,7 +79,7 @@ export class RatingLedger {
     }
     return tracks.filter((track, index) => {
       if (this.isWholeFile(track)) return false;
-      // 缺了戳的按 0 算：宁可多补读一次，也不拿可能过期的行值当真。
+      // 时间戳缺失时默认以 0 处理，倾向于多发起一次补读以保障数据准确
       const stamp = typeof stamps === 'number' ? stamps : (stamps[index] ?? 0);
       const known = [this.byTrack.get(track.handle)?.seq, this.own.get(track.handle)?.seq, stamp];
       return (
@@ -113,7 +111,7 @@ export class RatingLedger {
     return own;
   }
 
-  /** 开始写一首：先记下，答这次写入的编号。还在等的上一次写入的回滚目标原样接过来。 */
+  /** 发起单曲目写入记录并返回本次写入的序列号；继承前序尚未确认写入的回滚基准值 */
   begin(track: RatedTrack, rating: number): number {
     const before = this.pending.get(track.handle);
     const baseline = before ? before.baseline : this.own.get(track.handle);
@@ -123,8 +121,9 @@ export class RatingLedger {
   }
 
   /**
-   * 写入的应答回来了。被后来的写入顶掉时只做一件事：它成功了，后来那次失败时就回到它写成的值。
-   * 没被顶掉：成功就等确认，失败回到回滚目标。
+   * 结算写入操作响应结果
+   * 若已被后续写入顶替：成功时将其更新为后续操作的回滚基准值，返回 superseded
+   * 未被顶替：成功则进入确认流程，失败则回滚至基准值
    */
   finish(track: RatedTrack, write: number, rating: number, ok: boolean): WriteOutcome {
     const now = this.pending.get(track.handle);
@@ -150,21 +149,21 @@ export class RatingLedger {
     return 'rolledBack';
   }
 
-  /** 别处已经写成功，只记下值；这一首还在途的写入就此作废。 */
+  /** 同步外部已成功写入的评分值，清理在途待决议写入并登记本地记录 */
   assume(track: RatedTrack, rating: number): void {
     this.pending.delete(track.handle);
     this.record(track, rating);
   }
 
-  /** 这一首有没有等着确认、又不在写的值。 */
+  /** 查询曲目是否存在已完成写入但尚未确认的暂留状态 */
   awaitingConfirm(handle: string): boolean {
     const mine = this.own.get(handle);
     return mine !== undefined && !mine.confirmed && !this.pending.has(handle);
   }
 
   /**
-   * 到时限还没等到回声：等的这段时间里宿主报来过不同的值（事件或补读），以宿主最近报的为准，自己的值丢掉；
-   * 没报过、或最近报的就是这个值，按确认处理。
+   * 处理确认超时决议：若等待期间宿主回报了不同评分（经事件或补读），以宿主最新值为准并丢弃本地记录；
+   * 若无新回报或最新回报与目标值一致，则决议为确认完成
    */
   expire(handle: string): void {
     const mine = this.own.get(handle);
@@ -181,7 +180,7 @@ export class RatingLedger {
     else this.confirm(handle);
   }
 
-  /** 确认自己写的值：此后它与别的来源按先后比，戳更新的行能盖过它。答有没有这回事。 */
+  /** 标记本地写入为已确认状态，后续参与常规版本时序比对；返回是否成功确认 */
   confirm(handle: string): boolean {
     const mine = this.own.get(handle);
     if (!mine || mine.confirmed || this.pending.has(handle)) return false;
@@ -190,9 +189,8 @@ export class RatingLedger {
   }
 
   /**
-   * `metadb:changed` 报了一个文件的评分。报的值一律记新的先后，与上一次报的相同也不例外：取行之后宿主又改回
-   * 上一次报过的值时，这一次才盖得过行里的值。整文件的那一首：报的与自己等确认的值相同就算确认，写入还在途
-   * 时记下回声已到。文件里有好几首的：分不出报的是哪一首，自己已确认的偏离报的值不同才丢掉，等逐首补读。
+   * 记录 `metadb:changed` 广播的文件级评分
+   * 单曲目文件若与等待确认值一致则直接确认；复合分轨文件若与已确认偏离冲突则作废偏离，等待后续逐首补读
    */
   fromEvent(file: string, rating: number): void {
     this.byFile.set(file, { rating, seq: this.tick() });
@@ -206,7 +204,7 @@ export class RatingLedger {
     }
   }
 
-  /** 逐首补读回来的值，比此前取的行都新。 */
+  /** 记录逐首补读拉取的最新评分（时序优于此前获取的曲目行） */
   fromRead(handle: string, rating: number): void {
     this.byTrack.set(handle, { rating, seq: this.tick() });
   }

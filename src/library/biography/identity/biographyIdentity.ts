@@ -33,12 +33,12 @@ const DEBOUNCE_MS = 300;
 
 export interface BiographyIdentityDeps {
   readonly artist: Atom<string | null>;
-  /** 本地专辑艺术家是他的那些专辑的标题；媒体库还没读完时为 null，等读完再认定。 */
+  /** 本地专辑艺术家是他的那些专辑的标题；媒体库还没读完时为 null，等读完再认定 */
   readonly albums: Atom<readonly string[] | null>;
   readonly manual: Atom<BiographyIdentity | null>;
   readonly enabled: Atom<boolean>;
   readonly active: Atom<boolean>;
-  /** 界面语言，挑别名时优先同一种语言的。 */
+  /** 界面语言，挑别名时优先同一种语言的 */
   readonly locale: Atom<string>;
   readonly resources?: Pick<
     BiographyResources,
@@ -49,7 +49,7 @@ export interface BiographyIdentityDeps {
 /**
  * 认定本地艺人是 MusicBrainz 上的哪一位，给出取简介用的 Last.fm 名字与资料。用户手选的为准；
  * 否则按 `resolveIdentity` 自动认定。只在在线内容开着、简介正在显示时请求；结果按本地艺人名
- * 缓存，网络失败不缓存，只在内存里记到 retryAt。
+ * 缓存，网络失败不缓存，只在内存里记到 retryAt
  */
 export function startBiographyIdentity(
   store: ReturnType<typeof createStore>,
@@ -82,9 +82,9 @@ export function startBiographyIdentity(
   let running = false;
   let pending = false;
   let fresh = false;
-  // 说过「不是这位」又还没查出候选的那位：下次查时不自动认定。
+  // 说过「不是这位」又还没查出候选的那位：下次查时不自动认定
   let rejected: string | null = null;
-  // 限流与拒绝访问对所有艺人生效；断网与解析失败只记在出错的那位上。
+  // 限流与拒绝访问对所有艺人生效；断网与解析失败只记在出错的那位上
   let blocked: MusicbrainzFailure | null = null;
   const failures = new Map<string, MusicbrainzFailure>();
 
@@ -113,7 +113,7 @@ export function startBiographyIdentity(
     if (!mbid) return publish({ ...base, mbid: null, facts: [] });
     if (known?.status === 'resolved' && known.mbid === mbid && !force)
       return publish({ ...base, mbid, facts: known.facts });
-    // 资料取不到不影响身份：用户已经认定了这位。
+    // 资料取不到不影响身份：用户已经认定了这位
     publish({ ...base, mbid, facts: [] });
     const info = await lookupArtist(client, mbid, store.get(deps.locale), alive);
     if (!alive() || !info || 'kind' in info) return;
@@ -165,7 +165,7 @@ export function startBiographyIdentity(
     running = true;
     try {
       await cache.ready;
-      // 一次只认定一位；连续换人时只留最新的输入。
+      // 一次只认定一位；连续换人时只留最新的输入
       while (pending && !disposed) {
         pending = false;
         await load(generation);
@@ -239,7 +239,7 @@ export function startBiographyIdentity(
     state,
     cacheState,
     ready: cache.ready,
-    /** 用户从候选里选了一位：查出他在 Last.fm 上的名字，交给调用方存成手选。失败答 null。 */
+    /** 用户从候选里选了一位：查出他在 Last.fm 上的名字，交给调用方存成手选。失败答 null */
     async pick(mbid: string) {
       const artist = store.get(deps.artist);
       if (!artist || disposed) return null;
@@ -258,8 +258,8 @@ export function startBiographyIdentity(
       return alive() ? { sourceArtist, mbid } : null;
     },
     /**
-     * 「不是这位」：不再自动认定这位本地艺人，改列同名候选。手选的由调用方另外删掉。
-     * 认定时留下的候选直接列出来；没有就重新搜，这次不比对专辑。
+     * 「不是这位」：不再自动认定这位本地艺人，改列同名候选。手选的由调用方另外删掉
+     * 认定时留下的候选直接列出来；没有就重新搜，这次不比对专辑
      */
     reject(): void {
       const artist = store.get(deps.artist);

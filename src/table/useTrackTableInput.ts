@@ -23,42 +23,42 @@ import { TablePreviewContext } from './tableContext.ts';
 
 /**
  * 菜单作用于什么：曲目行是那一批选中（右键落在选中之外时只有它自己），分组头是它本身。只带位置不带身份，
- * `rows` 里还有折叠着、不在条目流里的行；调用方要在开菜单这一刻换成曲目，菜单开着时条目流可能已经变了。
+ * `rows` 里还有折叠着、不在条目流里的行；调用方要在开菜单这一刻换成曲目，菜单开着时条目流可能已经变了
  */
 export type TableMenuTarget =
   | { readonly kind: 'rows'; readonly index: number; readonly rows: SelectionRanges }
   | { readonly kind: 'group'; readonly index: number };
 
-/** 单击分组头时的修饰键：比行多一个 Alt，节头上 Alt 单击是连同里面的分组一起开合。 */
+/** 单击分组头时的修饰键：比行多一个 Alt，节头上 Alt 单击是连同里面的分组一起开合 */
 export interface GroupModifiers extends Modifiers {
   readonly alt: boolean;
 }
 
-/** 表格交给调用方的动作；下标都是显示位（条目流的下标）。 */
+/** 表格交给调用方的动作；下标都是显示位（条目流的下标） */
 export interface TableCallbacks<G> {
-  /** 双击或回车起播。曲目行与分组头都会来，按条目的种类定播什么。 */
+  /** 双击或回车起播。曲目行与分组头都会来，按条目的种类定播什么 */
   readonly onPlay: (index: number) => void;
   readonly onMenu?: (target: TableMenuTarget, point: TablePoint) => void;
-  /** 单击分组头：焦点已经落上去；需要开合时调 toggle，保留滚动位置。按钮、链接上的点击不算。 */
+  /** 单击分组头：焦点已经落上去；需要开合时调 toggle，保留滚动位置。按钮、链接上的点击不算 */
   readonly onGroupClick?: (index: number, modifiers: GroupModifiers, toggle: () => void) => void;
   readonly onToggleGroup?: (index: number) => void;
   readonly onSetGroup?: (index: number, collapsed: boolean) => void;
   readonly onExpandSiblings?: (index: number) => void;
-  /** 打字即跳给一条打分，见 `findTablePrefix`；不给就不接打字即跳。 */
+  /** 打字即跳给一条打分，见 `findTablePrefix`；不给就不接打字即跳 */
   readonly rank?: (item: TableItem<G>, needle: string) => number | undefined;
   /**
    * 调用方自己做的打字即跳，给行分页取、要异步翻页才找得到的表用：键的分派与表格自己的一样（串里有字时
-   * 可打印字符先给它，处理了表格键就清串），找到后由它经句柄的 `reveal` 落焦点。给了 `rank` 时不看它。
+   * 可打印字符先给它，处理了表格键就清串），找到后由它经句柄的 `reveal` 落焦点。给了 `rank` 时不看它
    */
   readonly typeSearch?: TypeSearch;
 }
 
-/** 分组头上的指针动作，由表格包在调用方画的分组头外面。 */
+/** 分组头上的指针动作，由表格包在调用方画的分组头外面 */
 export interface GroupHandlers {
   click(index: number, event: MouseEvent): void;
   play(index: number): void;
   menu(index: number, point: TablePoint): void;
-  /** 调用方画的开合键调它：开合前后这个分组头在视口里的位置不变。 */
+  /** 调用方画的开合键调它：开合前后这个分组头在视口里的位置不变 */
   toggle(index: number): void;
 }
 
@@ -69,19 +69,19 @@ export interface TrackTableInputOptions<G> extends TableCallbacks<G>, ScrollFram
   readonly groupHeight: (item: TableGroupItem<G>) => number;
   readonly groupFocus: boolean;
   readonly rows: TrackTableRows;
-  /** 行跟着滚的元素：表格自己的滚动区，或调用方给的页面滚动元素。 */
+  /** 行跟着滚的元素：表格自己的滚动区，或调用方给的页面滚动元素 */
   readonly scroller: RefObject<HTMLElement | null>;
-  /** 显示位上那一条的元素 id。 */
+  /** 显示位上那一条的元素 id */
   readonly rowId: (index: number) => string;
   readonly rate: RowHandlers['rate'];
 }
 
 export interface TrackTableInput {
-  /** 焦点所在的显示位；没有焦点、或那一条已不在条目流里时为 -1。 */
+  /** 焦点所在的显示位；没有焦点、或那一条已不在条目流里时为 -1 */
   readonly focus: number;
-  /** 焦点落到这个键的条目上，不改选中、不滚动；给调用方的句柄用。 */
+  /** 焦点落到这个键的条目上，不改选中、不滚动；给调用方的句柄用 */
   readonly setFocusKey: (key: string | null) => void;
-  /** 见 `TrackTableHandle.reveal`。 */
+  /** 见 `TrackTableHandle.reveal` */
   readonly reveal: (index: number, select: boolean) => boolean;
   readonly rowHandlers: RowHandlers;
   readonly groupHandlers: GroupHandlers;
@@ -98,8 +98,8 @@ const modifiersOf = (event: MouseEvent): Modifiers => ({
 
 /**
  * 表格的指针与键盘：落焦点、改选中、起播、开菜单、分组开合与打字即跳。焦点按条目的键记，条目流重排、
- * 折叠之后仍跟着同一条。键只在表格根元素自己拿着焦点时处理，列头与调用方画在分组头里的控件自己管自己的键。
- * 分组开合都经 `useGroupAnchor`，开合前后那个分组头在视口里不挪位置。
+ * 折叠之后仍跟着同一条。键只在表格根元素自己拿着焦点时处理，列头与调用方画在分组头里的控件自己管自己的键
+ * 分组开合都经 `useGroupAnchor`，开合前后那个分组头在视口里不挪位置
  */
 export function useTrackTableInput<G>(options: TrackTableInputOptions<G>): TrackTableInput {
   const preview = useContext(TablePreviewContext);
@@ -135,7 +135,7 @@ export function useTrackTableInput<G>(options: TrackTableInputOptions<G>): Track
     };
     // 键盘开菜单：落点是那一条的左下角。那一条不在视口里时先滚回来、等一帧再量：滚出去的要么已经不在 DOM
     // 里，要么还在视口上下多画的那几条里、只是被裁掉了，量出来的落点在表格外面。吸顶列头与下内边距那两截
-    // 不算视口。
+    // 不算视口
     const shownBox = (index: number) => {
       const box = document.getElementById(view().rowId(index))?.getBoundingClientRect();
       const area = view().scroller.current?.getBoundingClientRect();
@@ -155,7 +155,7 @@ export function useTrackTableInput<G>(options: TrackTableInputOptions<G>): Track
     };
     const rowHandlers: RowHandlers = {
       click(index, event) {
-        // 双击的第二下不再改选中：Ctrl 双击不会把刚切换的那一行又切回去。
+        // 双击的第二下不再改选中：Ctrl 双击不会把刚切换的那一行又切回去
         if (event.detail < 2) land(index, modifiersOf(event), true);
       },
       play: (index) => view().onPlay(index),
@@ -194,7 +194,7 @@ export function useTrackTableInput<G>(options: TrackTableInputOptions<G>): Track
   });
 
   // 输入模型带着打字即跳的定时器，建在 effect 里才释放得掉。给不给 `rank` 决定表格自己建不建打字即跳，变了
-  // 就重建；调用方给的那一个每次按键时现取，换了不用重建。
+  // 就重建；调用方给的那一个每次按键时现取，换了不用重建
   const [input, setInput] = useState<TableInput | null>(null);
   const typing = options.rank !== undefined;
   useEffect(() => {

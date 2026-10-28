@@ -1,5 +1,11 @@
+import { ApiCallError } from 'foo-webview-sdk/bridge';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { hostCommand, onMissingMethod, settle } from '../../../src/host/hostCall.ts';
+import {
+  hostCommand,
+  onMissingMethod,
+  settle,
+  settleDetailed,
+} from '../../../src/host/hostCall.ts';
 import { hostFailure, methodNotFound } from '../../fixtures/hostAnswers.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
@@ -44,6 +50,62 @@ describe('settle', () => {
     });
     await expect(settle(async () => null)).resolves.toBeNull();
     await expect(settle(async () => [1, 2])).resolves.toEqual([1, 2]);
+  });
+});
+
+describe('settleDetailed', () => {
+  it('成功时交应答，没有失败线索', async () => {
+    await expect(settleDetailed(async () => 42)).resolves.toEqual({ answer: 42, failure: null });
+  });
+
+  it('http 异步失败的信封挂在 Error.response 上，原文与码照出', async () => {
+    const host = installFakeHost();
+    host.answer('http.get', { success: true, async: true, requestId: 'http_1' });
+    const pending = settleDetailed(() => host.fb.http.request('https://example.test/x'));
+    await vi.waitFor(() => expect(host.listenerCount('http:response')).toBeGreaterThan(0));
+    host.emit('http:response', {
+      requestId: 'http_1',
+      success: false,
+      error: 'Target host resolves to a private/local network address',
+      code: 'PERMISSION_DENIED',
+    });
+    await expect(pending).resolves.toEqual({
+      answer: null,
+      failure: {
+        text: 'Target host resolves to a private/local network address',
+        code: 'PERMISSION_DENIED',
+      },
+    });
+  });
+
+  it('http 同步失败就是普通 Error：只有原文，没有码；被拒的 ApiCallError 直接带码', async () => {
+    const host = installFakeHost();
+    host.answer('http.get', hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'));
+    await expect(
+      settleDetailed(() => host.fb.http.request('https://example.test/x')),
+    ).resolves.toEqual({
+      answer: null,
+      failure: { text: 'Send failed: DNS name not resolved', code: null },
+    });
+    const callError = new ApiCallError(hostFailure('LOCKED', 'locked'));
+    await expect(
+      settleDetailed(async () => {
+        throw callError;
+      }),
+    ).resolves.toEqual({ answer: null, failure: { text: 'locked', code: 'LOCKED' } });
+  });
+
+  it('非 Error 的拒绝收成文本、没有码；失控长文按上限截断', async () => {
+    await expect(
+      settleDetailed(async () => {
+        throw 'boom';
+      }),
+    ).resolves.toEqual({ answer: null, failure: { text: 'boom', code: null } });
+    const settled = await settleDetailed(async () => {
+      throw new Error(` ${'x'.repeat(500)} `);
+    });
+    expect(settled.answer).toBeNull();
+    expect(settled.failure?.text).toHaveLength(201);
   });
 });
 

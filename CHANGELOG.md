@@ -2,6 +2,70 @@
 
 foo-webview-default-theme 每个版本的变化。主题里显示的更新日志和发行页正文都由这份文件生成，写法见 `src/update/changelogSource.ts` 开头的说明。
 
+## 0.3.0 - 2026-10-28
+
+### zh-CN
+
+#### 在线音乐、沉浸歌词与统一的页面工具栏
+
+加入网易云音乐在线搜索与直接播放，沉浸视图新增歌词样式与 Coverflow，支持独立桌面歌词。媒体库各页提供统一的工具栏与筛选，艺人与专辑名称支持随处点击跳转。
+
+- [search] **在线音乐** 搜索网易云音乐的曲目、专辑、歌单和艺人并直接播放，在播放栏查看并切换音质。支持按可播放、无损、高解析及艺人专辑等条件二次筛选结果，支持扫码登录以享受账号权益。
+- [search] **其他平台** 支持通过自定义音源扩展更多平台，可搜索并播放 QQ 音乐、酷我、酷狗和咪咕的曲目。支持播放故障时自动切换备用音源，并在设置中提供音源可用性检测。（主题不内置任何音源）
+- [player] **沉浸歌词视图与 Coverflow** 沉浸视图新增以歌词为核心的「歌词」样式，整合曲目信息、播放队列与历史，并与原有「图纸」样式保持互通。新增 Coverflow 封面流模式，支持通过封面快速浏览并选播曲目。
+- [lyrics] **桌面歌词** 新增置顶独立窗口的桌面歌词，支持锁定窗口、单行/多行切换与样式预设。可通过播放栏、标题栏或托盘菜单快速开关，并支持录制全局快捷键。
+- [library] **统一的页面工具栏** 歌曲、播放列表、专辑、流派和文件夹页的页头统一采用标题行与命令栏布局，集中搜索、筛选、排序和分组操作。选中多首曲目后，命令栏自动切换为批量操作。
+- [window] **随处可点的艺人与专辑** 播放栏、曲目表、侧栏及详情页中的艺人、专辑和流派名称均支持直接点击跳转，多位艺人时支持弹出菜单选择。
+
+##### 改进与修复
+
+- 自动更新模式支持后台预先下载并校验组件，关闭 foobar2000 替换文件前仍需手动点击「重启安装」确认。
+- 菜单统一为 Windows 11 风格，级联菜单支持展开动效，长菜单滚动条保持一致。
+- 全局搜索新增艺人类别，最佳匹配支持显示艺人，并覆盖全部标签、技术信息与路径。
+- 歌曲、专辑、文件夹和流派列表支持关闭分组，未分组时每行显示缩略图；播放列表补齐曲目列，支持双向排序。
+- 播放队列精简「下一轮」分段，行内封面随行高自适应缩放。
+- 播放进度条在宿主两次更新之间逐帧平滑推进，拖动进度时按 Esc 可取消。
+- 滚动条按需显示并在闲置后自动隐藏。
+- 专辑墙与首页专辑卡封面加载后淡入显示，悬停按钮支持平滑淡入淡出。
+- 颜色模式、播放按钮、窗口背景、沉浸视图样式、歌词对齐及桌面歌词等设置项改为带缩略图的卡片单选。
+- 歌词支持自定义文字对齐方式（左对齐、居中或右对齐）。
+- 侧边栏新增「视频」入口，支持浏览本地视频并定位所在文件夹；文件夹中的视频右键支持直接播放。
+- 托盘菜单歌曲卡适配在线曲目，正常显示封面、曲名与艺人。
+- 修正返回搜索结果页时意外触发的过渡动画，以及搜索浮层中 Tab 键循环切换焦点的问题。
+- 修正手动切歌或新曲目时长未知时进度条未平滑归零的问题。
+- 修正托盘菜单歌曲卡封面裁剪仅显示左上角的问题。
+
+### en
+
+#### Online music, immersive lyrics and consistent toolbars
+
+Search and play NetEase Cloud Music online. The immersive view gains a lyrics style and Coverflow, with support for floating desktop lyrics. Library pages share a consistent toolbar and filters, and artist and album names are clickable throughout the app.
+
+- [search] **Online music** Search NetEase Cloud Music for tracks, albums, playlists and artists and play them directly. Check and switch audio quality from the player bar, filter loaded results by quality or metadata, and sign in via QR code to access your account's benefits.
+- [search] **Other platforms** Expand online search to QQ Music, Kuwo, Kugou and Migu by importing trusted sources. Features automatic fallback to alternate sources during playback and source health checks in Settings. (The theme ships no sources)
+- [player] **Immersive lyrics view and Coverflow** The immersive view gains a Lyrics style focused on lyrics, alongside track details, the queue and history. Adds Coverflow mode to browse and play tracks visually.
+- [lyrics] **Desktop lyrics** Show lyrics in a separate, lockable always-on-top window with single- or multi-line display and style presets. Toggle from the player bar, menus or tray, with customizable global shortcuts.
+- [library] **Consistent page toolbars** Songs, playlists, albums, genres and folders pages share a consistent header layout with a title row and command bar for search, filters, sorting and grouping. Switches to batch actions when multiple tracks are selected.
+- [window] **Clickable artists and albums** Artist, album and genre names across the player bar, track tables, right pane and detail pages now open their corresponding pages directly.
+
+##### Improvements and fixes
+
+- Automatic update mode downloads and verifies new component files in the background, waiting for you to click "Restart and install" before replacing files.
+- Menus follow the Windows 11 style with smooth cascading transitions and consistent scrollbars.
+- Global search adds an Artists category, supports artists as the best match, and searches across all tags, technical info and paths.
+- Songs, albums, folders and genres lists can disable grouping, showing thumbnails on each row; playlists gain track columns and two-way sorting.
+- The play queue removes the "Next round" separator, and row covers scale with row height.
+- The progress bar eases smoothly frame-by-frame between host updates, and Escape cancels a seek drag.
+- Scrollbars appear on demand and hide automatically when inactive.
+- Album covers fade in smoothly upon loading, with faded hover action buttons.
+- Settings for color mode, play button, window materials, immersive view style, lyric alignment and desktop lyrics now use visual single-choice cards with thumbnails.
+- Lyrics now support text alignment options (left, center or right).
+- The sidebar gains a Video section to browse videos and open their folders; right-click videos in Folders to play directly.
+- Tray menu song cards now support online tracks with cover art, title and artist.
+- Fixed a stray transition animation when returning to search results, and Tab cycling between scope tabs in the search flyout.
+- Fixed the progress bar not easing back to zero when switching tracks manually or when track length is unknown.
+- Fixed the tray song card cover only showing its top-left corner.
+
 ## 0.2.0
 
 ### zh-CN

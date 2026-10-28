@@ -32,7 +32,7 @@ test('输入框里 Ctrl+A 照常全选框里的文字', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('滚动区的滚动条占 10px，没有两端箭头占的位置', async ({ page }) => {
+test('滚动区的滚动条占 8px，没有两端箭头占的位置', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const many = Array.from({ length: 30 }, (_, index) =>
     makePlaylist(index, `List ${String(index).padStart(2, '0')}`, { isActive: index === 0 }),
@@ -43,6 +43,6 @@ test('滚动区的滚动条占 10px，没有两端箭头占的位置', async ({ 
     while (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;
     return node ? node.offsetWidth - node.clientWidth : -1;
   });
-  expect(gutter).toBe(10);
+  expect(gutter).toBe(8);
   expect(errors).toEqual([]);
 });

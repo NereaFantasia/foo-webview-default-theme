@@ -10,22 +10,22 @@ import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactNode, Ref } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
 import { outputDevicesAtom } from './outputDevices.ts';
-import { PLAYER_KEY_ATTR } from '../playerFocus.ts';
-import type { VolumeSender } from './volumeControl.ts';
+import { PLAYER_KEY_ATTR, VOLUME_SLIDER_FOCUS } from '../playerFocus.ts';
+import type { VolumeSender } from '../../../playback/volume/volumeControl.ts';
 import type { VolumeScale } from '../../../playback/volumeScale.ts';
 import styles from './VolumeStack.module.css';
-import { VolumeSlider } from './VolumeSlider.tsx';
+import { VolumeSlider } from '../../../playback/volume/VolumeSlider.tsx';
 
 export interface VolumeStackProps {
-  /** `panel` 是标题栏里 44 高的输出面板，`flyout` 是朝上弹出的音量浮层。 */
+  /** `panel` 是标题栏里 44 高的输出面板，`flyout` 是朝上弹出的音量浮层 */
   readonly variant: 'panel' | 'flyout';
   readonly sender: VolumeSender;
   readonly scale: VolumeScale;
-  /** 设备列表开着：设备行的箭头朝上，`aria-expanded` 为真。 */
+  /** 设备列表开着：设备行的箭头朝上，`aria-expanded` 为真 */
   readonly deviceExpanded: boolean;
-  /** 设备行本身：面板把设备列表贴着它弹出，选完设备焦点回到它上面。 */
+  /** 设备行本身：面板把设备列表贴着它弹出，选完设备焦点回到它上面 */
   readonly deviceRef?: Ref<HTMLButtonElement>;
-  /** 设备行下面接着放的东西：浮层里原地展开的设备列表。 */
+  /** 设备行下面接着放的东西：浮层里原地展开的设备列表 */
   readonly children?: ReactNode;
   onDeviceToggle(): void;
   onDragChange?(dragging: boolean): void;
@@ -35,7 +35,7 @@ export interface VolumeStackProps {
  * 音量一栏在上、设备一栏在下，两行共用一套列：图标列、内容列、行尾列。静音键与设备图标落在同一列，滑条与
  * 设备名从同一条线起，滑条（或数值）与箭头收在同一条右缘。面板里两行各 18 高、隔 2，设备名 12 / 600 后接
  * 输出模块；浮层里两行各 40 高、隔 2 且中间一道分隔线，设备名 13，输出模块写在悬停提示里。设备行点了开合
- * 设备列表。还没读到当前设备时写「输出设备」。整个音量行上都能用滚轮调音量。
+ * 设备列表。还没读到当前设备时写「输出设备」。整个音量行上都能用滚轮调音量
  */
 export function VolumeStack(props: VolumeStackProps) {
   const { variant, deviceExpanded } = props;
@@ -54,6 +54,7 @@ export function VolumeStack(props: VolumeStackProps) {
         sender={props.sender}
         scale={props.scale}
         variant={variant}
+        keyAttributes={VOLUME_SLIDER_FOCUS}
         onDragChange={props.onDragChange}
       />
       {!panel && <div className={styles.divider} aria-hidden />}

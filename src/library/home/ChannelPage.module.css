@@ -3,10 +3,11 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalXL);
+  padding-top: var(--spacingVerticalL);
   gap: var(--spacingVerticalM);
 }
 .header {
+  padding-inline: var(--spacingHorizontalXL);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -28,9 +29,13 @@
   gap: var(--spacingHorizontalS);
 }
 .status {
+  padding-inline: var(--spacingHorizontalXL);
   color: var(--colorNeutralForeground2);
 }
 .table {
+  --table-inset-start: var(--spacingHorizontalXL);
+  --table-inset-end: var(--spacingHorizontalXL);
+  --table-bottom-inset: calc(var(--spacingVerticalL) + var(--player-inset, 0px));
   flex: 1;
   min-width: 0;
   min-height: 0;

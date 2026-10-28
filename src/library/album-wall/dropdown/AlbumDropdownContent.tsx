@@ -4,6 +4,11 @@ import {
   MoreHorizontal20Regular,
   Pause20Filled,
   Play20Filled,
+  CalendarLtr16Regular,
+  Clock16Regular,
+  Pulse20Regular,
+  Tag16Regular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { memo, type AnimationEvent } from 'react';
@@ -28,34 +33,32 @@ import { albumsKey } from '../../albumServices.ts';
 import { playbackKey } from '../../../playback/playbackContract.ts';
 import { albumDetailKey } from '../../album-detail/albumDetail.ts';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
+import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
+import { durationText } from '../../../table/cellText.ts';
+import { ObjectLink } from '../../../nav/ObjectLink.tsx';
+import { albumArtistLink } from '../../../track/trackLinks.ts';
 
 const useStyles = makeStyles({ spinner: { alignSelf: 'center' } });
 
 export interface AlbumDropdownContentProps {
   readonly album: Album;
-  /** 还在开合或改高：曲目没到时动完了才画骨架行。 */
+  /** 展开动画过渡中状态（动效完成前暂缓展示骨架屏） */
   readonly moving: boolean;
-  /** 同一行点了另一张、等了一阵它的曲目还没到：压暗，头部转圈。 */
+  /** 异步加载遮罩态：同排切换专辑等待曲目期间压暗并呈现加载指示器 */
   readonly dim: boolean;
-  /** 同一行换一张时的进场或退场，朝箭头移动的方向（left / right）；不在换时不给。 */
+  /** 同排切换专辑时的滑入或滑出过渡方向 */
   readonly enter?: 'left' | 'right';
   readonly leave?: 'left' | 'right';
   readonly onLeft?: () => void;
-  /** 专辑菜单的作用对象已经交给菜单服务（这张专辑，或它的一首曲目），该在 `point` 处打开菜单了。 */
+  /** 触发专辑或曲目快捷操作菜单回调 */
   readonly onMenu: (point: MenuPoint) => void;
 }
 
-/** 尾注：年份 · 流派 · 首数与分钟 · 格式（曲目到了才知道，几种格式并列）。空的项不写。 */
-function footOf(album: Album, codecs: readonly string[], count: (album: Album) => string): string {
-  return [albumYearOf(album), album.genre, count(album), codecs.join(' / ')]
-    .filter((part) => part !== '')
-    .join(' · ');
-}
-
 /**
- * 下拉的内容：专辑名与专辑艺术家、播放 / 更多 / 进详情页三枚键、曲目、尾注。这张在播时播放键是暂停
- * 与继续；更多与右键封面是同一份专辑菜单。同一行换一张时新旧两份叠着，各自滑入滑出。窗口变宽变窄时下拉的
- * 外框跟着重排，这里的属性不变、不重新渲染（换内容途中退场的那一份除外）。
+ * 专辑墙内嵌下拉面板内容区
+ *
+ * 展示专辑元数据、快捷操作键（播放/暂停、更多操作、详情跳转）、曲目列表与汇总信息；
+ * 同排切换时新旧内容执行同向平滑滑动转场；视口重排期间保持内容实例稳定
  */
 export const AlbumDropdownContent = memo(function AlbumDropdownContent(
   props: AlbumDropdownContentProps,
@@ -76,14 +79,8 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
   const playing = useAtomValueRawSync(playingAlbumKeyAtom) === key;
   const paused = useAtomValueRawSync(playbackPausedAtom);
   const codecs = [...new Set((tracks ?? []).map((track) => track.codec).filter(Boolean))];
-  const count = (shown: Album) => {
-    const total = tracks?.length ?? shown.trackCount;
-    const minutes = Math.round(shown.duration / 60);
-    return t(plural(total, 'album.dropdownFootOne', 'album.dropdownFoot'), {
-      count: total,
-      minutes,
-    });
-  };
+  const total = tracks?.length ?? album.trackCount;
+  const year = albumYearOf(album);
   const playLabel = playing
     ? t(paused ? 'album.tileResume' : 'album.tilePause')
     : t('album.tilePlay');
@@ -110,7 +107,9 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
               {album.name}
             </span>
             <span className={styles.artist} title={albumArtistOf(album)}>
-              {albumArtistOf(album)}
+              <ObjectLink to={albumArtistLink(album)?.ref ?? null}>
+                {albumArtistOf(album)}
+              </ObjectLink>
             </span>
           </div>
           {props.dim && <Spinner size="tiny" className={classes.spinner} />}
@@ -161,7 +160,31 @@ export const AlbumDropdownContent = memo(function AlbumDropdownContent(
             onMenu(point);
           }}
         />
-        <span className={styles.foot}>{footOf(album, codecs, count)}</span>
+        <Metadata className={styles.foot}>
+          {year && (
+            <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
+              {year}
+            </MetadataItem>
+          )}
+          {album.genre && (
+            <MetadataItem icon={<Tag16Regular />} label={t('table.genre')} title={album.genre}>
+              {album.genre}
+            </MetadataItem>
+          )}
+          <MetadataItem icon={<TextNumberListLtr16Regular />}>
+            {t(plural(total, 'album.menuTracksOne', 'album.menuTracks'), { count: total })}
+          </MetadataItem>
+          {album.duration > 0 && (
+            <MetadataItem icon={<Clock16Regular />} label={t('table.duration')}>
+              {durationText(album.duration)}
+            </MetadataItem>
+          )}
+          {codecs.map((codec) => (
+            <MetadataItem key={codec} icon={<Pulse20Regular />} label={t('trackInfo.codec')}>
+              {codec}
+            </MetadataItem>
+          ))}
+        </Metadata>
       </div>
     </AlbumColorTheme>
   );

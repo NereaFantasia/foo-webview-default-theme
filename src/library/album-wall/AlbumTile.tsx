@@ -1,5 +1,4 @@
-import { Spinner } from '@fluentui/react-components';
-import { Checkmark12Filled, Record48Regular } from '@fluentui/react-icons';
+import { Record48Regular } from '@fluentui/react-icons';
 import {
   memo,
   type CSSProperties,
@@ -7,7 +6,6 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react';
-import { PlayingMark } from '../../track/PlayingMark.tsx';
 import styles from './AlbumTile.module.css';
 import type { AlbumCover } from '../albumCovers.ts';
 import type { GridPosition } from './albumGridKeys.ts';
@@ -16,15 +14,18 @@ import { albumArtistOf, type Album } from '../../host/libraryContract.ts';
 import type { CoverOutcome } from '../../covers/coverGate.ts';
 import type { Modifiers } from '../../kit/keyedSelection.ts';
 import { useCoverLoad } from '../../covers/useCoverLoad.ts';
-import { REFLOW_KEY_ATTR, tileReflowKey } from './wallReflow.ts';
+import { CheckBadge, OpeningBadge, PlayingBadge } from '../cover-tile/TileBadges.tsx';
+import { TileArt } from '../cover-tile/TileArt.tsx';
+import { TileLabels } from '../cover-tile/TileLabels.tsx';
+import { REFLOW_KEY_ATTR, tileReflowKey } from '../cover-tile/tileReflow.ts';
 
 /**
- * 图块往上报的动作。整张网格共用一份、引用不变，图块才能按属性跳过重渲染；落点按「条目 + 列」给，
- * 同一张专辑在几节里各有一块时认得出点的是哪一块。
+ * 图块交互处理函数集；整张网格共享稳定引用以支持子树重渲染跳过
+ * 操作位置以条目与列坐标表示，以区分同一专辑跨节出现的多个实例
  */
 export interface TileHandlers {
   select(album: Album, at: GridPosition, modifiers: Modifiers): void;
-  /** 单击开合这张的下拉。 */
+  /** 单击展开或收起该专辑的下拉详情面板 */
   toggle(album: Album, at: GridPosition): void;
   play(album: Album): void;
   menu(album: Album, at: GridPosition, point: MenuPoint): void;
@@ -32,51 +33,52 @@ export interface TileHandlers {
   dragStart(album: Album, at: GridPosition, event: DragEvent): void;
   acquire(album: Album): boolean;
   settle(album: Album, outcome: CoverOutcome): void;
+  shown(album: Album): boolean;
   wait(retry: () => void): () => void;
 }
 
 export interface AlbumTileProps {
   readonly id: string;
-  /** 渲染键（`PlacedTile.key`）；网格按它认指针停在哪一块上。 */
+  /** 图块渲染键（PlacedTile.key），用于网格识别指针停留目标 */
   readonly tileKey: string;
   readonly album: Album;
   readonly index: number;
-  /** 行里第几块；横坐标由它与网格给的起点、列距在样式里算。 */
+  /** 行内列号，与网格行偏移、列距共同用于样式中计算横坐标 */
   readonly column: number;
-  /** 在行层里的上沿，CSS 像素。 */
+  /** 在行层坐标系中的顶部垂直坐标，单位 CSS 像素 */
   readonly y: number;
   readonly cover: AlbumCover | undefined;
   readonly selected: boolean;
-  /** 多选里的一张：左上角出勾。只选中一张时不画。 */
+  /** 多选态标记；多选选中的图块在左上角展示复选勾，单选时不展示 */
   readonly checked: boolean;
   readonly focused: boolean;
   readonly playing: boolean;
-  /** 正在播放的这张正在出声（没暂停）：记号的竖条跳动。别的图块恒为假，播放与暂停切换时它们不重渲染。 */
+  /** 正在播放的专辑是否处于发声状态；用于驱动指示器动效，非播放中图块恒为 false */
   readonly audible: boolean;
-  /** 从这一块的专辑菜单进详情页、曲目等得有一阵了：封面上出小转圈。从下拉的 › 进时转圈出在那枚键上。 */
+  /** 从该图块菜单进入详情页加载较慢时展示封面中央旋转动画 */
   readonly opening: boolean;
-  /** 指针停在这一块上：正在播放的记号让位给悬停的「更多」键。 */
+  /** 指针悬停指示；此时隐藏右下角正在播放标记以让位于悬停操作按钮 */
   readonly hovered: boolean;
   readonly showText: boolean;
-  /** 跟哪一组平移：上面正在开合的下拉有几条，0 是不动（见 `foldGroups`）。 */
+  /** 折叠分组索引，用于与正在展开/收起的分组实现联动平移（见 foldGroups） */
   readonly fold: number;
   readonly handlers: TileHandlers;
 }
 
-/** 图块样式里按列号与上沿定位（`AlbumTile.module.css` 的 `.tile`）。 */
+/** 生成图块绝对定位样式属性（见 AlbumTile.module.css .tile） */
 function placeOf(column: number, y: number): CSSProperties & Record<`--${string}`, string> {
   return { '--tile-column': String(column), '--tile-y': `${y}px` };
 }
 
-/** Ctrl 与 Command 同算：键盘那一侧也是这样认的。 */
+/** 提取键盘修饰键状态；Ctrl 与 Meta 等效映射 */
 function modifiersOf(event: MouseEvent): Modifiers {
   return { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey };
 }
 
 /**
- * 一块专辑：正方形封面加两行字。`cover` 为 undefined 是还没取地址或这张凉着，缺图与出错也画占位盘片。
- * 要画封面时经 `useCoverLoad` 向封面服务要名额，拿到了才挂 `<img>`，有了结局再报回，名额因此总能
- * 还回去。悬停的播放与更多两枚键不在图块里，整张网格只挂一对（`AlbumTileKeys`）。
+ * 封面墙专辑图块：方形封面与两行文字标签
+ * 封面加载受 useCoverLoad 配额管理，加载完成或异常均释放配额
+ * 悬停播放与更多按钮通过顶层单一实例复用（见 AlbumTileKeys），不在单个图块内实例化
  */
 export const AlbumTile = memo(function AlbumTile(props: AlbumTileProps) {
   const { album, handlers, cover } = props;
@@ -107,7 +109,7 @@ export const AlbumTile = memo(function AlbumTile(props: AlbumTileProps) {
       onClick={(event) => {
         const modifiers = modifiersOf(event);
         handlers.select(album, at, modifiers);
-        // 单击开合下拉：双击的第二下不算，带修饰键的只改选中。
+        // 单击展开下拉：忽略双击的第二击，携带修饰键时仅更新选中状态
         const plain = !modifiers.ctrl && !modifiers.shift && !event.altKey;
         if (plain && event.detail <= 1) handlers.toggle(album, at);
       }}
@@ -119,45 +121,20 @@ export const AlbumTile = memo(function AlbumTile(props: AlbumTileProps) {
       onPointerDown={(event) => handlers.press(album, at, event)}
       onDragStart={(event) => handlers.dragStart(album, at, event)}
     >
-      <div className={styles.art}>
-        {image.src ? (
-          <img
-            className={styles.image}
-            src={image.src}
-            alt=""
-            draggable={false}
-            onLoad={image.onLoad}
-            onError={image.onError}
-          />
-        ) : (
-          <Record48Regular className={styles.placeholder} />
-        )}
-        {props.playing && !props.hovered && (
-          <span className={styles.playing} aria-hidden>
-            <PlayingMark active={props.audible} className={styles['playing-mark']} />
-          </span>
-        )}
-        {props.checked && (
-          <span className={styles.check} aria-hidden data-tile-check>
-            <Checkmark12Filled />
-          </span>
-        )}
-        {props.opening && (
-          <span className={styles.opening} data-tile-opening>
-            <Spinner size="small" />
-          </span>
-        )}
-      </div>
-      {props.showText && (
-        <>
-          <span className={styles.name} title={album.name}>
-            {album.name}
-          </span>
-          <span className={styles.artist} title={artist}>
-            {artist}
-          </span>
-        </>
-      )}
+      <TileArt
+        src={image.src}
+        placeholder={Record48Regular}
+        seen={() => handlers.shown(album)}
+        onLoad={image.onLoad}
+        onError={image.onError}
+        selected={props.selected}
+        focused={props.focused}
+      >
+        {props.playing && <PlayingBadge audible={props.audible} covered={props.hovered} />}
+        {props.checked && <CheckBadge />}
+        {props.opening && <OpeningBadge />}
+      </TileArt>
+      {props.showText && <TileLabels title={album.name} subtitle={artist} />}
     </div>
   );
 });

@@ -1,0 +1,57 @@
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.window {
+  fill: var(--colorNeutralBackground3);
+}
+
+/* 色块的浓度：文字与图标按重要程度取前景色的几档混合，随深浅反色 */
+.hard {
+  fill: color-mix(in srgb, var(--colorNeutralForeground1) 62%, transparent);
+}
+
+.mid {
+  fill: color-mix(in srgb, var(--colorNeutralForeground1) 32%, transparent);
+}
+
+.soft {
+  fill: color-mix(in srgb, var(--colorNeutralForeground1) 16%, transparent);
+}
+
+.accent {
+  fill: var(--accent);
+}
+
+/* 描边宽度按缩略图的像素算，不随 viewBox 缩放，不然缩到 190 宽就细得看不见 */
+.field,
+.elevated,
+.pane,
+.stroke {
+  stroke-width: var(--strokeWidthThin);
+  vector-effect: non-scaling-stroke;
+}
+
+.field {
+  fill: var(--bg-view-control);
+  stroke: var(--line);
+}
+
+.elevated {
+  fill: var(--bg-elevated);
+  stroke: var(--line);
+}
+
+.pane {
+  fill: var(--bg-pane);
+  stroke: var(--line);
+}
+
+.stroke {
+  fill: none;
+  stroke: color-mix(in srgb, var(--colorNeutralForeground1) 40%, transparent);
+}

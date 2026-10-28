@@ -14,7 +14,7 @@ export interface BackgroundAppearance {
   readonly tint: number;
   readonly surfaceBlur: number;
   readonly grain: number;
-  /** 保留浓度存档，供仍读取该字段的版本使用。 */
+  /** 保留浓度存档，供仍读取该字段的版本使用 */
   readonly capsule: number;
 }
 
@@ -64,7 +64,7 @@ function parameters(value: unknown, fallback: BackgroundAppearance): BackgroundA
   return result;
 }
 
-// 颜色与表面的新偏好单独存储，旧版的背景来源和参数仍可原样读取。
+// 颜色与表面的新偏好单独存储，旧版的背景来源和参数仍可原样读取
 const appearancePref = defineLocalPref<Readonly<Record<ColorScheme, BackgroundAppearance>>>({
   key: BACKGROUND_APPEARANCE_KEY,
   fallback: APPEARANCE_DEFAULTS,
@@ -118,7 +118,7 @@ export function resetBackgroundAppearance(
   );
 }
 
-/** 高浓度阅读面也保留少量封面色相；灰图不染色，图片来源由调用方传 null。 */
+/** 高浓度阅读面也保留少量封面色相；灰图不染色，图片来源由调用方传 null */
 export function tintedSurface(
   neutral: string,
   color: CoverTone | null,

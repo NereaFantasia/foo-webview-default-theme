@@ -6,6 +6,7 @@ import { startRightCard } from '../../../src/shell/right-card/rightCard.ts';
 import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
 import { startPlayingTrack, flush } from '../../fixtures/playingTrack.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
+import { onlineAddress } from '../../../src/server/onlineAddress.ts';
 import { lyricCardAtom, lyricLogAtom } from '../../../src/immersive/lyrics/lyricLog.ts';
 
 async function setup() {
@@ -91,8 +92,23 @@ describe('歌词装配', () => {
     env.play(makeTrack({ path: 'https://example.com/radio', title: '电台歌曲' }));
     await flush();
     expect(env.store.get(env.integration.track)?.local).toBe(false);
+    expect(env.store.get(env.integration.track)?.query).not.toHaveProperty('neteaseId');
     expect(env.store.get(env.integration.service.state)).toMatchObject({ status: 'missing' });
     expect(env.host.callsTo('lyrics.get')).toHaveLength(1);
+  });
+
+  it('网易云在线曲目的查询带上它的网易云 ID，本地曲目没有', async () => {
+    const env = await setup();
+    env.play(makeTrack({ title: '本地' }));
+    await flush();
+    expect(env.store.get(env.integration.track)?.query).not.toHaveProperty('neteaseId');
+    const path = onlineAddress(4000, { platform: 'wy', id: '64317' }, '320k') ?? '';
+    env.play(makeTrack({ path, title: '因为爱情' }));
+    await flush();
+    expect(env.store.get(env.integration.track)).toMatchObject({
+      local: false,
+      query: { title: '因为爱情', neteaseId: '64317' },
+    });
   });
 
   it('歌词页可见才激活，隐藏窗口、关闭或进入沉浸视图暂停；释放清掉时钟监听', async () => {
@@ -114,6 +130,18 @@ describe('歌词装配', () => {
     const before = env.host.listenerCount('playback:timeHighRes');
     env.integration.dispose();
     expect(env.host.listenerCount('playback:timeHighRes')).toBeLessThan(before);
+  });
+
+  it('进入歌词页或沉浸视图时时钟重新对准，离开时不用', async () => {
+    const env = await setup();
+    env.play(makeTrack());
+    const resync = vi.spyOn(env.integration.clock, 'resync');
+    env.history.navigate({ id: 'nowPlaying' });
+    expect(resync).toHaveBeenCalledTimes(1);
+    env.history.navigate({ id: 'albums' });
+    expect(resync).toHaveBeenCalledTimes(1);
+    env.card.toggle('lyrics');
+    expect(resync).toHaveBeenCalledTimes(2);
   });
 
   it('旧歌词不能跳转新曲目；当前曲目能跳转时按秒下发', async () => {

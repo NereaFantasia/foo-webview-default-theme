@@ -4,7 +4,7 @@ import type { Store } from '../../kit/store.ts';
 
 export type InfoSource = 'playing' | 'preview';
 
-/** 只保存主动选中的曲目；页面卸载或播放换曲不清掉预览。 */
+/** 只保存主动选中的曲目；页面卸载或播放换曲不清掉预览 */
 export function createTrackInfoTarget(
   store: Store,
   playing: Atom<Track | null>,

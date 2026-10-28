@@ -8,6 +8,14 @@
   line-height: 1.5;
 }
 
+.root[data-lyrics-align='center'] {
+  text-align: center;
+}
+
+.root[data-lyrics-align='right'] {
+  text-align: end;
+}
+
 .line {
   margin: 0 0 var(--spacingVerticalS);
   overflow-wrap: anywhere;

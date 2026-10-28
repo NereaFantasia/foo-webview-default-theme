@@ -46,9 +46,42 @@ function setup(host: UnitHost = installFakeHost()) {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const changed = { count: 1, timestamp: 1 };
+const changed = { count: 1, handles: [], truncated: false, fromHook: false, timestamp: 1 };
 
 describe('取曲目', () => {
+  it('临时读取等待刷新完成，ready 的旧缓存不能提前作为结果', async () => {
+    const { host, service, state } = setup();
+    host.answer('library.getAll', tracksAnswer(LIBRARY.slice(0, 1)));
+    expect((await service.read())?.byHandle.size).toBe(1);
+    host.answer('library.getAll', tracksAnswer(LIBRARY));
+    const held = host.hold('library.getAll');
+    let settled = false;
+    const reading = service.read().then((result) => {
+      settled = true;
+      return result;
+    });
+    await vi.waitFor(() => expect(held.pending).toHaveLength(1));
+    expect(state().status).toBe('ready');
+    expect(settled).toBe(false);
+    held.release();
+    expect((await reading)?.byHandle.size).toBe(4);
+    expect(state().generation).toBe(2);
+  });
+
+  it('临时读取失败时不返回旧缓存，释放服务会结束尚未完成的读取', async () => {
+    const { host, service } = setup();
+    host.answer('library.getAll', tracksAnswer(LIBRARY));
+    await service.read();
+    host.answer('library.getAll', hostFailure('OPERATION_FAILED'));
+    await expect(service.read()).resolves.toBeNull();
+    const held = host.hold('library.getAll');
+    const reading = service.read();
+    await vi.waitFor(() => expect(held.pending).toHaveLength(1));
+    service.dispose();
+    await expect(reading).resolves.toBeNull();
+    held.release();
+  });
+
   it('没人要时不取；要了先订库变更再一次取全，按专辑分好、碟号曲号排好，戳在发请求前拿', async () => {
     const host = installFakeHost();
     const subscribed: number[] = [];

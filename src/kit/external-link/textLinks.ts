@@ -11,7 +11,7 @@ export interface TextLinkPart {
   readonly url?: string;
 }
 
-/** 只解码路径、查询与片段中的可见非 ASCII 字符；域名、分隔符与控制字符保持编码。 */
+/** 只解码路径、查询与片段中的可见非 ASCII 字符；域名、分隔符与控制字符保持编码 */
 export function readableUrl(value: string): string {
   const checked = externalHttpUrl(value);
   if (!checked) return value;
@@ -49,7 +49,7 @@ function bareLinks(text: string): TextLinkPart[] {
   return parts;
 }
 
-/** 文字与偏移始终基于原文；显示解码不参与链接定位，也不写回原文。 */
+/** 文字与偏移始终基于原文；显示解码不参与链接定位，也不写回原文 */
 export function textLinks(
   text: string,
   links: readonly TextLinkRange[] = [],

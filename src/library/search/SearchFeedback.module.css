@@ -6,3 +6,11 @@
 .root:not(:empty) {
   padding: var(--spacingVerticalM) var(--spacingHorizontalS);
 }
+/* 结果页的「没有匹配结果」与「在线音乐里搜索」上下居中排 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacingVerticalM);
+  padding-top: var(--spacingVerticalXXXL);
+}

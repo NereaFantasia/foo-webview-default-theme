@@ -14,7 +14,7 @@
   height: 100%;
 }
 
-/* 框底与相关条、摆锤条同一层淡底，三件仪表读成一组。 */
+/* 框底与相关条、摆锤条同一层淡底，三件仪表读成一组 */
 .frame {
   fill: color-mix(in srgb, var(--colorNeutralForeground1) 3%, transparent);
   stroke: var(--paper-ring);
@@ -38,7 +38,7 @@
   stroke: var(--paper-ring);
 }
 
-/* 角标字号随所在的格子，由格子上的 `--scope-corner-font` 给。 */
+/* 角标字号随所在的格子，由格子上的 `--scope-corner-font` 给 */
 .corner {
   position: absolute;
   top: 2px;

@@ -6,12 +6,14 @@ import {
   Settings20Regular,
   TextFont20Regular,
   TextAlignCenter20Regular,
+  TextAlignJustify20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactNode } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { useService } from '../kit/useService.ts';
 import {
+  LYRICS_ALIGNS,
   LYRICS_OPTIMIZATIONS,
   LYRICS_MASK_MODES,
   lyricsDisplayKey,
@@ -21,10 +23,15 @@ import {
   LYRICS_MOTION_PRESETS,
   lyricsMotionKey,
 } from '../lyrics/lyricsMotion.ts';
+import { AlignIcon } from './AlignIcon.tsx';
+import { DesktopLyricsExpander } from './DesktopLyricsExpander.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsCard, type SettingsCardIds } from './SettingsCard.tsx';
+import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
+import { SettingsSegmented } from './SettingsSegmented.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
+import { LyricsPositionThumb } from './thumbnails/LyricsPositionThumb.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
 import styles from './LyricsSection.module.css';
 
@@ -111,6 +118,21 @@ export function LyricsSection({
               min={12}
               max={48}
               onChange={(fontSize) => void displayService.update({ fontSize })}
+            />
+          )}
+        </SettingsCard>
+        {/* 分段里已经有三个对齐图标，卡图标取固定的一个，免得同屏两套 */}
+        <SettingsCard icon={<TextAlignJustify20Regular />} title={t('lyrics.textAlign')} field>
+          {() => (
+            <SettingsSegmented
+              label={t('lyrics.textAlign')}
+              value={display.align}
+              options={LYRICS_ALIGNS.map((value) => ({
+                value,
+                label: t(`lyrics.textAlign.${value}`),
+                icon: <AlignIcon align={value} />,
+              }))}
+              onChange={(align) => void displayService.update({ align })}
             />
           )}
         </SettingsCard>
@@ -210,31 +232,33 @@ export function LyricsSection({
             onChange={(wordFadeWidth) => service.customize({ wordFadeWidth })}
           />
         </SettingsExpander>
-        <SettingsExpander
+        <SettingsCard
           icon={<TextAlignCenter20Regular />}
           title={t('lyrics.position')}
-          field
-          defaultOpen={false}
-          control={(ids) => (
-            <SettingsSelect
+          block
+          footer={
+            <NumberSetting
+              label={t('lyrics.alignPosition')}
+              value={Math.round(motion.alignPosition * 100)}
+              min={0}
+              max={100}
+              onChange={(value) => service.customize({ alignPosition: value / 100 })}
+            />
+          }
+        >
+          {(ids) => (
+            <SettingsChoice
               {...ids}
               value={motion.alignAnchor}
               options={LYRICS_ALIGN_ANCHORS.map((value) => ({
                 value,
                 label: t(`lyrics.anchor.${value}`),
+                preview: <LyricsPositionThumb anchor={value} />,
               }))}
               onChange={(alignAnchor) => service.customize({ alignAnchor })}
             />
           )}
-        >
-          <NumberSetting
-            label={t('lyrics.alignPosition')}
-            value={Math.round(motion.alignPosition * 100)}
-            min={0}
-            max={100}
-            onChange={(value) => service.customize({ alignPosition: value / 100 })}
-          />
-        </SettingsExpander>
+        </SettingsCard>
         <SettingsExpander
           icon={<Settings20Regular />}
           title={t('lyrics.springSettings')}
@@ -377,6 +401,7 @@ export function LyricsSection({
             />
           </div>
         </SettingsExpander>
+        <DesktopLyricsExpander />
       </fieldset>
       {saveNotice}
     </div>

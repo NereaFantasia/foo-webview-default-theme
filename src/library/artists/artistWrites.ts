@@ -18,7 +18,7 @@ export interface ArtistWritePlan {
   readonly skipped: readonly LibraryTrack[];
 }
 
-/** 只改所选口径的单值标签；专辑艺术家缺失时沿用曲目艺术家，不凭空新增另一字段。 */
+/** 只改所选口径的单值标签；专辑艺术家缺失时沿用曲目艺术家，不凭空新增另一字段 */
 export function artistWritePlan(
   tracks: readonly LibraryTrack[],
   names: readonly string[],

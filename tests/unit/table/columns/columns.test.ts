@@ -5,8 +5,6 @@ import {
   DEFAULT_ORDER,
   DEFAULT_WIDTHS,
   insertColumn,
-  MIN_WIDTH,
-  resizePair,
   swapColumns,
   toWidths,
   widthOf,
@@ -14,8 +12,8 @@ import {
 } from '../../../../src/table/columns/columns.ts';
 
 describe('列宽', () => {
-  it('fr 列写成带最窄宽度保底的权重，其余列写像素', () => {
-    expect(columnTrack('title', DEFAULT_WIDTHS)).toBe(`minmax(${MIN_WIDTH}px, 2fr)`);
+  it('普通列使用独立像素宽度', () => {
+    expect(columnTrack('title', DEFAULT_WIDTHS)).toBe('280px');
     expect(columnTrack('duration', DEFAULT_WIDTHS)).toBe('60px');
   });
 
@@ -29,16 +27,6 @@ describe('列宽', () => {
     const next = withWidth(DEFAULT_WIDTHS, 'rating', 100);
     expect(widthOf(next, 'rating')).toBe(100);
     expect(widthOf(next, 'title')).toBe(widthOf(DEFAULT_WIDTHS, 'title'));
-  });
-
-  it('分隔条两侧一起改，和不变，两列都不窄于最窄宽度', () => {
-    expect(resizePair(100, 100, 30)).toEqual([130, 70]);
-    expect(resizePair(100, 100, 500)).toEqual([200 - MIN_WIDTH, MIN_WIDTH]);
-    expect(resizePair(100, 100, -500)).toEqual([MIN_WIDTH, 200 - MIN_WIDTH]);
-  });
-
-  it('两列本来就放不下两个最窄宽度时不动', () => {
-    expect(resizePair(20, 20, 10)).toEqual([20, 20]);
   });
 });
 

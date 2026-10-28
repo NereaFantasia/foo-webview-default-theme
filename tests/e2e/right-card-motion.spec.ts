@@ -100,7 +100,11 @@ test('入队从右进入，移除向右退场，重排按实际位移且副本�
   const player = await openLargeQueue(page, 50);
   const tracks = queueTracks('第一首', '第二首', '第三首');
   const queue = installFakeQueue(player.host, tracks);
-  await player.host.emit('playback:queueChanged', { origin: 'user_added', count: 3 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: 3,
+    contentVersion: '1',
+  });
   await expect(page.locator('[data-kind="queued"]')).toHaveCount(3);
   await expect
     .poll(() =>
@@ -112,7 +116,11 @@ test('入队从右进入，移除向右退场，重排按实际位移且副本�
     .toBe(0);
   await record(page);
   queue.set([tracks[2], tracks[0], tracks[1]]);
-  await player.host.emit('playback:queueChanged', { origin: 'unknown', count: 3 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'unknown',
+    count: 3,
+    contentVersion: '1',
+  });
   await expect
     .poll(async () =>
       (await logs(page)).some(
@@ -123,7 +131,11 @@ test('入队从右进入，移除向右退场，重排按实际位移且副本�
     .toBe(true);
   await clear(page);
   queue.set([tracks[2], tracks[1]]);
-  await player.host.emit('playback:queueChanged', { origin: 'user_removed', count: 2 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'user_removed',
+    count: 2,
+    contentVersion: '1',
+  });
   await expect
     .poll(async () =>
       (await logs(page)).some(
@@ -147,7 +159,11 @@ test('入队从右进入，移除向右退场，重排按实际位移且副本�
   await expect.poll(() => page.locator('[data-queue-exit]').count()).toBe(0);
   await clear(page);
   queue.set(tracks);
-  await player.host.emit('playback:queueChanged', { origin: 'user_added', count: 3 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: 3,
+    contentVersion: '1',
+  });
   await expect
     .poll(async () =>
       (await logs(page)).some(

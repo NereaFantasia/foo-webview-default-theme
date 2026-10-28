@@ -1,4 +1,11 @@
-import { createContext, useLayoutEffect, useRef, useState, type FocusEvent } from 'react';
+import {
+  createContext,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+} from 'react';
 import { usePointerActivity } from '../../../kit/usePointerActivity.ts';
 
 interface LyricsPreviewControls {
@@ -13,6 +20,8 @@ export function useLyricsPreview(enabled: boolean) {
   const toolbar = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLDivElement>(null);
   const { active, touch } = usePointerActivity(1500);
+  // 滚动只让滚动条露出来，不唤出控件：纯文本歌词滚动时控件保持隐藏
+  const { active: scrolling, touch: touchScroll } = usePointerActivity(1500);
   const [pinned, pin] = useState(false);
   const [focused, setFocused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -46,7 +55,7 @@ export function useLyricsPreview(enabled: boolean) {
 
   useLayoutEffect(() => {
     if (visible) return;
-    // 鼠标点击留下的焦点不能留在即将隐藏的控件里；键盘操作由 focused 保持可见。
+    // 鼠标点击留下的焦点不能留在即将隐藏的控件里；键盘操作由 focused 保持可见
     const parent = root.current;
     if (parent?.contains(document.activeElement)) {
       restoringFocus.current = true;
@@ -55,9 +64,28 @@ export function useLyricsPreview(enabled: boolean) {
     }
   }, [visible]);
 
-  const pointer = () => {
+  const lastPointerX = useRef(-1);
+  const lastPointerY = useRef(-1);
+
+  const pointer = (event?: { type?: string; clientX: number; clientY: number }) => {
+    // 过滤歌词播放动效或重排引起的虚假 pointermove（鼠标坐标未发生真实改变）
+    if (event && event.type === 'pointermove') {
+      if (event.clientX === lastPointerX.current && event.clientY === lastPointerY.current) {
+        return;
+      }
+      lastPointerX.current = event.clientX;
+      lastPointerY.current = event.clientY;
+    } else if (event) {
+      lastPointerX.current = event.clientX;
+      lastPointerY.current = event.clientY;
+    }
     setFocused(false);
     touch();
+  };
+
+  const pointerLeave = () => {
+    lastPointerX.current = -1;
+    lastPointerY.current = -1;
   };
   const focus = (event: FocusEvent<HTMLElement>) => {
     if (restoringFocus.current || !event.target.matches(':focus-visible')) return;
@@ -70,5 +98,23 @@ export function useLyricsPreview(enabled: boolean) {
     touch();
   };
 
-  return { root, toolbar, tabs, visible, pin, pointer, focus, blur, setMenuOpen };
+  const scroll = useCallback(() => {
+    if (enabled) touchScroll();
+  }, [enabled, touchScroll]);
+  const scrollbarsVisible = enabled && (active || scrolling);
+
+  return {
+    root,
+    toolbar,
+    tabs,
+    visible,
+    scrollbarsVisible,
+    pin,
+    pointer,
+    pointerLeave,
+    scroll,
+    focus,
+    blur,
+    setMenuOpen,
+  };
 }

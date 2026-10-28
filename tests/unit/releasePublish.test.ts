@@ -27,6 +27,22 @@ const CHANGELOG = text(
     entries: [{ version: '0.2.0', notes: { 'zh-CN': { title: '新版本', fixes: ['修复'] } } }],
   }),
 );
+const NCM = JSON.stringify({
+  format: 1,
+  name: 'ncm',
+  version: '4.41.1',
+  url: 'https://cnb.example.test/ncm-4.41.1/ncm-4.41.1.zip',
+  size: 100,
+  sha256: 'b'.repeat(64),
+  unpackedSize: 200,
+  licenses: ['MIT'],
+});
+const LX = JSON.stringify({
+  ...JSON.parse(NCM),
+  name: 'lxserver',
+  version: '2.1.3',
+  url: 'https://cnb.example.test/lxserver-2.1.3/lxserver-2.1.3.zip',
+});
 const temporary: string[] = [];
 afterEach(() => {
   for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true });
@@ -37,6 +53,11 @@ async function artifacts(
   change: (files: Record<string, Uint8Array>) => void = () => {},
   changeFirst: (files: Record<string, Uint8Array>) => void = () => {},
   withBackend = false,
+  backendFiles = [
+    { path: 'server.cjs', bytes: text('服务') },
+    { path: 'ncm.json', bytes: text(NCM) },
+    { path: 'lxserver.json', bytes: text(LX) },
+  ],
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'publish-'));
   temporary.push(dir);
@@ -47,7 +68,7 @@ async function artifacts(
     { path: 'assets/app.js', bytes: text('console.log(1)') },
     { path: 'changelog.json', bytes: CHANGELOG },
   ];
-  const be = zipEntries([{ path: 'server.cjs', bytes: text('服务') }]);
+  const be = zipEntries(backendFiles);
   const backend = {
     format: 1 as const,
     version: '0.2.0',
@@ -116,9 +137,28 @@ describe('分发物核对', () => {
     const verified = await verifyArtifacts(dir, keys);
     expect(verified.assets.map((asset) => asset.name)).toContain('be-0.2.0.zip');
     expect(verified.runtime).toMatchObject({ url: 'https://example.com/runtime.json', size: 100 });
+    expect(verified.components).toMatchObject({
+      ncm: { version: '4.41.1', size: 100 },
+      lxserver: { version: '2.1.3', size: 100 },
+    });
     writeFileSync(join(dir, 'be-0.2.0.zip'), text('损坏'));
     await expect(verifyArtifacts(dir, keys)).rejects.toThrow('后端附件');
   });
+  it('后端包缺任一组件描述、描述无效或名字对不上时停下', async () => {
+    const server = { path: 'server.cjs', bytes: text('服务') };
+    const ncm = { path: 'ncm.json', bytes: text(NCM) };
+    const lx = { path: 'lxserver.json', bytes: text(LX) };
+    for (const [files, missing] of [
+      [[server, lx], 'ncm'],
+      [[server, { path: 'ncm.json', bytes: text('{}') }, lx], 'ncm'],
+      [[server, ncm], 'lxserver'],
+      [[server, ncm, { path: 'lxserver.json', bytes: text(NCM) }], 'lxserver'],
+    ] as const) {
+      const { dir, keys } = await artifacts(undefined, undefined, true, [...files]);
+      await expect(verifyArtifacts(dir, keys)).rejects.toThrow(`缺少有效的 ${missing} 组件描述`);
+    }
+  });
+
   it('一致的分发物通过，交回附件与序号', async () => {
     const { dir, keys } = await artifacts();
     const verified = await verifyArtifacts(dir, keys);

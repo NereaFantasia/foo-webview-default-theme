@@ -32,13 +32,13 @@ export function biographyLanguage(tag: string): BiographyLanguage {
 export interface BiographyIdentity {
   readonly artist: string;
   readonly sourceArtist: string;
-  /** 从 MusicBrainz 候选里选的才有；粘贴 Last.fm 链接确认的没有。 */
+  /** 从 MusicBrainz 候选里选的才有；粘贴 Last.fm 链接确认的没有 */
   readonly mbid?: string;
 }
 
 export interface BiographyInput {
   readonly artist: string;
-  /** 只有已确认的来源身份才填值，未确认时为 null。 */
+  /** 只有已确认的来源身份才填值，未确认时为 null */
   readonly sourceArtist: string | null;
   readonly language: BiographyLanguage;
 }
@@ -64,9 +64,19 @@ export interface BiographyCacheEntry {
   readonly details?: BiographyDetails;
 }
 
-/** keyInvalid、keySuspended 只来自 Last.fm API：key 无效或被停用。 */
+/**
+ * keyInvalid、keySuspended 只来自 Last.fm API：key 无效或被停用
+ * dns、localRelay 是宿主 http 失败的细分（host/hostHttpFailure.ts 的归类）
+ */
 export type BiographyProblem =
-  'network' | 'blocked' | 'rateLimited' | 'invalid' | 'keyInvalid' | 'keySuspended';
+  | 'network'
+  | 'dns'
+  | 'localRelay'
+  | 'blocked'
+  | 'rateLimited'
+  | 'invalid'
+  | 'keyInvalid'
+  | 'keySuspended';
 
 export interface BiographyState {
   readonly status:
@@ -75,10 +85,13 @@ export interface BiographyState {
   readonly refreshing: boolean;
   readonly stale: boolean;
   readonly problem: BiographyProblem | null;
+  /** problem 的宿主失败原文，只在内存里给界面诊断用 */
+  readonly problemDetail?: string | null;
   readonly cacheFailed: boolean;
   readonly details?: BiographyDetails | null;
   readonly detailsLoading?: boolean;
   readonly detailsProblem?: BiographyProblem | null;
+  readonly detailsProblemDetail?: string | null;
 }
 
 export const BIOGRAPHY_TEXT_LIMIT = 64_000;
@@ -115,7 +128,7 @@ export function lastfmArtistFromUrl(value: string): string | null {
       !['www.last.fm', 'last.fm'].includes(url.hostname)
     )
       return null;
-    // 有简繁两个条目或改过名的艺人，Last.fm 链到另一个名字时带 `+noredirect/`，仍是这个名字的页面。
+    // 有简繁两个条目或改过名的艺人，Last.fm 链到另一个名字时带 `+noredirect/`，仍是这个名字的页面
     const match = /^\/(?:[a-z]{2}\/)?music\/(?:\+noredirect\/)?([^/]+)(?:\/\+wiki)?\/?$/.exec(
       url.pathname,
     );

@@ -5,27 +5,22 @@ import {
   TableCell,
   TableRow,
 } from '@fluentui/react-components';
-import { Fragment, memo, type MouseEvent, type ReactNode } from 'react';
+import { memo, type MouseEvent, type ReactNode } from 'react';
 import type { Translate } from '../i18n/translate.ts';
 import type { TableServices } from './tableContext.ts';
+import { TrackAlbum, TrackArtists } from '../track/TrackCredits.tsx';
 import { trackDisplayTitle } from '../track/trackDisplayTitle.ts';
 import { bitrateText, dayText, durationText, yearText } from './cellText.ts';
 import { columnDef, type ColumnId } from './columns/columns.ts';
 import { RatingCell } from './RatingCell.tsx';
-import type {
-  TableArtwork,
-  TableLinks,
-  TablePoint,
-  TableRowItem,
-  TableTrack,
-} from './tableItems.ts';
+import type { TableArtwork, TablePoint, TableRowItem, TableTrack } from './tableItems.ts';
 import textStyles from './TrackTableRow.module.css';
 import { useTrackTableStyles } from './useTrackTableStyles.ts';
 
-/** 这一行与正在播放的关系：不是它、是它但暂停着、是它且正在出声。 */
+/** 这一行与正在播放的关系：不是它、是它但暂停着、是它且正在出声 */
 export type PlayingState = 'none' | 'paused' | 'active';
 
-/** 行的事件，由表格给一份不变的；下标是显示位。 */
+/** 行的事件，由表格给一份不变的；下标是显示位 */
 export interface RowHandlers {
   click(index: number, event: MouseEvent): void;
   play(index: number): void;
@@ -36,14 +31,14 @@ export interface RowHandlers {
 export interface TrackTableRowProps {
   readonly id: string;
   readonly index: number;
-  /** 读屏的行号与层级，见 `ariaRowsOf`。 */
+  /** 读屏的行号与层级，见 `ariaRowsOf` */
   readonly rowIndex: number;
   readonly level: number;
   readonly item: TableRowItem;
-  /** 在行带里的纵坐标，CSS 像素。 */
+  /** 在行带里的纵坐标，CSS 像素 */
   readonly top: number;
   readonly cells: readonly ColumnId[];
-  /** 第一格在列头里是第几列，从 1 数：有封面列时它占了列头的第 1 列，行里的格子从第 2 列起。 */
+  /** 第一格在列头里是第几列，从 1 数：有封面列时它占了列头的第 1 列，行里的格子从第 2 列起 */
   readonly firstColumn: number;
   readonly selected: boolean;
   readonly focused: boolean;
@@ -51,57 +46,19 @@ export interface TrackTableRowProps {
   readonly PlayingMark: TableServices['PlayingMark'];
   readonly rating: number;
   readonly ratable: boolean;
-  /** 序号格的写法：只写曲号，或「碟.曲」。 */
+  /** 序号格的写法：只写曲号，或「碟.曲」 */
   readonly numberText: (track: TableTrack) => string;
-  readonly links: TableLinks | undefined;
   readonly artwork: TableArtwork | undefined;
-  /** 缩略图边长，CSS 像素。 */
+  /** 缩略图边长，CSS 像素 */
   readonly artSize: number;
   readonly handlers: RowHandlers;
   readonly t: Translate;
 }
 
 /**
- * 画成链接的格子。不进 Tab 次序：拿到焦点时表格收回去，键盘照样走行。带修饰键的单击照常交给行去改选中，
- * 不跳转。
+ * 艺人、专辑格里的名字可点。不进 Tab 次序：键盘走行，跳转用菜单里的「转到」；带修饰键的单击照常交给行
+ * 去改选中
  */
-function LinkText(props: { readonly value: string; readonly onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      className={`${textStyles.text} ${textStyles.secondary} ${textStyles.link}`}
-      title={props.value}
-      onClick={(event) => {
-        if (event.ctrlKey || event.shiftKey || event.metaKey) return;
-        event.stopPropagation();
-        props.onOpen();
-      }}
-      onDoubleClick={(event) => event.stopPropagation()}
-    >
-      {props.value}
-    </button>
-  );
-}
-
-function artistContent(track: TableTrack, open: TableLinks['artist']): ReactNode {
-  const values = track.artists?.filter((name) => name.trim().length > 0);
-  const names = values?.length ? values : [track.artist];
-  return (
-    <span
-      className={`${textStyles.text} ${textStyles.secondary} ${textStyles['artist-links']}`}
-      title={names.join(', ')}
-    >
-      {names.map((name, index) => (
-        <Fragment key={`${index}:${name}`}>
-          {index > 0 && ', '}
-          {open && name.trim() ? <LinkText value={name} onOpen={() => open(name, track)} /> : name}
-        </Fragment>
-      ))}
-    </span>
-  );
-}
-
 function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): ReactNode {
   const { playing, t, PlayingMark } = props;
   const text = (value: string, extra?: string) => (
@@ -115,7 +72,7 @@ function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): Re
     case 'art':
       return props.artwork?.(track, props.artSize) ?? null;
     case 'status':
-      // 序号列不在时，正在播放的记号挪到这一格。
+      // 序号列不在时，正在播放的记号挪到这一格
       if (playing !== 'none' && !props.cells.includes('number')) {
         return <PlayingMark active={playing === 'active'} label={t('table.nowPlaying')} />;
       }
@@ -129,15 +86,21 @@ function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): Re
     case 'title':
       return text(trackDisplayTitle(track), textStyles.title);
     case 'artist':
-      return artistContent(track, props.links?.artist);
-    case 'album': {
-      const open = props.links?.album;
-      return open && track.album ? (
-        <LinkText value={track.album} onOpen={() => open(track)} />
-      ) : (
-        text(track.album, textStyles.secondary)
+      return (
+        <TrackArtists
+          track={track}
+          className={`${textStyles.text} ${textStyles.secondary}`}
+          tabIndex={-1}
+        />
       );
-    }
+    case 'album':
+      return (
+        <TrackAlbum
+          track={track}
+          className={`${textStyles.text} ${textStyles.secondary}`}
+          tabIndex={-1}
+        />
+      );
     case 'rating':
       return props.ratable ? (
         <RatingCell
@@ -164,6 +127,16 @@ function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): Re
       return text(track.codec ?? '', textStyles.secondary);
     case 'bitrate':
       return bitrateText(track.bitrate);
+    case 'sampleRate':
+      return track.sampleRate && track.sampleRate > 0
+        ? `${track.sampleRate.toLocaleString()} Hz`
+        : '';
+    case 'channels':
+      return track.channels && track.channels > 0 ? String(track.channels) : '';
+    case 'fileSize':
+      return track.fileSize !== undefined && track.fileSize >= 0
+        ? `${(track.fileSize / 1024 / 1024).toFixed(1)} MiB`
+        : '';
     case 'path':
       return text(track.absolutePath || track.path, textStyles.secondary);
   }
@@ -171,7 +144,7 @@ function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): Re
 
 /**
  * 表格里的一行曲目：Fluent 的 `TableRow` 与 `TableCell`，各格按列模型给的列排进行的栅格。还没取到曲目时
- * 画骨架。正在播放的那一行在序号格画记号、文字取品牌色；选中使用底色与侧边指示器，不与播放记号混在一起。
+ * 画骨架。正在播放的那一行在序号格画记号、文字取品牌色；选中使用底色与侧边指示器，不与播放记号混在一起
  */
 export const TrackTableRow = memo(function TrackTableRow(props: TrackTableRowProps) {
   const styles = useTrackTableStyles();

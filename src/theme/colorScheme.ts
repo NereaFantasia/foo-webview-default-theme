@@ -6,19 +6,19 @@ import type { ColorScheme } from './themes.ts';
 
 const QUERY = '(prefers-color-scheme: dark)';
 
-/** 深浅模式：`system` 跟随系统，另两档由用户定下、不再看系统。 */
+/** 配色方案模式：`system` 跟随系统偏好，`light`/`dark` 由用户显式锁定 */
 export const COLOR_MODES = ['system', 'light', 'dark'] as const;
 export type ColorMode = (typeof COLOR_MODES)[number];
 
 export const DEFAULT_COLOR_MODE: ColorMode = 'system';
 /**
- * 模式存 localStorage，不进宿主 config：首帧之前就要定下深浅，等宿主应答的话，手选与系统相反的用户
- * 每次启动都会先看到一帧相反的颜色。
+ * 配色模式保存在 localStorage，不写入宿主全局 config：
+ * 首帧渲染前即需确定深浅方案，若等待宿主异步响应，与系统主题相左的用户会在启动时遭遇白屏/黑屏闪烁
  */
 export const COLOR_MODE_STORAGE_KEY = 'default-theme.color-mode.v1';
 
 const systemDarkAtom = atom(false);
-/** 没有存档、存储被禁或取值不在表里，都回到缺省。 */
+/** 存档缺失、存储被禁或取值非法时统一回退至默认配置 */
 const modePref = defineLocalPref<ColorMode>({
   key: COLOR_MODE_STORAGE_KEY,
   fallback: DEFAULT_COLOR_MODE,
@@ -28,8 +28,8 @@ const modePref = defineLocalPref<ColorMode>({
 export const colorModeAtom: Atom<ColorMode> = modePref.atom;
 
 /**
- * 界面此刻用哪一档。模式是 `system` 时取系统的深浅色偏好（WebView2 跟随 Windows 的应用模式，切换时
- * 即时生效），否则就是用户定的那一档。
+ * 当前界面渲染所采用的实际配色方案
+ * 若模式为 `system`，则动态监听系统级色彩偏好（WebView2 紧跟 Windows 应用模式实时响应）；否则返回锁定的模式
  */
 export const colorSchemeAtom: Atom<ColorScheme> = atom((get) => {
   const mode = get(modePref.atom);
@@ -38,8 +38,8 @@ export const colorSchemeAtom: Atom<ColorScheme> = atom((get) => {
 });
 
 /**
- * 读回用户定的模式，并让系统那一档跟随系统，返回停止跟随的函数。在首帧之前调。
- * 没有 `matchMedia` 时系统那一档一直是浅色。
+ * 加载持久化的配色模式并启动系统主题监听，返回解绑函数（须在首帧渲染前执行）
+ * 若环境缺失 `matchMedia`，跟随系统时默认回退为浅色方案
  */
 export function watchColorScheme(
   store: Store,
@@ -50,7 +50,7 @@ export function watchColorScheme(
   return syncMediaQuery(store, systemDarkAtom, QUERY, source);
 }
 
-/** 换模式并记住，立即生效。存不下（存储被禁或写满）只影响下次启动。 */
+/** 切换配色模式并立即持久化生效；存储失败仅影响下次启动，当前运行状态依然更新 */
 export function chooseColorMode(store: Store, mode: ColorMode, storage?: PrefStorage | null): void {
   modePref.set(store, mode, storage);
 }

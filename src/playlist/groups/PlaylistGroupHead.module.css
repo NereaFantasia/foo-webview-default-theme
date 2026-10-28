@@ -1,4 +1,4 @@
-/* 一级组头占满整行：开合键、组名、艺术家，横线填满到右端的首数与年份。横线替代了组与组之间的空白。 */
+/* 一级组头占满整行：开合键、组名、艺术家，横线填满到右端的首数与年份。横线替代了组与组之间的空白 */
 .head {
   display: flex;
   align-items: center;
@@ -34,7 +34,7 @@
 .chevron[data-expanded='true'] svg {
   transform: rotate(90deg);
 }
-/* 艺术家、首数与年份是次要信息，同一档灰；先让艺术家收缩再让组名收缩。 */
+/* 艺术家、首数与年份是次要信息，同一档灰；先让艺术家收缩再让组名收缩 */
 .artist {
   flex: 0 2 auto;
   min-width: 0;
@@ -47,14 +47,14 @@
   flex: 1 1 auto;
   min-width: var(--spacingHorizontalS);
   height: var(--strokeWidthThin);
-  background: var(--colorNeutralStroke2);
+  background: var(--line);
 }
 .count {
   flex: none;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
-/* 二级组头（碟号）排在封面右边，让开封面列，也不跟专辑名抢。 */
+/* 二级组头（碟号）排在封面右边，让开封面列，也不跟专辑名抢 */
 .head[data-level='2'] {
   padding-left: calc(var(--table-row-left, 0px) + var(--spacingHorizontalS));
 }
@@ -62,7 +62,7 @@
   color: var(--text-secondary);
   font-weight: var(--fontWeightRegular);
 }
-/* 封面挂在一级组头下面、压在组里前几行的左边：行让开了封面列的宽。 */
+/* 封面挂在一级组头下面、压在组里前几行的左边：行让开了封面列的宽 */
 .cover {
   position: absolute;
   top: 100%;

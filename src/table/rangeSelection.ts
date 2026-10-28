@@ -1,14 +1,14 @@
 /**
- * 选中行的区间集合：有序、互不相交、相邻即合并的 `[start, end)` 序列，纯函数。
+ * 选中行的区间集合：有序、互不相交、相邻即合并的 `[start, end)` 序列，纯函数
  *
  * 存区间而不是逐行的集合：全选十万首时一个 `Set<number>` 要占好几 MB，而全选与 Shift 扩选本来就是
  * 连续的一段，只有 Ctrl 逐行点才会碎。坐标是表格的调用方给的行序号，不是显示位置：折叠、分组让显示位置
- * 整体重排时行序号不变，选中也就不丢。
+ * 整体重排时行序号不变，选中也就不丢
  */
 
 export interface SelectionRange {
   readonly start: number;
-  /** 不含这一行。 */
+  /** 不含这一行 */
   readonly end: number;
 }
 
@@ -16,7 +16,7 @@ export type SelectionRanges = readonly SelectionRange[];
 
 export const NO_RANGES: SelectionRanges = [];
 
-/** 起点不大于 `target` 的最后一个区间的下标；没有则 -1。 */
+/** 起点不大于 `target` 的最后一个区间的下标；没有则 -1 */
 function lastAtMost(ranges: SelectionRanges, target: number): number {
   let low = 0;
   let high = ranges.length - 1;
@@ -34,7 +34,7 @@ function lastAtMost(ranges: SelectionRanges, target: number): number {
   return found;
 }
 
-/** 并入 `[from, to)`。端点相接也合并，逐行 Ctrl 点出来的连续一段因此是一个区间。 */
+/** 并入 `[from, to)`。端点相接也合并，逐行 Ctrl 点出来的连续一段因此是一个区间 */
 export function addRange(ranges: SelectionRanges, from: number, to: number): SelectionRanges {
   if (to <= from) return ranges;
   const out: SelectionRange[] = [];
@@ -60,7 +60,7 @@ export function addRange(ranges: SelectionRanges, from: number, to: number): Sel
   return out;
 }
 
-/** 去掉 `[from, to)`：跨在边界上的区间裁短，罩住它的区间切成两段。 */
+/** 去掉 `[from, to)`：跨在边界上的区间裁短，罩住它的区间切成两段 */
 export function removeRange(ranges: SelectionRanges, from: number, to: number): SelectionRanges {
   if (to <= from) return ranges;
   const out: SelectionRange[] = [];
@@ -80,7 +80,7 @@ export function containsRow(ranges: SelectionRanges, at: number): boolean {
   return range !== undefined && at < range.end;
 }
 
-/** 切换一行：选着就去掉，没选就加上。 */
+/** 切换一行：选着就去掉，没选就加上 */
 export function toggleRow(ranges: SelectionRanges, at: number): SelectionRanges {
   return containsRow(ranges, at) ? removeRange(ranges, at, at + 1) : addRange(ranges, at, at + 1);
 }
@@ -89,7 +89,7 @@ export function countRows(ranges: SelectionRanges): number {
   return ranges.reduce((total, range) => total + range.end - range.start, 0);
 }
 
-/** 两份区间集合的交集。 */
+/** 两份区间集合的交集 */
 export function intersectRanges(left: SelectionRanges, right: SelectionRanges): SelectionRanges {
   const out: SelectionRange[] = [];
   let i = 0;
@@ -107,7 +107,7 @@ export function intersectRanges(left: SelectionRanges, right: SelectionRanges): 
   return out;
 }
 
-/** 裁掉 `total` 及以后的部分：表变短时用。 */
+/** 裁掉 `total` 及以后的部分：表变短时用 */
 export function clampRanges(ranges: SelectionRanges, total: number): SelectionRanges {
   const out: SelectionRange[] = [];
   for (const range of ranges) {
@@ -124,7 +124,7 @@ export function sameRanges(left: SelectionRanges, right: SelectionRanges): boole
   );
 }
 
-/** 从行序号收成区间集合：顺序任意，重复的只算一次，负数与非整数不收。宿主报的选中从这里进来。 */
+/** 从行序号收成区间集合：顺序任意，重复的只算一次，负数与非整数不收。宿主报的选中从这里进来 */
 export function rangesOfRows(rows: readonly number[]): SelectionRanges {
   const sorted = [...new Set(rows)]
     .filter((row) => Number.isInteger(row) && row >= 0)
@@ -145,7 +145,7 @@ export function rangesOfRows(rows: readonly number[]): SelectionRanges {
   return out;
 }
 
-/** 摊平成行序号，升序。代价与选中行数成正比，只在要把一批交出去时用；判一行选没选中用 `containsRow`。 */
+/** 摊平成行序号，升序。代价与选中行数成正比，只在要把一批交出去时用；判一行选没选中用 `containsRow` */
 export function rowsOf(ranges: SelectionRanges): number[] {
   const out: number[] = [];
   for (const range of ranges) {

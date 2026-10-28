@@ -5,7 +5,7 @@ export const contextMenuEn = {
   'context.restart': 'Play from beginning',
   'context.playSelected': 'Play selected',
   'context.playFromHere': 'Play from here',
-  'context.loading': 'Loading additional commands...',
+  'context.loading': 'Loading additional commands…',
   'context.failed': 'Could not load additional commands',
   'context.limited': 'Additional commands are unavailable for this selection size',
   'context.selectionLimited': 'The selection exceeds the limit for this action',

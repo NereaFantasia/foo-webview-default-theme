@@ -10,27 +10,27 @@ import { createHolds, createSlots } from '../playlistHolds.ts';
 import type { PlaylistRowsService } from '../playlistRows.ts';
 import { DEFAULT_GROUP_MODE, GROUP_MODES } from '../sortPatterns.ts';
 
-/** 行变了到重取游程之间的合并窗口，毫秒。 */
+/** 行变了到重取游程之间的合并窗口，毫秒 */
 export const GROUPS_COALESCE_MS = 150;
 /**
  * 接受的一级游程数上限。宿主不截断游程，分组键接近逐行不同时组头与载荷都会很多；超限时不留这份游程，
- * 带提示退回扁平列表。
+ * 带提示退回扁平列表
  */
 export const MAX_RUNS = 10_000;
-/** 游程与一页的总数对不上说明列表正在变：重取这么多次仍对不上就先不分组，等下一次变化。 */
+/** 游程与一页的总数对不上说明列表正在变：重取这么多次仍对不上就先不分组，等下一次变化 */
 const MAX_RESYNC = 2;
 
-/** 退回扁平时带的提示：宿主取不到游程，或组太多。列表正在变这类一时的情况不提示。 */
+/** 退回扁平时带的提示：宿主取不到游程，或组太多。列表正在变这类一时的情况不提示 */
 export type GroupsFailure = 'unavailable' | 'tooMany';
 
 export interface PlaylistGroupsState {
-  /** 这张列表的游程；不分组、没取到或降级了时为空，表格据此走扁平。 */
+  /** 这张列表的游程；不分组、没取到或降级了时为空，表格据此走扁平 */
   readonly runs: readonly GroupRun[];
   readonly total: number;
-  /** 在等游程：表格先按旧的样子画，不在游程与行之间来回跳。 */
+  /** 在等游程：表格先按旧的样子画，不在游程与行之间来回跳 */
   readonly loading: boolean;
   readonly failure: GroupsFailure | null;
-  /** 折起来的一级组键。只在内存里记、不落盘，页面放手这张列表后就清掉。 */
+  /** 折起来的一级组键。只在内存里记、不落盘，页面放手这张列表后就清掉 */
   readonly collapsed: ReadonlySet<string>;
 }
 
@@ -48,23 +48,23 @@ export interface PlaylistGroupsFace extends HostReadyFace {
 
 export interface PlaylistGroupsDeps {
   readonly rows: Pick<PlaylistRowsService, 'stateOf'>;
-  /** 不给时用页面的 localStorage。 */
+  /** 不给时用页面的 localStorage */
   readonly storage?: PrefStorage | null;
 }
 
 export interface PlaylistGroupsService {
   readonly ready: Promise<void>;
   readonly prefsAtom: Atom<GroupsPrefs>;
-  /** 一张列表的分组；同一 GUID 总是同一个原子，没有页面要它时是 `NO_GROUPS`。 */
+  /** 一张列表的分组；同一 GUID 总是同一个原子，没有页面要它时是 `NO_GROUPS` */
   stateOf(guid: string): Atom<PlaylistGroupsState>;
-  /** 页面挂上时调，开始取这张的游程；返回的函数在卸下时调。 */
+  /** 页面挂上时调，开始取这张的游程；返回的函数在卸下时调 */
   acquire(guid: string): () => void;
   toggleCollapsed(guid: string, key: string): void;
   collapseAll(guid: string): void;
   expandAll(guid: string): void;
   /**
-   * 换分组依据：先让宿主按这一档重排这张列表，再取游程。游程只认相邻的行，顺序不对就碎成一堆单曲组。
-   * 重排被拒（列表锁着）时照样换档重取，组按现有顺序算，碎一点但不是错的。
+   * 换分组依据：先让宿主按这一档重排这张列表，再取游程。游程只认相邻的行，顺序不对就碎成一堆单曲组
+   * 重排被拒（列表锁着）时照样换档重取，组按现有顺序算，碎一点但不是错的
    */
   setMode(guid: string, mode: number): Promise<void>;
   setEnabled(enabled: boolean): void;
@@ -78,24 +78,24 @@ interface Entry {
   readonly own: PrimitiveAtom<PlaylistGroupsState>;
   generation: number;
   timer: ReturnType<typeof setTimeout> | undefined;
-  /** 换档时发出的重排：取游程要等它答了，否则取到的是重排之前的顺序。 */
+  /** 换档时发出的重排：取游程要等它答了，否则取到的是重排之前的顺序 */
   sorting: Promise<unknown>;
-  /** 按行服务哪一版内容取过游程；-1 是还没取过。 */
+  /** 按行服务哪一版内容取过游程；-1 是还没取过 */
   contentVersion: number;
   closed: boolean;
   off: () => void;
 }
 
 /**
- * 播放列表页的分组游程：取它、维护它的新鲜度，只此两件；行归行服务，游程只给边界、不带行数据。
+ * 播放列表页的分组游程：取它、维护它的新鲜度，只此两件；行归行服务，游程只给边界、不带行数据
  *
  * 不自己订阅宿主事件：行服务已经把内容事件收成 `contentVersion`，这里跟着它走，按
- * `GROUPS_COALESCE_MS` 合并。`itemsReordered` 不改总数却改分组边界，弱版本拦不住，只能靠它重取。
- * 游程与同刻取的一页总数对不上，说明列表在两次读之间变了，重取有限次。
+ * `GROUPS_COALESCE_MS` 合并。`itemsReordered` 不改总数却改分组边界，弱版本拦不住，只能靠它重取
+ * 游程与同刻取的一页总数对不上，说明列表在两次读之间变了，重取有限次
  *
  * 任何一步走不通都退回扁平，而不是把整页判失败：列表本身读得到，分组只是它的一层视图。退回时带提示，
  * 不静默。折叠状态也放这里：它按组键记，组键的生死由这一份游程定；重取时只丢已经不在的键，随便加一首
- * 歌不会把折起来的组全展开。
+ * 歌不会把折起来的组全展开
  */
 export function startPlaylistGroups(
   store: Store,
@@ -121,12 +121,12 @@ export function startPlaylistGroups(
     entry.timer = undefined;
   }
 
-  /** 退回扁平；`failure` 为 null 是列表正在变这类一时的情况，不打扰用户。 */
+  /** 退回扁平；`failure` 为 null 是列表正在变这类一时的情况，不打扰用户 */
   function degrade(entry: Entry, failure: GroupsFailure | null): void {
     update(entry, { runs: [], total: 0, loading: false, failure });
   }
 
-  /** 排一次取游程；`delay` 是合并窗口，页面刚挂上的第一次不等。 */
+  /** 排一次取游程；`delay` 是合并窗口，页面刚挂上的第一次不等 */
   function schedule(entry: Entry, resync = 0, delay = GROUPS_COALESCE_MS): void {
     if (entry.closed || disposed) return;
     stopTimer(entry);
@@ -149,14 +149,14 @@ export function startPlaylistGroups(
     if (stale()) return;
     const mode = GROUP_MODES[store.get(prefs).mode] ?? GROUP_MODES[DEFAULT_GROUP_MODE];
     const patterns = [...(mode?.patterns ?? [])];
-    // 两次读尽量同刻：弱版本比的就是它们之间列表有没有动。页只取一行、只投影 index。
+    // 两次读尽量同刻：弱版本比的就是它们之间列表有没有动。页只取一行、只投影 index
     const [grouped, page] = await Promise.all([
       settle(() => host.playlist.getGroupRuns(patterns, entry.guid)),
       settle(() => host.playlist.getTracks(entry.guid, 0, 1, undefined, ['index'])),
     ]);
     if (stale()) return;
     if (!grouped || grouped.success === false) {
-      // 列表已不在：页面自己显示已删除，这里不再添一条提示。
+      // 列表已不在：页面自己显示已删除，这里不再添一条提示
       degrade(entry, grouped?.code === 'NOT_FOUND' ? null : 'unavailable');
       return;
     }
@@ -181,7 +181,7 @@ export function startPlaylistGroups(
     });
   }
 
-  /** 行增删重排过：重取游程。列表删了就收起分组。 */
+  /** 行增删重排过：重取游程。列表删了就收起分组 */
   function onRows(entry: Entry): void {
     const rows = store.get(deps.rows.stateOf(entry.guid));
     if (rows.status === 'gone') {
@@ -198,7 +198,7 @@ export function startPlaylistGroups(
 
   /**
    * 页面刚挂上：马上取第一份游程，与行服务取第一页并行。游程自带一页总数核对，不必等行先到；组头与封面
-   * 都等游程，串在第一页后面、再等一个合并窗口，进页后封面要晚到好一截。
+   * 都等游程，串在第一页后面、再等一个合并窗口，进页后封面要晚到好一截
    */
   function first(entry: Entry): void {
     entry.contentVersion = store.get(deps.rows.stateOf(entry.guid)).contentVersion;

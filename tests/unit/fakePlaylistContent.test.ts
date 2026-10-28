@@ -59,6 +59,7 @@ describe('FakePlaylistContent 的选中', () => {
       count: 2,
       playlist: 0,
       playlistGuid: MAIN,
+      contentVersion: expect.any(String),
     });
     await call(() => playlist.setSelection(MAIN, [0], false));
     await call(() => playlist.setSelection(MAIN, [0, 1, 3]));
@@ -95,6 +96,19 @@ describe('FakePlaylistContent 的选中', () => {
     expect(await playlist.getSelection(GONE)).toMatchObject({ code: 'NOT_FOUND' });
     expect(await host.invoke('playlist.getSelection', {})).toMatchObject({ playlist: 0 });
   });
+
+  it('内容版本随改行变，只动选中不变', async () => {
+    const { playlist } = setup();
+    const version = async () => {
+      const answer = await playlist.getSelection(MAIN);
+      return answer.success ? answer.contentVersion : '';
+    };
+    const before = await version();
+    await playlist.setSelection(MAIN, [1]);
+    expect(await version()).toBe(before);
+    await playlist.removeTracks(MAIN, [0]);
+    expect(await version()).not.toBe(before);
+  });
 });
 
 describe('FakePlaylistContent 的增删与挪动', () => {
@@ -111,12 +125,24 @@ describe('FakePlaylistContent 的增删与挪动', () => {
     expect(pushed).toStrictEqual([
       {
         event: 'playlist:itemsRemoved',
-        payload: { playlist: 0, playlistGuid: MAIN, oldCount: 5, newCount: 4 },
+        payload: {
+          playlist: 0,
+          playlistGuid: MAIN,
+          oldCount: 5,
+          newCount: 4,
+          contentVersion: expect.any(String),
+        },
         answered: false,
       },
       {
         event: 'playlist:itemsRemoved',
-        payload: { playlist: 0, playlistGuid: MAIN, oldCount: 4, newCount: 2 },
+        payload: {
+          playlist: 0,
+          playlistGuid: MAIN,
+          oldCount: 4,
+          newCount: 2,
+          contentVersion: expect.any(String),
+        },
         answered: false,
       },
     ]);
@@ -151,6 +177,7 @@ describe('FakePlaylistContent 的增删与挪动', () => {
       invalidCount: 1,
       countBefore: 3,
       totalCount: 5,
+      contentVersion: expect.any(String),
     });
     expect(titles()).toStrictEqual(['Main 1', 'Inserted 1', 'Inserted 2', 'Main 2', 'Main 3']);
     const rows = rowsOf();
@@ -228,6 +255,7 @@ describe('FakePlaylistContent 的分组游程', () => {
       playlist: 0,
       playlistGuid: MAIN,
       total: 5,
+      contentVersion: expect.any(String),
       runs: [
         { start: 0, count: 2, key: 'X', sub: [{ start: 0, count: 2, key: '1' }] },
         {

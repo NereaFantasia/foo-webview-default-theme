@@ -17,7 +17,7 @@ import { installFakeHost } from '../../../fixtures/unitHost.ts';
 
 afterEach(() => vi.useRealTimers());
 
-const changed = { count: 1, timestamp: 1 };
+const changed = { count: 1, handles: [], truncated: false, fromHook: false, timestamp: 1 };
 const rows = Array.from({ length: 220 }, (_, i) => trackRow('Album', `Song ${i}`));
 const answer = (count = 1, total = count): HostResponse<'library.query'> => ({
   success: true,
@@ -70,6 +70,25 @@ describe('搜索读取', () => {
     ]);
     expect(subscribed).toBe(true);
     expect(state()).toMatchObject({ status: 'ready', tracks: [rows[0]], total: 1 });
+  });
+
+  it('换字段范围马上按新字段重查，答回之前留着旧结果；同一个范围不重查', async () => {
+    const { host, service, state } = setup();
+    service.setText('nujabes', true);
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    const held = host.hold('library.query');
+    service.setScope('title');
+    await vi.waitFor(() => expect(held.pending).toHaveLength(1));
+    expect(state()).toMatchObject({ status: 'ready', tracks: [rows[0]], total: 1 });
+    held.respond(0, answer(2));
+    await vi.waitFor(() => expect(state().tracks).toHaveLength(2));
+    held.release();
+    expect(host.callsTo('library.query')[1]).toMatchObject({
+      query: searchQuery('nujabes', 'title')?.query,
+    });
+    service.setScope('title');
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(host.callsTo('library.query')).toHaveLength(2);
   });
 
   it('新词立即清旧结果，旧词在新请求之前或之后答回都不能覆盖', async () => {

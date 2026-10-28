@@ -16,7 +16,9 @@ import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
 const BLUE = albumRow('Blue', 'Joni');
 const HEJIRA = albumRow('Hejira', 'Joni');
 const KEY = albumKeyOf(BLUE);
-const changed = { count: 1, timestamp: 1 };
+/** 这里只测详情页的数据，进页走对象打开服务，另有单测 */
+const OBJECTS = { open: () => Promise.resolve('done' as const) };
+const changed = { count: 1, handles: [], truncated: false, fromHook: false, timestamp: 1 };
 
 async function setup(albums: readonly AlbumInfo[] = [BLUE, HEJIRA], host?: UnitHost) {
   const fake = host ?? installFakeHost({ answers: libraryAnswers(albums) });
@@ -25,7 +27,11 @@ async function setup(albums: readonly AlbumInfo[] = [BLUE, HEJIRA], host?: UnitH
   const list = startAlbums(store, fake.fb);
   let stamps = 0;
   const refetch = atom(0);
-  const detail = startAlbumDetail(store, { history, stamp: () => ++stamps, refetch }, fake.fb);
+  const detail = startAlbumDetail(
+    store,
+    { history, stamp: () => ++stamps, refetch, objects: OBJECTS },
+    fake.fb,
+  );
   onTestFinished(() => {
     detail.dispose();
     list.dispose();
@@ -79,7 +85,11 @@ describe('页面要一张专辑', () => {
     const store = createStore();
     const history = startNavHistory(store);
     const list = startAlbums(store, host.fb);
-    const detail = startAlbumDetail(store, { history, stamp: () => 1, refetch: atom(0) }, host.fb);
+    const detail = startAlbumDetail(
+      store,
+      { history, stamp: () => 1, refetch: atom(0), objects: OBJECTS },
+      host.fb,
+    );
     onTestFinished(() => {
       detail.dispose();
       list.dispose();

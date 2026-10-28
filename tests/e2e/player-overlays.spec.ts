@@ -208,7 +208,11 @@ for (const width of [1280, 900]) {
     await expect(capsule).toBeVisible();
     const scroller = playlist.grid.locator('> div[tabindex="-1"]');
     const viewport = scroller.locator('[role="rowgroup"] > [role="none"]');
-    expect((await box(playlist.view)).bottom - (await box(scroller)).bottom).toBeCloseTo(16, 0);
+    // 滚动区一直延伸到页面底边，尾部空间在它自己的 padding-bottom 里：胶囊高 64 加离底 16，再加表格的 16
+    expect((await box(playlist.view)).bottom - (await box(scroller)).bottom).toBeLessThanOrEqual(1);
+    expect(await scroller.evaluate((element) => getComputedStyle(element).paddingBottom)).toBe(
+      '96px',
+    );
     const capsuleBox = await box(capsule);
     expect((await box(viewport)).bottom).toBeGreaterThanOrEqual(capsuleBox.bottom);
     expect(

@@ -46,6 +46,26 @@ async function setup(host: UnitHost, dimension: 'artist' | 'genre') {
 }
 
 describe('startArtistCredits', () => {
+  it('专辑引用保留 albumId，同显示名称的专辑分别记录署名', async () => {
+    const host = installFakeHost();
+    const items = [
+      {
+        ...artist('A', []),
+        albums: [{ name: '\uFFFD', artist: 'X', albumId: 'album1:b90058' }],
+      },
+      {
+        ...artist('B', []),
+        albums: [{ name: '\uFFFD', artist: 'X', albumId: 'album1:ba0058' }],
+      },
+    ];
+    host.answer('library.getArtists', { success: true, items, count: items.length });
+    const { state } = await setup(host, 'artist');
+    expect([...(state().credits ?? [])]).toEqual([
+      ['album1:b90058', ['A']],
+      ['album1:ba0058', ['B']],
+    ]);
+  });
+
   it('分节依据是艺术家才取；专辑到署名的表按专辑键记，去掉没名字的艺术家', async () => {
     const host = installFakeHost();
     host.answer('library.getArtists', { success: true, items: ITEMS, count: ITEMS.length });
@@ -74,12 +94,18 @@ describe('startArtistCredits', () => {
     vi.useFakeTimers();
     const host = installFakeHost();
     const { prefs } = await setup(host, 'artist');
-    host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
-    host.emit('library:itemsModified', { count: 1, timestamp: 2 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      fromHook: false,
+      timestamp: 2,
+    });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(host.callsTo('library.getArtists')).toHaveLength(2);
     prefs.setDimension('genre');
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 3 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 3 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(host.callsTo('library.getArtists')).toHaveLength(2);
     prefs.setDimension('artist');

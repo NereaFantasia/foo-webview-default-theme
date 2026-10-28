@@ -1,0 +1,17 @@
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  container-type: inline-size;
+  background-color: var(--colorNeutralBackground4);
+}
+
+/* 容器查询单位只认祖先的容器，字号要写在容器的里面一层 */
+.icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--colorNeutralForeground2);
+  font-size: 26cqw;
+}

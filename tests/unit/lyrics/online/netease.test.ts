@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LyricsCandidate, LyricsQuery } from '../../../../src/lyrics/online/lyricsSource.ts';
+import { rankCandidates } from '../../../../src/lyrics/online/lyricsMatch.ts';
 import { createNeteaseSource } from '../../../../src/lyrics/online/netease.ts';
 import { installLyricsHttp, json } from '../../../fixtures/lyricsHttp.ts';
 
@@ -52,6 +53,28 @@ describe('网易云来源', () => {
     const [request] = http.requests();
     expect(request?.url.searchParams.get('s')).toBe('アイドル YOASOBI');
     expect(request?.header('Referer')).toBe('https://music.163.com/');
+  });
+
+  it('网易云在线曲目按 ID 认出唯一候选，不发搜索请求，匹配是满分；手动搜索照旧按关键词搜', async () => {
+    const http = installLyricsHttp({ [SEARCH]: json({ code: 200, result: { songCount: 0 } }) });
+    const source = createNeteaseSource(http.host);
+    const online = { ...query, neteaseId: '2048982668' };
+    const found = await source.search(online);
+    expect(found).toEqual([
+      {
+        source: 'netease',
+        ref: '2048982668',
+        title: 'アイドル',
+        artists: ['YOASOBI', 'Ayase'],
+        album: 'アイドル',
+        durationMs: 213_000,
+      },
+    ]);
+    expect(http.requests()).toEqual([]);
+    const ranked = found === 'failed' ? [] : rankCandidates(online, found, 'high');
+    expect(ranked.map((item) => item.match.level)).toEqual(['perfect']);
+    expect(await source.search({ ...online, keywords: 'Idol' })).toEqual([]);
+    expect(http.requests()[0]?.url.searchParams.get('s')).toBe('Idol');
   });
 
   it('搜不到时 result 里没有 songs，答空数组；code 不是 200 答失败', async () => {

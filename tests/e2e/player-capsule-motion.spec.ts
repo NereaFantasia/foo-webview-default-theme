@@ -5,7 +5,7 @@ import {
   PLAYING_TRACK,
   switchPreference,
 } from '../fixtures/playerPage.ts';
-import { enterSettings } from '../fixtures/settingsPage.ts';
+import { enterSettings, chooseBackground } from '../fixtures/settingsPage.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -79,8 +79,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(capsule(page)).toHaveCSS('backdrop-filter', 'blur(24px) saturate(1.1)');
       await expect.poll(() => alphaOf(page)).toBeCloseTo(0.45, 2);
       await enterSettings(page);
-      await page.getByRole('combobox', { name: '窗口背景', exact: true }).click();
-      await page.getByRole('option', { name: 'Mica', exact: true }).click();
+      await chooseBackground(page, 'Mica');
       await expect(capsule(page)).toHaveCSS('backdrop-filter', 'none');
       await expect.poll(() => alphaOf(page)).toBe(1);
       const events: unknown = await page.evaluate(() =>
@@ -200,7 +199,6 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(await capsule(page).evaluate((node) => getComputedStyle(node, '::before').opacity)).toBe(
       '0.02',
     );
-    await expand('播放栏位置');
     const blur = page.getByRole('switch', { name: '胶囊背景模糊', exact: true });
     await expect(blur).toBeChecked();
     await blur.uncheck();
@@ -209,7 +207,6 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(pane).toHaveCSS('backdrop-filter', 'blur(60px) saturate(1.1)');
     await page.reload();
     await enterSettings(page);
-    await expand('播放栏位置');
     await expect(blur).not.toBeChecked();
     await expect(capsule(page)).toHaveCSS('backdrop-filter', 'none');
     await blur.check();

@@ -4,6 +4,7 @@ import {
   startGenresActions,
 } from '../../../../src/library/genres/genresActions.ts';
 import { LIBRARY_VIEW_PLAYLIST, exclusive } from '../../../../src/playback/libraryView.ts';
+import { genresRowsAtom, startGenresRows } from '../../../../src/library/genres/genresRows.ts';
 import { GENRE_TRACKS, genresLibrary } from '../../../fixtures/genresLibrary.ts';
 import { playlistRow } from '../../../fixtures/libraryRows.ts';
 
@@ -96,4 +97,37 @@ it('新列表建成前释放时补删该列表；不清空其他列表', async (
     { playlistGuid: '{00000000-0000-0000-0000-000000000001}' },
   ]);
   expect(env.host.callsTo('playlist.clear')).toEqual([]);
+});
+it('按显示中的降序结果起播：从表格第一行开始；结果换过或换了流派就不动列表', async () => {
+  const env = await setup();
+  const rows = startGenresRows(env.store, env.host.fb);
+  onTestFinished(() => rows.dispose());
+  const [one, two] = [GENRE_TRACKS[0]!, GENRE_TRACKS[1]!];
+  env.host.answer('library.query', {
+    success: true,
+    total: 2,
+    tracks: [one, two].map(({ handle, path, subsong }, index) => ({
+      index,
+      handle,
+      path,
+      subsong,
+    })),
+  });
+  rows.select('Rock', 'album', 'ALL', { column: 'title', descending: true });
+  await vi.waitFor(() => expect(env.store.get(genresRowsAtom).status).toBe('ready'));
+  const shown = env.store.get(genresRowsAtom).fill!;
+  expect(await env.actions.play(['Rock'], 'Rock', undefined, shown)).toBe(true);
+  expect(env.host.callsTo('library.addToPlaylist')[0]).toMatchObject({
+    paths: [two.path, one.path],
+  });
+  expect(env.host.callsTo('playlist.playTrack')).toEqual([{ playlistGuid: VIEW.guid, index: 0 }]);
+  expect(await env.actions.send(['Jazz'], 'Jazz', false, shown)).toBe(false);
+  expect(env.notice()).toBe('gone');
+  rows.select('Rock', 'album', '%title% HAS One', null);
+  env.actions.openSongs(['Rock'], shown);
+  expect(env.deps.openSongs.mock.calls).toEqual([]);
+  await vi.waitFor(() => expect(env.store.get(genresRowsAtom).status).toBe('ready'));
+  const filtered = env.store.get(genresRowsAtom).fill!;
+  env.actions.openSongs(['Rock'], filtered);
+  expect(env.deps.openSongs.mock.calls).toEqual([[['Rock'], filtered]]);
 });

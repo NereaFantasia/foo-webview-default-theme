@@ -23,6 +23,8 @@ import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
 import { installFakeHost, type UnitHost } from '../../fixtures/unitHost.ts';
 import { stubColorWorker } from '../../fixtures/colorWorker.ts';
+import { hostArtwork } from '../../fixtures/trackArtwork.ts';
+import type { fb } from 'foo-webview-sdk/bridge';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -42,11 +44,11 @@ type Rgb = readonly [number, number, number];
 
 function startCoverAccent(
   store: ReturnType<typeof createStore>,
-  options: PlayingCoverOptions & { seed?: Seeder } = {},
+  options: Omit<PlayingCoverOptions, 'artwork'> & { host?: typeof fb; seed?: Seeder } = {},
 ) {
   const seedOf = options.seed;
   return startColorIntegration(store, {
-    host: options.host,
+    artwork: hostArtwork(store, options.host),
     storage: options.storage,
     analysis: seedOf
       ? {

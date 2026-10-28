@@ -9,7 +9,7 @@ import type { RecordedSource } from '../playback/playbackSource.ts';
 import type { TrackActionsService } from '../track/trackActions.ts';
 import type { SendTarget } from '../track/trackListActions.ts';
 
-/** 从一张专辑起播（整张或其中几首）时记的来源。 */
+/** 从一张专辑起播（整张或其中几首）时记的来源 */
 export function albumSource(album: Album): RecordedSource {
   return { kind: 'album', subject: albumKeyOf(album), name: album.name };
 }
@@ -20,15 +20,15 @@ export interface AlbumActionsFace extends AlbumTracksFace {
 
 /**
  * 专辑的动作，经 `TrackActionsService` 执行，失败与忙碌的提示也挂在那里。菜单那几项作用于 `albumMenuAtom`
- * 里准备好的那一批（右键与「更多」同一份），曲目没到手或过了上限时不发、答 false。
+ * 里准备好的那一批（右键与「更多」同一份），曲目没到手或过了上限时不发、答 false
  */
 export interface AlbumActionsService {
-  /** 从这张专辑的第 `index` 首起播：双击封面、回车与悬停的播放键都走这里。 */
+  /** 从这张专辑的第 `index` 首起播：双击封面、回车与悬停的播放键都走这里 */
   play(album: Album, index?: number): Promise<boolean>;
-  /** 发到「发送到」子菜单里点的那一项；那张列表已经删了或锁着时宿主拒收，同样挂命令失败。 */
+  /** 发到「发送到」子菜单里点的那一项；那张列表已经删了或锁着时宿主拒收，同样挂命令失败 */
   sendTo(target: SendTarget): Promise<boolean>;
   sendToNew(): Promise<boolean>;
-  /** 建成后切为活动列表。 */
+  /** 建成后切为活动列表 */
   createAutoplaylist(): Promise<boolean>;
 }
 
@@ -42,7 +42,7 @@ export function startAlbumActions(
     return paths ? run(paths) : Promise.resolve(false);
   }
 
-  /** 一首曲目叫曲名，一张专辑叫专辑名（没有名字用缺省名），多张叫「首张 等 N 张」。 */
+  /** 一首曲目叫曲名，一张专辑叫专辑名（没有名字用缺省名），多张叫「首张 等 N 张」 */
   function batchName(albums: readonly Album[]): string {
     const translate = store.get(translateAtom);
     const menu = store.get(albumMenuAtom);

@@ -1,11 +1,11 @@
+import { Menu } from '../../motion/Surfaces.tsx';
+import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
 import {
   mergeClasses,
   Button,
-  Menu,
   MenuItem,
   MenuItemRadio,
   MenuList,
-  MenuPopover,
   MenuTrigger,
   makeStyles,
   tokens,
@@ -23,7 +23,7 @@ import type { Translate } from '../../i18n/translate.ts';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
 import type { TrackInfoService } from './trackInfo.ts';
 import type { TrackInfoTarget } from './trackInfoTarget.ts';
-import { infoMediaKind } from './trackInfoModel.ts';
+import { trackAbilities } from '../../host/trackOrigin.ts';
 import cardStyles from '../right-card/RightCard.module.css';
 import styles from './TrackInfoToolbar.module.css';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
@@ -126,7 +126,7 @@ export function TrackInfoToolbar({
                 icon={<ArrowSync16Regular />}
                 disabled={
                   !state.track ||
-                  infoMediaKind(state.track) === 'stream' ||
+                  !trackAbilities(state.track.path).opensLocally ||
                   state.metadata.status === 'loading'
                 }
                 onClick={() => service.refresh()}

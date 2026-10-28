@@ -1,6 +1,6 @@
 import type { PlaybackClock } from 'foo-webview-sdk/bridge';
 
-/** 驱动要用到的播放器方法，签名照 AMLL 的 `DomLyricPlayer`；时间单位是毫秒。 */
+/** 驱动要用到的播放器方法，签名照 AMLL 的 `DomLyricPlayer`；时间单位是毫秒 */
 export interface LyricsPlayerFace {
   setCurrentTime(time: number, isSeek?: boolean): void;
   update(delta?: number): void;
@@ -10,7 +10,7 @@ export interface LyricsPlayerFace {
 
 export type LyricsClockFace = Pick<PlaybackClock, 'position' | 'state' | 'onChange'>;
 
-/** 逐帧回调的来源；回调收到的时刻与 `performance.now()` 同一刻度。 */
+/** 逐帧回调的来源；回调收到的时刻与 `performance.now()` 同一刻度 */
 export interface FrameSource {
   request(callback: (now: number) => void): number;
   cancel(handle: number): void;
@@ -22,7 +22,7 @@ const browserFrames: FrameSource = {
 };
 
 export interface LyricsDriver {
-  /** 歌词区看不见时停帧并暂停播放器；再看得见时直接跳到当前位置，不从停下的地方滚过去。 */
+  /** 歌词区看不见时停帧并暂停播放器；再看得见时直接跳到当前位置，不从停下的地方滚过去 */
   setActive(active: boolean): void;
   setOffset(seconds: number): void;
   dispose(): void;
@@ -31,20 +31,43 @@ export interface LyricsDriver {
 /**
  * 把 AMLL 播放器接到 SDK 的播放时钟上。AMLL 要求每帧推一次时间再 `update`；位置取时钟在这一帧时刻的
  * 估计，宿主约 100 ms 一次的进度事件之间也连续。跳转、换曲与时钟重新对准当作跳转告诉播放器，
- * 它据此直接排版、不播滚动；暂停与停止让播放器停住逐字动画。
+ * 它据此直接排版、不播滚动；暂停与停止让播放器停住逐字动画
+ * 播放器异常时停止驱动并注销时钟监听；提供 onError 时交给调用方显示回退内容
  */
 export function startLyricsDriver(
   player: LyricsPlayerFace,
   clock: LyricsClockFace,
   frames: FrameSource = browserFrames,
+  onError?: (error: unknown) => void,
 ): LyricsDriver {
   let active = false;
   let disposed = false;
+  let failed = false;
   let handle: number | null = null;
   let last = 0;
   let offset = 0;
 
   const ms = (seconds: number) => (seconds - offset) * 1000;
+
+  function run(action: () => void): void {
+    if (failed || disposed) return;
+    try {
+      action();
+    } catch (error) {
+      failed = true;
+      active = false;
+      if (handle !== null) frames.cancel(handle);
+      handle = null;
+      off();
+      try {
+        player.pause();
+      } catch {
+        // 保留最初的播放错误；即使暂停也失败，订阅与后续帧仍已停止
+      }
+      if (onError) onError(error);
+      else throw error;
+    }
+  }
 
   function applyState(): void {
     if (clock.state === 'playing') player.resume();
@@ -54,10 +77,12 @@ export function startLyricsDriver(
   function frame(now: number): void {
     handle = null;
     if (!active || disposed) return;
-    player.setCurrentTime(ms(clock.position(now)));
-    player.update(Math.max(0, now - last));
-    last = now;
-    handle = frames.request(frame);
+    run(() => {
+      player.setCurrentTime(ms(clock.position(now)));
+      player.update(Math.max(0, now - last));
+      last = now;
+      handle = frames.request(frame);
+    });
   }
 
   function start(): void {
@@ -72,33 +97,40 @@ export function startLyricsDriver(
   function stop(): void {
     if (handle !== null) frames.cancel(handle);
     handle = null;
-    player.pause();
+    if (!failed) player.pause();
   }
 
   const off = clock.onChange((change) => {
     if (!active || disposed) return;
-    if (change.reason !== 'state') player.setCurrentTime(ms(change.position), true);
-    applyState();
+    run(() => {
+      if (change.reason !== 'state') player.setCurrentTime(ms(change.position), true);
+      applyState();
+    });
   });
 
   return {
     setActive(next) {
-      if (disposed || next === active) return;
+      if (disposed || failed || next === active) return;
       active = next;
-      if (active) start();
-      else stop();
+      run(() => {
+        if (active) start();
+        else stop();
+      });
     },
     setOffset(seconds) {
       if (disposed || !Number.isFinite(seconds)) return;
       offset = seconds;
-      if (active) player.setCurrentTime(ms(clock.position()), true);
+      if (active) run(() => player.setCurrentTime(ms(clock.position()), true));
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       active = false;
-      stop();
-      off();
+      try {
+        stop();
+      } finally {
+        off();
+      }
     },
   };
 }

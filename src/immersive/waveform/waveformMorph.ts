@@ -3,14 +3,14 @@ import type { ColumnLayer } from './waveformDraw.ts';
 import type { LayerTone } from './waveformModes.ts';
 
 /**
- * 整轨波形换数据时的形变：画面上现有的层与新的层逐列插值高度、按层插值透明度。换曲、分频结果到手、换画法都走这里。
+ * 整轨波形换数据时的形变：画面上现有的层与新的层逐列插值高度、按层插值透明度。换曲、分频结果到手、换画法都走这里
  *
  * 新层怎么接旧层：
  * - 同色调、同分道、同列数的旧层直接变形过去（同一种画法换曲；全频变 A 计权）；
  * - 以中线对称的新层找不到同色调的前身，就借旧图里最显眼的那一层对称层的轮廓，从那里变形并淡入
  *   （全频变中高频：主体从全频的轮廓变过去，全频底影从同一个轮廓淡出来）；
- * - 连轮廓都借不到（分道画法、或原来什么都没有）就从零长起。
- * 没被接手的旧层压回零并淡出。换曲时新数据还没到，新层为空，旧图整个压回中线。
+ * - 连轮廓都借不到（分道画法、或原来什么都没有）就从零长起
+ * 没被接手的旧层压回零并淡出。换曲时新数据还没到，新层为空，旧图整个压回中线
  */
 export type ShownLayer = ColumnLayer & { alpha: number };
 
@@ -29,18 +29,18 @@ export interface WaveformMorph {
   motion: Motion;
 }
 
-/** 形变到 `now` 这一刻画面上的层；`done` 时已落到目标，淡出完的层已去掉。 */
+/** 形变到 `now` 这一刻画面上的层；`done` 时已落到目标，淡出完的层已去掉 */
 export interface MorphFrame {
   layers: ShownLayer[];
   done: boolean;
 }
 
-/** 画面上的层原样当作静止的层（透明度 1）。 */
+/** 画面上的层原样当作静止的层（透明度 1） */
 export function restingLayers(target: readonly ColumnLayer[]): ShownLayer[] {
   return target.map((layer) => ({ ...layer, alpha: 1 }));
 }
 
-/** 对称层里最显眼的那一层：透明度最高的，一样高时取数据墨。 */
+/** 对称层里最显眼的那一层：透明度最高的，一样高时取数据墨 */
 function outlineOf(shown: readonly ShownLayer[]): ShownLayer | undefined {
   let best: ShownLayer | undefined;
   for (const layer of shown) {
@@ -60,7 +60,7 @@ function same(a: Float32Array, b: Float32Array): boolean {
   return true;
 }
 
-/** 从画面上的 `shown` 变到 `target`；两边一模一样（没有要动的）给 `null`。 */
+/** 从画面上的 `shown` 变到 `target`；两边一模一样（没有要动的）给 `null` */
 export function morphTo(
   shown: readonly ShownLayer[],
   target: readonly ColumnLayer[],

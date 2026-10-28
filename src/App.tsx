@@ -33,7 +33,7 @@ export interface AppProps {
   services: AppServices;
 }
 
-/** 页面组装入口：接上 store、服务与主题，再挂主窗与全应用共用的轻提示；不放业务逻辑。 */
+/** 页面组装入口：接上 store、服务与主题，再挂主窗与全应用共用的轻提示；不放业务逻辑 */
 export function App({ services }: AppProps) {
   const table = useMemo(
     () => ({

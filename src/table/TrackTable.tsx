@@ -16,7 +16,6 @@ import {
 } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { useTableServices, type TableServices } from './tableContext.ts';
-import type { ColumnMenuExtras } from './columns/ColumnMenuExtras.tsx';
 import type { ColumnId } from './columns/columns.ts';
 import type { ColumnsModel } from './columns/columnsModel.ts';
 import { containsRow } from './rangeSelection.ts';
@@ -26,7 +25,6 @@ import {
   type TableGroupItem,
   type TableItem,
   type TableArtwork,
-  type TableLinks,
   type TableTrack,
   type TableRowItem,
 } from './tableItems.ts';
@@ -41,117 +39,115 @@ import { useTrackTableInput, type TableCallbacks } from './useTrackTableInput.ts
 import { useTrackTableRows } from './useTrackTableRows.ts';
 import { useTrackTableStyles } from './useTrackTableStyles.ts';
 import { useTableGroupFold } from './useTableGroupFold.ts';
+import { useTableHorizontalScroll } from './useTableHorizontalScroll.ts';
 
-/** 表格交给调用方的句柄：离开页面时记下焦点行、回来时交还，从外面定位到一行。 */
+/** 表格交给调用方的句柄：离开页面时记下焦点行、回来时交还，从外面定位到一行 */
 export interface TrackTableHandle {
-  /** 焦点所在那一条的键；没有焦点时为 null。 */
+  /** 焦点所在那一条的键；没有焦点时为 null */
   focusedKey(): string | null;
   /**
    * 焦点落到这个键的条目上，不改选中、不滚动。表格还没见过焦点时，那一条不在条目流里也照样记着，
-   * 等它出现才生效：数据晚到时先交还焦点不会落空。
+   * 等它出现才生效：数据晚到时先交还焦点不会落空
    */
   setFocusKey(key: string | null): void;
   /**
    * 焦点落到这一位并滚到视口中间，`select` 为真且是曲目行时只选它；给定位正在播放、打字即跳这类从外面来的
    * 定位用。下标按最近一次提交的条目流算，调用方在条目流换过之后的 effect 里调；那一位不是曲目行或分组头时
-   * 什么都不动，答假。
+   * 什么都不动，答假
    */
   reveal(index: number, select: boolean): boolean;
-  /** 把 DOM 焦点交给表格，不滚动。 */
+  /** 把 DOM 焦点交给表格，不滚动 */
   focus(): void;
-  /** 行跟着滚的元素：表格自己的滚动区，或调用方给的页面滚动元素。还没挂上时为 null。 */
+  /** 行跟着滚的元素：表格自己的滚动区，或调用方给的页面滚动元素。还没挂上时为 null */
   scrollElement(): HTMLElement | null;
-  /** 按条目键开合单个分组，沿用组头的锚点与动效；条目已不在表内时不操作，答假。 */
+  horizontalScrollElement(): HTMLElement | null;
+  /** 按条目键开合单个分组，沿用组头的锚点与动效；条目已不在表内时不操作，答假 */
   toggleGroup(key: string): boolean;
 }
 
 /**
  * 表格行的评分戳，见 `TrackRatingsService.stamp`：整张表一个，或按行给（分页取的表各页取回的时刻不同，戳
- * 按页各有一个）。按行给时要是稳定的函数，与条目流一起换：它一变就整张表重新登记一次。
+ * 按页各有一个）。按行给时要是稳定的函数，与条目流一起换：它一变就整张表重新登记一次
  */
 export type TableRatingStamp = number | ((item: TableRowItem) => number);
 
-/** 调用方画分组头时拿到的状态。 */
+/** 调用方画分组头时拿到的状态 */
 export interface TableGroupState {
   readonly focused: boolean;
-  /** 开合这一组：交给 `onToggleGroup`，开合前后这个分组头在视口里的位置不变。 */
+  /** 开合这一组：交给 `onToggleGroup`，开合前后这个分组头在视口里的位置不变 */
   toggle(): void;
 }
 
 export interface TrackTableProps<G> extends TableCallbacks<G> {
-  /** 列模型，建在摆放表格的那一层，一张表一个存档键。 */
+  /** 列模型，建在摆放表格的那一层，一张表一个存档键 */
   readonly columns: ColumnsModel;
   /**
    * 条目流，按显示顺序。分组、折叠与垫位由调用方排好。要记忆化：每换一份就整份重算行位置，并重新登记整条流的
-   * 评分。
+   * 评分
    */
   readonly items: readonly TableItem<G>[];
-  /** 本地多选，按行序号记；换了一批行或重新排序时由调用方清空。 */
+  /** 本地多选，按行序号记；换了一批行或重新排序时由调用方清空 */
   readonly selection: RowSelection;
-  /** 读屏念的表名。 */
+  /** 读屏念的表名 */
   readonly label: string;
-  /** 曲目行与空位的高，CSS 像素。 */
+  /** 曲目行与空位的高，CSS 像素 */
   readonly rowHeight: number;
-  /** 分组头的高；要给稳定的函数。不给时与曲目行同高。 */
+  /** 分组头的高；要给稳定的函数。不给时与曲目行同高 */
   readonly groupHeight?: (item: TableGroupItem<G>) => number;
   /**
    * 分组头里画什么；表格只管它的位置、焦点与开合。里面的按钮设 `tabIndex={-1}`：鼠标点它时焦点交还表格，
-   * 键盘接得上。
+   * 键盘接得上
    */
   readonly renderGroup?: (item: TableGroupItem<G>, state: TableGroupState) => ReactNode;
-  /** 上下键停不停在分组头上。 */
+  /** 上下键停不停在分组头上 */
   readonly groupFocus?: boolean;
-  /** 允许播放单个分组的开合动画；批量和数据刷新仍直接到位。 */
+  /** 允许播放单个分组的开合动画；批量和数据刷新仍直接到位 */
   readonly animateGroupFold?: (item: TableGroupItem<G>) => boolean;
   /**
    * 取这批行的请求发出之前从评分服务拿的戳，见 `TrackRatingsService.stamp`；应答回来后才拿的话，请求途中来的
-   * 评分事件会被行里的旧值盖掉。整张表一个，或按行给，见 `TableRatingStamp`。
+   * 评分事件会被行里的旧值盖掉。整张表一个，或按行给，见 `TableRatingStamp`
    */
   readonly ratingStamp: TableRatingStamp;
   /**
    * 画出来的显示位区间 [start, end) 变了（含视口上下多画的几条），或条目流换了一份。分页取行的调用方据此
-   * 取缺的页。
+   * 取缺的页
    */
   readonly onRange?: (start: number, end: number) => void;
-  /** 序号格的写法。曲目行按属性跳过重渲染，要给稳定的函数。 */
+  /** 序号格的写法。曲目行按属性跳过重渲染，要给稳定的函数 */
   readonly numberText: (track: TableTrack) => string;
-  /** 画成链接的列；同样要给稳定的对象。 */
-  readonly links?: TableLinks;
-  /** 缩略图列里画什么，`size` 是缩略图边长（CSS 像素，随行高）；不给时这一列空着。同样要给稳定的函数。 */
+  /** 缩略图列里画什么，`size` 是缩略图边长（CSS 像素，随行高）；不给时这一列空着。同样要给稳定的函数 */
   readonly artwork?: TableArtwork;
   readonly sort?: TableSort | null;
-  /** 单击列头排序；不给时列头不能点着排序。 */
+  /** 单击列头排序；不给时列头不能点着排序 */
   readonly onSort?: (column: ColumnId) => void;
-  /** 列头菜单里列勾选之外的几段（排序、分组）；不给时列头菜单只有列的勾选。 */
-  readonly columnMenu?: ColumnMenuExtras;
-  /** 行还在取，读屏据此报「忙」。 */
+  /** 行还在取，读屏据此报「忙」 */
   readonly loading?: boolean;
-  /** 条目流为空时画在行的位置上；还在取与取到空由调用方分开画。 */
+  /** 条目流为空时画在行的位置上；还在取与取到空由调用方分开画 */
   readonly empty?: ReactNode;
   /**
    * 行跟着这个元素滚：表格按内容高摆在页面的滚动内容里，上方可以有别的内容，列头滚到顶时吸住。它要是定位
-   * 元素，表格与它之间不能再有滚动容器。挂上之前给 null；不给（undefined）时表格撑满父容器、自己滚。
+   * 元素，表格与它之间不能再有滚动容器。挂上之前给 null；不给（undefined）时表格撑满父容器、自己滚
    */
   readonly scrollParent?: HTMLElement | null;
-  /** 读写焦点行的句柄，页面离开时记下、回来时交还。 */
+  /** 读写焦点行的句柄，页面离开时记下、回来时交还 */
   readonly handle?: Ref<TrackTableHandle>;
 }
 
 type TableVariables = CSSProperties & Record<`--${string}`, string>;
 
-/** 缩略图上下各让出的 CSS 像素，相邻两行的缩略图不贴在一起。 */
+/** 缩略图上下各让出的 CSS 像素，相邻两行的缩略图不贴在一起 */
 const ART_INSET = 4;
 
 /**
  * 曲目表格：Fluent 的 `Table*` 画列头与单元格，虚拟滚动、分组头、换列与粘性视口在它上面补。条目流、选中与
- * 列模型归调用方；表格管焦点、键盘、滚动、播放记号与评分。所有位置都是显示位（条目流的下标）。
+ * 列模型归调用方；表格管焦点、键盘、滚动、播放记号与评分。所有位置都是显示位（条目流的下标）
  *
  * 焦点只在表格根元素上，行不拿焦点，焦点行靠 `aria-activedescendant` 告诉读屏。滚动区、以及行带里不在 Tab
  * 次序上的元素（调用方画在分组头里、`tabIndex` 为 -1 的按钮）被鼠标点到时也会拿到焦点，这时交还给根元素，
- * 键盘照样接得上。
+ * 键盘照样接得上
  *
  * 给了 `scrollParent` 时表格不自己滚：按内容高摆在页面里，列头吸在页面滚动元素的顶上，行的可见区从列头下面
- * 开始，行不会从列头底下透出来，列头因此不用铺底。
+ * 开始，行不会从列头底下透出来，列头因此不用铺底
  */
 export function TrackTable<G>(props: TrackTableProps<G>) {
   const { columns, items, selection, rowHeight, renderGroup, scrollParent } = props;
@@ -167,6 +163,9 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
   const scroller = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const strip = useRef<HTMLDivElement>(null);
+  const horizontal = useRef<HTMLDivElement>(null);
+  const columnState = useAtomValueRawSync(columns.state);
+  useTableHorizontalScroll(root, horizontal);
   const id = useId();
   const rowId = useCallback((index: number) => `${id}-${index}`, [id]);
   const sameHeight = useCallback(() => rowHeight, [rowHeight]);
@@ -212,6 +211,7 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
     toggleGroup: input.groupHandlers.toggle,
     root,
     scroller: scrolling,
+    horizontal,
   });
   useStickyViewport(scrolling, viewport, strip, {
     ...frame,
@@ -225,8 +225,8 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
     if (playingKey === '' || services.trackKey(track) !== playingKey) return 'none';
     return audible ? 'active' : 'paused';
   };
-  // 焦点按行走，读屏整行念：照 ARIA 的模式只有 treegrid 的行能拿焦点，所以平铺表也是一棵只有一层的树。
-  // 调用方接了开合才报展开态。
+  // 焦点按行走，读屏整行念：照 ARIA 的模式只有 treegrid 的行能拿焦点，所以平铺表也是一棵只有一层的树
+  // 调用方接了开合才报展开态
   const expandable = props.onToggleGroup !== undefined;
   const aria = useMemo(() => ariaRowsOf(items), [items]);
   const focusShown = rows.visible.some((virtual) => virtual.index === input.focus);
@@ -238,6 +238,9 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
     '--table-row-left': `${layout.coverWidth}px`,
     '--table-row-height': `${rowHeight}px`,
     '--table-art-size': `${artSize}px`,
+    '--table-content-width': layout.contentWidth,
+    '--table-viewport-width':
+      columnState.containerWidth > 0 ? `${columnState.containerWidth}px` : '100%',
   };
 
   return (
@@ -264,7 +267,6 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
         sort={props.sort}
         onSort={props.onSort}
         sticky={pageScroll}
-        menu={props.columnMenu}
       />
       <div
         ref={scroller}
@@ -340,7 +342,6 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
                       rating={ratings.ratingOf(item)}
                       ratable={ratings.canRate(item)}
                       numberText={props.numberText}
-                      links={props.links}
                       artwork={props.artwork}
                       artSize={artSize}
                       handlers={input.rowHandlers}
@@ -353,24 +354,28 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
           </TableBody>
         )}
       </div>
+      <div ref={horizontal} className={styles.horizontal} data-table-horizontal aria-hidden>
+        <div className={styles['horizontal-content']} />
+      </div>
     </Table>
   );
 }
 
 interface TableHandleSource<G> {
   readonly items: readonly TableItem<G>[];
-  /** 焦点所在的显示位，-1 是没有。 */
+  /** 焦点所在的显示位，-1 是没有 */
   readonly focus: number;
   readonly setFocusKey: (key: string | null) => void;
-  /** 见 `TrackTableHandle.reveal`；要是稳定的函数。 */
+  /** 见 `TrackTableHandle.reveal`；要是稳定的函数 */
   readonly reveal: (index: number, select: boolean) => boolean;
   readonly toggleGroup: (index: number) => void;
-  /** 表格根元素：焦点只在它上面。 */
+  /** 表格根元素：焦点只在它上面 */
   readonly root: RefObject<HTMLElement | null>;
   readonly scroller: RefObject<HTMLElement | null>;
+  readonly horizontal: RefObject<HTMLElement | null>;
 }
 
-/** 把表格的焦点行交给调用方读写；读的是调用那一刻最近一次提交的条目流与焦点。 */
+/** 把表格的焦点行交给调用方读写；读的是调用那一刻最近一次提交的条目流与焦点 */
 function useTableHandle<G>(
   handle: Ref<TrackTableHandle> | undefined,
   source: TableHandleSource<G>,
@@ -388,6 +393,7 @@ function useTableHandle<G>(
       reveal,
       focus: () => latest.current.root.current?.focus({ preventScroll: true }),
       scrollElement: () => latest.current.scroller.current,
+      horizontalScrollElement: () => latest.current.horizontal.current,
       toggleGroup: (key: string) => {
         const index = latest.current.items.findIndex(
           (item) => item.kind === 'group' && item.key === key,
@@ -402,14 +408,14 @@ function useTableHandle<G>(
 }
 
 interface TableRatings {
-  /** 这一行此刻几星；曲目还没取到时是 0。 */
+  /** 这一行此刻几星；曲目还没取到时是 0 */
   ratingOf(item: TableRowItem): number;
   canRate(item: TableRowItem): boolean;
 }
 
 /**
  * 表格的评分：评分的已知偏离一变就重画，并登记条目流里取到了的曲目。一个文件里有好几首时，评分事件分不出
- * 是哪一首，登记着的逐首补读；整张表一次登记，同一个文件落在两页里也认得出它不止一首。
+ * 是哪一首，登记着的逐首补读；整张表一次登记，同一个文件落在两页里也认得出它不止一首
  */
 function useTableRatings<G>(
   items: readonly TableItem<G>[],
@@ -435,8 +441,7 @@ function useTableRatings<G>(
 }
 
 /**
- * 把表格容器的内容宽报给列模型：窄档与封面列的上限都按它算，列模型自己不量 DOM。量的必须是列头与
- * 曲目行共用的那个盒，否则两边不在同一帧换档，栅格的轨道数与格子数对不上。
+ * 把表格容器的内容宽报给列模型，供旧比例列换算与封面上限使用；列头与曲目行按同一个盒对齐
  */
 function useColumnsContainer(element: RefObject<HTMLElement | null>, columns: ColumnsModel): void {
   useLayoutEffect(() => {
@@ -451,8 +456,8 @@ function useColumnsContainer(element: RefObject<HTMLElement | null>, columns: Co
 }
 
 /**
- * 把此刻画出来的显示位区间 [start, end) 报给调用方，含视口上下多画的那几条；分页取行的调用方据此取缺的页。
- * 区间变了、或条目流换了一份才报：分组开合之后，同一段显示位对应的已是另一批行。什么都没画时不报。
+ * 把此刻画出来的显示位区间 [start, end) 报给调用方，含视口上下多画的那几条；分页取行的调用方据此取缺的页
+ * 区间变了、或条目流换了一份才报：分组开合之后，同一段显示位对应的已是另一批行。什么都没画时不报
  */
 function useVisibleRange(
   visible: readonly VirtualItem[],

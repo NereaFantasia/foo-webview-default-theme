@@ -238,7 +238,9 @@ test('侧边栏键把侧边栏整个藏起来，没有握柄、内容卡占满�
   expect(shell.errors).toEqual([]);
 });
 
-test('两种形态里同一项的图标在同一处；分节标题与细线占同样的高度', async ({ page }) => {
+test('两种形态里同一项的图标同高同大，图标态向右多 2 的视觉补偿；分节标题与细线占同样的高度', async ({
+  page,
+}) => {
   const shell = await openShell(page);
   const iconBox = (name: string) =>
     shell.nav
@@ -257,7 +259,8 @@ test('两种形态里同一项的图标在同一处；分节标题与细线占�
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   await expect(shell.nav.getByRole('button', { name: '首页', exact: true })).toHaveCount(1);
   const rail = await Promise.all(names.map(iconBox));
-  expect(rail).toEqual(expanded);
+  // 图标态的图标向右多出一档 spacingHorizontalXXS（2）的视觉补偿，对齐分隔线的中线；竖向与大小不变
+  expect(rail).toEqual(expanded.map((box) => ({ ...box, x: box.x + 2 })));
   expect(shell.errors).toEqual([]);
 });
 
@@ -420,7 +423,11 @@ test('图标态：分节标题换成细线，资料库各项常显；播放列�
   // 缺省的清单里 Chill 在播。
   await expect(dotOf('播放列表')).toHaveCount(1);
   await expect(shell.nav.getByRole('button', { name: /播放队列/ })).toHaveCount(0);
-  await shell.host.emit('playback:queueChanged', { origin: 'user_added', count: 2 });
+  await shell.host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: 2,
+    contentVersion: '1',
+  });
   await expect(shell.nav.getByRole('button', { name: /播放队列/ })).toHaveCount(0);
   expect(await shell.saved()).toEqual({
     rail: true,

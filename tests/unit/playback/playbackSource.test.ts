@@ -6,6 +6,7 @@ import { createTranslate } from '../../../src/i18n/translate.ts';
 import { LIBRARY_VIEW_PLAYLIST } from '../../../src/playback/libraryView.ts';
 import {
   playbackSourceAtom,
+  refOfSource,
   sourceHome,
   sourceLabel,
   type PlaybackSource,
@@ -13,6 +14,8 @@ import {
   type RecordedSource,
 } from '../../../src/playback/playbackSource.ts';
 import { createConfigWriter } from '../../../src/host/configWrite.ts';
+import { placeOf } from '../../../src/nav/objectRef.ts';
+import { onlineListSubject } from '../../../src/nav/places.ts';
 import type { DataWriter } from '../../../src/kit/dataWrite.ts';
 import { createMemoryDataWriter, occupyWriteLock } from '../../fixtures/dataWriter.ts';
 import type { HostResponse } from '../../fixtures/fakeHost.ts';
@@ -147,6 +150,15 @@ describe('startPlaybackSource', () => {
     await settle();
     expect(source()).toEqual({ kind: 'library' });
     expect(sourceHome({ kind: 'library' })).toEqual({ id: 'albums' });
+    expect(sourceHome({ kind: 'online', subject: 'Nujabes', name: 'Nujabes' })).toEqual({
+      id: 'search',
+      subject: 'Nujabes',
+    });
+    for (const kind of ['onlineAlbum', 'onlinePlaylist', 'onlineArtist'] as const)
+      expect(sourceHome({ kind, subject: '["wy","album","5","X"]', name: 'X' })).toEqual({
+        id: 'onlineList',
+        subject: '["wy","album","5","X"]',
+      });
   });
 
   it('宿主答没有在播的表（停止之后）不改来源', async () => {
@@ -470,11 +482,77 @@ describe('来源文字', () => {
     ],
     [{ kind: 'genre', subject: 'Jazz', name: 'Jazz' }, '流派 · Jazz', 'Genre · Jazz'],
     [{ kind: 'folder', subject: 'folder-key', name: 'Music' }, '文件夹 · Music', 'Folder · Music'],
+    [
+      { kind: 'onlineAlbum', subject: 'x', name: 'Modal Soul' },
+      '专辑 · Modal Soul',
+      'Album · Modal Soul',
+    ],
+    [{ kind: 'onlinePlaylist', subject: 'x', name: '深夜' }, '歌单 · 深夜', 'Playlist · 深夜'],
+    [
+      { kind: 'onlineArtist', subject: 'x', name: 'Nujabes' },
+      '热门歌曲 · Nujabes',
+      'Top songs · Nujabes',
+    ],
     [{ kind: 'library' }, '媒体库', 'Library'],
   ];
 
   it.each(cases)('%j 的中英文来源文字', (source, chinese, english) => {
     expect(sourceLabel(source, createTranslate(zhCN, {}))).toBe(chinese);
     expect(sourceLabel(source, createTranslate(en, {}))).toBe(english);
+  });
+});
+
+describe('来源对应的对象', () => {
+  const LIST = onlineListSubject({
+    kind: 'album',
+    ref: { platform: 'wy', id: '5' },
+    title: 'Modal Soul',
+  });
+  const cases: readonly [PlaybackSource, object | null][] = [
+    [MODAL_SOUL, { kind: 'album', key: MODAL_SOUL.subject }],
+    [
+      { kind: 'artist', subject: 'Nujabes', name: 'Nujabes' },
+      { kind: 'artist', name: 'Nujabes' },
+    ],
+    [
+      { kind: 'artist', subject: '', name: '' },
+      { kind: 'artist', name: '' },
+    ],
+    [
+      { kind: 'playlist', subject: CHILL, name: 'Chill' },
+      { kind: 'playlist', guid: CHILL },
+    ],
+    [
+      { kind: 'genre', subject: 'Jazz', name: 'Jazz' },
+      { kind: 'genre', value: 'Jazz' },
+    ],
+    [
+      { kind: 'onlineAlbum', subject: LIST, name: 'Modal Soul' },
+      expect.objectContaining({ kind: 'onlineList' }),
+    ],
+  ];
+
+  it.each(cases)('%j', (source, ref) => {
+    expect(refOfSource(source)).toEqual(ref);
+  });
+
+  it('没有对应对象的来源：歌曲页、在线搜索、媒体库、文件夹页的目录，主体读不出的流派与在线列表', () => {
+    const none: readonly PlaybackSource[] = [
+      { kind: 'songs', subject: '', name: '' },
+      { kind: 'online', subject: 'Nujabes', name: 'Nujabes' },
+      { kind: 'library' },
+      { kind: 'folder', subject: '{"rootId":"E"}', name: 'E' },
+      { kind: 'genre', subject: '\0', name: '' },
+      { kind: 'genre', subject: '\0["A","B"]', name: '' },
+      { kind: 'onlineArtist', subject: 'not json', name: 'X' },
+    ];
+    for (const source of none) expect(refOfSource(source)).toBeNull();
+  });
+
+  it('有对象的来源，对象的地点就是来源的家，两张表不漂移', () => {
+    for (const [source] of cases) {
+      const ref = refOfSource(source);
+      expect(ref && placeOf(ref)).toEqual(sourceHome(source));
+    }
   });
 });

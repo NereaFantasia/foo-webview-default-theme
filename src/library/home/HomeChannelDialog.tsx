@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Field,
   Input,
-  Select,
+  Option,
   Spinner,
   makeStyles,
   tokens,
@@ -17,6 +17,8 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useState } from 'react';
 import { ArrowClockwise20Regular } from '@fluentui/react-icons';
 import { translateAtom } from '../../i18n/locale.ts';
+import { ScrollDropdown } from '../../kit/ScrollDropdown.tsx';
+import { PresetChips } from '../../track/PresetChips.tsx';
 import { QueryBox } from '../../track/QueryBox.tsx';
 import type { QueryInput } from '../../track/queryInput.ts';
 import {
@@ -81,6 +83,10 @@ function ChannelEditor({
     HOME_CHANNEL_TEMPLATES.find((item) => item.query === draft?.query)?.id ?? '',
   );
   const [sort, setSort] = useState<ChannelSort>(initial?.sort ?? 'album');
+  const template = HOME_CHANNEL_TEMPLATES.find((item) => item.id === templateId);
+  const sortLabel = t(
+    sort === 'album' ? 'home.sortAlbum' : sort === 'title' ? 'home.sortTitle' : 'home.sortRandom',
+  );
   const text = allOf([
     input.mode === 'advanced' ? input.advancedText : wordsQuery(queryWords(input.text), scope),
     ...[...presets].map((preset) => presetOf(preset).query),
@@ -119,12 +125,17 @@ function ChannelEditor({
           <DialogContent className={classes.content}>
             {!channel && (
               <Field label={t('home.template')}>
-                <Select
-                  value={templateId}
+                <ScrollDropdown
+                  inlinePopup
+                  value={t(template?.label ?? 'home.templateCustom')}
+                  selectedOptions={[templateId]}
                   disabled={saved.saving}
-                  onChange={(_, data) => {
-                    setTemplateId(data.value);
-                    const selected = HOME_CHANNEL_TEMPLATES.find((item) => item.id === data.value);
+                  onOptionSelect={(_, data) => {
+                    if (data.optionValue === undefined) return;
+                    setTemplateId(data.optionValue);
+                    const selected = HOME_CHANNEL_TEMPLATES.find(
+                      (item) => item.id === data.optionValue,
+                    );
                     if (!selected) return;
                     setName(t(selected.label));
                     setInput({ mode: 'advanced', text: '', advancedText: selected.query });
@@ -132,17 +143,17 @@ function ChannelEditor({
                     setSort('random');
                   }}
                 >
-                  <option value="">{t('home.templateCustom')}</option>
+                  <Option value="">{t('home.templateCustom')}</Option>
                   {HOME_CHANNEL_TEMPLATES.map((template) => (
-                    <option
+                    <Option
                       key={template.id}
                       value={template.id}
                       disabled={template.statistics && feed.available !== true}
                     >
                       {t(template.label)}
-                    </option>
+                    </Option>
                   ))}
-                </Select>
+                </ScrollDropdown>
               </Field>
             )}
             <Field label={t('home.name')} required>
@@ -167,8 +178,6 @@ function ChannelEditor({
               <QueryBox
                 input={input}
                 scope={scope}
-                checked={presets}
-                playcount={feed.available}
                 invalid={tooLong}
                 menuOpen={menuOpen && !saved.saving}
                 placeholder={t('home.queryPlaceholder')}
@@ -180,26 +189,32 @@ function ChannelEditor({
                   if (!tooLong) query.setQuery(text, sort, true);
                 }}
                 onScope={setScope}
-                onTogglePreset={(preset) => {
-                  if (!saved.saving) setPresets((previous) => togglePreset(previous, preset));
-                }}
                 onMenuOpenChange={setMenuOpen}
               />
             </Field>
+            <PresetChips
+              checked={presets}
+              playcount={feed.available}
+              onToggle={(preset) => {
+                if (!saved.saving) setPresets((previous) => togglePreset(previous, preset));
+              }}
+            />
             <Field label={t('home.sort')}>
-              <Select
-                value={sort}
+              <ScrollDropdown
+                inlinePopup
+                value={sortLabel}
+                selectedOptions={[sort]}
                 disabled={saved.saving}
-                onChange={(_, data) => {
-                  const next = CHANNEL_SORTS.find((value) => value === data.value);
+                onOptionSelect={(_, data) => {
+                  const next = CHANNEL_SORTS.find((value) => value === data.optionValue);
                   if (!next) return;
                   setSort(next);
                 }}
               >
-                <option value="album">{t('home.sortAlbum')}</option>
-                <option value="title">{t('home.sortTitle')}</option>
-                <option value="random">{t('home.sortRandom')}</option>
-              </Select>
+                <Option value="album">{t('home.sortAlbum')}</Option>
+                <Option value="title">{t('home.sortTitle')}</Option>
+                <Option value="random">{t('home.sortRandom')}</Option>
+              </ScrollDropdown>
             </Field>
             <section className={styles.preview} aria-label={t('home.preview')} aria-live="polite">
               <header className={styles['preview-header']}>

@@ -2,11 +2,11 @@ import { COLUMN_PITCH, COLUMN_WIDTH, columnLevels, playedColumnCount } from './w
 import type { LayerTone, WaveformLayer } from './waveformModes.ts';
 
 /**
- * 整轨波形各层的画法：层先按 canvas 宽重采样成列（数据或尺寸变时算一次），每次重画只按播放头染色。
- * 没有分道的层以中线上下对称，有分道的在自己那一道里从底往上；有声的列至少画 1 px，安静段不至于断成缺口。
+ * 整轨波形各层的画法：层先按 canvas 宽重采样成列（数据或尺寸变时算一次），每次重画只按播放头染色
+ * 没有分道的层以中线上下对称，有分道的在自己那一道里从底往上；有声的列至少画 1 px，安静段不至于断成缺口
  */
 
-/** 画层只用到 canvas 2D 上下文的这三项，`CanvasRenderingContext2D` 直接满足。 */
+/** 画层只用到 canvas 2D 上下文的这三项，`CanvasRenderingContext2D` 直接满足 */
 export interface WaveformContext {
   fillStyle: string | CanvasGradient | CanvasPattern;
   globalAlpha: number;
@@ -23,16 +23,16 @@ export interface ColumnLayer {
   levels: Float32Array;
   tone: LayerTone;
   lane?: number;
-  /** 整层的透明度倍数，缺省 1；换数据时形变中的层才小于 1（`waveformMorph.ts`）。 */
+  /** 整层的透明度倍数，缺省 1；换数据时形变中的层才小于 1（`waveformMorph.ts`） */
   alpha?: number;
 }
 
-/** 分道之间的空（CSS 像素）。 */
+/** 分道之间的空（CSS 像素） */
 export const LANE_GAP = 3;
 
 /**
- * 已播段按色调取色；未播段一律取未播色，三种色调换成三档深浅，叠画与分道在灰里也分得开。
- * 淡色取数据墨的三成五：底影与主体分得开，又不抢主体。
+ * 已播段按色调取色；未播段一律取未播色，三种色调换成三档深浅，叠画与分道在灰里也分得开
+ * 淡色取数据墨的三成五：底影与主体分得开，又不抢主体
  */
 const TONES: Record<LayerTone, { color: 'ink' | 'hot'; playedAlpha: number; idleAlpha: number }> = {
   shade: { color: 'ink', playedAlpha: 0.35, idleAlpha: 0.4 },
@@ -44,7 +44,7 @@ function laneHeightOf(lanes: number, height: number): number {
   return lanes > 0 ? (height - LANE_GAP * (lanes - 1)) / lanes : height;
 }
 
-/** 第 `lane` 道（从上往下数）的竖向中点，相对波形带顶；分道名按它对齐。 */
+/** 第 `lane` 道（从上往下数）的竖向中点，相对波形带顶；分道名按它对齐 */
 export function laneCenter(lane: number, lanes: number, height: number): number {
   const laneHeight = laneHeightOf(lanes, height);
   return lane * (laneHeight + LANE_GAP) + laneHeight / 2;
@@ -58,7 +58,7 @@ export function layerColumns(layers: readonly WaveformLayer[], columns: number):
   }));
 }
 
-/** 从后往前画各层；`playedX` 左边算已播。 */
+/** 从后往前画各层；`playedX` 左边算已播 */
 export function drawColumnLayers(
   ctx: WaveformContext,
   layers: readonly ColumnLayer[],

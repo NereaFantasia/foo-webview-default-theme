@@ -86,9 +86,50 @@ describe('startCommandRegistry', () => {
     expect(closeMenu).toHaveBeenCalledTimes(1);
   });
 
-  it('列表部件、当前地点与全局三层不许认领 Esc', () => {
+  it('部件取消选区的 Esc 等浮层关闭与输入框退出后才执行', () => {
     const commands = startCommandRegistry(null);
-    for (const layer of ['widget', 'place', 'global'] as const) {
+    let overlay = true;
+    let input = true;
+    let selected = true;
+    commands.register({
+      id: 'selection.clear',
+      layer: 'widget',
+      keys: [{ key: 'Escape' }],
+      enabled: () => selected,
+      run: () => {
+        selected = false;
+      },
+    });
+    commands.register({
+      id: 'input.close',
+      layer: 'input',
+      keys: [{ key: 'Escape' }],
+      enabled: () => input,
+      run: () => {
+        input = false;
+      },
+    });
+    commands.register({
+      id: 'overlay.close',
+      layer: 'overlay',
+      keys: [{ key: 'Escape' }],
+      enabled: () => overlay,
+      run: () => {
+        overlay = false;
+      },
+    });
+    expect(commands.dispatchKey(key('Escape'))).toBe('overlay.close');
+    expect(selected).toBe(true);
+    expect(commands.dispatchKey(key('Escape'))).toBe('input.close');
+    expect(selected).toBe(true);
+    expect(commands.dispatchKey(key('Escape'))).toBe('selection.clear');
+    expect(selected).toBe(false);
+    expect(commands.dispatchKey(key('Escape'))).toBeNull();
+  });
+
+  it('当前地点与全局层不许认领 Esc', () => {
+    const commands = startCommandRegistry(null);
+    for (const layer of ['place', 'global'] as const) {
       expect(() =>
         commands.register({ id: `x.${layer}`, layer, keys: [{ key: 'escape' }], run: () => {} }),
       ).toThrow(/Esc/);
@@ -208,10 +249,64 @@ describe('startCommandRegistry', () => {
       expect(fire('mouseup', { button: 2 }, true).defaultPrevented).toBe(false);
     });
 
+    it('early 命令在捕获阶段接手并拦下缺省，冒泡阶段不再重复；没声明的只在冒泡阶段接手', () => {
+      const { target, fire } = fakeTarget();
+      const commands = startCommandRegistry(target);
+      const cancel = vi.fn();
+      const reset = vi.fn();
+      let dragging = false;
+      commands.register({
+        id: 'seek.cancel',
+        layer: 'gesture',
+        early: true,
+        keys: [{ key: 'Escape' }],
+        enabled: () => dragging,
+        run: cancel,
+      });
+      commands.register({
+        id: 'coverflow.reset',
+        layer: 'gesture',
+        keys: [{ key: 'Escape' }],
+        run: reset,
+      });
+
+      // 没在拖动：捕获阶段不认领，也不拦缺省
+      expect(fire('keydown', { key: 'Escape' }, true).defaultPrevented).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+      expect(reset).not.toHaveBeenCalled();
+
+      dragging = true;
+      expect(fire('keydown', { key: 'Escape' }, true).defaultPrevented).toBe(true);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(reset).not.toHaveBeenCalled();
+      // 同一下 Esc 到冒泡阶段时缺省已被拦
+      fire('keydown', { key: 'Escape', defaultPrevented: true });
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(reset).not.toHaveBeenCalled();
+
+      // 没声明 early 的 gesture 命令照旧在冒泡阶段接手
+      dragging = false;
+      fire('keydown', { key: 'Escape' });
+      expect(reset).toHaveBeenCalledTimes(1);
+    });
+
+    it('early 只许 gesture 层用', () => {
+      const commands = startCommandRegistry(null);
+      expect(() =>
+        commands.register({
+          id: 'menu.close',
+          layer: 'overlay',
+          early: true,
+          keys: [{ key: 'Escape' }],
+          run: () => {},
+        }),
+      ).toThrow('early 只给拖动进行中的 gesture 层');
+    });
+
     it('释放后摘掉全部监听', () => {
       const { target, count } = fakeTarget();
       const commands = startCommandRegistry(target);
-      expect(count()).toBe(4);
+      expect(count()).toBe(5);
       commands.dispose();
       expect(count()).toBe(0);
     });

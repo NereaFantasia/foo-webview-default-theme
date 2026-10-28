@@ -6,7 +6,10 @@ export const savingEn = {
   'saving.saved': 'Saved',
   'saving.retry': 'Retry saving',
   'info.title': 'Information center',
-  'info.count': 'Information center: {count} messages',
+  'info.keyMore': '{title} (+{count} more)',
+  'info.keyUpdateAvailable': 'Theme update available: {version}',
+  'info.keyUpdateReady':
+    'Theme {version} is downloaded and takes effect after restarting foobar2000',
   'info.empty': 'No issues to address',
   'info.preferencesUnsaved': 'Some settings could not be saved',
   'info.preferencesDetail': '{count} settings are active but have not been saved.',

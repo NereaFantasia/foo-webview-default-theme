@@ -16,7 +16,7 @@
   height: 114px;
 }
 
-/* 字按基线落位：字盒底边裁到字母基线，`top` 写的就是基线（相对卡顶）。 */
+/* 字按基线落位：字盒底边裁到字母基线，`top` 写的就是基线（相对卡顶） */
 .text {
   position: absolute;
   margin: 0;
@@ -26,7 +26,7 @@
   text-box-edge: text alphabetic;
 }
 
-/* 正文限宽 1394，是卡宽上限减去左右内边距；字号由组件给。 */
+/* 正文限宽 1394，是卡宽上限减去左右内边距；字号由组件给 */
 .main,
 .sub {
   left: 46px;
@@ -62,7 +62,7 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* 来源标右对齐在卡内右下：右边留 16、基线在卡底上方 12。 */
+/* 来源标右对齐在卡内右下：右边留 16、基线在卡底上方 12 */
 .source {
   right: 16px;
   top: auto;

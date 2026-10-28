@@ -1,11 +1,11 @@
-/** 封面请求尺寸按这个步长取整，档数少，宿主的缩放缓存才命中得了。 */
+/** 宿主封面尺寸阶梯步长（128 物理像素），阶梯化请求以提升宿主原生缩放缓存命中率 */
 const SIZE_STEP = 128;
 const MIN_SIZE = 256;
 const MAX_SIZE = 1024;
 
 /**
- * 向宿主要多大的封面（设备像素）：显示宽（CSS 像素）乘像素比，向上取到 128 的整数倍，
- * 夹在 256 到 1024 之间。像素比取不到或不是正数时按 1。
+ * 计算请求宿主封面缩略图的目标物理像素尺寸
+ * 将 CSS 像素宽度乘以设备像素比（DPI）后向上对齐至 128 像素的整数倍，并限制在 [256, 1024] 区间内
  */
 export function artworkRequestSize(displayWidth: number, pixelRatio: number): number {
   const ratio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;

@@ -3,7 +3,12 @@ import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { settle } from '../../../host/hostCall.ts';
 import type { Store } from '../../../kit/store.ts';
-import { FOLDERS_LIMIT, foldersDirectory, type FolderNode } from '../tree/foldersModel.ts';
+import {
+  compareFolderNames,
+  FOLDERS_LIMIT,
+  foldersDirectory,
+  type FolderNode,
+} from '../tree/foldersModel.ts';
 import { foldersSort } from './foldersSort.ts';
 
 export interface FoldersPreviewState {
@@ -80,10 +85,10 @@ export function startFoldersPreview(
         store.set(stateAtom, { ...store.get(stateAtom), status: 'failed' });
         return;
       }
-      for (const directory of answer.directories) {
-        const child = foldersDirectory(directory);
-        directories.set(child.key, child);
-      }
+      const children = answer.directories
+        .map(foldersDirectory)
+        .sort((a, b) => compareFolderNames(a.name, b.name));
+      for (const child of children) directories.set(child.key, child);
       for (const track of answer.files) tracks.set(track.handle, track);
       limited ||= tracks.size > FOLDERS_LIMIT;
     }

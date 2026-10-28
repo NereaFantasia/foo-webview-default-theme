@@ -66,7 +66,7 @@ export function summarizeBiographyLibrary(
       (own ? albums : appearances).add(key);
     }
     duration += Math.max(0, track.duration);
-    // 复合署名不按标点拆开；只有宿主给出的多值艺人才算合作关系。
+    // 复合署名不按标点拆开；只有宿主给出的多值艺人才算合作关系
     for (const name of new Set(track.artists ?? [])) {
       if (name !== artist && biographyArtist(name))
         collaborators.set(name, (collaborators.get(name) ?? 0) + 1);
@@ -122,7 +122,7 @@ export function startBiographyLibrary(
       failed: !result || result.success === false,
       summary:
         result?.success === true ? summarizeBiographyLibrary(artist, result.tracks) : old.summary,
-      // 此端点的 total 同样是截断后的条数，不能当作完整总量。
+      // 此端点的 total 同样是截断后的条数，不能当作完整总量
       truncated: result?.success === true ? result.count >= BIOGRAPHY_LIBRARY_LIMIT : old.truncated,
     };
     cached.set(artist, next);

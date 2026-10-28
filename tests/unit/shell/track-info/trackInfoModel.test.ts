@@ -6,9 +6,10 @@ import {
   infoFilePath,
   infoIdentity,
   emptyTrackInfo,
-  infoMediaKind,
+  infoSections,
   infoTags,
   infoTitle,
+  INFO_SECTIONS,
 } from '../../../../src/shell/track-info/trackInfoModel.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
@@ -47,16 +48,26 @@ describe('信息字段保真', () => {
     expect(infoTags({})).toEqual([]);
   });
 
-  test('网络、自定义协议、容器与物理文件分开；分轨不会改物理路径', () => {
+  test('只有物理文件给出文件位置；分轨不会改物理路径', () => {
     const cue = makeTrack({ path: 'file://E:/Music/album.cue', subsong: 5 });
-    expect(infoMediaKind(cue)).toBe('file');
     expect(infoFilePath(cue)).toBe('E:/Music/album.cue');
-    for (const path of ['https://x/a', 'spotify:track:abc', 'mms://x']) {
-      const track = makeTrack({ path });
-      expect(infoMediaKind(track)).toBe('stream');
-      expect(infoFilePath(track)).toBeNull();
-    }
-    expect(infoMediaKind(makeTrack({ path: 'unpack://zip|E:/x.zip|a.flac' }))).toBe('container');
+    for (const path of [
+      'https://x/a',
+      'spotify:track:abc',
+      'mms://x',
+      'unpack://zip|E:/x.zip|a.flac',
+    ])
+      expect(infoFilePath(makeTrack({ path }))).toBeNull();
     expect(infoFilePath(makeTrack({ path: 'file-relative://a.flac' }))).toBeNull();
+  });
+});
+
+describe('信息页的分节', () => {
+  test('在线曲目多「来源」一节，不列文件位置、播放统计与回放增益；本地文件与普通网络流照常', () => {
+    const online = makeTrack({ path: 'http://127.0.0.1:51234/music/stream/wy/123.flac?q=flac' });
+    expect(infoSections(online)).toEqual(['metadata', 'source', 'audio', 'credits', 'tags']);
+    const local = INFO_SECTIONS.filter((section) => section !== 'source');
+    expect(infoSections(makeTrack({ path: 'E:/a.flac' }))).toEqual(local);
+    expect(infoSections(makeTrack({ path: 'http://radio.example.test/live' }))).toEqual(local);
   });
 });

@@ -1,8 +1,8 @@
 import type { PlaylistTrackPartial, Track } from 'foo-webview-sdk';
 
 /**
- * 播放列表页每行投影的字段：表格、分组头（专辑艺术家、日期）、页内过滤（流派、日期）与行菜单的「筛选」
- * （一首有几位艺术家时逐位列出，要拆开的 `artists`）要的并集。
+ * 播放列表页使用的曲目字段：表格、分组头（专辑艺术家、日期）、页内过滤（流派、日期）与行菜单的「筛选」
+ * （一首有几位艺术家时逐位列出，要拆开的 `artists`）要的并集
  */
 export const ROW_FIELDS = [
   'handle',
@@ -13,6 +13,7 @@ export const ROW_FIELDS = [
   'artist',
   'artists',
   'album',
+  'albumId',
   'albumArtist',
   'albumArtists',
   'genre',
@@ -21,11 +22,17 @@ export const ROW_FIELDS = [
   'discNumber',
   'duration',
   'rating',
+  'codec',
+  'bitrate',
+  'sampleRate',
+  'channels',
+  'fileSize',
 ] as const satisfies readonly (keyof Track)[];
 
-export type PlaylistRow = Pick<Track, (typeof ROW_FIELDS)[number]>;
+export type PlaylistRow = Pick<Track, (typeof ROW_FIELDS)[number]> &
+  Pick<PlaylistTrackPartial, 'added' | 'lastPlayed' | 'playCount'>;
 
-/** 投影过的行在类型上每一项都可缺；请求了的字段宿主一定带，缺省值只用来收窄类型。 */
+/** 曲目基础字段补为显示用的缺省值；未安装播放统计组件时，统计字段保持缺省 */
 export function playlistRowOf(track: PlaylistTrackPartial): PlaylistRow {
   return {
     handle: track.handle ?? '',
@@ -36,6 +43,7 @@ export function playlistRowOf(track: PlaylistTrackPartial): PlaylistRow {
     artist: track.artist ?? '',
     artists: track.artists ?? [],
     album: track.album ?? '',
+    ...(track.albumId === undefined ? {} : { albumId: track.albumId }),
     albumArtist: track.albumArtist ?? '',
     albumArtists: track.albumArtists ?? [],
     genre: track.genre ?? '',
@@ -44,5 +52,13 @@ export function playlistRowOf(track: PlaylistTrackPartial): PlaylistRow {
     discNumber: track.discNumber ?? 0,
     duration: track.duration ?? 0,
     rating: track.rating ?? 0,
+    codec: track.codec ?? '',
+    bitrate: track.bitrate ?? 0,
+    sampleRate: track.sampleRate ?? 0,
+    channels: track.channels ?? 0,
+    fileSize: track.fileSize ?? -1,
+    added: track.added,
+    lastPlayed: track.lastPlayed,
+    playCount: track.playCount,
   };
 }

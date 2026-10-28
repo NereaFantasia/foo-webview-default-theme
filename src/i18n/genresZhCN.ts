@@ -1,6 +1,8 @@
 import type { genresEn } from './genresEn.ts';
 
 export const genresZhCN: Record<keyof typeof genresEn, string> = {
+  'genres.filterTracks': '搜索当前流派的曲目',
+  'genres.defaultOrder': '默认顺序',
   'genres.directory': '流派列表',
   'genres.closeDirectory': '关闭流派列表',
   'genres.split': '流派列表宽度',
@@ -37,11 +39,9 @@ export const genresZhCN: Record<keyof typeof genresEn, string> = {
   'genres.actionFailed': '操作失败',
   'genres.busy': '播放列表操作进行中，请稍后重试',
   'genres.dismiss': '关闭提示',
-  'genres.sort': '流派排序',
   'genres.sort.name': '名称',
   'genres.sort.tracks': '曲目数',
   'genres.sort.albums': '专辑数',
-  'genres.descending': '降序',
   'genres.group': '分组依据',
   'genres.group.album': '专辑',
   'genres.group.albumDisc': '专辑与碟号',
@@ -49,8 +49,6 @@ export const genresZhCN: Record<keyof typeof genresEn, string> = {
   'genres.group.artist': '艺人',
   'genres.group.directory': '文件夹',
   'genres.group.none': '不分组',
-  'genres.expand': '全部展开',
-  'genres.collapse': '全部折叠',
   'genres.toggle': '展开或折叠分组',
   'genres.disc': '第 {number} 碟',
   'genres.missingGroup': '未知',

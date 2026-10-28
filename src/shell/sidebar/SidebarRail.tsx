@@ -10,6 +10,7 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
+import { roleVar } from '../../theme/roles.ts';
 import { useShellSlots } from '../shellSlots.ts';
 import { playlistsAtom } from '../../playback/playlists.ts';
 import { createDragHover, type DragHoverSpot } from './dragHover.ts';
@@ -17,8 +18,9 @@ import { historyAtom, historyKey } from '../../nav/navHistory.ts';
 import { PANE_ONLY_ATTR } from '../../nav/sidebar/paneFades.ts';
 import { PLACE_LABELS } from '../../nav/places.ts';
 import styles from './SidebarRail.module.css';
-import { SidebarIcon } from './SidebarIcon.tsx';
+import { SidebarIcon } from '../../nav/sidebar/SidebarIcon.tsx';
 import { SidebarItem } from '../../nav/sidebar/SidebarItem.tsx';
+import { SIDEBAR_OPTICAL_OFFSET } from '../../nav/sidebar/useSidebarItemStyles.ts';
 import {
   itemKey,
   LIBRARY_ITEMS,
@@ -32,11 +34,11 @@ import { sidebarPrefsAtom } from '../../nav/sidebar/sidebarPrefs.ts';
 import { useSelectionIndicator } from '../../kit/useSelectionIndicator.ts';
 import { useService } from '../../kit/useService.ts';
 
-/** 图标态里代表整个播放列表节的那一项的选中键。 */
+/** 图标态里代表整个播放列表节的那一项的选中键 */
 const RAIL_PLAYLISTS = 'rail:playlists';
 
-// 宽 48：左留 8、右不留，图标项 40 × 32，与标题栏的键同宽同位，加上内容区左侧的 8，图标在窗口边与内容卡
-// 之间居中。放大镜与细线占的高度同展开态的搜索框与分节标题，下面各项与展开态同高。
+// 宽 48：左留 8、右不留，按钮项 40 × 32。图标与细线共用向右的视觉补偿；放大镜与细线占的高度
+// 同展开态的搜索框与分节标题，下面各项与展开态同高
 const useStyles = makeStyles({
   nav: {
     alignItems: 'center',
@@ -49,22 +51,26 @@ const useStyles = makeStyles({
   search: { flex: 'none', marginBottom: tokens.spacingVerticalSNudge },
   divider: {
     flex: 'none',
-    width: '100%',
+    width: `calc(100% - 2 * ${SIDEBAR_OPTICAL_OFFSET})`,
+    transform: `translateX(${SIDEBAR_OPTICAL_OFFSET})`,
     height: '32px',
     margin: `${tokens.spacingVerticalSNudge} 0 0`,
+    // Fluent 的 Divider 用两个伪元素画线，缺省取不透明的 Stroke2
+    '&::before': { borderTopColor: roleVar('line') },
+    '&::after': { borderTopColor: roleVar('line') },
   },
 });
 
-/** 只在图标态里有的部分：从展开态换过来时淡入（`paneFades.ts`）。 */
+/** 只在图标态里有的部分：从展开态换过来时淡入（`paneFades.ts`） */
 const PANE_ONLY = { [PANE_ONLY_ATTR]: true };
 
 /**
  * 侧边栏的图标态：宽 48，只有图标，悬停出名字。分节标题换成细线，资料库各项不论那一节收没收起都画出来，
- * 开合的存档不动。搜索收成放大镜，点开带输入框的浮层。两种形态都有的项摆在与展开态同样的位置。
+ * 开合的存档不动。搜索收成放大镜，点开带输入框的浮层。两种形态都有的项摆在与展开态同样的位置
  *
  * 播放列表节收成一个图标，点它在右边弹出列表浮层；拖着专辑或文件停在它上面也会弹出。有列表在播时它的
  * 右上角点小圆点。选中与展开态同一套：浅底加竖条，正在看一张列表时亮
- * 播放列表图标。
+ * 播放列表图标
  */
 export function SidebarRail() {
   const slots = useShellSlots();
@@ -107,7 +113,7 @@ export function SidebarRail() {
   }
   useSelectionIndicator(root, selected, reduced);
 
-  // 去了别的地点（在浮层里点了一张列表、新建成了一张）浮层就关；焦点在浮层里就还给图标。
+  // 去了别的地点（在浮层里点了一张列表、新建成了一张）浮层就关；焦点在浮层里就还给图标
   const placeKey = `${place.id}:${place.subject ?? ''}`;
   const lastPlace = useRef(placeKey);
   useEffect(() => {
@@ -125,7 +131,7 @@ export function SidebarRail() {
       return panel.current?.contains(target) ? 'panel' : null;
     };
     const onOver = (event: DragEvent) => hover.over(spotOf(event.target));
-    // 拖出窗口时 relatedTarget 为 null，当作到了别处。
+    // 拖出窗口时 relatedTarget 为 null，当作到了别处
     const onLeave = (event: DragEvent) => {
       if (event.relatedTarget === null) hover.over(null);
     };

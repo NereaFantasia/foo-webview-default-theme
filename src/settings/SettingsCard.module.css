@@ -1,4 +1,4 @@
-/* 图标 20 一列、文字占余量、控件按内容宽；没有说明行时也是 58 高，各张卡齐平。 */
+/* 图标 20 一列、文字占余量、控件按内容宽；没有说明行时也是 58 高，各张卡齐平 */
 .root {
   position: relative;
   box-sizing: border-box;
@@ -13,7 +13,7 @@
   background-color: var(--bg-view-control);
 }
 
-/* 控件换到标题下面，与文字左对齐、占满一行。 */
+/* 控件换到标题下面，与文字左对齐、占满一行 */
 .stacked {
   grid-template-columns: 20px minmax(0, 1fr);
   row-gap: var(--spacingVerticalMNudge);
@@ -48,7 +48,7 @@
   color: var(--error);
 }
 
-/* 读屏的播报区：绝对定位，不占网格的格子；裁成看不见，但仍在无障碍树里。 */
+/* 读屏的播报区：绝对定位，不占网格的格子；裁成看不见，但仍在无障碍树里 */
 .announcer {
   position: absolute;
   width: 1px;
@@ -67,4 +67,18 @@
 .stacked .control {
   grid-column: 2;
   justify-content: stretch;
+}
+
+/* 缩略图组撑满整行，宽度由组自己按列数限 */
+.block .control {
+  display: block;
+}
+
+/* 压在卡的两侧与底边，细线通栏；里面的一行自带缩进，文字与标题左缘对齐 */
+.footer {
+  --settings-icon-size: 20px;
+
+  grid-column: 1 / -1;
+  margin: 0 calc(-1 * var(--spacingHorizontalL)) calc(-1 * var(--spacingVerticalM));
+  border-top: var(--strokeWidthThin) solid var(--line-subtle);
 }

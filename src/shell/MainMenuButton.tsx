@@ -5,27 +5,31 @@ import {
   MenuTrigger,
   ToolbarButton,
   Tooltip,
+  mergeClasses,
 } from '@fluentui/react-components';
 import { Menu } from '../motion/Surfaces.tsx';
-import { MoreHorizontal16Regular } from '@fluentui/react-icons';
+import { MoreHorizontal16Regular, Subtitles20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../i18n/locale.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { HostMenuList, MenuSurface, menuCheckProps } from '../kit/HostMenuList.tsx';
 import { mainMenuAtom, mainMenuKey } from './mainMenu.ts';
 import type { MenuNode } from '../host/menuNodes.ts';
 import { useService } from '../kit/useService.ts';
 import { MiniPlayerMenuItem } from './miniplayer/MiniPlayerMenuItem.tsx';
+import { DesktopLyricsMenu } from './DesktopLyricsMenu.tsx';
 
 export interface MainMenuButtonProps {
   className?: string;
 }
 
 /**
- * 标题栏的 ⋯：fb2k 主菜单的各个根收在这一个键里，默认隐藏的命令收进末尾的「更多」。
- * 每次打开都重读一次，先显示手上这份，新的到了再换，不挡着菜单打开。
+ * 标题栏的 ⋯：fb2k 主菜单的各个根收在这一个键里，默认隐藏的命令收进末尾的「更多」
+ * 每次打开都重读一次，先显示手上这份，新的到了再换，不挡着菜单打开
  */
 export function MainMenuButton({ className }: MainMenuButtonProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const menu = useAtomValueRawSync(mainMenuAtom);
   const mainMenu = useService(mainMenuKey);
   const run = (node: MenuNode) => void mainMenu.run(node);
@@ -39,7 +43,7 @@ export function MainMenuButton({ className }: MainMenuButtonProps) {
       <MenuTrigger disableButtonEnhancement>
         <Tooltip content={t('menu.trigger')} relationship="label">
           <ToolbarButton
-            className={className}
+            className={mergeClasses(className, viewControls.icon)}
             icon={<MoreHorizontal16Regular />}
             disabled={menu.status !== 'connected'}
             data-menu="main"
@@ -49,6 +53,9 @@ export function MainMenuButton({ className }: MainMenuButtonProps) {
       <MenuSurface>
         <MenuList>
           <MiniPlayerMenuItem />
+          <DesktopLyricsMenu>
+            <MenuItem icon={<Subtitles20Regular />}>{t('desktopLyrics.title')}</MenuItem>
+          </DesktopLyricsMenu>
           <MenuDivider />
         </MenuList>
         {unreadable ? (

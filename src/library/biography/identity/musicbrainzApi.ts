@@ -1,23 +1,30 @@
 import { fb } from 'foo-webview-sdk/bridge';
-import { settle } from '../../../host/hostCall.ts';
+import { settleDetailed } from '../../../host/hostCall.ts';
+import { classifyHostHttpFailure } from '../../../host/hostHttpFailure.ts';
 import { biographyRetryAt } from '../biographyCacheFormat.ts';
 import type { BiographyProblem } from '../biographyModel.ts';
 
 export const MUSICBRAINZ_API_URL = 'https://musicbrainz.org/ws/2/';
-/** MusicBrainz 要求每个客户端每秒最多一个请求，超了回 503；留 100 ms 余量。 */
+/** MusicBrainz 要求每个客户端每秒最多一个请求，超了回 503；留 100 ms 余量 */
 export const MUSICBRAINZ_INTERVAL_MS = 1100;
-/** 应答体上限，超出按无法解析处理。 */
+/** 应答体上限，超出按无法解析处理 */
 const BODY_LIMIT = 2_000_000;
 
 export type MusicbrainzResult =
   | { readonly kind: 'data'; readonly data: Readonly<Record<string, unknown>> }
   | { readonly kind: 'missing' }
-  | { readonly kind: 'failed'; readonly problem: BiographyProblem; readonly retryAt: number };
+  | {
+      readonly kind: 'failed';
+      readonly problem: BiographyProblem;
+      readonly retryAt: number;
+      /** 传输失败的宿主原文；HTTP 层失败（403、429 等）没有原文 */
+      readonly detail?: string | null;
+    };
 
 export interface MusicbrainzClient {
   /**
    * 排进全局队列发一次 GET。轮到它时 `alive()` 已经答 false（调用方换人或释放了）就不再发，
-   * 直接答网络失败，调用方本来也会丢掉这个结果。
+   * 直接答网络失败，调用方本来也会丢掉这个结果
    */
   request(
     path: string,
@@ -44,25 +51,32 @@ async function send(
   params: Readonly<Record<string, string>>,
 ): Promise<MusicbrainzResult> {
   const query = new URLSearchParams({ ...params, fmt: 'json' });
-  const answer = await settle(() =>
+  const called = await settleDetailed(() =>
     host.http.request(`${MUSICBRAINZ_API_URL}${path}?${query.toString()}`, {
       timeout: 15_000,
       redirect: 'error',
       headers: {
-        // MusicBrainz 要求 UA 写明应用与联系方式，否则可能限速或拒绝。
+        // MusicBrainz 要求 UA 写明应用与联系方式，否则可能限速或拒绝
         'User-Agent': 'foo-webview-default-theme/0.1 ( https://github.com/NereaFantasia )',
         Accept: 'application/json',
       },
     }),
   );
   const now = Date.now();
-  const headers = answer?.headers ?? {};
-  const fail = (problem: BiographyProblem, delay: number): MusicbrainzResult => ({
+  const headers = called.answer?.headers ?? {};
+  const fail = (
+    problem: BiographyProblem,
+    delay: number,
+    detail: string | null = null,
+  ): MusicbrainzResult => ({
     kind: 'failed',
     problem,
     retryAt: biographyRetryAt(headers, now, delay),
+    detail,
   });
-  if (!answer) return fail('network', 30_000);
+  if (called.failure)
+    return fail(classifyHostHttpFailure(called.failure) ?? 'network', 30_000, called.failure.text);
+  const answer = called.answer;
   if (answer.status === 404) return { kind: 'missing' };
   if (answer.status === 503 || answer.status === 429) return fail('rateLimited', 10_000);
   if (answer.status === 403) return fail('blocked', 15 * 60_000);
@@ -71,7 +85,7 @@ async function send(
   return data ? { kind: 'data', data } : fail('invalid', 5 * 60_000);
 }
 
-/** 一个装配一个客户端：所有 MusicBrainz 请求排成一列，相邻两次的开始至少隔 1.1 秒。 */
+/** 一个装配一个客户端：所有 MusicBrainz 请求排成一列，相邻两次的开始至少隔 1.1 秒 */
 export function createMusicbrainzClient(
   host: Pick<typeof fb, 'http'> = fb,
   now: () => number = Date.now,
@@ -95,11 +109,11 @@ export function createMusicbrainzClient(
       const run = queue
         .then(async (): Promise<MusicbrainzResult> => {
           if (!readers.some((current) => current()))
-            return { kind: 'failed', problem: 'network', retryAt: 0 };
+            return { kind: 'failed', problem: 'network', retryAt: 0, detail: null };
           const gap = last + MUSICBRAINZ_INTERVAL_MS - now();
           if (gap > 0) await wait(gap);
           if (!readers.some((current) => current()))
-            return { kind: 'failed', problem: 'network', retryAt: 0 };
+            return { kind: 'failed', problem: 'network', retryAt: 0, detail: null };
           last = now();
           return send(host, path, params);
         })

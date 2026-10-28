@@ -1,9 +1,10 @@
 import type { MessageKey } from '../../i18n/en.ts';
 import type { Translate } from '../../i18n/translate.ts';
+import type { OnlineSource } from '../../playback/onlineTracks.ts';
 import {
   findInfoTag,
   infoTags,
-  INFO_SECTIONS,
+  infoSections,
   type InfoSection,
   type InfoTag,
   type TrackInfoState,
@@ -73,14 +74,25 @@ export function infoBytes(bytes: number | undefined, locale: string): string | u
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(bytes / 1024 ** index)} ${units[index]}`;
 }
 
+/** `source` 是在线曲目的来源，见 `onlineSourceOf`；本地曲目为 null */
 export function trackInfoRows(
   state: TrackInfoState,
   section: InfoSection,
   t: Translate,
   locale: string,
+  source: OnlineSource | null = null,
 ): readonly InfoRow[] {
   const { track, metadata, audio, file, statistics, replayGain } = state;
   if (!track) return [];
+  if (section === 'source') {
+    if (!source) return [];
+    return [
+      row('trackInfo.platform', t(`online.platform.${source.ref.platform}`)),
+      row('trackInfo.requestedQuality', t(`online.qualityOption.${source.quality}`)),
+      ...(source.unblocked ? [row('trackInfo.audioSource', t('trackInfo.unblockedSource'))] : []),
+      row('trackInfo.trackId', source.ref.id),
+    ];
+  }
   const tags = metadata.status === 'ready' ? infoTags(metadata.value.tags) : [];
   if (section === 'metadata') {
     return metadata.status === 'ready' ? taggedRows(tags, METADATA) : [];
@@ -178,17 +190,22 @@ export function infoReadLabel(status: string): MessageKey {
   }
 }
 
-export function copyInfoFields(state: TrackInfoState, t: Translate, locale: string): string {
+export function copyInfoFields(
+  state: TrackInfoState,
+  t: Translate,
+  locale: string,
+  source: OnlineSource | null = null,
+): string {
   if (!state.track) return '';
   return JSON.stringify(
     Object.fromEntries(
-      INFO_SECTIONS.map((section) => {
+      infoSections(state.track).map((section) => {
         const notice = infoSectionNotice(state, section);
         if (notice && section !== 'file') return [t(`trackInfo.${section}`), t(notice)];
         if (section === 'tags' && state.metadata.status === 'ready')
           return [t('trackInfo.tags'), state.metadata.value.tags];
         const fields = Object.fromEntries(
-          trackInfoRows(state, section, t, locale).map(({ label, values, missing }) => [
+          trackInfoRows(state, section, t, locale, source).map(({ label, values, missing }) => [
             t(label),
             values.length === 0
               ? t(missing ?? 'trackInfo.unknown')
@@ -208,8 +225,8 @@ export function copyInfoFields(state: TrackInfoState, t: Translate, locale: stri
 }
 
 export function infoSectionNotice(state: TrackInfoState, section: InfoSection): MessageKey | null {
+  if (section === 'audio' || section === 'source') return null;
   const data = state[section === 'credits' || section === 'tags' ? 'metadata' : section];
-  if (section === 'audio') return null;
   if (data.status !== 'ready') {
     return section === 'statistics' && data.status === 'unavailable'
       ? 'trackInfo.noStatistics'

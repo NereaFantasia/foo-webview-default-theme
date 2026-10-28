@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { atom } from 'jotai/vanilla';
 import { CapsuleVolume } from '../shell/player/volume/CapsuleVolume.tsx';
-import { SeekBar } from '../shell/player/SeekBar.tsx';
+import { SEEK_FOCUS } from '../shell/player/playerFocus.ts';
+import { SeekBar } from '../playback/seek/SeekBar.tsx';
 import { currentTrackAtom, playbackAtom } from '../playback/playback.ts';
-import { displayTitle, nowPlayingAtom } from '../shell/player/now-playing/nowPlaying.ts';
+import { displayTitle, nowPlayingAtom } from '../playback/now-playing/nowPlaying.ts';
 import { trackKeyOf } from '../playback/playbackContract.ts';
 import { CaptionButtons } from '../shell/CaptionButtons.tsx';
 import type { AppServices } from './services.ts';
@@ -14,6 +15,9 @@ import { VideoEntryContext } from '../nav/videoEntry.ts';
 import { VideoEntry } from '../video/VideoEntry.tsx';
 import { historyAtom } from '../nav/navHistory.ts';
 import { START_PLACE } from '../nav/places.ts';
+import { useService } from '../kit/useService.ts';
+import { foldersKey } from '../library/folders/foldersServices.ts';
+import { objectOpenerKey } from '../nav/objectOpener.ts';
 
 export function VideoRoot({
   services,
@@ -23,6 +27,8 @@ export function VideoRoot({
   readonly children: ReactNode;
 }) {
   const { store, playback, history } = services;
+  const folders = useService(foldersKey);
+  const objects = useService(objectOpenerKey);
   const [service, setService] = useState<VideoService | null>(null);
   const [expanded, expand] = useState(false);
   const closeVideo = () => {
@@ -42,6 +48,7 @@ export function VideoRoot({
           duration: value.duration,
           title: value.track ? displayTitle(value.track) : '',
           cover: cover.key === trackKeyOf(value.track) ? cover.cover : null,
+          file: value.track?.absolutePath || null,
         };
       }),
     [],
@@ -60,15 +67,22 @@ export function VideoRoot({
               playback: state,
               expanded,
               expand,
-              seekBar: <SeekBar interactive thickness={4} thumb clock />,
+              seekBar: <SeekBar interactive thickness={4} thumb clock {...SEEK_FOCUS} />,
               volume: <CapsuleVolume roomy />,
               captions: <CaptionButtons />,
               toggle: () => void playback.playOrPause(),
               previous: () => void playback.previous(),
               next: () => void playback.next(),
               seek: (seconds) => void playback.seek(seconds),
+              browse: () => void folders.browseVideo(store.get(state).file),
+              reveal: async () => {
+                const file = store.get(state).file;
+                if (file === null) return false;
+                const result = await objects.open({ kind: 'folder', path: file });
+                return result === 'done' || result === 'external';
+              },
               stepVolume: (up) => void playback.stepVolume(up),
-              open: () => history.navigate({ id: 'video' }),
+              open: () => history.navigate({ id: 'video' }, 'drill'),
               close: closeVideo,
             }
           : null

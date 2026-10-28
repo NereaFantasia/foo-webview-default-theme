@@ -44,6 +44,20 @@
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
   outline-offset: -2px;
 }
+/* 艺人没有封面，画圆形占位；边长与封面缩略图一样由行给 */
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+.avatar svg {
+  width: 50%;
+  height: 50%;
+}
 .labels {
   display: flex;
   flex: 1;
@@ -63,6 +77,8 @@
   line-height: var(--lineHeightBase300);
 }
 .subtitle {
+  display: flex;
+  flex-wrap: nowrap;
   font-size: var(--fontSizeBase200);
   color: var(--colorNeutralForeground3);
   line-height: var(--lineHeightBase200);

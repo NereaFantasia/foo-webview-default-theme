@@ -21,7 +21,11 @@ test('基础色：自定义取色即时生效并恢复，Windows 通过 SDK 更�
   await expect.poll(color).toBe(custom);
   await enterSettings(page);
   await settings.expand('强调色');
-  await expect(settings.select('基础强调色')).toHaveText('自定义颜色');
+  await expect(
+    page
+      .getByRole('tablist', { name: '基础强调色', exact: true })
+      .getByRole('tab', { name: '自定义颜色' }),
+  ).toHaveAttribute('aria-selected', 'true');
   settings.host.answer('system.getTheme', {
     success: true,
     darkMode: false,

@@ -1,4 +1,4 @@
-/* 组内的小节名：比组标题低一级，与上一张卡隔开一些。 */
+/* 组内的小节名：比组标题低一级，与上一张卡隔开一些 */
 .subheading {
   margin: var(--spacingVerticalM) 0 var(--spacingVerticalXXS);
   color: var(--text-secondary);

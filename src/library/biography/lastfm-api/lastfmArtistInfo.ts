@@ -15,12 +15,12 @@ import {
 } from '../details/biographyDetailsModel.ts';
 import { matchBiographyLinks } from '../article/biographyLinks.ts';
 
-/** Last.fm 用户撰写的正文按 CC BY-SA 3.0 发布，它的 wiki 页链的就是这一版。 */
+/** Last.fm 用户撰写的正文按 CC BY-SA 3.0 发布，它的 wiki 页链的就是这一版 */
 const LICENSE = { url: 'https://creativecommons.org/licenses/by-sa/3.0/', name: 'CC BY-SA 3.0' };
-/** 正文末尾的许可声明；许可由来源行另写，正文里不重复。 */
+/** 正文末尾的许可声明；许可由来源行另写，正文里不重复 */
 const LICENSE_TAIL =
   /\s*User-contributed text is available under the Creative Commons By-SA License; additional terms may apply\.?\s*$/i;
-/** 正文末尾指回 Last.fm 的「Read more on Last.fm」；来源行已经链回原页。 */
+/** 正文末尾指回 Last.fm 的「Read more on Last.fm」；来源行已经链回原页 */
 const MORE_TAIL = /\s*<a\s[^>]*href="https?:\/\/(?:www\.)?last\.fm\/[^"]*"[^>]*>[^<]*<\/a>\.?\s*$/i;
 
 export interface LastfmArtistInfo {
@@ -32,13 +32,13 @@ function record(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Last.fm 的 JSON 由 XML 转来：只有一项时那一项是对象，不是数组。 */
+/** Last.fm 的 JSON 由 XML 转来：只有一项时那一项是对象，不是数组 */
 function items(value: unknown, key: string): readonly unknown[] {
   const inner = record(value) ? value[key] : undefined;
   return Array.isArray(inner) ? inner : record(inner) ? [inner] : [];
 }
 
-/** API 给的链接里名字带「+」时编码了两次（%252B）：按网页规则解完还剩一层，再解一次后比较。 */
+/** API 给的链接里名字带「+」时编码了两次（%252B）：按网页规则解完还剩一层，再解一次后比较 */
 function linksTo(url: unknown, name: string): boolean {
   const linked = typeof url === 'string' ? lastfmArtistFromUrl(url) : null;
   if (!linked) return false;
@@ -79,7 +79,7 @@ function entity(whole: string, name: string): string {
 
 /**
  * 正文是带少量 <a> 的纯文本。只取文字：去标签、解实体。结果只当文本渲染，从不当 HTML 插进页面，
- * 所以不经 DOM 解析。用户写的换行原样留下，每行一段。
+ * 所以不经 DOM 解析。用户写的换行原样留下，每行一段
  */
 function paragraphsOf(html: string): readonly string[] {
   const text = html
@@ -104,7 +104,7 @@ function paragraphsOf(html: string): readonly string[] {
 
 /**
  * 把 `artist.getInfo` 的应答转成正文与附加资料。回来的艺人链接对不上请求的这位时答 null：
- * 请求时关了 autocorrect，对不上说明应答不可信。没有正文（这种语言没写）时 document 为 null。
+ * 请求时关了 autocorrect，对不上说明应答不可信。没有正文（这种语言没写）时 document 为 null
  */
 export function readLastfmArtistInfo(
   data: unknown,
@@ -120,7 +120,7 @@ export function readLastfmArtistInfo(
   const tags: string[] = [];
   for (const tag of items(info['tags'], 'tag')) {
     const name = record(tag) ? tag['name'] : undefined;
-    // 标签里常有艺人自己的名字，它不是分类。
+    // 标签里常有艺人自己的名字，它不是分类
     if (!biographyField(name, 80) || name.toLowerCase() === self) continue;
     if (!tags.some((item) => item.toLowerCase() === name.toLowerCase())) tags.push(name);
   }

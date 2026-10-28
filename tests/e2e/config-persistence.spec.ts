@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { installPageHost } from '../fixtures/pageHost.ts';
 import { openSettings } from '../fixtures/settingsPage.ts';
-import { hostFailure } from '../fixtures/hostAnswers.ts';
+import { HOST_VERSION, hostFailure } from '../fixtures/hostAnswers.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -39,18 +39,24 @@ test('专辑页通过应用装配记录形态偏好的写入代数', async ({ pa
   const host = await installPageHost(page, { answers: libraryAnswers(SAMPLE_ALBUMS) });
   await page.goto('/');
   await expect(page.locator('[data-album-tile]').first()).toBeVisible();
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect.poll(() => host.config.get('defaultTheme.browser.form')).toBe('list');
   await expect.poll(() => generation(page, 'defaultTheme.browser.form')).toBeGreaterThan(0);
   const first = await generation(page, 'defaultTheme.browser.form');
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect.poll(() => host.config.get('defaultTheme.browser.form')).toBe('wall');
   await expect.poll(() => generation(page, 'defaultTheme.browser.form')).toBeGreaterThan(first);
 });
 
 test('信息中心恢复提醒通过同一持久化入口记代数', async ({ page }) => {
   const key = 'defaultTheme.infoCenter.dismissed';
-  const settings = await openSettings(page, { config: { [key]: { playcountMissing: '2.0.0' } } });
+  const settings = await openSettings(page, {
+    config: { [key]: { playcountMissing: HOST_VERSION } },
+  });
   await expect(settings.card('已关闭的提醒')).toContainText('已关闭 1 条');
   await page.getByRole('button', { name: '恢复 已关闭的提醒' }).click();
   await expect.poll(() => settings.host.config.get(key)).toEqual({});

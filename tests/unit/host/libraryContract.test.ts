@@ -4,6 +4,7 @@ import {
   albumKeyOf,
   albumYearOf,
   onLibraryChanged,
+  onLibraryStatsRefresh,
   openLibraryPreferences,
   trackAlbumKeyOf,
   trackPathOf,
@@ -39,10 +40,36 @@ describe('专辑身份与专辑艺术家', () => {
     expect(trackAlbumKeyOf(untagged)).toBe(albumKeyOf(albumRow('Mix', 'DJ A')));
   });
 
+  it('在线曲目套上的专辑名只是展示，不属于任何一张本地专辑', () => {
+    const online = 'http://127.0.0.1:51234/music/stream/wy/12.flac?q=flac';
+    expect(trackAlbumKeyOf({ path: online, album: 'Mix', artists: ['DJ A'] })).toBeNull();
+    expect(trackAlbumKeyOf({ path: 'file://E:/a.flac', album: 'Mix', artists: ['DJ A'] })).toBe(
+      albumKeyOf(albumRow('Mix', 'DJ A')),
+    );
+  });
+
   it('同名专辑按专辑艺术家分开', () => {
     expect(albumKeyOf(albumRow('Greatest Hits', 'Queen'))).not.toBe(
       albumKeyOf(albumRow('Greatest Hits', 'ABBA')),
     );
+  });
+
+  it('显示名称相同的异常专辑按 albumId 分开，合法替换字符仍用原键', () => {
+    const first = { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' };
+    const second = { ...first, albumId: 'album1:ba0058' };
+    expect(albumKeyOf(first)).toBe(first.albumId);
+    expect(albumKeyOf(second)).toBe(second.albumId);
+    expect(albumKeyOf(albumRow('\uFFFD', 'X'))).toBe('\uFFFD\0X');
+    expect(new Set([first, second, albumRow('\uFFFD', 'X')].map(albumKeyOf)).size).toBe(3);
+  });
+
+  it('曲目的 albumId 与专辑行用同一个键，没有专辑名仍不属于任何专辑', () => {
+    const track = {
+      ...trackRow('\uFFFD', 'own', { albumArtist: 'X' }),
+      albumId: 'album1:b90058',
+    };
+    expect(trackAlbumKeyOf(track)).toBe(track.albumId);
+    expect(trackAlbumKeyOf({ ...track, album: '' })).toBeNull();
   });
 });
 
@@ -67,14 +94,75 @@ describe('库变更', () => {
     const host = installFakeHost();
     let calls = 0;
     const off = onLibraryChanged(host.fb, () => (calls += 1));
-    host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 2 });
-    host.emit('library:itemsModified', { count: 1, timestamp: 3 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 2 });
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      fromHook: false,
+      timestamp: 3,
+    });
     host.emit('library:initialized', { timestamp: 4 });
     expect(calls).toBe(4);
     off();
     expect(host.listenerCount('library:itemsAdded')).toBe(0);
     expect(host.listenerCount('library:initialized')).toBe(0);
+  });
+
+  it('hook 刷新不报给整份重拉，非 hook 的修改照报', () => {
+    const host = installFakeHost();
+    let calls = 0;
+    const off = onLibraryChanged(host.fb, () => (calls += 1));
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: ['E:\\a.flac'],
+      truncated: false,
+      fromHook: true,
+      timestamp: 1,
+    });
+    expect(calls).toBe(0);
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: ['E:\\a.flac'],
+      truncated: false,
+      fromHook: false,
+      timestamp: 2,
+    });
+    expect(calls).toBe(1);
+    off();
+  });
+
+  it('统计刷新只报 hook 事件，把手交给载荷里变化的那几首', () => {
+    const host = installFakeHost();
+    const seen: unknown[] = [];
+    const off = onLibraryStatsRefresh(host.fb, (payload) => seen.push(payload.handles));
+    expect(host.listenerCount('library:itemsAdded')).toBe(0);
+    host.emit('library:itemsModified', {
+      count: 2,
+      handles: ['E:\\a.flac', 'E:\\b.flac'],
+      truncated: false,
+      fromHook: false,
+      timestamp: 1,
+    });
+    expect(seen).toEqual([]);
+    host.emit('library:itemsModified', {
+      count: 2,
+      handles: ['E:\\a.flac', 'E:\\b.flac'],
+      truncated: false,
+      fromHook: true,
+      timestamp: 2,
+    });
+    expect(seen).toEqual([['E:\\a.flac', 'E:\\b.flac']]);
+    host.emit('library:itemsAdded', {
+      count: 1,
+      handles: ['E:\\c.flac'],
+      truncated: false,
+      timestamp: 3,
+    });
+    expect(seen).toHaveLength(1);
+    off();
+    expect(host.listenerCount('library:itemsModified')).toBe(0);
   });
 });
 

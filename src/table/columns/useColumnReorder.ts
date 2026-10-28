@@ -16,27 +16,28 @@ import { createColumnMotion } from './columnMotion.ts';
 import { dropTarget, insideHeader, type ColumnRect, type DropTarget } from './columnPreview.ts';
 import { insertColumn, type ColumnId } from './columns.ts';
 import type { ColumnsModel } from './columnsModel.ts';
+import { startColumnEdgeScroll } from './columnEdgeScroll.ts';
 
-/** 按下后指针挪过这么多 CSS 像素才算拖动；不到就是一次单击（排序）。 */
+/** 按下后指针挪过这么多 CSS 像素才算拖动；不到就是一次单击（排序） */
 const DRAG_THRESHOLD = 5;
 
 export interface ColumnReorder {
-  /** 正在拖的列；拖动状态挂在这一列自己的列头格上。 */
+  /** 正在拖的列；拖动状态挂在这一列自己的列头格上 */
   readonly dragging: ColumnId | null;
   readonly ghost: ColumnGhostState | null;
-  /** 在一次按下到松开之间（含还没过阈值时）。 */
+  /** 在一次按下到松开之间（含还没过阈值时） */
   active(): boolean;
-  /** 列头格上的 pointerdown。只接鼠标左键，封面不能拖。 */
+  /** 列头格上的 pointerdown。只接鼠标左键，封面不能拖 */
   onPointerDown(event: ReactPointerEvent<HTMLElement>, id: ColumnId): void;
-  /** 拖过之后浏览器照样补一次 click；答真时这次点击不当排序。键盘点出来的 click 不吞。 */
+  /** 拖过之后浏览器照样补一次 click；答真时这次点击不当排序。键盘点出来的 click 不吞 */
   swallowClick(event: Pick<MouseEvent, 'detail'>): boolean;
-  /** 取消：各列滑回原位，不改列序。 */
+  /** 取消：各列滑回原位，不改列序 */
   cancel(): void;
 }
 
 /**
  * 拖列头换列：过了阈值才捕获指针、冻结列宽，途中各列按预演的列序让位，松手时落盘并让各格从屏幕上的位置
- * 滑到新位置。窗口失焦、指针被夺走时取消；窗口缩放时直接撤掉，列宽已经不是按下时量的了。
+ * 滑到新位置。窗口失焦、指针被夺走时取消；窗口缩放时直接撤掉，列宽已经不是按下时量的了
  */
 export function useColumnReorder(
   columns: ColumnsModel,
@@ -48,7 +49,7 @@ export function useColumnReorder(
   const [ghost, setGhost] = useState<ColumnGhostState | null>(null);
   const session = useRef<((commit: boolean, immediate: boolean) => void) | null>(null);
   const swallow = useRef(false);
-  /** 等真正松手再清 `swallow` 的那个 window 监听，卸载时摘掉。 */
+  /** 等真正松手再清 `swallow` 的那个 window 监听，卸载时摘掉 */
   const release = useRef<(() => void) | null>(null);
   const ghostTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [motion] = useState(() =>
@@ -71,7 +72,7 @@ export function useColumnReorder(
       const row = header.current;
       if (event.button !== 0 || event.pointerType !== 'mouse' || id === 'cover' || !row) return;
       session.current?.(false, true);
-      // 上一轮换完还在淡出的列名作废，不然它的定时器会把这一轮刚出来的列名收掉。
+      // 上一轮换完还在淡出的列名作废，不然它的定时器会把这一轮刚出来的列名收掉
       clearTimeout(ghostTimer.current);
       const cell = event.currentTarget;
       const pointer = event.pointerId;
@@ -81,11 +82,20 @@ export function useColumnReorder(
       let rects: ColumnRect[] = [];
       let moved = false;
       let target: DropTarget | null = null;
+      let current = start;
+      const edge = startColumnEdgeScroll(root.current, row, () => update(current.x, current.y));
+      const startScroll = edge.offset();
       swallow.current = false;
 
       const update = (x: number, y: number) => {
         setGhost({ id, x, y, leaving: false });
-        target = insideHeader(rects, area, x, y) ? dropTarget(rects, id, x) : null;
+        const shifted = rects.map((rect) => ({
+          ...rect,
+          left: rect.left - edge.offset() + startScroll,
+        }));
+        const viewport = root.current?.getBoundingClientRect();
+        const visible = viewport && x >= viewport.left && x <= viewport.right;
+        target = visible && insideHeader(shifted, area, x, y) ? dropTarget(shifted, id, x) : null;
         motion.preview(target ? insertColumn(base, id, target.id, target.after) : base);
       };
       const move = (next: PointerEvent) => {
@@ -98,11 +108,14 @@ export function useColumnReorder(
           setDragging(id);
         }
         next.preventDefault();
+        current = { x: next.clientX, y: next.clientY };
         update(next.clientX, next.clientY);
+        edge.update(next.clientX, next.clientY);
       };
       const finish = (commit: boolean, immediate: boolean, released = false) => {
         if (session.current !== finish) return;
         session.current = null;
+        edge.dispose();
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', cancelled);
@@ -114,7 +127,7 @@ export function useColumnReorder(
         if (!moved) return;
         // 拖过之后浏览器在松手时补的那一下 click 不当排序；它没落到按钮上时，松手后的下一轮就清掉，不误吞后来的
         // 点击。Esc、丢了指针捕获这类在松手之前就结束的，要等到真的松手：指针捕获已经放掉，回到原处松手时这一下
-        // 会落在列头的按钮上。
+        // 会落在列头的按钮上
         swallow.current = true;
         const clear = () => {
           if (release.current === clear) release.current = null;
@@ -136,7 +149,7 @@ export function useColumnReorder(
         motion.settle(
           drop
             ? () => {
-                // 往右换位时 React 挪的是被拖的这一格，里面拿着的焦点跟着丢到 body；挪完还给它。
+                // 往右换位时 React 挪的是被拖的这一格，里面拿着的焦点跟着丢到 body；挪完还给它
                 const focused = cell.contains(document.activeElement);
                 flushSync(() => columns.moveColumn(id, drop.id, drop.after));
                 if (focused && !cell.contains(document.activeElement)) focusColumn(row, id);
@@ -157,7 +170,7 @@ export function useColumnReorder(
       function lost() {
         finish(false, false);
       }
-      // 窗口失焦时多半在窗口外松手，等不到那一下 pointerup：当作已经松手。
+      // 窗口失焦时多半在窗口外松手，等不到那一下 pointerup：当作已经松手
       function blurred() {
         finish(false, false, true);
       }
@@ -172,7 +185,7 @@ export function useColumnReorder(
       window.addEventListener('resize', resized);
       cell.addEventListener('lostpointercapture', lost);
     },
-    [columns, header, motion, store, fadeGhost],
+    [columns, header, root, motion, store, fadeGhost],
   );
 
   useEffect(
@@ -192,7 +205,7 @@ export function useColumnReorder(
     active: () => session.current !== null,
     onPointerDown,
     swallowClick(event) {
-      // 键盘（回车、空格）点出来的 click 的 detail 是 0，不是拖动补的那一下。
+      // 键盘（回车、空格）点出来的 click 的 detail 是 0，不是拖动补的那一下
       if (event.detail === 0) return false;
       const swallowed = swallow.current;
       swallow.current = false;

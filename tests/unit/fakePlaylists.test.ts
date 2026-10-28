@@ -40,7 +40,7 @@ it('列表重排、复制和删除的载荷保留身份，不用当前位置重�
     },
     {
       event: 'playlist:itemsAdded',
-      payload: { playlist: 2, playlistGuid: copy.guid, start: 0, count: 10 },
+      payload: { playlist: 2, playlistGuid: copy.guid, start: 0, count: 10, contentVersion: '0' },
     },
   ]);
   await host.fb.playlist.remove(other);

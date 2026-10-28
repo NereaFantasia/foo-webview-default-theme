@@ -26,7 +26,8 @@ const STARTUP = {
 } as const;
 const encoder = new TextEncoder();
 
-async function setup() {
+/** `tamper`：把候选的 DLL 换成哈希对不上的内容，再启动发起方 */
+async function setup(mode: 'notify' | 'auto' = 'notify', tamper = false) {
   const env = installTemplateHost({
     'current.json': JSON.stringify({ schema: 1, frontend: { version: CURRENT } }),
     'fe/0.2.0/installed.json': JSON.stringify({
@@ -36,7 +37,7 @@ async function setup() {
       releaseSha256: 'd'.repeat(64),
     }),
   });
-  env.host.config.set('defaultTheme.update.mode', 'auto');
+  env.host.config.set('defaultTheme.update.mode', mode);
   const signer = await rootSigner('plugin');
   const files = ['foo_ui_webview2.dll', 'WebView2Loader.dll'].map((path, index) => ({
     path,
@@ -79,6 +80,8 @@ async function setup() {
     );
   }
   await root(1);
+  if (tamper)
+    routes.set(new URL('foo_ui_webview2.dll', candidate.url).href, new Uint8Array(128).fill(9));
   env.host.answer('http.get', (params) => {
     const bytes = routes.get(String(params['url']));
     return {
@@ -163,7 +166,12 @@ async function setup() {
   });
   store.set(confirmedStartupAtom, STARTUP);
   await service.check();
-  await vi.waitFor(() => expect(store.get(service.status).phase).toBe('available'));
+  await vi.waitFor(() =>
+    expect(store.get(service.status)).toMatchObject({
+      phase: 'available',
+      ...(mode === 'auto' && !tamper ? { staged: true } : {}),
+    }),
+  );
   return {
     ...env,
     store,
@@ -186,7 +194,7 @@ async function setup() {
 }
 
 describe('插件更新发起方', () => {
-  it('主题没有新版时仍发现插件，自动模式也不下载 DLL 或退出', async () => {
+  it('主题没有新版时仍发现插件，只通知的模式不下载 DLL 或退出', async () => {
     const env = await setup();
     expect(env.status()).toEqual({
       phase: 'available',
@@ -198,6 +206,61 @@ describe('插件更新发起方', () => {
       false,
     );
     expect([...env.files.keys()].some((path) => path.endsWith('.dll'))).toBe(false);
+  });
+
+  it('自动模式提前下载并校验两份 DLL，但不准备、不启动、不退出宿主', async () => {
+    const env = await setup('auto');
+    expect(env.status()).toEqual({
+      phase: 'available',
+      version: '2.1.0',
+      sha256: env.candidate.sha256,
+      staged: true,
+    });
+    expect(env.order).toEqual([]);
+    const paths = [...env.files.keys()].filter((path) => path.endsWith('.dll'));
+    expect(paths).toHaveLength(2);
+    for (const path of paths)
+      expect(path).toContain(`state/plugin-${env.candidate.sha256.slice(0, 16)}/`);
+  });
+
+  it('已提前下载的候选安装时不再下载，直接准备、启动、授权、退出', async () => {
+    const env = await setup('auto');
+    const downloads = () =>
+      env.host.callsTo('http.get').filter((call) => String(call['url']).endsWith('.dll')).length;
+    expect(downloads()).toBe(2);
+    await env.service.install(env.candidate.sha256);
+    expect(downloads()).toBe(2);
+    expect(env.status()).toEqual({ phase: 'restarting', version: '2.1.0' });
+    expect(env.order).toEqual(['prepare', 'start', 'authorize', 'exit']);
+  });
+
+  it('再次检查时候选没变就不重复下载', async () => {
+    const env = await setup('auto');
+    await env.service.check();
+    await vi.waitFor(() => expect(env.status()).toMatchObject({ staged: true }));
+    expect(
+      env.host.callsTo('http.get').filter((call) => String(call['url']).endsWith('.dll')),
+    ).toHaveLength(2);
+  });
+
+  it('提前下载的文件哈希不符时不标记已下载，候选照常可见，安装时再如实报错', async () => {
+    const env = await setup('auto', true);
+    await vi.waitFor(() =>
+      expect(
+        env.host.callsTo('http.get').some((call) => String(call['url']).endsWith('.dll')),
+      ).toBe(true),
+    );
+    await vi.waitFor(() =>
+      expect(env.status()).toEqual({
+        phase: 'available',
+        version: '2.1.0',
+        sha256: env.candidate.sha256,
+      }),
+    );
+    expect(env.order).toEqual([]);
+    await env.service.install(env.candidate.sha256);
+    expect(env.status()).toMatchObject({ phase: 'failed' });
+    expect(env.order).toEqual([]);
   });
 
   it('根清单撤下全部插件候选后不再显示插件行', async () => {

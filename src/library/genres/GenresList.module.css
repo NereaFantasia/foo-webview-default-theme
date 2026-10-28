@@ -12,10 +12,12 @@
   gap: var(--spacingVerticalXXS);
   padding: var(--spacingVerticalS) var(--library-content-inset, var(--spacingHorizontalM));
 }
+/* 筛选框占满余量，排序菜单写当前字段，方向在菜单里改 */
 .sort {
   display: flex;
   align-items: center;
-  gap: var(--spacingHorizontalS);
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
 }
 .scroll {
   overflow: auto;
@@ -74,6 +76,7 @@
   font-size: var(--fontSizeBase300);
 }
 .count {
+  flex-wrap: nowrap;
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase200);
 }

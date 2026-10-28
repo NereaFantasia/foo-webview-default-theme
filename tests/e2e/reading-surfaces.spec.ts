@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openPlayer } from '../fixtures/playerPage.ts';
-import { enterSettings } from '../fixtures/settingsPage.ts';
+import { enterSettings, backgroundCard } from '../fixtures/settingsPage.ts';
 import { openArtists } from '../fixtures/artistsPage.ts';
 import { openGenres } from '../fixtures/genresPage.ts';
 import { openFolders } from '../fixtures/foldersPage.ts';
@@ -76,10 +76,7 @@ for (const scheme of ['light', 'dark'] as const) {
       ).toBe('none');
     }
     await enterSettings(page);
-    const toggle = page
-      .locator('[data-settings-expander]')
-      .filter({ has: page.getByRole('combobox', { name: '窗口背景', exact: true }) })
-      .locator('[data-settings-toggle]');
+    const toggle = backgroundCard(page).locator('[data-settings-toggle]');
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
     const opacity = page.getByRole('slider', { name: '内容区域不透明度', exact: true });
     await opacity.focus();

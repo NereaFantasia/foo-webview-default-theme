@@ -1,0 +1,168 @@
+/* 筛选键占的位：32 宽加一个间距，没有筛选键时是 0 */
+.root {
+  --sort-travel: calc(126px + 32px + var(--spacingHorizontalS) * 2);
+  --filter-slot: 0px;
+  container-type: inline-size;
+  margin-bottom: var(--spacingVerticalL);
+}
+
+.root {
+  position: relative;
+}
+
+.root[data-has-filter] {
+  --filter-slot: calc(32px + var(--spacingHorizontalS));
+}
+
+.start {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  max-width: calc(100% - 2 * 32px - var(--spacingHorizontalS) * 2 - var(--filter-slot));
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rail {
+  position: relative;
+  height: 32px;
+  /* 整行宽的一层盖在靠左的页签上，只让各个键与输入框接收指针 */
+  pointer-events: none;
+}
+
+/* 两组控件保留完整尺寸，只改变位移与裁剪；反向时浏览器从当前进度接续 */
+.search {
+  position: absolute;
+  top: 0;
+  right: calc(32px + var(--sort-travel) + var(--spacingHorizontalS) + var(--filter-slot));
+  width: min(240px, calc(100% - 32px - var(--spacingHorizontalS) - var(--filter-slot)));
+  height: 32px;
+  pointer-events: none;
+  translate: var(--sort-travel) 0;
+  clip-path: inset(-2px);
+  transition: translate var(--tool-close) var(--motion-curve-pane);
+}
+
+.input {
+  width: 100%;
+  height: 32px;
+  pointer-events: auto;
+  translate: calc(100% - 32px) 0;
+  visibility: hidden;
+  transition:
+    translate var(--tool-close) var(--motion-curve-pane),
+    visibility 0s var(--tool-close);
+}
+
+.search-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity var(--motion-faster) var(--curveLinear) var(--tool-close);
+}
+
+.filter {
+  position: absolute;
+  top: 0;
+  pointer-events: auto;
+  right: calc(32px + var(--sort-travel) + var(--spacingHorizontalS));
+  width: 32px;
+  height: 32px;
+  translate: var(--sort-travel) 0;
+  transition: translate var(--tool-close) var(--motion-curve-pane);
+}
+
+.sort {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(32px + var(--sort-travel));
+  height: 32px;
+  pointer-events: none;
+  clip-path: inset(-2px);
+}
+
+.sort-trigger,
+.controls {
+  position: absolute;
+  top: 0;
+  height: 32px;
+  pointer-events: auto;
+  translate: var(--sort-travel) 0;
+  transition: translate var(--tool-close) var(--motion-curve-pane);
+}
+
+.sort-trigger {
+  left: 0;
+  width: 32px;
+}
+
+.controls {
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  visibility: hidden;
+  transition:
+    translate var(--tool-close) var(--motion-curve-pane),
+    visibility 0s var(--tool-close);
+}
+
+.rail[data-sort-open] .search,
+.rail[data-sort-open] .filter,
+.rail[data-sort-open] .sort-trigger,
+.rail[data-sort-open] .controls {
+  translate: 0 0;
+  transition-duration: var(--tool-open);
+}
+
+.rail[data-sort-open] .controls {
+  visibility: visible;
+  transition:
+    translate var(--tool-open) var(--motion-curve-pane),
+    visibility 0s;
+}
+
+.rail[data-find-open] .input {
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    translate var(--tool-open) var(--motion-curve-pane),
+    visibility 0s;
+}
+
+.rail[data-find-open] .search-trigger {
+  opacity: 0;
+  transition: none;
+}
+
+@container (max-width: 485px) {
+  .rail[data-find-open][data-sort-open] {
+    height: calc(64px + var(--spacingVerticalS));
+  }
+
+  .rail[data-find-open][data-sort-open] .search {
+    right: 0;
+    translate: 0 0;
+    transition: none;
+  }
+
+  /* 查找框占了上一行，筛选键下到排序那一行 */
+  .rail[data-find-open][data-sort-open] .filter {
+    top: auto;
+    bottom: 0;
+    transition: none;
+  }
+}

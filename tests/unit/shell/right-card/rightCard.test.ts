@@ -41,6 +41,56 @@ describe('parseRightCardPrefs', () => {
 });
 
 describe('startRightCard', () => {
+  it('宽窗悬停以浮层预览，关闭不改停靠偏好，点击同页恢复停靠', () => {
+    const store = createStore();
+    const storage = memoryStorage();
+    const card = startRightCard(store, { wide: atom(true) }, storage);
+    card.peek('queue');
+    expect(store.get(card.view)).toMatchObject({
+      form: 'overlay',
+      peeking: true,
+      prefs: { open: false },
+    });
+    card.peek('lyrics');
+    expect(store.get(card.view).prefs.page).toBe('lyrics');
+    card.close();
+    expect(store.get(card.view)).toMatchObject({
+      form: 'none',
+      peeking: false,
+      prefs: { open: false },
+    });
+    card.peek('lyrics');
+    card.toggle('lyrics');
+    expect(store.get(card.view)).toMatchObject({ form: 'docked', peeking: false });
+    card.peek('queue');
+    expect(store.get(card.view)).toMatchObject({ form: 'docked', prefs: { page: 'lyrics' } });
+    card.close();
+    expect(store.get(card.view).form).toBe('none');
+    card.dispose();
+  });
+
+  it('悬停跨档后关闭；窄窗点击确认浮层不修改宽窗的停靠偏好', () => {
+    const store = createStore();
+    const wide = atom(true);
+    const storage = memoryStorage();
+    const card = startRightCard(store, { wide }, storage);
+    card.peek('queue');
+    store.set(wide, false);
+    expect(store.get(card.view).form).toBe('none');
+    card.peek('queue');
+    card.toggle('queue');
+    expect(store.get(card.view)).toMatchObject({
+      form: 'overlay',
+      peeking: false,
+      prefs: { open: false },
+    });
+    card.peek('lyrics');
+    expect(store.get(card.view).prefs.page).toBe('queue');
+    store.set(wide, true);
+    expect(store.get(card.view).form).toBe('none');
+    card.dispose();
+  });
+
   it('四个页签与歌词子页使用独立历史，后退不改变主视图', () => {
     const store = createStore();
     const main = startNavHistory(store);

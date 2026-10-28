@@ -1,0 +1,7 @@
+.root {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}

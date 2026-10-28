@@ -10,7 +10,15 @@ import {
   onLibraryChanged,
   type LibraryEventsFace,
 } from '../../host/libraryContract.ts';
-import { bestSearchHit, searchAlbums, searchQuery, type SearchHit } from './searchQuery.ts';
+import { albumArtistRows } from '../artists/artistIndex.ts';
+import {
+  bestSearchHit,
+  searchAlbums,
+  searchArtists,
+  searchQuery,
+  type SearchHit,
+  type SearchScope,
+} from './searchQuery.ts';
 
 export const SEARCH_PAGE_SIZE = 100;
 export const SEARCH_RESULT_LIMIT = 100_000;
@@ -36,10 +44,16 @@ export interface SearchResultsFace extends HostReadyFace, LibraryEventsFace {
 export interface SearchResultsService {
   readonly state: Atom<SearchResultsState>;
   readonly albums: Atom<ReturnType<typeof searchAlbums>>;
+  /** 按专辑艺人归出的艺人，与艺人页缺省的列出依据一致；只在客串里出现的艺人不在这里 */
+  readonly artists: Atom<ReturnType<typeof searchArtists>>;
   readonly best: Atom<SearchHit | null>;
+  /** 字段▾：曲目、专辑与艺人都按它比；缺省 `any` */
+  readonly scope: Atom<SearchScope>;
   setText(text: string, immediate?: boolean): void;
+  /** 换字段范围，马上重查 */
+  setScope(scope: SearchScope): void;
   more(minimum?: number): Promise<void>;
-  /** 读取完整结果供全选；失败、查询失效或超过读取上限时为 null，不返回部分选择。 */
+  /** 读取完整结果供全选；失败、查询失效或超过读取上限时为 null，不返回部分选择 */
   all(): Promise<readonly LibraryTrackPartial[] | null>;
   retry(): void;
   dispose(): void;
@@ -57,8 +71,8 @@ const INITIAL: SearchResultsState = {
 };
 
 /**
- * library.query 没有 offset，续页扩大有序前缀并整份替换，不拼接可能重复或改序的旧页。
- * 每次库事件立即作废应答，合并窗口只延迟重读；达到前缀上限后仍保留完整 total。
+ * library.query 没有 offset，续页扩大有序前缀并整份替换，不拼接可能重复或改序的旧页
+ * 每次库事件立即作废应答，合并窗口只延迟重读；达到前缀上限后仍保留完整 total
  */
 export function startSearchResults(
   store: Store,
@@ -66,10 +80,18 @@ export function startSearchResults(
   host: SearchResultsFace = fb,
 ): SearchResultsService {
   const state = atom<SearchResultsState>(INITIAL);
+  const scope = atom<SearchScope>('any');
   const albums = atom((get) => {
     const source = get(albumsAtom);
     return source.status === 'ready' && source.enabled
-      ? searchAlbums(source.albums, get(state).text)
+      ? searchAlbums(source.albums, get(state).text, get(scope))
+      : [];
+  });
+  const artistRows = atom((get) => albumArtistRows(get(albumsAtom).albums));
+  const artists = atom((get) => {
+    const source = get(albumsAtom);
+    return source.status === 'ready' && source.enabled
+      ? searchArtists(get(artistRows), get(state).text, get(scope))
       : [];
   });
   const best = atom((get) => {
@@ -82,7 +104,7 @@ export function startSearchResults(
       source.truncated
     )
       return null;
-    return bestSearchHit(get(albums), result.tracks, result.text);
+    return bestSearchHit(get(albums), result.tracks, result.text, get(artists));
   });
   let disposed = false;
   let generation = 0;
@@ -102,7 +124,7 @@ export function startSearchResults(
 
   async function load(mine: number, limit: number, more: boolean): Promise<void> {
     const stale = () => disposed || mine !== generation;
-    const compiled = searchQuery(store.get(state).text);
+    const compiled = searchQuery(store.get(state).text, store.get(scope));
     if (!compiled || stale()) return;
     const waiting = waitForHost(host);
     waiter = waiting;
@@ -178,8 +200,16 @@ export function startSearchResults(
   return {
     state,
     albums,
+    artists,
     best,
+    scope,
     setText,
+    setScope(next) {
+      if (disposed || next === store.get(scope)) return;
+      store.set(scope, next);
+      // 换字段不清空手上的结果，新结果到了整份替换：先清空再填回来，整页会闪一下
+      if (store.get(state).text) void load(invalidate(), SEARCH_PAGE_SIZE, false);
+    },
     async more(minimum = 0) {
       const current = store.get(state);
       if (

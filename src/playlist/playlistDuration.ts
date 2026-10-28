@@ -15,16 +15,16 @@ export interface PlaylistDurationDeps {
 }
 
 export interface PlaylistDurationService {
-  /** 这张列表的总时长，秒；还没读到、读不到时为 null。 */
+  /** 这张列表的总时长，秒；还没读到、读不到时为 null */
   stateOf(guid: string): Atom<number | null>;
-  /** 页面挂上时调；返回的函数在卸下时调。 */
+  /** 页面挂上时调；返回的函数在卸下时调 */
   acquire(guid: string): () => void;
   dispose(): void;
 }
 
 interface Entry {
   generation: number;
-  /** 按行服务哪一版内容与标签读过；还没读过是 null。 */
+  /** 按行服务哪一版内容与标签读过；还没读过是 null */
   readAt: { readonly content: number; readonly tags: number } | null;
   wasActive: boolean;
   offs: (() => void)[];
@@ -33,7 +33,7 @@ interface Entry {
 /**
  * 播放列表页页头的总时长。宿主只在 `getActive` 里报时长，清单与取行都不带，所以只有这张是活动列表时才读：
  * 进页时它就是活动的；行增删、替换过（内容版本变了），曲目标签变过（换了文件、重新载入信息），或它重新
- * 成了活动列表，再读一次。读回的不是这张就不写；后发的读压过先发的。
+ * 成了活动列表，再读一次。读回的不是这张就不写；后发的读压过先发的
  */
 export function startPlaylistDuration(
   store: Store,

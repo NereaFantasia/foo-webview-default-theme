@@ -1,24 +1,24 @@
 import type { ColumnId } from './columns.ts';
 
-// 拖动换列时的几何：指针落在哪一列前后、按新列序各列要挪多少。按下时量一次列头各格，拖动途中不再量。
+// 拖动换列时的几何：指针落在哪一列前后、按新列序各列要挪多少。按下时量一次列头各格，拖动途中不再量
 
-/** 一列列头在按下那一刻的横向位置，视口坐标，CSS 像素。 */
+/** 一列列头在按下那一刻的横向位置，视口坐标，CSS 像素 */
 export interface ColumnRect {
   readonly id: ColumnId;
   readonly left: number;
   readonly width: number;
 }
 
-/** 各列从原位置横向要挪的像素；没写的列不挪。 */
+/** 各列从原位置横向要挪的像素；没写的列不挪 */
 export type ColumnOffsets = Partial<Record<ColumnId, number>>;
 
 export interface DropTarget {
   readonly id: ColumnId;
-  /** 插在 `id` 后面；为假时插在前面。 */
+  /** 插在 `id` 后面；为假时插在前面 */
   readonly after: boolean;
 }
 
-/** 松手的地方在不在列头那一条里；出了这一条松手不换列。 */
+/** 松手的地方在不在列头那一条里；出了这一条松手不换列 */
 export function insideHeader(
   rects: readonly ColumnRect[],
   area: DOMRect,
@@ -34,7 +34,7 @@ export function insideHeader(
 
 /**
  * 指针横坐标在 `x` 时，拖着的 `source` 落到哪：越过哪一列的中线就插到它前面，越过最后一列的中线就插到
- * 最后一列后面。落回原位时为 null。封面不参与换位。
+ * 最后一列后面。落回原位时为 null。封面不参与换位
  */
 export function dropTarget(
   rects: readonly ColumnRect[],
@@ -55,8 +55,8 @@ export function dropTarget(
 }
 
 /**
- * 按 `order` 重新排一遍各列、宽度不变，答每列从原位置要挪多少。`gap` 是相邻两列之间的空隙。
- * `order` 里量不到的列（藏着的）跳过。
+ * 按 `order` 重新排一遍各列、宽度不变，答每列从原位置要挪多少。`gap` 是相邻两列之间的空隙
+ * `order` 里量不到的列（藏着的）跳过
  */
 export function columnOffsets(
   rects: readonly ColumnRect[],

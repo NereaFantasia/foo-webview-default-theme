@@ -1,0 +1,99 @@
+/* 嵌入时在阅读面上就地展开，不另铺底；栏头右端是改为浮层与收起 */
+.docked {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+}
+
+/* 弹出与浮动：盖在页面上的覆盖层，复用主视图背景色调与磨砂质感，缺省宽度放得下三栏分面；栏数少的页面经 --filter-flyout-width 收窄 */
+.flyout {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  box-sizing: border-box;
+  width: min(var(--filter-flyout-width, 640px), calc(100% - 2 * var(--spacingHorizontalS)));
+  max-height: calc(100% - 2 * var(--spacingVerticalS));
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalM);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAlpha);
+  border-radius: var(--radius-overlay);
+  background-color: color-mix(in srgb, var(--bg-panel-overlay) 35%, var(--bg-pane));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--shadow16);
+  /* 出场时从筛选键一侧往下移入，方向变量与 Fluent 定位层写的同名 */
+  --fui-positioning-slide-direction-x: 0px;
+  --fui-positioning-slide-direction-y: 1px;
+}
+.flyout:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+/* 窄档铺满内容宽度，左右由内联位置给出 */
+.flyout[data-narrow] {
+  width: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  gap: var(--spacingHorizontalS);
+}
+.flyout .head {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.flyout[data-narrow] .head {
+  cursor: auto;
+}
+.flyout[data-filter-surface='floating'] .head:active {
+  cursor: grabbing;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground2);
+}
+.grip {
+  color: var(--colorNeutralForeground3);
+}
+.ops {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+}
+/* 常用条件在上，页面的分面或范围在下 */
+.body {
+  display: grid;
+  align-content: start;
+  row-gap: var(--spacingVerticalM);
+  min-height: 0;
+  overflow: auto;
+  padding-top: var(--spacingVerticalXS);
+}
+.flyout .body {
+  margin-inline: calc(-1 * var(--spacingHorizontalL));
+  padding-inline: var(--spacingHorizontalL);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  padding-top: var(--spacingVerticalS);
+  border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+@media (forced-colors: active) {
+  .flyout {
+    background-color: Canvas;
+    border-color: CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

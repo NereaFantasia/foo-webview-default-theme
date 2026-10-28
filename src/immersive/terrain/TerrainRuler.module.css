@@ -1,4 +1,4 @@
-/* 场景底边的一条：上边框就是基线，高度含边框。 */
+/* 场景底边的一条：上边框就是基线，高度含边框 */
 .ruler {
   position: absolute;
   left: 0;
@@ -12,7 +12,7 @@
   pointer-events: none;
 }
 
-/* 分界刻度：从基线往上伸 10 高，底端贴着基线。 */
+/* 分界刻度：从基线往上伸 10 高，底端贴着基线 */
 .tick {
   position: absolute;
   top: -11px;
@@ -21,7 +21,7 @@
   background: var(--paper-cross);
 }
 
-/* 频段名在自己那一段里居中。 */
+/* 频段名在自己那一段里居中 */
 .band {
   position: absolute;
   top: 7px;

@@ -4,18 +4,18 @@ import { settle } from '../host/hostCall.ts';
 import type { Store } from '../kit/store.ts';
 import { parseLyricsText, type LyricsContent } from './lyricsText.ts';
 
-/** 取词要的那一首：由 `app/` 从正在播放的曲目换算后注入，本层不认播放服务。 */
+/** 取词要的那一首：由 `app/` 从正在播放的曲目换算后注入，本层不认播放服务 */
 export interface LyricsTrack {
-  /** 曲目身份，换了它才重新取词；编辑标签不换身份。 */
+  /** 曲目身份，换了它才重新取词；编辑标签不换身份 */
   readonly key: string;
-  /** 交给宿主的路径，分轨自带 `|subsong:N`。 */
+  /** 交给宿主的路径，分轨自带 `|subsong:N` */
   readonly handle: string;
-  /** 本地文件才问宿主；网络流问的话，宿主要在主线程上同步打开 URL，会卡到网络超时。 */
+  /** 本地文件才问宿主；网络流问的话，宿主要在主线程上同步打开 URL，会卡到网络超时 */
   readonly local: boolean;
 }
 
 export type LocalLyricsState =
-  /** 没在播放，或宿主没连上。 */
+  /** 没在播放，或宿主没连上 */
   | { readonly status: 'idle' }
   | { readonly status: 'loading'; readonly key: string }
   | { readonly status: 'missing'; readonly key: string }
@@ -24,7 +24,7 @@ export type LocalLyricsState =
       readonly status: 'ready';
       readonly key: string;
       readonly source: 'embedded' | 'file';
-      /** 来自音频旁的文件时是它的完整路径。 */
+      /** 来自音频旁的文件时是它的完整路径 */
       readonly sourcePath?: string;
       readonly content: LyricsContent;
     };
@@ -45,13 +45,13 @@ const IDLE: LocalLyricsState = { status: 'idle' };
 
 /**
  * 跟着当前曲目读本地歌词（内嵌标签与音频旁的文件，顺序由宿主定）。先订阅再初读；换曲时丢掉还没答的那次，
- * 晚到的应答不覆盖新曲目的状态。
+ * 晚到的应答不覆盖新曲目的状态
  */
 export function startLocalLyrics(store: Store, deps: LocalLyricsDeps): LocalLyricsService {
   const state = atom<LocalLyricsState>(IDLE);
   let generation = 0;
   let disposed = false;
-  // 上一次看到的输入：连上且在播时是曲目身份，否则是空串；还没看过时为 undefined。
+  // 上一次看到的输入：连上且在播时是曲目身份，否则是空串；还没看过时为 undefined
   let input: string | undefined;
 
   async function load(track: LyricsTrack, id: number): Promise<void> {

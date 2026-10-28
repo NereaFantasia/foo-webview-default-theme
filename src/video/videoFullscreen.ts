@@ -38,7 +38,7 @@ export function startVideoFullscreen(
         if (owned) return leave();
         const current = await settle(() => host.isFullscreen());
         if (disposed || !current || current.success === false) return false;
-        // 已经由别处进入全屏时只改变页面形态，不取得退出宿主全屏的所有权。
+        // 已经由别处进入全屏时只改变页面形态，不取得退出宿主全屏的所有权
         if (current.isFullscreen) return true;
         const result = await settle(() => host.enterFullscreen());
         if (!result || result.success === false || !result.isFullscreen) return false;

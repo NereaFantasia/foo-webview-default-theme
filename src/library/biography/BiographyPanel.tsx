@@ -1,12 +1,12 @@
+import { Menu } from '../../motion/Surfaces.tsx';
+import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
 import {
   Button,
   Field,
   Input,
   Link,
-  Menu,
   MenuItem,
   MenuList,
-  MenuPopover,
   MenuTrigger,
   Spinner,
   Switch,
@@ -50,7 +50,7 @@ export interface BiographyPanelProps {
   readonly artistImages?: ReadonlyMap<string, string>;
   readonly artistLinks?: ReadonlyMap<string, () => void>;
   readonly onRefresh?: () => void;
-  /** 身份认定；不给时只能粘贴 Last.fm 链接确认。 */
+  /** 身份认定；不给时只能粘贴 Last.fm 链接确认 */
   readonly identity?: BiographyIdentityService;
   readonly layout?: 'card' | 'about';
   readonly heading?: string;
@@ -252,6 +252,7 @@ export function BiographyPanel(props: BiographyPanelProps) {
       <div className={styles.status} role="status">
         {loading && <Spinner size="tiny" aria-label={t('biography.loading')} />}
         {status && <span>{status}</span>}
+        {state.problemDetail && <span className={styles.statusDetail}>{state.problemDetail}</span>}
         {state.stale && <span>{t('biography.stale')}</span>}
         {state.cacheFailed && <span>{t('biography.cacheFailed')}</span>}
         {settings.failed && <span>{t('biography.prefsFailed')}</span>}
@@ -259,6 +260,9 @@ export function BiographyPanel(props: BiographyPanelProps) {
           <span>
             {t('biography.detailsFailed')} · {t(`biography.${state.detailsProblem}`)}
           </span>
+        )}
+        {state.detailsProblemDetail && (
+          <span className={styles.statusDetail}>{state.detailsProblemDetail}</span>
         )}
         {(state.problem || state.detailsProblem || state.status === 'cleared') && (
           <Button

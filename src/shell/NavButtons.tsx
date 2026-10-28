@@ -10,9 +10,9 @@ import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export interface NavButtonsProps {
   className?: string;
-  /** 圆形悬停底（导航行的胶囊里）；为假时是标题栏工具键的圆角方形。缺省为真。 */
+  /** 圆形悬停底（导航行的胶囊里）；为假时是标题栏工具键的圆角方形。缺省为真 */
   round?: boolean;
-  /** 两键之间画一道 1 × 16 的竖线（导航行的胶囊里）。 */
+  /** 两键之间画一道 1 × 16 的竖线（导航行的胶囊里） */
   divided?: boolean;
 }
 
@@ -22,7 +22,7 @@ const useStyles = makeStyles({
 
 /**
  * 后退、前进键（在导航行或标题栏里），与鼠标侧键、Alt+← / → 走同一条全局历史。页面里不另放返回键；
- * 悬停提示写要去的那一处的名字，已跳过主体不在的记录。
+ * 悬停提示写要去的那一处的名字，已跳过主体不在的记录
  */
 export function NavButtons({ className, round = true, divided = false }: NavButtonsProps) {
   const viewControls = useViewControlStyles();

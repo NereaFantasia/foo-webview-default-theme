@@ -1,0 +1,22 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXL);
+}
+.root h2 {
+  margin: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+.group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+}
+.busy {
+  justify-content: start;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+}

@@ -56,11 +56,13 @@ test('胶囊的键调到与宽窗相同的命令；进度线跟着宿主的进�
   await expect(capsuleKey(page, 'play')).toHaveAccessibleName('播放');
   await expect(capsuleKey(page, 'order')).toHaveAccessibleName('播放顺序：默认');
 
-  const fill = capsule(page).locator('[style*="scaleX"]');
-  await expect(fill).toHaveAttribute('style', /scaleX\(0\.175\)/);
+  const seek = capsule(page).getByRole('slider', { name: '播放进度' });
+  const fraction = () =>
+    seek.evaluate((element) => Number(element.style.getPropertyValue('--seek-progress')));
+  await expect.poll(fraction).toBeCloseTo(0.175, 3);
   await host.emit('playback:timeHighRes', { hostTime: Date.now(), position: 120 });
-  await expect(fill).toHaveAttribute('style', /scaleX\(0\.5\)/);
-  const box = await capsule(page).getByRole('slider', { name: '播放进度' }).boundingBox();
+  await expect.poll(fraction).toBeCloseTo(0.5, 3);
+  const box = await seek.boundingBox();
   if (!box) throw new Error('进度线没画出来');
   await page.mouse.click(box.x + box.width / 4, box.y + box.height / 2);
   await expect.poll(() => calls('playback.setPosition').length).toBe(1);
@@ -80,7 +82,7 @@ test('胶囊形态的宽窗：宽 680；封面离外缘 8，键组离右缘 14�
   const menu = await boxOf(page, '[data-player-capsule] [data-player-key="more"]');
   expect(pill.x + pill.width - (menu.x + menu.width)).toBe(14);
   const line = await capsule(page)
-    .locator('[style*="scaleX"]')
+    .locator('[data-seek-fill]')
     .evaluate((fill) => {
       const box = (fill.parentElement ?? fill).getBoundingClientRect();
       return {

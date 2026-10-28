@@ -1,6 +1,7 @@
 import { fb } from 'foo-webview-sdk/bridge';
 import { settle } from '../../../host/hostCall.ts';
 import {
+  compareFolderNames,
   foldersAddress,
   foldersDirectory,
   foldersSubject,
@@ -11,7 +12,7 @@ export interface FoldersTreeFace {
   library: Pick<typeof fb.library, 'getRoots' | 'browseTree'>;
 }
 
-/** 每次库索引换代创建一份；过期请求只可写它自己已被丢弃的缓存。 */
+/** 每次库索引换代创建一份；过期请求只可写它自己已被丢弃的缓存 */
 export function createFoldersCache(
   host: FoldersTreeFace,
   current: () => boolean,
@@ -31,7 +32,9 @@ export function createFoldersCache(
     if (!current()) return false;
     if (!answer || answer.success === false) failed.add(key);
     else {
-      const rows = answer.directories.map(foldersDirectory);
+      const rows = answer.directories
+        .map(foldersDirectory)
+        .sort((a, b) => compareFolderNames(a.name, b.name));
       for (const row of rows) nodes.set(row.key, row);
       children.set(
         key,

@@ -1,0 +1,45 @@
+/* 已选条件标签栏与分类栏、滚动列表保持统一水平内边距；--search-inset 由搜索结果页根元素提供 */
+.conditions {
+  padding-inline: var(--search-inset);
+  padding-top: var(--spacingVerticalXS);
+}
+/* 停靠态筛选面板与分类栏保持统一水平内边距；浮层形态下由绝对定位容器独立承载 */
+.surface {
+  padding-inline: var(--search-inset);
+}
+/* 停靠模式下面板下方的结果统计文案 */
+.dockedResult {
+  padding-top: var(--spacingVerticalXS);
+  font-size: var(--fontSizeBase200);
+  color: var(--text-secondary);
+}
+/* 浮层底栏操作区：包含匹配结果统计与清除条件操作 */
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase200);
+  color: var(--text-secondary);
+}
+/* 筛选无匹配曲目时的空状态容器，占位替换列表主区域 */
+.empty {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 176px;
+  text-align: center;
+  gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalXXL) var(--spacingHorizontalS);
+}
+.emptyIcon {
+  flex-shrink: 0;
+  color: var(--colorNeutralForeground3);
+  margin-bottom: var(--spacingVerticalS);
+}
+.detail {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}

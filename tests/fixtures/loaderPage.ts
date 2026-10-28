@@ -4,9 +4,11 @@ import type { Page } from '@playwright/test';
 import { libraryAnswers, SAMPLE_ALBUMS } from './albumLibrary.ts';
 import { installPageHost } from './pageHost.ts';
 import { hostFailure } from './hostAnswers.ts';
+import { CURRENT_VERSION, NEXT_VERSION } from './themeVersion.ts';
 
-export const LOADER_CURRENT = { v: '0.1.0', dir: '0.1.0' };
-export const LOADER_NEXT = { v: '0.2.0', dir: '0.2.0_abc123' };
+/** 构建产物的版本目录与包版本同名。 */
+export const LOADER_CURRENT = { v: CURRENT_VERSION, dir: CURRENT_VERSION };
+export const LOADER_NEXT = { v: NEXT_VERSION, dir: `${NEXT_VERSION}_abc123` };
 export const LOADER_OLD = { v: '0.0.9', dir: '0.0.9_xyz789' };
 const DISK_ROOT = 'E:\\loader-example';
 

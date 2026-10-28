@@ -17,10 +17,12 @@ import { historyAtom, historyKey } from '../nav/navHistory.ts';
 import { START_PLACE, type PageProps } from '../nav/places.ts';
 import { useCommand } from '../nav/useCommand.ts';
 import { PageEntryContext } from '../nav/usePageSnapshot.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 import styles from './DeferredPage.module.css';
 
 function PageStatus({ failed = false }: { readonly failed?: boolean }) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const store = useStore();
   const history = useService(historyKey);
   const entry = useContext(PageEntryContext);
@@ -42,7 +44,11 @@ function PageStatus({ failed = false }: { readonly failed?: boolean }) {
       {failed ? (
         <>
           <Body1>{t('page.loadFailed')}</Body1>
-          <Button icon={<ArrowClockwise20Regular />} onClick={() => location.reload()}>
+          <Button
+            className={viewControls.field}
+            icon={<ArrowClockwise20Regular />}
+            onClick={() => location.reload()}
+          >
             {t('page.reload')}
           </Button>
         </>
@@ -70,7 +76,7 @@ function PageReady({
   return children;
 }
 
-/** 页面模块首次进入时加载；导入失败留在当前页面，由用户重新加载主题恢复。 */
+/** 页面模块首次进入时加载；导入失败留在当前页面，由用户重新加载主题恢复 */
 export function deferPage(load: () => Promise<ComponentType<PageProps>>): ComponentType<PageProps> {
   const Page = lazy(() =>
     load()
@@ -81,7 +87,7 @@ export function deferPage(load: () => Promise<ComponentType<PageProps>>): Compon
     const entry = useContext(PageEntryContext);
     const current = useAtomValueRawSync(historyAtom).entry === entry;
     const shown = useRef(false);
-    // 已显示的页面保留退场；尚未显示就离开时，不让迟到的 Portal 或页面副作用重新挂载。
+    // 已显示的页面保留退场；尚未显示就离开时，不让迟到的 Portal 或页面副作用重新挂载
     if (!current && !shown.current) return null;
     return (
       <Suspense fallback={<PageStatus />}>

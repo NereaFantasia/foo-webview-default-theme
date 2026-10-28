@@ -1,4 +1,4 @@
-/* 零尺寸的定位锚：各件按版心坐标绝对定位，锚本身不挡右栏的指针。 */
+/* 零尺寸的定位锚：各件按版心坐标绝对定位，锚本身不挡右栏的指针 */
 .dial {
   position: absolute;
   left: 0;
@@ -21,7 +21,7 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* 环内上下的专辑名与曲号：以环心为中线，超了省略。 */
+/* 环内上下的专辑名与曲号：以环心为中线，超了省略 */
 .text {
   position: absolute;
   text-align: center;

@@ -1,27 +1,22 @@
-/* 标题在左，过滤框与按钮在右，一行排下；窄档时标题与按钮一行，过滤框单独一行。 */
+/* 标题行在上：左边标题与统计，右边集合操作；下面是命令栏 */
 .root {
   display: grid;
-  grid-template-areas: 'titles filter actions';
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalXS);
+}
+.titleRow {
+  display: flex;
   align-items: center;
-  gap: var(--spacingVerticalS) var(--spacingHorizontalL);
-  padding-bottom: var(--spacingVerticalL);
-}
-.root[data-tier='narrow'] {
-  grid-template-areas:
-    'titles actions'
-    'filter filter';
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.root[data-tier='narrow'] .titles {
-  flex-wrap: wrap;
-  gap: var(--spacingVerticalXXS) var(--spacingHorizontalS);
+  justify-content: space-between;
+  gap: var(--spacingHorizontalL);
+  min-width: 0;
 }
 .titles {
   display: flex;
-  grid-area: titles;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--spacingHorizontalMNudge);
+  gap: var(--spacingVerticalXXS) var(--spacingHorizontalMNudge);
   min-width: 0;
 }
 .subtitle {
@@ -30,24 +25,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.filter {
-  display: flex;
-  grid-area: filter;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--spacingHorizontalS);
-  min-width: 0;
-}
 .actions {
   display: flex;
-  grid-area: actions;
+  flex: none;
   align-items: center;
-  gap: var(--spacingHorizontalS);
+  gap: var(--spacingHorizontalXS);
 }
-/* 错误说明跨越页头各列，窄窗允许换行。 */
+/* 错误说明窄窗允许换行 */
 .invalid {
   display: flex;
-  grid-column: 1 / -1;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--spacingHorizontalS);

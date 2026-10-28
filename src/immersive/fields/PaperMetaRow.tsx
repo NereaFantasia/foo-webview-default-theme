@@ -6,7 +6,7 @@ import { durationTextAtom, elapsedTextAtom } from './clockText.ts';
 import styles from './PaperMetaRow.module.css';
 import { trackExtrasAtom } from './trackExtras.ts';
 
-/** Duration / Elapsed 一格；行里只有这一格跟着播放位置走。 */
+/** Duration / Elapsed 一格；行里只有这一格跟着播放位置走 */
 function TimesCell() {
   const duration = useAtomValueRawSync(durationTextAtom);
   const elapsed = useAtomValueRawSync(elapsedTextAtom);
@@ -29,16 +29,16 @@ function TimesCell() {
 }
 
 export interface PaperMetaRowProps {
-  /** 去掉声场一格，Genre / Year / Label 左移补位，行高 143 → 113。 */
+  /** 去掉声场一格，Genre / Year / Label 左移补位，行高 143 → 113 */
   readonly compact: boolean;
-  /** 左格里的声场件；`compact` 时不出。 */
+  /** 左格里的声场件；`compact` 时不出 */
   readonly stereo: ReactNode;
 }
 
 /**
- * 收缩档与竖版图纸右栏横线下的第一行，三格：声场、Genre / Year / Label、Duration / Elapsed（Elapsed 用热色）。
+ * 收缩档与竖版图纸右栏横线下的第一行，三格：声场、Genre / Year / Label、Duration / Elapsed（Elapsed 用热色）
  * 缺值写 `—`，键名保留。格宽、分隔线与字的纵向位置照图纸；等宽字按图纸字号放大一成
- * （图纸用 Geist Mono，这里的等宽字体字面窄一成）。
+ * （图纸用 Geist Mono，这里的等宽字体字面窄一成）
  */
 export function PaperMetaRow({ compact, stereo }: PaperMetaRowProps) {
   const track = useAtomValueRawSync(currentTrackAtom);

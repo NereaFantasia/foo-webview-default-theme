@@ -1,4 +1,4 @@
-/* 自己滚动；窄窗时底部多让出胶囊盖住的那一截（`--player-inset`，由内容卡给出）。 */
+/* 自己滚动；窄窗时底部多让出胶囊盖住的那一截（`--player-inset`，由内容卡给出） */
 .root {
   min-height: 0;
   overflow: auto;

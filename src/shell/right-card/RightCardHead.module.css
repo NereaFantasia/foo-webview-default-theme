@@ -12,7 +12,7 @@
   background: var(--bg-selected);
 }
 
-/* 横向外留 4、内留 4，缩小底色后封面仍与队列节头对齐。 */
+/* 横向外留 4、内留 4，缩小底色后封面仍与队列节头对齐 */
 .collapsed {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -23,12 +23,12 @@
   padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
 }
 
-/* 展开的那一块滑进滑出时露在头外面的部分裁掉；用 clip 不用 hidden，免得成了滚动容器。 */
+/* 展开的那一块滑进滑出时露在头外面的部分裁掉；用 clip 不用 hidden，免得成了滚动容器 */
 .fold {
   overflow: clip;
 }
 
-/* 展开：封面保持 1:1，宽卡上不超过 288，给曲目与队列留出空间。 */
+/* 展开：封面保持 1:1，宽卡上不超过 288，给曲目与队列留出空间 */
 .expanded {
   display: grid;
   gap: var(--spacingVerticalXS);
@@ -150,26 +150,8 @@
 }
 
 .subtitle {
+  flex-wrap: nowrap;
   color: var(--text-secondary);
   font-size: var(--fontSizeBase200);
   line-height: var(--lineHeightBase200);
-}
-
-/* 专辑名：看着是正文，指针停上去出下划线。 */
-.link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
-.link:focus-visible {
-  border-radius: var(--borderRadiusSmall);
-  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
 }

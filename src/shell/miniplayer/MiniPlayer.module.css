@@ -1,4 +1,4 @@
-/* 盖满整个窗口。不设 CSS 拖动区，拖动经宿主接口，指针一直归页面，窗口键才能跟着悬停浮现。
+/* 盖满整个窗口。不设 CSS 拖动区，拖动经宿主接口，指针一直归页面，窗口键才能跟着悬停浮现
    底色比封面占位深一档，模糊的封面往下渐隐到它。 */
 .root {
   position: fixed;
@@ -13,7 +13,7 @@
   background: var(--colorNeutralBackground3);
 }
 
-/* 紧凑态 380 × 152：封面 100 见方，跨标题与控制两行；标题顶齐封面上沿，控制底齐下沿，进度通栏在底。 */
+/* 紧凑态 380 × 152：封面 100 见方，跨标题与控制两行；标题顶齐封面上沿，控制底齐下沿，进度通栏在底 */
 .root[data-layout='compact'] {
   grid-template:
     'cover meta' minmax(0, 1fr)
@@ -25,7 +25,7 @@
   padding: var(--spacingVerticalM) var(--spacingHorizontalM) var(--spacingVerticalS);
 }
 
-/* 封面态 320 × 456：封面 288 见方，下面依次是标题、控制与进度。菜单打开时占封面那一格。 */
+/* 封面态 320 × 456：封面 288 见方，下面依次是标题、控制与进度。菜单打开时占封面那一格 */
 .root[data-layout='cover'] {
   grid-template:
     'cover' minmax(0, 1fr)
@@ -38,7 +38,7 @@
   padding: var(--spacingVerticalL) var(--spacingHorizontalL);
 }
 
-/* 紧凑态的菜单 380 × 292：菜单在上，下面一条 64 高的当前曲目，进度仍在底。 */
+/* 紧凑态的菜单 380 × 292：菜单在上，下面一条 64 高的当前曲目，进度仍在底 */
 .root[data-layout='strip'] {
   grid-template:
     'menu menu menu' minmax(0, 1fr)
@@ -59,7 +59,7 @@
   mask-image: linear-gradient(to bottom, var(--colorNeutralForeground1) 20%, transparent);
 }
 
-/* 外扩一个模糊半径，边缘不透出底色。深色压暗，浅色提亮后半透，正文在两档上都读得清。 */
+/* 外扩一个模糊半径，边缘不透出底色。深色压暗，浅色提亮后半透，正文在两档上都读得清 */
 .blur {
   position: absolute;
   inset: -64px;
@@ -71,7 +71,7 @@
   filter: blur(64px) saturate(2.2) brightness(1.1);
 }
 
-/* 窗口键平时透明，指针在播放器上或焦点进来时 83 ms 淡入。底是半透明的中性色，透出后面模糊过的画面。 */
+/* 窗口键平时透明，指针在播放器上或焦点进来时 83 ms 淡入。底是半透明的中性色，透出后面模糊过的画面 */
 .captions {
   position: absolute;
   top: var(--spacingVerticalXS);
@@ -99,7 +99,7 @@
   }
 }
 
-/* 菜单的框：不动，裁掉滑进滑出的内容。 */
+/* 菜单的框：不动，裁掉滑进滑出的内容 */
 .menu {
   display: flex;
   grid-area: menu;
@@ -111,7 +111,7 @@
   grid-area: cover;
 }
 
-/* 菜单与下面那条当前曲目之间的分隔线，贯穿整个窗口宽。 */
+/* 菜单与下面那条当前曲目之间的分隔线，贯穿整个窗口宽 */
 .divider {
   grid-row: 2;
   grid-column: 1 / -1;
@@ -194,7 +194,7 @@
   line-height: var(--lineHeightBase200);
 }
 
-/* 副标题与评分一行；评分 104 宽、右对齐，与下面工具组的右缘对齐。不能评分时这一格空着，字不挪位。 */
+/* 副标题与评分一行；评分 104 宽、右对齐，与下面工具组的右缘对齐。不能评分时这一格空着，字不挪位 */
 .byline {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 104px;
@@ -234,7 +234,7 @@
   gap: var(--spacingHorizontalXS);
 }
 
-/* 音量滑条按它定位：右缘对齐工具组，贴在上方。 */
+/* 音量滑条按它定位：右缘对齐工具组，贴在上方 */
 .tools {
   position: relative;
 }
@@ -254,7 +254,7 @@
   gap: var(--spacingHorizontalS);
 }
 
-/* 网络流没有时长，进度那一行换成直播标记。 */
+/* 网络流没有时长，进度那一行换成直播标记 */
 .live {
   display: flex;
   align-items: center;

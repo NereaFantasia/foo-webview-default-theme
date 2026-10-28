@@ -1,7 +1,18 @@
-/* 页头、筛选条与横幅按内容高，余下的高度全给封面墙或列表形态，它们自己滚动。 */
+/* 页头、筛选条与横幅按内容高，余下的高度全给封面墙或列表形态，它们自己滚动 */
 .root {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+
+/* 嵌入时的筛选面板与页头、网格左右对齐；弹出时浮层按页面根定位 */
+.filter {
+  padding: 0 var(--spacingHorizontalXXL);
+}
+/* 筛选浮层底栏：当前显示几张、一共几张 */
+.result {
+  font-size: var(--fontSizeBase200);
+  color: var(--text-secondary);
 }

@@ -16,8 +16,8 @@ interface Shown {
 }
 
 /**
- * 在元素上播一组动画，先停掉它身上还在播的（进场没播完就又要离场，或离场没播完就被接回来）。
- * 全部播完兑现 true；被停掉的兑现 false，调用方据此不去移走一层已经被接回来的页面。
+ * 在元素上播一组动画，先停掉它身上还在播的（进场没播完就又要离场，或离场没播完就被接回来）
+ * 全部播完兑现 true；被停掉的兑现 false，调用方据此不去移走一层已经被接回来的页面
  */
 function play(element: HTMLElement, motions: readonly LayerMotion[]): Promise<boolean> {
   for (const running of element.getAnimations()) running.cancel();
@@ -29,7 +29,7 @@ function play(element: HTMLElement, motions: readonly LayerMotion[]): Promise<bo
 
 /**
  * 中央区域：显示历史当前记录的页面，跨页换记录时播页面切换动效。目录内导航复用页面，其他记录分别建层，
- * 离场的旧层留到动画播完才移走，期间不接指针与焦点。
+ * 离场的旧层留到动画播完才移走，期间不接指针与焦点
  */
 export function CentralView() {
   const { pages } = useShellSlots();
@@ -55,7 +55,7 @@ export function CentralView() {
 
   const elements = useRef(new Map<HistoryEntry, HTMLElement>());
   const played = useRef(shown.entry);
-  // 布局阶段起播，新页面画出来的第一帧就在出场位置上。
+  // 布局阶段起播，新页面画出来的第一帧就在出场位置上
   useLayoutEffect(() => {
     if (played.current === shown.entry) return;
     played.current = shown.entry;

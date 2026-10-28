@@ -1,0 +1,15 @@
+/* 卡头的状态，同网易云账号卡 */
+.status {
+  color: var(--colorNeutralForeground2);
+}
+
+/* 每行的值照 28G 分两行、靠右；只读的状态，用说明行的字号与次要文字色 */
+.value {
+  display: grid;
+  justify-items: end;
+  row-gap: var(--spacingVerticalXXS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  text-align: end;
+}

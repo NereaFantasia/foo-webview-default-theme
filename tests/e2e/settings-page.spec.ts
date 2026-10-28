@@ -56,11 +56,21 @@ for (const colorScheme of ['dark', 'light'] as const) {
   test.describe(`${colorScheme === 'dark' ? '深色' : '浅色'}档`, () => {
     test.use({ colorScheme });
 
-    test('1280：目录在左，卡列最宽 760，下拉框在标题右边', async ({ page }) => {
+    test('1280：目录在左，下拉框在标题右边；页面够宽时卡列止于 760', async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
       const settings = await openSettings(page);
       await expect(settings.nav).toHaveAttribute('data-settings-nav', 'directory');
-      const groups = ['常规', '外观', '播放', '沉浸视图', '歌词', '在线内容', '快捷键', '关于'];
+      const groups = [
+        '常规',
+        '外观',
+        '播放',
+        '沉浸视图',
+        '歌词',
+        '在线音乐',
+        '在线内容',
+        '快捷键',
+        '关于',
+      ];
       await expect(settings.nav.getByRole('button')).toHaveText(groups);
       for (const name of groups) {
         await expect(settings.nav.getByRole('button', { name, exact: true })).toBeVisible();
@@ -68,7 +78,9 @@ for (const colorScheme of ['dark', 'light'] as const) {
       const language = await fieldPlacement(settings, '界面语言');
       expect(language.beside).toBe(true);
       expect(language.fieldWidth).toBe(220);
-      expect(language.cardWidth).toBe(760);
+      // 1280 时卡列随侧边栏与主视图留白后的可用宽度走，未必到 760；把设置页调宽再量上限。
+      await fitPageWidth(page, 1200);
+      expect((await fieldPlacement(settings, '界面语言')).cardWidth).toBe(760);
       expect(settings.errors).toEqual([]);
     });
 
@@ -120,7 +132,8 @@ test('点目录滚到那一组并亮着它；自己滚回去后亮的那一项�
   expect(await scrollTop(settings.scroller)).toBeGreaterThan(0);
 
   await settings.scroller.hover();
-  await page.mouse.wheel(0, -5000);
+  // 一次滚够：页越写越长，固定的滚动量不一定到得了顶
+  await page.mouse.wheel(0, -(await scrollTop(settings.scroller)));
   await expect.poll(() => scrollTop(settings.scroller)).toBe(0);
   await expect(currentItem(settings)).toHaveText('常规');
   expect(settings.errors).toEqual([]);
@@ -228,15 +241,19 @@ test('离开设置页再回来，滚动位置还在', async ({ page }) => {
   const settings = await openSettings(page);
   await settings.nav.getByRole('button', { name: '快捷键', exact: true }).click();
   await expect(currentItem(settings)).toHaveText('快捷键');
-  const left = await scrollTop(settings.scroller);
-  expect(left).toBeGreaterThan(0);
+  expect(await scrollTop(settings.scroller)).toBeGreaterThan(0);
+  // 比「快捷键」这组标题在卡列里的位置，不比 scrollTop 的数：上面几组的内容随异步读回的状态变高时，
+  // 浏览器的滚动锚定会把 scrollTop 往下推，看到的内容不动。
+  const heading = settings.scroller.getByRole('heading', { level: 2, name: '快捷键' });
+  const shown = async () => Math.round((await box(heading)).y - (await box(settings.scroller)).y);
+  const left = await shown();
 
   // 后退回专辑页，再前进回设置页。
   await clickSideButton(page, 'back');
   await expect(page.getByRole('heading', { level: 1, name: '专辑' })).toBeVisible();
   await clickSideButton(page, 'forward');
   await expect(page.getByRole('heading', { level: 1, name: '设置' })).toBeVisible();
-  await expect.poll(() => scrollTop(settings.scroller)).toBe(left);
+  await expect.poll(shown).toBe(left);
   expect(settings.errors).toEqual([]);
 });
 
@@ -267,7 +284,7 @@ test('从专辑页进设置页再后退，专辑页的过滤词还在', async ({
   await page.setViewportSize({ width: 1280, height: 800 });
   const settings = await openSettings(page);
   await clickSideButton(page, 'back');
-  const filter = page.getByRole('textbox', { name: '筛选专辑' });
+  const filter = page.getByRole('searchbox', { name: '搜索专辑' });
   await filter.fill('nujabes');
 
   await enterSettings(page);

@@ -99,7 +99,7 @@ test('不给排序时列头点不着，也没有排序指示', async ({ page }) 
   expect(await harnessLog(page)).toEqual([]);
 });
 
-test('拖分隔条改宽，两侧一起改；落盘后重载还在；拖动中 Esc 回到原宽', async ({ page }) => {
+test('拖分隔条只改当前列；落盘后重载还在；拖动中 Esc 回到原宽', async ({ page }) => {
   await openTableHarness(page);
   const title = header(page, '标题');
   const artist = header(page, '艺人');
@@ -117,7 +117,7 @@ test('拖分隔条改宽，两侧一起改；落盘后重载还在；拖动中 E
   await drag(page, handle, 60);
   const after = [await widthOf(title), await widthOf(artist)];
   expect((after[0] ?? 0) - (before[0] ?? 0)).toBeCloseTo(60, -1);
-  expect((after[0] ?? 0) + (after[1] ?? 0)).toBeCloseTo((before[0] ?? 0) + (before[1] ?? 0), 0);
+  expect(after[1]).toBeCloseTo(before[1] ?? 0, 0);
   expect(await storedColumns(page)).toMatchObject({ widths: expect.any(Array) });
 
   await gotoHarness(page);
@@ -175,16 +175,14 @@ test('拖列头、拖分隔条的途中按下与松开回车、空格、Alt+→�
   expect(await harnessLog(page)).toEqual([{ type: 'sort', column: 'artist' }]);
 });
 
-test('拖分隔条的途中它被卸掉（容器收窄进了窄档）：松手照样结束，之后键盘照常排序', async ({
-  page,
-}) => {
+test('拖分隔条途中容器收窄：列继续保留，松手后键盘照常排序', async ({ page }) => {
   await openTableHarness(page, { sortable: true });
   const box = page.locator('[data-harness-box]');
   const handle = header(page, '艺人').locator('.fui-TableResizeHandle');
   await drag(page, handle, 30, async () => {
     await expect(handle).toHaveAttribute('data-dragging', 'true');
     await box.evaluate((element) => element.style.setProperty('width', '500px'));
-    await expect.poll(() => headerOrder(page)).toEqual(['number', 'title', 'duration']);
+    await expect.poll(() => headerOrder(page)).toContain('artist');
   });
   await box.evaluate((element) => element.style.setProperty('width', '900px'));
   await expect.poll(() => headerOrder(page)).toContain('artist');
@@ -310,11 +308,116 @@ test('封面列：行让开封面宽、分组头横跨整行，短组垫满封�
   expect(await widthOf(cover)).toBeCloseTo(150, 0);
   expect(await inset()).toBeCloseTo(150, 0);
   expect(await span()).toBe(32 + 5 * 36);
-  expect(await widthOf(header(page, '标题'))).toBeLessThan(title);
+  expect(await widthOf(header(page, '标题'))).toBe(title);
 });
 
-test('容器不宽于 520 时只留序号、标题与时长', async ({ page }) => {
+test('窄窗保留列，并提供横向滚动', async ({ page }) => {
   await openTableHarness(page, { width: 500 });
-  // 容器宽度要等 ResizeObserver 量到才进窄档。
-  await expect.poll(() => headerOrder(page)).toEqual(['number', 'title', 'duration']);
+  await expect
+    .poll(() => headerOrder(page))
+    .toEqual(['status', 'number', 'title', 'artist', 'album', 'rating', 'duration']);
+  await expect(grid(page).locator('[data-table-horizontal]')).toHaveAttribute(
+    'data-overflow',
+    'true',
+  );
+});
+
+for (const pageScroll of [false, true]) {
+  test(`${pageScroll ? '页面' : '表格'}滚动：滚出视口后列头与行对齐，最后一列仍可改宽`, async ({
+    page,
+  }) => {
+    await openTableHarness(page, { width: 450, rows: 200, page: pageScroll, above: 300 });
+    if (pageScroll) {
+      await page.locator('[data-harness-page]').evaluate((element) => {
+        element.scrollTop = 600;
+      });
+    }
+    const bar = grid(page).locator('[data-table-horizontal]');
+    await expect(bar).toHaveAttribute('data-overflow', 'true');
+    await bar.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(100);
+    const duration = header(page, '时长');
+    const firstRow = grid(page).locator('[role="row"][aria-selected]').first();
+    await expect
+      .poll(async () => {
+        const headBox = await duration.boundingBox();
+        const cellBox = await firstRow.locator('[data-column-id="duration"]').boundingBox();
+        return Math.abs((headBox?.x ?? 0) - (cellBox?.x ?? 1));
+      })
+      .toBeLessThan(1);
+    await expect(duration).toBeInViewport();
+    const titleWidth = await widthOf(header(page, '标题'));
+    const before = await widthOf(duration);
+    await drag(page, duration.locator('.fui-TableResizeHandle'), -20);
+    expect(await widthOf(duration)).toBeCloseTo(before - 20, 0);
+    expect(await widthOf(header(page, '标题'))).toBe(titleWidth);
+    if (pageScroll) {
+      const outer = await page.locator('[data-harness-page]').boundingBox();
+      const barBox = await bar.boundingBox();
+      const headBox = await duration.boundingBox();
+      expect(outer && headBox && headBox.y >= outer.y && headBox.y < outer.y + 45).toBeTruthy();
+      expect(outer && barBox && barBox.y + barBox.height <= outer.y + outer.height).toBeTruthy();
+    }
+  });
+}
+
+test('边缘调宽会滚向视口外，取消后收回越界滚动，键盘聚焦不可见列会将它带回', async ({ page }) => {
+  await openTableHarness(page, { width: 450, sortable: true });
+  const bar = grid(page).locator('[data-table-horizontal]');
+  const title = header(page, '标题');
+  const handle = title.locator('.fui-TableResizeHandle');
+  const bounds = await bar.boundingBox();
+  const origin = await handle.boundingBox();
+  if (!bounds || !origin) throw new Error('列头尚未排定');
+  const before = await widthOf(title);
+  await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width - 2, origin.y + origin.height / 2, { steps: 5 });
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(30);
+  expect(await widthOf(title)).toBeGreaterThan(before);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  expect(await widthOf(title)).toBeCloseTo(before, 0);
+  await header(page, '时长').getByRole('button').focus();
+  await expect(header(page, '时长')).toBeInViewport();
+  await header(page, '音轨号').getByRole('button').focus();
+  await expect(header(page, '音轨号')).toBeInViewport();
+  await grid(page).hover();
+  await page.keyboard.down('Shift');
+  await page.mouse.wheel(0, 400);
+  await page.keyboard.up('Shift');
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(100);
+});
+
+test('滚动后换列可继续移向视口外；隐藏列后收回滚动位置，不留下空白', async ({ page }) => {
+  await openTableHarness(page, { width: 450, sortable: true });
+  const bar = grid(page).locator('[data-table-horizontal]');
+  await bar.evaluate((element) => {
+    element.scrollLeft = 180;
+  });
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBe(180);
+  const artist = await header(page, '艺人').boundingBox();
+  const bounds = await bar.boundingBox();
+  if (!artist || !bounds) throw new Error('列头尚未排定');
+  await page.mouse.move(artist.x + artist.width / 2, artist.y + artist.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width - 3, artist.y + artist.height / 2, { steps: 5 });
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBeGreaterThan(210);
+  await page.mouse.up();
+  await expect(grid(page)).not.toHaveAttribute('data-column-motion');
+  const order = await headerOrder(page);
+  expect(order.indexOf('artist')).toBeGreaterThan(order.indexOf('album'));
+  for (const label of ['艺人', '专辑', '评分']) {
+    await header(page, '时长').getByRole('button').focus();
+    await page.keyboard.press('Shift+F10');
+    await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click();
+    await page.keyboard.press('Escape');
+  }
+  await expect.poll(() => bar.evaluate((element) => element.scrollLeft)).toBe(0);
+  await expect(bar).toHaveAttribute('data-overflow', 'false');
+  const title = await header(page, '标题').boundingBox();
+  const cell = await row(page, 'Track 0001').locator('[data-column-id="title"]').boundingBox();
+  expect(Math.abs((title?.x ?? 0) - (cell?.x ?? 1))).toBeLessThan(1);
 });

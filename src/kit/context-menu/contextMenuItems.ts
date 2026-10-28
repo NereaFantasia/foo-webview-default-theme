@@ -5,6 +5,8 @@ interface ContextItemLabel {
   readonly label: string;
   readonly icon?: ReactElement;
   readonly detail?: string;
+  /** 名称后面的徽章，标出这一项的身份（如「默认」）；不放说明 */
+  readonly badge?: string;
   readonly disabled?: boolean;
   readonly reason?: string;
   readonly data?: Readonly<Record<`data-${string}`, string | number>>;
@@ -37,7 +39,7 @@ export interface ContextMenuStatus {
 export type ContextMenuEntry =
   ContextMenuCommand | ContextMenuBranch | ContextMenuSeparator | ContextMenuStatus;
 
-/** 只压缩分隔线，不猜测命令语义或丢弃空子菜单。 */
+/** 只压缩分隔线，不猜测命令语义或丢弃空子菜单 */
 export function contextMenuItems(items: readonly ContextMenuEntry[]): ContextMenuEntry[] {
   const result: ContextMenuEntry[] = [];
   for (const item of items) {

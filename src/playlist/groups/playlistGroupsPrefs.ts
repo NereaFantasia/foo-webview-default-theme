@@ -2,15 +2,15 @@ import { defineLocalPref, storedRecord, type PrefStorage } from '../../kit/local
 import { DEFAULT_GROUP_MODE, GROUP_MODES } from '../sortPatterns.ts';
 
 export interface GroupsPrefs {
-  /** 用户开没开分组；开着也可能因为取不到游程而显示扁平。 */
+  /** 用户开没开分组；开着也可能因为取不到游程而显示扁平 */
   readonly enabled: boolean;
-  /** 分组依据在 `GROUP_MODES` 里的下标。 */
+  /** 分组依据在 `GROUP_MODES` 里的下标 */
   readonly mode: number;
 }
 
 const FALLBACK: GroupsPrefs = { enabled: true, mode: DEFAULT_GROUP_MODE };
 
-/** 分组开关与依据的存档，整个主题一份。形状不对的项按缺省：分组开着、缺省档。 */
+/** 分组开关与依据的存档，整个主题一份。形状不对的项按缺省：分组开着、缺省档 */
 const PREF = defineLocalPref<GroupsPrefs>({
   key: 'default-theme.playlist-groups.v1',
   fallback: FALLBACK,
@@ -24,7 +24,7 @@ const PREF = defineLocalPref<GroupsPrefs>({
   format: JSON.stringify,
 });
 
-/** 读存档：形状不对的项按缺省，读不到整份按缺省。 */
+/** 读存档：形状不对的项按缺省，读不到整份按缺省 */
 export function readGroupsPrefs(storage: PrefStorage | null): GroupsPrefs {
   return PREF.read(storage);
 }

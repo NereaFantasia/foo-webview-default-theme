@@ -1,3 +1,4 @@
+import { sameTrackFilter, type TrackFilter } from '../../track/trackFilter.ts';
 import { Body1, Button, Subtitle2 } from '@fluentui/react-components';
 import { Search32Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
@@ -11,16 +12,28 @@ import { TrackTable, type TrackTableHandle } from '../../table/TrackTable.tsx';
 import { useTableSnapshot, type TableView } from '../../table/useTableSnapshot.ts';
 import type { TableMenuTarget } from '../../table/useTrackTableInput.ts';
 import { albumsAtom } from '../albums.ts';
-import { TrackMenu } from '../TrackMenu.tsx';
-import { SongArt } from './SongArt.tsx';
+import { batchNameOf, TrackMenu } from '../TrackMenu.tsx';
+import { SelectionBar } from '../../track/SelectionBar.tsx';
+import { pathHandlers, trackActionsKey } from '../../track/trackActions.ts';
+import type { TrackMenuHandlers } from '../../track/trackMenuEntries.ts';
+import { trackPathOf } from '../../host/libraryContract.ts';
+import { LIBRARY_SOURCE } from '../../playback/playbackSource.ts';
+import { SongArt } from '../SongArt.tsx';
 import { SongsConditions } from './SongsConditions.tsx';
 import { SongsFacets } from './SongsFacets.tsx';
-import { songsFilterAtom, sameSongsFilter, type SongsFilter } from './songsFilter.ts';
+import { songsFilterAtom } from './songsFilter.ts';
 import { SongsHeader } from './SongsHeader.tsx';
-import { noMatchText } from './songsLabels.ts';
+import { FilterSurface, useFilterSurface } from '../../track/FilterSurface.tsx';
+import { COMMAND_BAR_TIERS, type CommandBarTier } from '../../kit/CommandBar.tsx';
+import { useWidthTier } from '../../kit/useWidthTier.ts';
+import { PresetChips } from '../../track/PresetChips.tsx';
+import { ConditionEditor } from '../../track/ConditionEditor.tsx';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
+import { playStatsAtom } from '../playStats.ts';
+import { filterConditions, noMatchText } from '../../track/filterLabels.ts';
 import { SongsNotices } from './SongsNotices.tsx';
 import styles from './SongsPage.module.css';
-import { songsPrefsAtom } from './songsPrefs.ts';
+import { songsFilterDockedAtom, songsPrefsAtom } from './songsPrefs.ts';
 import { songsRowsAtom } from './songsRows.ts';
 import { songsFillAtom, songsKey } from './songsServices.ts';
 import { useDensityAnchor } from './useDensityAnchor.ts';
@@ -29,18 +42,19 @@ import { useService } from '../../kit/useService.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 import { AddFoldersAction } from '../AddFoldersAction.tsx';
 
-/** 离开时记下滚动、焦点行与筛选（框里的字、预设与分面）；排序与列是落盘的偏好，不进快照。 */
-const SONGS_SLOT = createSnapshotSlot<TableView<SongsFilter>>();
+/** 离开时记下滚动、焦点行与筛选（框里的字、预设与分面）；排序与列是落盘的偏好，不进快照 */
+const SONGS_SLOT = createSnapshotSlot<TableView<TrackFilter>>();
 
 /**
  * 歌曲页：整库平铺成一张曲目表，按宿主排好的顺序显示。页头的过滤框按词或按 fb2k 查询筛，查询菜单里勾预设，分面条
- * 按流派、年代、艺术家筛；双击、回车从那一首起播，都由宿主按同一串查询填专用列表。
+ * 按流派、年代、艺术家筛；双击、回车从那一首起播，都由宿主按同一串查询填专用列表
  */
 export function SongsPage() {
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
   const songs = useService(songsKey);
   const albumList = useService(albumListKey);
+  const trackActions = useService(trackActionsKey);
   const prefs = useAtomValueRawSync(songsPrefsAtom);
   const { status: albumsStatus, enabled } = useAtomValueRawSync(albumsAtom);
   const model = useSongsPage();
@@ -50,6 +64,19 @@ export function SongsPage() {
   const [menuAt, setMenuAt] = useState<TablePoint | null>(null);
   const menuCurrent = useRef<() => boolean>(() => false);
   const [queryOpen, setQueryOpen] = useState(false);
+  const [measure, tier] = useWidthTier<CommandBarTier, HTMLDivElement>(COMMAND_BAR_TIERS);
+  const docked = useAtomValueRawSync(songsFilterDockedAtom);
+  const { available } = useAtomValueRawSync(playStatsAtom);
+  const controls = useViewControlStyles();
+  const surface = useFilterSurface({
+    docked,
+    expanded: prefs.facetsOpen,
+    narrow: tier === 'narrow',
+    onDock: songs.prefs.setFilterDocked,
+    onExpand: songs.prefs.setFacetsOpen,
+  });
+  const conditionCount = filterConditions(filter, t).length;
+  const numbers = new Intl.NumberFormat();
   const artwork = useCallback<TableArtwork>(
     (track, size) => <SongArt album={albumOf(track)} size={size} />,
     [albumOf],
@@ -62,12 +89,12 @@ export function SongsPage() {
     ready: model.settled && rows.status !== 'loading',
     extra: () => store.get(songsFilterAtom),
     apply: (saved) => songs.filter.restore(saved),
-    // 筛选换回去了、宿主按换回去的那一份答过了，行才排好。
+    // 筛选换回去了、宿主按换回去的那一份答过了，行才排好
     matches: (saved) => {
       const fill = store.get(songsFillAtom);
       const answered = rows.answered;
       return (
-        sameSongsFilter(store.get(songsFilterAtom), saved) &&
+        sameTrackFilter(store.get(songsFilterAtom), saved) &&
         answered !== null &&
         answered.query === fill.query &&
         answered.sort === fill.sort &&
@@ -88,6 +115,37 @@ export function SongsPage() {
     void albumList.menu.prepare(tracks, view.trackAt(target.index), library.stamp);
     setMenuAt(at);
   };
+
+  // 选区操作按点下那一刻的选中项取曲目，不在每次渲染时展开整个选区
+  const onSelected = (act: (handlers: TrackMenuHandlers) => void) => {
+    const tracks = rowsOf(store.get(model.selection.state).ranges).flatMap(
+      (row) => view.trackAt(row) ?? [],
+    );
+    if (tracks.length === 0) return;
+    act(
+      pathHandlers(trackActions, tracks.map(trackPathOf), batchNameOf(tracks, t), LIBRARY_SOURCE),
+    );
+  };
+  const selected = countRows(ranges);
+  const selection = selected > 1 && (
+    <SelectionBar
+      count={selected}
+      labelled={tier === 'wide'}
+      handlers={{
+        play: () => onSelected((handlers) => handlers.play()),
+        next: () => onSelected((handlers) => handlers.next()),
+        enqueue: () => onSelected((handlers) => handlers.enqueue()),
+        sendToNew: () => onSelected((handlers) => handlers.sendToNew()),
+        sendTo: (target) => onSelected((handlers) => handlers.sendTo(target)),
+      }}
+      onClear={() => model.selection.clear()}
+      onMore={(point) => {
+        const { ranges: rows } = store.get(model.selection.state);
+        const index = rowsOf(rows)[0];
+        if (index !== undefined) openMenu({ kind: 'rows', rows, index }, point);
+      }}
+    />
+  );
 
   const empty =
     albumsStatus === 'ready' && !enabled ? (
@@ -115,15 +173,49 @@ export function SongsPage() {
   return (
     <section className={styles.root} aria-label={t('songs.title')} data-page="songs">
       <div className={styles.body}>
-        <div className={styles.top}>
+        <div ref={measure} className={styles.top}>
           <SongsHeader
             model={model}
-            selected={countRows(ranges)}
+            selection={selection || undefined}
             queryOpen={queryOpen}
             onQueryOpenChange={setQueryOpen}
+            tier={tier}
+            surface={surface}
+            conditions={conditionCount}
           />
-          {prefs.facetsOpen && <SongsFacets filter={filter} library={library} />}
-          <SongsConditions filter={filter} />
+          <FilterSurface
+            id="songs"
+            state={surface}
+            footer={
+              <>
+                <ConditionEditor playcount={available} onAdd={songs.filter.addCondition} />
+                <span className={styles.result}>
+                  {model.settled &&
+                    t('songs.filterResult', {
+                      count: numbers.format(rows.handles.length),
+                      total: numbers.format(library.byHandle.size),
+                    })}
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    className={controls.icon}
+                    disabled={conditionCount === 0}
+                    onClick={songs.filter.clearConditions}
+                  >
+                    {t('songs.conditionsClear')}
+                  </Button>
+                </span>
+              </>
+            }
+          >
+            <PresetChips
+              checked={filter.presets}
+              playcount={available}
+              onToggle={songs.filter.togglePreset}
+            />
+            <SongsFacets filter={filter} library={library} tabs={surface.narrow} />
+          </FilterSurface>
+          <SongsConditions filter={filter} hideWhenEmpty={!(surface.docked && surface.open)} />
           <SongsNotices model={model} />
         </div>
         <div className={styles.table}>
@@ -138,7 +230,6 @@ export function SongsPage() {
             numberText={trackNumberText}
             sort={model.sort}
             onSort={model.onSort}
-            links={model.links}
             artwork={artwork}
             loading={model.loading}
             empty={empty}
@@ -158,7 +249,6 @@ export function SongsPage() {
       <TrackMenu
         at={menuAt}
         onClose={() => setMenuAt(null)}
-        goToAlbum
         isCurrent={() => menuCurrent.current()}
       />
     </section>

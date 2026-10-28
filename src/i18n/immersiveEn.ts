@@ -1,6 +1,12 @@
-/** 正在播放全屏页的英文文案，并进英文包；键都以 `immersive.` 开头。 */
+/** 沉浸式正在播放视图的英文文案，供主英文包合入 */
 export const immersiveEn = {
   'immersive.exit': 'Exit',
+  'immersive.view': 'View',
+  'immersive.pages': 'Pages',
+  'immersive.page.history': 'History',
+  'immersive.expandSidebar': 'Show sidebar',
+  'immersive.collapseSidebar': 'Hide sidebar',
+  'immersive.coverflow': 'Coverflow',
   'immersive.fullscreen': 'Full screen',
   'immersive.exitFullscreen': 'Exit full screen',
   'immersive.stereoUnavailable': 'No stereo waveform',

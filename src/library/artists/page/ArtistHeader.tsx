@@ -4,19 +4,27 @@ import {
   MoreHorizontal20Regular,
   ImageMultiple20Regular,
   Play20Filled,
+  RecordRegular,
+  CalendarLtr16Regular,
+  Clock16Regular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useState } from 'react';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
+import { pluralAtom } from '../../../i18n/plural.ts';
+import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
 import { BiographyPhotoViewer } from '../../biography/BiographyPhotoViewer.tsx';
 import { ArtistPhotoBanner } from '../photos/ArtistPhotoBanner.tsx';
-import { SongArt } from '../../songs/SongArt.tsx';
+import { SongArt } from '../../SongArt.tsx';
 import { useArtists } from '../artistsContext.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import styles from './ArtistHeader.module.css';
 import { ArtistPhotoTools } from '../photos/ArtistPhotoTools.tsx';
 
 export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: number) => void }) {
   const services = useArtists();
+  const viewControls = useViewControlStyles();
   const name = useAtomValueRawSync(services.places.selected);
   const state = useAtomValueRawSync(services.detail.state);
   const compilation = useAtomValueRawSync(services.compilation);
@@ -24,6 +32,7 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
   const prefs = useAtomValueRawSync(services.prefs.state);
   const viewerTop = useAtomValueRawSync(services.biography.viewerTop);
   const t = useAtomValueRawSync(translateAtom);
+  const plural = useAtomValueRawSync(pluralAtom);
   const locale = useAtomValueRawSync(localeAtom).active;
   const [viewing, setViewing] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -48,11 +57,7 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
     !state.refreshFailed &&
     !state.guestPending;
   return (
-    <header
-      className={styles.root}
-      data-artist-header
-      data-compact={compilation || (!portrait && !loading) || undefined}
-    >
+    <header className={styles.root} data-artist-header data-compact={compilation || undefined}>
       {compilation ? (
         <div className={styles.collage}>
           {Array.from({ length: 4 }, (_, at) => (
@@ -85,19 +90,43 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
           <h2 title={name || t('artists.unknown')}>{name || t('artists.unknown')}</h2>
           {detail && (
             <p>
-              {t('artists.summary', {
-                albums: count.format(detail.summary.ownAlbums),
-                guest: count.format(detail.summary.guestAlbums),
-                tracks: count.format(detail.summary.tracks),
-              })}
-              {' · '}
-              {new Intl.NumberFormat(locale, {
-                style: 'unit',
-                unit: 'hour',
-                maximumFractionDigits: 1,
-              }).format(detail.summary.duration / 3600)}
-              {detail.summary.firstYear &&
-                ` · ${detail.summary.firstYear}${detail.summary.lastYear !== detail.summary.firstYear ? `–${detail.summary.lastYear}` : ''}`}
+              <Metadata>
+                <MetadataItem icon={<RecordRegular />} label={t('trackInfo.album')}>
+                  {t(plural(detail.summary.ownAlbums, 'album.countOne', 'album.count'), {
+                    count: count.format(detail.summary.ownAlbums),
+                  })}
+                </MetadataItem>
+                <MetadataItem icon={<RecordRegular />}>
+                  {t(
+                    plural(
+                      detail.summary.guestAlbums,
+                      'artists.guestCountOne',
+                      'artists.guestCount',
+                    ),
+                    { count: count.format(detail.summary.guestAlbums) },
+                  )}
+                </MetadataItem>
+                <MetadataItem icon={<TextNumberListLtr16Regular />}>
+                  {t(plural(detail.summary.tracks, 'album.menuTracksOne', 'album.menuTracks'), {
+                    count: count.format(detail.summary.tracks),
+                  })}
+                </MetadataItem>
+                <MetadataItem icon={<Clock16Regular />} label={t('table.duration')}>
+                  {new Intl.NumberFormat(locale, {
+                    style: 'unit',
+                    unit: 'hour',
+                    maximumFractionDigits: 1,
+                  }).format(detail.summary.duration / 3600)}
+                </MetadataItem>
+                {detail.summary.firstYear && (
+                  <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
+                    {detail.summary.firstYear}
+                    {detail.summary.lastYear !== detail.summary.firstYear
+                      ? `–${detail.summary.lastYear}`
+                      : ''}
+                  </MetadataItem>
+                )}
+              </Metadata>
             </p>
           )}
           {!compilation && !!detail?.collaborators.length && (
@@ -122,6 +151,7 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
             {t('artists.play')}
           </Button>
           <Button
+            className={viewControls.field}
             icon={<ArrowShuffle20Regular />}
             disabled={!playable}
             onClick={() => void services.play(0, true)}
@@ -130,10 +160,16 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
           </Button>
           {!compilation && (
             <Tooltip content={t('biography.photos')} relationship="label">
-              <Button icon={<ImageMultiple20Regular />} disabled={!photo} onClick={openPhotos} />
+              <Button
+                className={viewControls.field}
+                icon={<ImageMultiple20Regular />}
+                disabled={!photo}
+                onClick={openPhotos}
+              />
             </Tooltip>
           )}
           <Button
+            className={viewControls.field}
             icon={<MoreHorizontal20Regular />}
             aria-label={t('artists.more')}
             onClick={(event) => onMenu(event.clientX, event.clientY)}

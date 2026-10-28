@@ -1,23 +1,23 @@
 import { albumArtistOf, albumYearOf, type Album } from '../../host/libraryContract.ts';
 
 // 筛选条的三列：流派、年代、专辑艺术家。取值与过滤都按专辑行上的字段，不问宿主：
-// 流派比 `genre`（首曲的首个 genre），年代由 `year` 归出，专辑艺术家比 `albumArtistOf`。
-// 取值因此恰是筛得出专辑的那些，每项的数目就是勾上它能筛出几张。
-// 列内多选是 OR，跨列 AND；一列一个都没勾就是这一列不设条件。
+// 流派比 `genre`（首曲的首个 genre），年代由 `year` 归出，专辑艺术家比 `albumArtistOf`
+// 取值因此恰是筛得出专辑的那些，每项的数目就是勾上它能筛出几张
+// 列内多选是 OR，跨列 AND；一列一个都没勾就是这一列不设条件
 
 export const FACET_FIELDS = ['genre', 'decade', 'albumArtist'] as const;
 export type FacetField = (typeof FACET_FIELDS)[number];
 
 export interface FacetValue {
   readonly name: string;
-  /** 带这个值的专辑张数。 */
+  /** 带这个值的专辑张数 */
   readonly albumCount: number;
 }
 
 export type FacetOptions = Readonly<Record<FacetField, readonly FacetValue[]>>;
 export type FacetSelection = Readonly<Record<FacetField, ReadonlySet<string>>>;
 
-/** 每列最多列多少项。按张数取前面的，冷门的值仍能从过滤框打字命中。 */
+/** 每列最多列多少项。按张数取前面的，冷门的值仍能从过滤框打字命中 */
 export const FACET_LIMIT = 200;
 
 export const EMPTY_FACET_SELECTION: FacetSelection = {
@@ -26,7 +26,7 @@ export const EMPTY_FACET_SELECTION: FacetSelection = {
   albumArtist: new Set(),
 };
 
-/** `2016` 归 `2010s`；没有年份的不归任何年代。 */
+/** `2016` 归 `2010s`；没有年份的不归任何年代 */
 export function decadeOf(year: string): string | null {
   return /^\d{4}$/.test(year) ? `${year.slice(0, 3)}0s` : null;
 }
@@ -53,13 +53,21 @@ function countBy(albums: readonly Album[], field: FacetField): Map<string, numbe
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-/** 三列的取值：流派与专辑艺术家按张数多的在前、同数按名字，年代新的在前；每列最多 `FACET_LIMIT` 项。 */
-export function facetOptionsOf(albums: readonly Album[]): FacetOptions {
-  const byCount = (field: FacetField): FacetValue[] =>
-    [...countBy(albums, field)]
+/**
+ * 三列的取值：流派与专辑艺术家按张数多的在前、同数按名字，年代新的在前；每列列前 `FACET_LIMIT` 项，
+ * 已勾的值排在这之后时接在末尾，仍有专辑带着它就不能因为冷门而没处取消、被当成库里没有剔掉
+ */
+export function facetOptionsOf(
+  albums: readonly Album[],
+  selection: FacetSelection = EMPTY_FACET_SELECTION,
+): FacetOptions {
+  const byCount = (field: FacetField): FacetValue[] => {
+    const all = [...countBy(albums, field)]
       .map(([name, albumCount]) => ({ name, albumCount }))
-      .sort((a, b) => b.albumCount - a.albumCount || collator.compare(a.name, b.name))
-      .slice(0, FACET_LIMIT);
+      .sort((a, b) => b.albumCount - a.albumCount || collator.compare(a.name, b.name));
+    const checked = all.slice(FACET_LIMIT).filter((value) => selection[field].has(value.name));
+    return [...all.slice(0, FACET_LIMIT), ...checked];
+  };
   const decades = [...countBy(albums, 'decade')]
     .map(([name, albumCount]) => ({ name, albumCount }))
     .sort((a, b) => b.name.localeCompare(a.name));
@@ -74,7 +82,7 @@ export function facetSelectionCount(selection: FacetSelection): number {
   return FACET_FIELDS.reduce((count, field) => count + selection[field].size, 0);
 }
 
-/** 按勾选筛专辑；没设条件时原样复制一份。 */
+/** 按勾选筛专辑；没设条件时原样复制一份 */
 export function applyFacets(albums: readonly Album[], selection: FacetSelection): Album[] {
   const active = FACET_FIELDS.filter((field) => selection[field].size > 0);
   if (active.length === 0) return [...albums];
@@ -86,7 +94,7 @@ export function applyFacets(albums: readonly Album[], selection: FacetSelection)
   );
 }
 
-/** 勾上或取消一个值，返回新的勾选；原来的不改。 */
+/** 勾上或取消一个值，返回新的勾选；原来的不改 */
 export function toggleFacet(
   selection: FacetSelection,
   field: FacetField,
@@ -98,10 +106,10 @@ export function toggleFacet(
 }
 
 /**
- * 库变了之后，勾选里不在取值清单上的值剔掉：库里已经没有专辑带着它，或它掉出了这一列的前
- * `FACET_LIMIT` 项。留着它会筛出 0 张，清单里又没有这一项可以取消。不改成把它留在清单里显示：
- * 清单只列筛得出专辑的值，每项的数目就是勾上能筛出几张，混进一项 0 张的就不是这个口径了。
- * 没有要剔的时原样答回，调用方可按引用判断。
+ * 库变了之后，勾选里不在取值清单上的值剔掉：库里已经没有专辑带着它（已勾的冷门值由 `facetOptionsOf`
+ * 留在清单末尾，不在此列）。留着它会筛出 0 张，清单里又没有这一项可以取消。不改成把它留在清单里显示：
+ * 清单只列筛得出专辑的值，每项的数目就是勾上能筛出几张，混进一项 0 张的就不是这个口径了
+ * 没有要剔的时原样答回，调用方可按引用判断
  */
 export function pruneFacetSelection(
   selection: FacetSelection,

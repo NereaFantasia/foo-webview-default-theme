@@ -24,7 +24,7 @@ import {
   type TrackAlbumFields,
 } from '../../../host/libraryContract.ts';
 import { readSendTargets, type SendTarget } from '../../../track/trackListActions.ts';
-import { searchHitKey, type SearchHit } from '../searchQuery.ts';
+import { searchHitKey, type MediaHit, type SearchHit } from '../searchQuery.ts';
 import type { SearchResultsService } from '../searchResults.ts';
 
 interface SearchMenuDeps {
@@ -35,8 +35,8 @@ interface SearchMenuHost extends AlbumTracksFace, ContextMenuFace {
   playlist: Pick<typeof fb.playlist, 'getAll' | 'createAutoplaylist' | 'setActive'>;
 }
 interface SearchMenuState {
-  readonly hit: SearchHit | null;
-  readonly hits: readonly SearchHit[];
+  readonly hit: MediaHit | null;
+  readonly hits: readonly MediaHit[];
   readonly tracks: readonly LibraryTrack[];
   readonly paths: readonly string[];
   readonly stamp: number;
@@ -104,7 +104,10 @@ export function startSearchMenu(
   }
   async function open(hit: SearchHit, selection: readonly SearchHit[] = [hit]) {
     close();
-    const hits = [...new Map(selection.map((item) => [searchHitKey(item), item])).values()];
+    // 艺人没有曲目菜单；选区里混进的艺人不算
+    if (hit.kind === 'artist') return;
+    const media = selection.filter((item): item is MediaHit => item.kind !== 'artist');
+    const hits = [...new Map(media.map((item) => [searchHitKey(item), item])).values()];
     const mine = generation;
     const source = store.get(results.state);
     const catalog = store.get(albumsAtom).albums;
@@ -179,7 +182,7 @@ export function startSearchMenu(
       }
     }
     if (!valid() || mine !== generation) return;
-    // 任一对象读取失败时整批不可执行，不能悄悄只发送已读到的部分。
+    // 任一对象读取失败时整批不可执行，不能悄悄只发送已读到的部分
     patch({
       tracks: failed ? [] : [...tracks.values()],
       paths: failed ? [] : [...paths],

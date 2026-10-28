@@ -2,16 +2,16 @@ import { lastfmArtistFromUrl } from '../biographyModel.ts';
 import { biographyField, type BiographyFact } from '../details/biographyDetailsModel.ts';
 
 const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/** 这几种类型的生卒写成「成立」「解散」，其余按人写「出生」「逝世」。 */
+/** 这几种类型的生卒写成「成立」「解散」，其余按人写「出生」「逝世」 */
 const GROUP_TYPES = new Set(['Group', 'Orchestra', 'Choir']);
-/** 候选列表最多留几位：MusicBrainz 按相关度排序，再往后基本是别的同名者。 */
+/** 候选列表最多留几位：MusicBrainz 按相关度排序，再往后基本是别的同名者 */
 export const CANDIDATE_LIMIT = 5;
 
 export function isMbid(value: unknown): value is string {
   return typeof value === 'string' && MBID.test(value);
 }
 
-/** 同名候选里给用户辨认用的信息，全部取自搜索结果，不再逐个查。 */
+/** 同名候选里给用户辨认用的信息，全部取自搜索结果，不再逐个查 */
 export interface MusicbrainzCandidate {
   readonly mbid: string;
   readonly name: string;
@@ -26,7 +26,7 @@ export interface MusicbrainzCandidate {
 export interface MusicbrainzArtist {
   readonly mbid: string;
   readonly name: string;
-  /** MusicBrainz 链到的 Last.fm 艺人名；没有这条链接时为 null。 */
+  /** MusicBrainz 链到的 Last.fm 艺人名；没有这条链接时为 null */
   readonly lastfmArtist: string | null;
   readonly facts: readonly BiographyFact[];
 }
@@ -54,7 +54,7 @@ function aliasNames(value: unknown): readonly string[] {
   });
 }
 
-/** `artist?query=` 的搜索结果。 */
+/** `artist?query=` 的搜索结果 */
 export function readMusicbrainzCandidates(data: unknown): readonly MusicbrainzCandidate[] {
   const artists = record(data) ? data['artists'] : undefined;
   if (!Array.isArray(artists)) return [];
@@ -76,7 +76,7 @@ export function readMusicbrainzCandidates(data: unknown): readonly MusicbrainzCa
   });
 }
 
-/** `release-group?artist=` 的一页标题，以及他名下发行组的总数（判断要不要翻页）。 */
+/** `release-group?artist=` 的一页标题，以及他名下发行组的总数（判断要不要翻页） */
 export function readReleaseGroups(data: unknown): {
   readonly titles: readonly string[];
   readonly total: number;
@@ -99,8 +99,8 @@ function areaName(value: unknown): string {
 }
 
 /**
- * 别名：先放与界面语言同一种的主名，再放本名一类；去掉与艺人名相同的，最多四个。
- * MusicBrainz 的 `locale` 是 ja、zh_Hans 这样的写法，只比语言部分。
+ * 别名：先放与界面语言同一种的主名，再放本名一类；去掉与艺人名相同的，最多四个
+ * MusicBrainz 的 `locale` 是 ja、zh_Hans 这样的写法，只比语言部分
  */
 function aliasFact(value: unknown, name: string, locale: string): string {
   if (!Array.isArray(value)) return '';
@@ -117,7 +117,7 @@ function aliasFact(value: unknown, name: string, locale: string): string {
   return [...new Set(ranked.map((item) => item.alias))].slice(0, 4).join(' · ');
 }
 
-/** `artist/<mbid>?inc=url-rels+aliases` 的应答。资料只留有值的几项。 */
+/** `artist/<mbid>?inc=url-rels+aliases` 的应答。资料只留有值的几项 */
 export function readMusicbrainzArtist(data: unknown, locale: string): MusicbrainzArtist | null {
   if (!record(data) || !isMbid(data['id'])) return null;
   const name = text(data['name']);

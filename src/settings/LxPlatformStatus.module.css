@@ -1,0 +1,53 @@
+/* 与说明行同字号同颜色；放不下时平台项换行 */
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--spacingHorizontalM);
+  row-gap: var(--spacingVerticalXXS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  border-radius: var(--borderRadiusSmall);
+}
+
+.item:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+.checked {
+  white-space: nowrap;
+}
+
+.icon {
+  flex: none;
+}
+
+.ok {
+  color: var(--colorStatusSuccessForeground1);
+}
+
+.failed {
+  color: var(--colorStatusDangerForeground1);
+}
+
+.unknown {
+  color: var(--colorNeutralForeground3);
+}
+
+/* 检测中的转圈缩到和状态图标一样大 */
+.spinner {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+}

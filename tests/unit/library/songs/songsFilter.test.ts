@@ -1,23 +1,22 @@
+import { sameTrackFilter, trackQueryOf } from '../../../../src/track/trackFilter.ts';
 import { createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_SONGS_FILTER,
-  sameSongsFilter,
   songsFilterAtom,
-  songsQueryOf,
   startSongsFilter,
 } from '../../../../src/library/songs/songsFilter.ts';
-import { toggleSongFacet } from '../../../../src/library/songs/songsFacets.ts';
+import { toggleTrackFacet } from '../../../../src/track/trackFacets.ts';
 
 describe('筛选拼成查询', () => {
   it('什么都不筛时是整个媒体库', () => {
-    expect(songsQueryOf(EMPTY_SONGS_FILTER, 'all')).toEqual({
+    expect(trackQueryOf(EMPTY_SONGS_FILTER, 'all')).toEqual({
       query: 'ALL',
       raw: false,
       words: [],
       filtered: false,
     });
-    expect(songsQueryOf({ ...EMPTY_SONGS_FILTER, text: '?' }, 'all').filtered).toBe(true);
+    expect(trackQueryOf({ ...EMPTY_SONGS_FILTER, text: '?' }, 'all').filtered).toBe(true);
   });
 
   it('词、预设与分面几段都要成立，各加括号', () => {
@@ -25,9 +24,9 @@ describe('筛选拼成查询', () => {
       ...EMPTY_SONGS_FILTER,
       text: 'Live',
       presets: new Set(['lossless'] as const),
-      facets: toggleSongFacet(EMPTY_SONGS_FILTER.facets, 'genre', 'Jazz'),
+      facets: toggleTrackFacet(EMPTY_SONGS_FILTER.facets, 'genre', 'Jazz'),
     };
-    expect(songsQueryOf(filter, 'title')).toEqual({
+    expect(trackQueryOf(filter, 'title')).toEqual({
       query: '(title HAS "live") AND (%__encoding% IS lossless) AND (genre IS "Jazz")',
       raw: false,
       words: ['live'],
@@ -42,10 +41,10 @@ describe('筛选拼成查询', () => {
       text: 'ignored draft',
       advancedText: '%bitrate% GREATER 900 OR genre HAS jazz',
     };
-    const query = songsQueryOf(filter, 'all');
+    const query = trackQueryOf(filter, 'all');
     expect(query.raw).toBe(true);
     expect(query.query).toBe('%bitrate% GREATER 900 OR genre HAS jazz');
-    const both = songsQueryOf({ ...filter, presets: new Set(['long'] as const) }, 'all');
+    const both = trackQueryOf({ ...filter, presets: new Set(['long'] as const) }, 'all');
     expect(both.query).toBe(
       '(%bitrate% GREATER 900 OR genre HAS jazz) AND (%length_seconds% GREATER 600)',
     );
@@ -57,12 +56,12 @@ describe('筛选服务', () => {
     const store = createStore();
     const filter = startSongsFilter(store);
     filter.setText('100% ? live');
-    expect(songsQueryOf(store.get(songsFilterAtom), 'title')).toMatchObject({
+    expect(trackQueryOf(store.get(songsFilterAtom), 'title')).toMatchObject({
       raw: false,
       words: ['100%', '?', 'live'],
     });
     filter.setQuery({ ...store.get(songsFilterAtom), mode: 'advanced' });
-    expect(songsQueryOf(store.get(songsFilterAtom), 'title').filtered).toBe(false);
+    expect(trackQueryOf(store.get(songsFilterAtom), 'title').filtered).toBe(false);
     filter.setText('%codec% IS flac');
     filter.togglePreset('lossless');
     const saved = store.get(songsFilterAtom);
@@ -72,9 +71,9 @@ describe('筛选服务', () => {
     filter.restore(saved);
     expect(store.get(songsFilterAtom)).toBe(saved);
     filter.setQuery({ ...saved, mode: 'text' });
-    expect(songsQueryOf(store.get(songsFilterAtom), 'title').raw).toBe(false);
+    expect(trackQueryOf(store.get(songsFilterAtom), 'title').raw).toBe(false);
     expect(store.get(songsFilterAtom).advancedText).toBe('%codec% IS flac');
-    expect(sameSongsFilter(saved, store.get(songsFilterAtom))).toBe(false);
+    expect(sameTrackFilter(saved, store.get(songsFilterAtom))).toBe(false);
   });
 
   it('勾预设时去掉冲突的；清条件留着框里的字；全部清掉回到空的', () => {
@@ -89,7 +88,7 @@ describe('筛选服务', () => {
     expect(store.get(songsFilterAtom).text).toBe('live');
     expect(store.get(songsFilterAtom).presets.size).toBe(0);
     filter.clear();
-    expect(sameSongsFilter(store.get(songsFilterAtom), EMPTY_SONGS_FILTER)).toBe(true);
+    expect(sameTrackFilter(store.get(songsFilterAtom), EMPTY_SONGS_FILTER)).toBe(true);
   });
 
   it('交还快照：一样就不换，免得订阅的一方白跑一遍', () => {

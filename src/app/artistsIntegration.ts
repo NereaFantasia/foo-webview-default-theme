@@ -2,7 +2,8 @@ import { atom } from 'jotai/vanilla';
 import { localeAtom } from '../i18n/locale.ts';
 import { sidebarViewAtom } from '../nav/sidebar/sidebarView.ts';
 import { playerBarStyleAtom, playerShellOf } from '../theme/playerBarStyle.ts';
-import { probeCover, sameCoverPixels } from '../immersive/cover/coverIdentity.ts';
+import { probeCover } from '../covers/coverIdentity.ts';
+import { sameBiographyPhotoPixels } from '../library/biography/biographyPhotoSimilarity.ts';
 import { startArtists } from '../library/artists/artistsServices.ts';
 import { EMPTY_SONGS_FILTER } from '../library/songs/songsFilter.ts';
 import type { AppServices } from './services.ts';
@@ -38,7 +39,7 @@ export function startArtistsIntegration(
           : 48,
       ),
       probe: probeCover,
-      same: sameCoverPixels,
+      same: sameBiographyPhotoPixels,
     },
     actions: services.trackActions,
     openAlbum: (album) => services.albumDetail.open(album),

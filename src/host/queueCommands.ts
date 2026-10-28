@@ -2,8 +2,8 @@ import { fb } from 'foo-webview-sdk/bridge';
 import { settle } from './hostCall.ts';
 
 /**
- * `queue.insertNext` 一次送这么多条。坐标形态的上限是 max(256, 当前队列长度)，超出整次失败；路径形态
- * 宿主没写上限，按同一批量送，免得一次解析太多路径卡住宿主。
+ * `queue.insertNext` 单批入队上限数量（256 条）
+ * 坐标入队模式下宿主上限为 max(256, 队列当前长度)；路径模式沿用相同分批步长，避免单次传入过多路径导致宿主阻塞
  */
 export const QUEUE_BATCH = 256;
 
@@ -12,16 +12,14 @@ export interface QueueCommandsFace {
   playlist: Pick<typeof fb.playlist, 'getAll' | 'getTracks' | 'playTrack'>;
 }
 
-/** `next` 插在队首（下一首播放），`last` 接在队尾（加入队列）。 */
+/** 队列插入位置：`next` 插在当前曲目之后（下一首播放），`last` 追加至播放队列末尾 */
 export type EnqueuePlace = 'next' | 'last';
 
 /**
- * 按路径入队，路径是曲目的句柄（`absolutePath`，非零 subsong 带 `|subsong:N`）。条目不带列表位置，
- * 也不先落进哪张播放列表：队列播完，核心从插播前那一首的下一首接着播。代价是来源后面也有同一首时，
- * 顺序播到会再播一遍。
- *
- * 已在队列里的同一首由宿主挪过来，不再排一份。队尾的位置取此刻的长度：被挪走的条目让队列变短，
- * 位置超过长度时宿主接到末尾。分批送，后一批接在前一批落下的位置之后；某一批失败即停，已入队的不撤回。
+ * 按原生路径句柄将一批曲目插入播放队列
+ * - 该模式不改变各播放列表内容，队列播放完毕后原列表自动衔接
+ * - 若曲目已在队列中，宿主将执行移动而非重复插入
+ * - 超过分批上限的请求自动拆分为多批串行提交，中途若单批失败即终止，已成功入队的批次不执行回滚
  */
 export async function enqueuePaths(
   host: { queue: Pick<typeof fb.queue, 'insertNext' | 'getCount'> },
@@ -47,17 +45,17 @@ export async function enqueuePaths(
 }
 
 /**
- * 从一张列表的第 `row` 行起播，留住已有的队列。
+ * 从指定播放列表的第 `row` 行起播，同时保留已有播放队列
  *
  * 核心的默认动作（`playlist.playTrack` 走的那一条）先清空整个队列。队列不为空时改走两步：按坐标把这一行
  * 插到队首，再 `queue.playNow(0)` 只取走它。带坐标的条目播出时正在播放的列表与续播起点都跟到这一行，
- * 之后先播留着的队列，再从这一行往下。队列为空时照旧 `playTrack`，与宿主的缺省一致。
+ * 之后先播留着的队列，再从这一行往下。队列为空时照旧 `playTrack`，与宿主的缺省一致
  *
- * 坐标要列表序号，序号在起播前按 GUID 现查：用户刚增删过别的列表时，调用方手里的序号可能已经指到别处。
- * 两步之间刚好换曲、核心取走了这条新插的队首，`playNow(0)` 会播到留着的下一条；窗口只有一次往返，接受。
+ * 坐标要列表序号，序号在起播前按 GUID 现查：用户刚增删过别的列表时，调用方手里的序号可能已经指到别处
+ * 两步之间刚好换曲、核心取走了这条新插的队首，`playNow(0)` 会播到留着的下一条；窗口只有一次往返，接受
  *
  * 行号是调用方早先读到的。给了 `expected`（那一行当时的句柄）时先核一次：列表在这一行之前插进或删掉了行，
- * 这一行已是另一首，不起播、答 false。
+ * 这一行已是另一首，不起播、答 false
  */
 export async function playKeepingQueue(
   host: QueueCommandsFace,

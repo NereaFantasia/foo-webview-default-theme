@@ -45,7 +45,7 @@ it('按显示顺序播放且成功后才记录目录来源；路径带 subsong �
   const node = foldersDirectory(folderDirectory('Alpha', 2));
   const cue = trackRow('Alpha', 'A cue', { subsong: 2 });
   const tracks = foldersSort([FOLDER_TRACKS[0]!, cue], { column: 'title', descending: false });
-  await env.actions.run({ nodes: [node], tracks }, 'play', 1);
+  expect(await env.actions.run({ nodes: [node], tracks }, 'play', 1)).toBe(true);
   expect(env.host.callsTo('library.addToPlaylist')[0]).toMatchObject({
     paths: [`${cue.path}|subsong:2`, FOLDER_TRACKS[0]!.path],
   });
@@ -78,11 +78,11 @@ it('清空后离页不追加不起播；部分添加失败不记录来源', asyn
   await vi.waitFor(() => expect(held.pending).toHaveLength(1));
   env.actions.cancel();
   held.release();
-  await playing;
+  expect(await playing).toBe(false);
   expect(env.host.callsTo('library.addToPlaylist')).toEqual([]);
   expect(env.record).not.toHaveBeenCalled();
   env.host.answer('library.addToPlaylist', { success: true, added: 1 });
-  await env.actions.run(target, 'play');
+  expect(await env.actions.run(target, 'play')).toBe(false);
   expect(env.host.callsTo('playlist.playTrack')).toEqual([]);
   expect(env.store.get(foldersNoticeAtom)).toBe('failed');
 });
@@ -92,10 +92,10 @@ it('多步写串行，第二次动作明确提示忙', async () => {
   const target = { nodes: [foldersRoot(FOLDER_ROOT)], tracks: FOLDER_TRACKS };
   const first = env.actions.run(target, 'play');
   await vi.waitFor(() => expect(held.pending).toHaveLength(1));
-  await env.actions.run(target, 'next');
+  expect(await env.actions.run(target, 'next')).toBe(false);
   expect(env.store.get(foldersNoticeAtom)).toBe('busy');
   held.release();
-  await first;
+  expect(await first).toBe(true);
   expect(env.host.callsTo('queue.insertNext')).toEqual([]);
 });
 it('超限整批不写入；任一目录读取失败不发送前面已读的部分', async () => {

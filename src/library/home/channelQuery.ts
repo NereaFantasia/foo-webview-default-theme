@@ -22,7 +22,7 @@ export interface ChannelQueryState {
 
 export type ChannelQueryHost = Pick<typeof fb, 'library' | 'on' | 'ready' | 'isAvailable'>;
 
-/** 排序交给宿主，一次取有上限的完整前缀，不把几次不同顺序的随机结果拼起来。 */
+/** 排序交给宿主，一次取有上限的完整前缀，不把几次不同顺序的随机结果拼起来 */
 export function startChannelQuery(
   store: Store,
   limit = CHANNEL_RESULT_LIMIT,

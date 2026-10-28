@@ -24,7 +24,7 @@ import {
 } from './pluginRelease.ts';
 import { fetchVerified, type ReleaseHttp } from './releaseFetch.ts';
 import { templateFiles, type TemplateFileHost, type TemplateFiles } from './templateFiles.ts';
-import type { UpdaterService, UpdatePublication } from './updater.ts';
+import { EFFECTIVE_UPDATE_MODE, type UpdaterService, type UpdatePublication } from './updater.ts';
 import { loadPointer } from './updateState.ts';
 
 interface PluginOffer {
@@ -34,7 +34,13 @@ interface PluginOffer {
 }
 export type PluginUpdateStatus =
   | { readonly phase: 'off' | 'checking' | 'current' }
-  | { readonly phase: 'available'; readonly version: string; readonly sha256: string }
+  | {
+      readonly phase: 'available';
+      readonly version: string;
+      readonly sha256: string;
+      /** 两份 DLL 已下载并校验，安装时不必再下载 */
+      readonly staged?: true;
+    }
   | { readonly phase: 'downloading' | 'preparing' | 'restarting'; readonly version: string }
   | { readonly phase: 'blocked'; readonly reason: 'backend' | 'pending' | 'compatibility' }
   | { readonly phase: 'transaction'; readonly transaction: PluginTransactionStatus }
@@ -72,7 +78,10 @@ async function failedReleases(files: TemplateFiles): Promise<string[]> {
   return value.releases;
 }
 
-/** 插件只自动发现；下载、准备和宿主退出都必须由明确的安装操作发起。 */
+/**
+ * 插件静默发现与版本匹配；更新模式为自动时再把两份 DLL 提前下载、校验到模板目录的 `state/`。准备事务绑定
+ * 本次 foobar2000 进程、还会复制恢复工具，退出宿主并替换文件更是必须由明确的用户安装操作触发，这些都不提前做
+ */
 export function startPluginUpdater(
   store: Store,
   updater: Pick<UpdaterService, 'publication' | 'check' | 'maintain' | 'status'>,
@@ -88,6 +97,10 @@ export function startPluginUpdater(
   let generation = 0;
   let offer: PluginOffer | null = null;
   let installing = false;
+  /** 已下载并校验过的候选（插件发行清单的哈希）与正在下载的任务；下载失败的候选不在同一轮里重试 */
+  let staged: string | null = null;
+  let staging: Promise<void> | null = null;
+  let stageFailed: string | null = null;
   let refreshing: Promise<void> | null = null;
   let transaction: PluginTransactionStatus | null = null;
   let poll: ReturnType<typeof setTimeout> | undefined;
@@ -136,6 +149,76 @@ export function startPluginUpdater(
         poll = undefined;
         void refresh();
       }, 2000);
+  }
+  /**
+   * 把候选的两份 DLL 下载并校验到 `state/plugin-<发行清单哈希前 16 位>/`，同一个发行总用同一个目录：
+   * 已经在那里且哈希对得上的不再下载，所以提前下载与安装时补下载共用这一段。
+   */
+  async function ensurePayload(
+    selected: PluginOffer,
+    files: TemplateFiles,
+    check: () => void,
+  ): Promise<string> {
+    const payload = `state/plugin-${selected.candidate.sha256.slice(0, 16)}`;
+    for (const file of selected.release.files) {
+      const path = `${payload}/${file.path}`;
+      const existing = await files.readBytes(path);
+      check();
+      if (existing && existing.length === file.size && (await sha256(existing)) === file.sha256)
+        continue;
+      const fetched = await fetchVerified(
+        host.http,
+        new URL(file.path, selected.candidate.url).href,
+        { ...file, limit: file.size },
+      );
+      check();
+      if (!fetched.ok) throw new Error(`插件下载失败：${fetched.problem}`);
+      for (let offset = 0; offset < fetched.value.length; offset += WRITE_CHUNK) {
+        check();
+        await files.writeBytes(path, fetched.value.subarray(offset, offset + WRITE_CHUNK), {
+          append: offset > 0,
+        });
+        await pause();
+      }
+      const actual = await files.readBytes(path);
+      if (!actual || (await sha256(actual)) !== file.sha256)
+        throw new Error('插件下载文件读回校验失败');
+      check();
+    }
+    return payload;
+  }
+  /** 自动模式下提前下载候选；失败只记下这个候选，不改状态、不报错，安装时会再下载一次并如实报错 */
+  function stage(selected: PluginOffer, startup: ConfirmedStartup): void {
+    const sha = selected.candidate.sha256;
+    if (
+      staging ||
+      installing ||
+      staged === sha ||
+      stageFailed === sha ||
+      store.get(EFFECTIVE_UPDATE_MODE) !== 'auto'
+    )
+      return;
+    const check = () => {
+      if (disposed || installing || store.get(confirmedStartupAtom) !== startup)
+        throw new Error('插件提前下载已取消');
+      if (store.get(updater.status).phase === 'shared') throw new Error('主题目录被其他实例共用');
+    };
+    const version = selected.release.version;
+    staging = (async () => {
+      try {
+        show({ phase: 'downloading', version });
+        await ensurePayload(selected, templateFiles(host.file, startup.directory, check), check);
+        staged = sha;
+        if (offer?.candidate.sha256 === sha)
+          show({ phase: 'available', version, sha256: sha, staged: true });
+      } catch {
+        stageFailed = sha;
+        if (!disposed && offer?.candidate.sha256 === sha)
+          show({ phase: 'available', version, sha256: sha });
+      }
+    })().finally(() => {
+      staging = null;
+    });
   }
   async function findOffer(
     publication: UpdatePublication,
@@ -198,7 +281,11 @@ export function startPluginUpdater(
       const publication = store.get(updater.publication);
       if (!publication?.payload.plugins.length)
         return show(transaction ? { phase: 'transaction', transaction } : { phase: 'off' });
-      if ((await loadPointer(files)).frontend.pending !== undefined)
+      const pointer = await loadPointer(files);
+      if (
+        pointer.frontend.pending !== undefined ||
+        !sameVersion(versionRef(pointer.frontend.version), startup.session.version)
+      )
         return show({ phase: 'blocked', reason: 'pending' });
       show({ phase: 'checking' });
       const local = await installed(startup);
@@ -207,12 +294,17 @@ export function startPluginUpdater(
       offer = await findOffer(publication, local, failed, check);
       check();
       if (publication !== store.get(updater.publication)) return;
-      if (offer)
-        return show({
+      if (offer) {
+        const sha = offer.candidate.sha256;
+        show({
           phase: 'available',
           version: offer.release.version,
-          sha256: offer.candidate.sha256,
+          sha256: sha,
+          ...(staged === sha ? { staged: true as const } : {}),
         });
+        stage(offer, startup);
+        return;
+      }
       show(
         transaction && ['rolledBack', 'cancelled'].includes(transaction.phase)
           ? { phase: 'transaction', transaction }
@@ -247,6 +339,8 @@ export function startPluginUpdater(
     try {
       if (!startup) throw new Error('当前主题尚未确认');
       const check = () => current(startup, turn);
+      // 提前下载在写同一个目录；`installing` 一置位它就在下一次检查点收手，等它收完再接着写
+      await staging;
       show({ phase: 'preparing', version: selected.release.version });
       await updater.check();
       check();
@@ -291,30 +385,8 @@ export function startPluginUpdater(
           program.success === false
         )
           throw new Error('无法确认当前宿主的安装目录');
-        const payload = `state/plugin-${crypto.randomUUID()}`;
-        show({ phase: 'downloading', version: selected.release.version });
-        for (const file of selected.release.files) {
-          const fetched = await fetchVerified(
-            host.http,
-            new URL(file.path, selected.candidate.url).href,
-            { ...file, limit: file.size },
-          );
-          check();
-          if (!fetched.ok) throw new Error(`插件下载失败：${fetched.problem}`);
-          for (let offset = 0; offset < fetched.value.length; offset += WRITE_CHUNK) {
-            check();
-            await files.writeBytes(
-              `${payload}/${file.path}`,
-              fetched.value.subarray(offset, offset + WRITE_CHUNK),
-              { append: offset > 0 },
-            );
-            await pause();
-          }
-          const actual = await files.readBytes(`${payload}/${file.path}`);
-          if (!actual || (await sha256(actual)) !== file.sha256)
-            throw new Error('插件下载文件读回校验失败');
-          check();
-        }
+        if (staged !== expected) show({ phase: 'downloading', version: selected.release.version });
+        const payload = await ensurePayload(selected, files, check);
         show({ phase: 'preparing', version: selected.release.version });
         const raw = await connection.request('/plugin/prepare', {
           root: publication.text,
@@ -377,6 +449,7 @@ export function startPluginUpdater(
     store.sub(confirmedStartupAtom, sync),
     store.sub(updater.publication, sync),
     store.sub(backend.status, sync),
+    store.sub(EFFECTIVE_UPDATE_MODE, sync),
   ];
   sync();
   return {

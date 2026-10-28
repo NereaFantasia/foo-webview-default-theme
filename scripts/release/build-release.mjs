@@ -1,11 +1,13 @@
-// 生成一个发行版的全部分发物，只写到本地目录，不上传：
-//   release.json、fe-<版本>.zip、首装包 foo-webview-default-theme-<版本>.zip、签名后的 manifest.json、
-//   累计更新日志 changelog.json。发行说明与更新日志都由仓库根的 CHANGELOG.md 生成，必须写了本版。
-// 先打前端包（不含 installed.json），再生成记着它哈希的发行清单，最后把发行清单的哈希写进首装包的
-// 安装标记，避免标记与清单互相包含对方的哈希。签名钥必须是主题内置的公钥，生成物都用客户端代码核对。
+// 构建发行版分发工件集并完成双向签名校验（仅输出至本地目录，不执行上传）
+//
+// 契约说明：
+// 1. 打包顺序：先打包前端资产（不含 installed.json），将资产哈希注入 release.json；
+//    随后将 release.json 的哈希注入首装包 installed.json，杜绝哈希循环依赖
+// 2. 验签闭环：签名私钥必须对应内置受信任公钥，产出工件通过客户端校验逻辑完成回读核验
 //
 // 用法：node scripts/release/build-release.mjs --out <目录> --key <keyId>=<私钥路径> [--key …]
 //   [--previous <上一份 manifest.json>] [--upgrade-from >=X.Y.Z] [--skip-build]
+//   [--runtime <runtime.json> --ncm <ncm.json> --lx <lxserver.json>]  带后端时三项都要给
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -37,9 +39,14 @@ const { values } = parseArgs({
     'skip-build': { type: 'boolean', default: false },
     dist: { type: 'string', default: 'dist' },
     runtime: { type: 'string' },
+    ncm: { type: 'string' },
+    lx: { type: 'string' },
   },
 });
 if (!values.out || !values.key?.length) throw new Error('需要 --out 与至少一个 --key');
+const withBackend = [values.runtime, values.ncm, values.lx];
+if (withBackend.some(Boolean) && !withBackend.every(Boolean))
+  throw new Error('--runtime、--ncm 与 --lx 要一起给：带后端的发行都要登记网易云与 lxserver 组件');
 
 /** @type {{ version: string, hostRequirements: { foo_ui_webview2: string } }} */
 const metadata = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
@@ -69,9 +76,15 @@ if (!values['skip-build']) {
 }
 const dist = new URL(`${values.dist}/`, root);
 const frontend = new URL(`fe/${version}/`, dist);
-const backend = values.runtime
-  ? await backendArtifacts(version, values.runtime, fileURLToPath(new URL(`be/${version}/`, dist)))
-  : null;
+const backend =
+  values.runtime && values.ncm && values.lx
+    ? await backendArtifacts(
+        version,
+        values.runtime,
+        fileURLToPath(new URL(`be/${version}/`, dist)),
+        { ncm: values.ncm, lxserver: values.lx },
+      )
+    : null;
 if (backend) writeFileSync(new URL('backend.json', frontend), backend.text);
 else if (existsSync(new URL('backend.json', frontend)))
   throw new Error('前端目录已有后端描述，需要提供对应 --runtime 或重新构建');
@@ -145,7 +158,7 @@ if (backend) writeFileSync(join(out, backend.name), backend.bytes);
 writeFileSync(join(out, `foo-webview-default-theme-${version}.zip`), firstInstall);
 writeFileSync(join(out, 'manifest.json'), manifest);
 writeFileSync(join(out, 'changelog.json'), changelogBytes);
-// 写出之后从磁盘读回，按上传前同一套核对再走一遍。
+// 回读本地工件并调用客户端校验管道执行一致性验收
 const verified = await verifyArtifacts(out);
 console.log(
   JSON.stringify({

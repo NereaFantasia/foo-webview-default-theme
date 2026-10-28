@@ -3,6 +3,7 @@ import { createStore } from 'jotai/vanilla';
 import { expect, onTestFinished, vi } from 'vitest';
 import { startLibraryTracks } from '../../src/library/libraryTracks.ts';
 import { genresCatalogAtom, startGenresCatalog } from '../../src/library/genres/genresCatalog.ts';
+import { startGenreValues } from '../../src/library/genreValues.ts';
 import { trackRow } from './libraryRows.ts';
 import { installFakeHost } from './unitHost.ts';
 
@@ -25,9 +26,11 @@ export function genresLibrary(tracks: readonly LibraryTrack[] = GENRE_TRACKS) {
   host.answer('library.getAll', genreTracksAnswer(tracks));
   const store = createStore();
   const library = startLibraryTracks(store, () => 7, host.fb);
-  const catalog = startGenresCatalog(store, library, host.fb);
+  const values = startGenreValues(store, library, host.fb);
+  const catalog = startGenresCatalog(store, values);
   onTestFinished(() => {
     catalog.dispose();
+    values.dispose();
     library.dispose();
   });
   const state = () => store.get(genresCatalogAtom);

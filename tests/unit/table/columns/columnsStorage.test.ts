@@ -23,7 +23,16 @@ const FALLBACK: StoredColumns = {
 function memory(initial?: unknown): PrefStorage & { saved: Map<string, string> } {
   const saved = new Map<string, string>();
   if (initial !== undefined) {
-    saved.set(KEY, typeof initial === 'string' ? initial : JSON.stringify(initial));
+    saved.set(
+      KEY,
+      typeof initial === 'string'
+        ? initial
+        : JSON.stringify(
+            typeof initial === 'object' && initial !== null && !Array.isArray(initial)
+              ? { unit: 'px', ...initial }
+              : initial,
+          ),
+    );
   }
   return {
     saved,
@@ -32,7 +41,7 @@ function memory(initial?: unknown): PrefStorage & { saved: Map<string, string> }
   };
 }
 
-/** 专辑艺术家到路径的九列，按缺省列序。 */
+/** 专辑艺术家到路径的扩展列，按缺省列序。 */
 const LATER: readonly ColumnId[] = [
   'albumArtist',
   'year',
@@ -42,10 +51,19 @@ const LATER: readonly ColumnId[] = [
   'lastPlayed',
   'codec',
   'bitrate',
+  'sampleRate',
+  'channels',
+  'fileSize',
   'path',
 ];
-/** 八项那一版之后加的十列，按 `COLUMNS` 的下标；读回时按这个次序记成藏着。 */
-const ADDED: readonly ColumnId[] = [...LATER, 'art'];
+/** 八项那一版之后加的列，按 `COLUMNS` 的下标；读回时按这个次序记成藏着。 */
+const ADDED: readonly ColumnId[] = [
+  ...LATER.filter((id) => !['sampleRate', 'channels', 'fileSize'].includes(id)),
+  'art',
+  'sampleRate',
+  'channels',
+  'fileSize',
+];
 /** 八项那一版的列宽与列序。 */
 const WIDTHS_8 = [100, 24, 40, 300, 200, 88, 60, 150];
 const ORDER_8: ColumnId[] = [
@@ -59,7 +77,7 @@ const ORDER_8: ColumnId[] = [
   'duration',
 ];
 /** 全部列的一份合法存档；缩略图列插在缺省列序里它前面的序号列后面。 */
-const WIDTHS = [...WIDTHS_8, 1, 52, 96, 96, 60, 96, 64, 72, 2, 48];
+const WIDTHS = [...WIDTHS_8, 160, 52, 96, 96, 60, 96, 64, 72, 320, 48, 96, 56, 96];
 const ORDER: ColumnId[] = [
   'cover',
   'number',
@@ -114,14 +132,13 @@ describe('读回存档', () => {
     expect(loadColumns(storage, KEY, FALLBACK).widths).toEqual(widths);
   });
 
-  it('定宽列一律取缺省宽度；存像素的列夹到最窄宽度，封面与 fr 列不夹', () => {
-    const widths = [0, 90, 5, 0.5, 0, 10, 12, 1, 0.25, 3, 3, 3, 3, 3, 3, 3, 0, 7];
+  it('定宽列一律取缺省宽度；存像素的列夹到最窄宽度，封面可以为零', () => {
+    const widths = [0, 90, 5, 0.5, 0, 10, 12, 1, 0.25, 3, 3, 3, 3, 3, 3, 3, 0, 7, 3, 3, 3];
     const storage = memory({ widths, hidden: [], order: ORDER });
-    const flexible = new Set(COLUMNS.filter((column) => column.flexible).map((c) => c.id));
     expect(loadColumns(storage, KEY, FALLBACK).widths).toEqual(
       COLUMNS.map((column, at) => {
         if (column.fixed) return DEFAULT_WIDTHS[at];
-        if (column.id === 'cover' || flexible.has(column.id)) return widths[at];
+        if (column.id === 'cover') return widths[at];
         return MIN_WIDTH;
       }),
     );
@@ -155,7 +172,7 @@ describe('读回存档', () => {
     expect(loaded).toEqual({ widths: WIDTHS, hidden: ['album'], order: DEFAULT_ORDER });
   });
 
-  it('八项的存档补上后来的十列：取缺省宽，缩略图插在序号后、其余插在专辑后，都记成藏着', () => {
+  it('八项的存档补上扩展列：取缺省宽，缩略图插在序号后、其余插在专辑后，都记成藏着', () => {
     const storage = memory({ widths: WIDTHS_8, hidden: ['album'], order: ORDER_8 });
     expect(loadColumns(storage, KEY, FALLBACK)).toEqual({
       widths: [...WIDTHS_8, ...DEFAULT_WIDTHS.slice(8)],
@@ -164,14 +181,14 @@ describe('读回存档', () => {
     });
   });
 
-  it('七项的旧存档补上专辑列与后来的十列：专辑权重同艺术家、插在艺术家后面，都记成藏着', () => {
+  it('七项的旧存档补上专辑列与扩展列：专辑采用缺省像素宽度、插在艺术家后面，都记成藏着', () => {
     const storage = memory({
       widths: WIDTHS_8.slice(0, 7),
       hidden: ['status'],
       order: ['cover', 'number', 'title', 'artist', 'status', 'rating', 'duration'],
     });
     expect(loadColumns(storage, KEY, FALLBACK)).toEqual({
-      widths: [...WIDTHS_8.slice(0, 7), WIDTHS_8[4], ...DEFAULT_WIDTHS.slice(8)],
+      widths: [...WIDTHS_8.slice(0, 7), ...DEFAULT_WIDTHS.slice(7)],
       hidden: ['status', 'album', ...ADDED],
       order: [
         'cover',
@@ -200,6 +217,7 @@ describe('写存档', () => {
     const columns: StoredColumns = { widths: DEFAULT_WIDTHS, hidden: ['rating'], order: ORDER };
     saveColumns(storage, KEY, columns);
     expect(JSON.parse(storage.saved.get(KEY) ?? 'null')).toEqual({
+      unit: 'px',
       widths: [...DEFAULT_WIDTHS],
       hidden: ['rating'],
       order: ORDER,
@@ -216,4 +234,39 @@ describe('写存档', () => {
     };
     expect(() => saveColumns(full, KEY, FALLBACK)).not.toThrow();
   });
+});
+
+it('十八列存档保留原列序、宽度和显隐，新增音频字段默认收起', () => {
+  const added: ColumnId[] = ['sampleRate', 'channels', 'fileSize'];
+  const oldOrder = ORDER.filter((id) => !added.includes(id));
+  const oldWidths = WIDTHS.slice(0, 18);
+  const loaded = loadColumns(
+    memory({ widths: oldWidths, hidden: ['status'], order: oldOrder }),
+    KEY,
+    FALLBACK,
+  );
+  expect(loaded.widths.slice(0, 18)).toEqual(oldWidths);
+  expect(loaded.hidden).toEqual(['status', ...added]);
+  expect(loaded.order.filter((id) => !added.includes(id))).toEqual(oldOrder);
+  expect(loadColumns(memory({ widths: WIDTHS_8, order: oldOrder }), KEY, FALLBACK).order).toEqual(
+    ORDER,
+  );
+});
+
+it('页面新增可选列先收起，保存后尊重用户已经打开的列', () => {
+  const introduced = { widthCount: 21, columns: ['albumArtist', 'genre'] as const };
+  const old = loadColumns(
+    memory({ widths: WIDTHS.slice(0, 18), hidden: [], order: ORDER }),
+    KEY,
+    FALLBACK,
+    introduced,
+  );
+  expect(old.hidden).toEqual(['albumArtist', 'genre', 'sampleRate', 'channels', 'fileSize']);
+  const current = loadColumns(
+    memory({ widths: WIDTHS, hidden: [], order: ORDER }),
+    KEY,
+    FALLBACK,
+    introduced,
+  );
+  expect(current.hidden).toEqual([]);
 });

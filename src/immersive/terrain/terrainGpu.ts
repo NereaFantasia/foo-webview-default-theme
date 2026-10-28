@@ -16,22 +16,22 @@ import {
 } from './terrainShaders.ts';
 
 /**
- * 山脊图的 GPU 画法（WebGL2）：整幅在显卡上算，每帧脚本只设几个 uniform、发几次绘制命令。
- * 历史缓冲整份传成一张 R32F 纹理（行数 × 点数，按物理行存），只在缓冲进了新行时重传。
+ * 山脊图的 GPU 画法（WebGL2）：整幅在显卡上算，每帧脚本只设几个 uniform、发几次绘制命令
+ * 历史缓冲整份传成一张 R32F 纹理（行数 × 点数，按物理行存），只在缓冲进了新行时重传
  *
  * 一帧三步：轮廓第一遍把每行折线在各 CSS 像素列的 y 写进纹理的下一行；再做几遍前缀最小值，行 k 成为
  * 它前面各行的合成轮廓（与 `skyline.ts` 逐行并进的结果相同）；最后一次实例化绘制画完所有行的折线、
- * 两侧竖边与基线，同一行里每个像素只由一段画（`terrainLineShaders.ts`）。几何与 CPU 画法的对应见 `terrainShaders.ts`。
+ * 两侧竖边与基线，同一行里每个像素只由一段画（`terrainLineShaders.ts`）。几何与 CPU 画法的对应见 `terrainShaders.ts`
  *
  * 与 `drawTerrain` 的差别：曲线恒切 4 份，不看 `flatness`（自适应细分与恒切 4 份差不到 0.1 物理像素）；
  * 不支持 `smooth`（重画循环从不设它）；被挡处按像素切齐，不做沿线的抗锯齿；线的覆盖率是盒式滤波，
- * 斜线与 Skia 的抗锯齿不逐像素相同。
+ * 斜线与 Skia 的抗锯齿不逐像素相同
  *
  * 要 WebGL2 与 `EXT_color_buffer_float`（轮廓纹理要当浮点渲染目标）；建上下文带 `failIfMajorPerformanceCaveat`，
- * 软件渲染等情形会被拒。缺哪样都由调用方退回 canvas 2D。
+ * 软件渲染等情形会被拒。缺哪样都由调用方退回 canvas 2D
  */
 
-/** 能开 WebGL2 的 canvas：主线程的 `HTMLCanvasElement`，Worker 里与探测用的 `OffscreenCanvas`。 */
+/** 能开 WebGL2 的 canvas：主线程的 `HTMLCanvasElement`，Worker 里与探测用的 `OffscreenCanvas` */
 export interface GpuCanvas {
   width: number;
   height: number;
@@ -49,7 +49,7 @@ export const GPU_ATTRIBUTES: WebGLContextAttributes = {
 };
 
 const CORNERS = new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]);
-/** 每行除折线的段以外还有两侧竖边与基线三段。 */
+/** 每行除折线的段以外还有两侧竖边与基线三段 */
 const EXTRA_SEGMENTS = 3;
 
 type Uniforms = Record<string, WebGLUniformLocation | null>;
@@ -115,7 +115,7 @@ interface Renderer {
   dispose(): void;
 }
 
-/** 编着色器、建纹理与缓冲；缺扩展或编不过返回 `null`。 */
+/** 编着色器、建纹理与缓冲；缺扩展或编不过返回 `null` */
 function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer | null {
   if (!gl.getExtension('EXT_color_buffer_float')) return null;
   const seed = link(gl, FULLSCREEN_VERTEX, SKYLINE_SEED_FRAGMENT);
@@ -170,7 +170,7 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
 
   let skylineSize = { columns: 0, rows: 0 };
 
-  // 历史纹理固定在 0 号单元，轮廓纹理在 1 号单元。
+  // 历史纹理固定在 0 号单元，轮廓纹理在 1 号单元
   function uploadHistory(history: SpectrumHistory): void {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, historyTexture);
@@ -231,12 +231,12 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
         gl.uniform1f(uniforms.uAlphaFar ?? null, options.alphaFar ?? ALPHA_FAR);
       };
 
-      // 轮廓：第一遍写各行折线，再按 1、2、4…行的步长做前缀最小值；浮点目标不能开混合。
+      // 轮廓：第一遍写各行折线，再按 1、2、4…行的步长做前缀最小值；浮点目标不能开混合
       gl.disable(gl.BLEND);
       gl.bindVertexArray(emptyVao);
       gl.viewport(0, 0, columns, rows);
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[0] ?? null);
-      // 1 号单元别留着正要写的那张纹理，免得成了读写同一张纹理的回环。
+      // 1 号单元别留着正要写的那张纹理，免得成了读写同一张纹理的回环
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, skylines[1] ?? null);
       gl.useProgram(seed.program);
@@ -275,7 +275,7 @@ function createRenderer(gl: WebGL2RenderingContext, canvas: GpuCanvas): Renderer
 
 /**
  * 先在一块 1 × 1 的 `OffscreenCanvas` 上试建：要画的那块 canvas 一旦开了 WebGL 就再也要不到 2D 上下文，
- * 探测不能拿它试。试完立刻丢掉上下文，不占着显存。
+ * 探测不能拿它试。试完立刻丢掉上下文，不占着显存
  */
 export function probeTerrainGpu(): boolean {
   if (typeof OffscreenCanvas === 'undefined') return false;
@@ -289,9 +289,9 @@ export function probeTerrainGpu(): boolean {
 }
 
 /**
- * 探测通过才动要画的 canvas；返回 `null` 时它没开过任何上下文，调用方可以接着要 2D。
- * 探测通过而这块 canvas 建不起渲染器（同一块显卡上不该发生）时抛错：它已经开了 WebGL，只能换一块新的。
- * 上下文丢了，下一次 `draw` 调一次 `onLost`，之后不再画。
+ * 探测通过才动要画的 canvas；返回 `null` 时它没开过任何上下文，调用方可以接着要 2D
+ * 探测通过而这块 canvas 建不起渲染器（同一块显卡上不该发生）时抛错：它已经开了 WebGL，只能换一块新的
+ * 上下文丢了，下一次 `draw` 调一次 `onLost`，之后不再画
  */
 export function openTerrainGpu(canvas: GpuCanvas, onLost: () => void): TerrainDrawer | null {
   if (!probeTerrainGpu()) return null;

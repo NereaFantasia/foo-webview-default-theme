@@ -1,9 +1,12 @@
-/* 列表形态占满页头以下的高度，表格自己滚动；左右与封面墙留同样的边。 */
+/* 列表形态占满页头以下的高度，表格自己滚动；左右与封面墙留同样的边 */
 .root {
+  --table-inset-start: var(--spacingHorizontalXXL);
+  --table-inset-end: var(--spacingHorizontalXXL);
+  --table-bottom-inset: calc(var(--spacingVerticalL) + var(--player-inset, 0px));
   position: relative;
   flex: 1 1 auto;
   display: flex;
   min-width: 0;
   min-height: 0;
-  padding: 0 var(--spacingHorizontalXXL) var(--spacingVerticalL);
+  padding: 0;
 }

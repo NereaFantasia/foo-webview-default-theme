@@ -22,7 +22,7 @@
 }
 
 .root:hover {
-  background: var(--bg-hover);
+  background: var(--state-hover);
 }
 
 .root:focus-visible {

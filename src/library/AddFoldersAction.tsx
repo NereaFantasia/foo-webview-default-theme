@@ -9,13 +9,13 @@ import { libraryEmptyAtom } from './albums.ts';
 
 /**
  * 地点空态里的「添加文件夹」：打开 foobar2000 首选项的媒体库页，与新人引导第 1 步作用相同。媒体库里有
- * 东西时什么也不画，空态由所在地点自己写。打开失败时在按钮下面写出来，播报区常驻，读屏才念得到。
+ * 东西时什么也不画，空态由所在地点自己写。打开失败时在按钮下面写出来，播报区常驻，读屏才念得到
  */
 export function AddFoldersAction() {
   const t = useAtomValueRawSync(translateAtom);
   const empty = useAtomValueRawSync(libraryEmptyAtom);
   const [failed, setFailed] = useState(false);
-  // 首选项的应答可能在离开这一页之后才回来，那时不再改状态。
+  // 首选项的应答可能在离开这一页之后才回来，那时不再改状态
   const alive = useRef(false);
   useEffect(() => {
     alive.current = true;

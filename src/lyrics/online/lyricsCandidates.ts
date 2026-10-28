@@ -6,7 +6,7 @@ export interface LyricsCandidates {
   readonly failed: readonly LyricsSourceId[];
 }
 
-/** 手动搜索保留候选，不用自动取词的门槛淘汰；相同匹配程度按来源顺序排列。 */
+/** 手动搜索保留候选，不用自动取词的门槛淘汰；相同匹配程度按来源顺序排列 */
 export async function findLyricsCandidates(
   query: LyricsQuery,
   sources: readonly LyricsSource[],
@@ -44,7 +44,7 @@ export async function findLyricsCandidates(
       [query.title, query.artists.join(', ')].join(' '),
     ].some((value) => normalize(value) === normalize(query.keywords ?? ''));
   const match = [...candidates].sort(byMatch).find((item) => item.title && item.artists.length);
-  // 聚合接口只收曲名和艺人；自由关键词先由直连来源解析成候选，不借当前艺人猜测另一首歌。
+  // 聚合接口只收曲名和艺人；自由关键词先由直连来源解析成候选，不借当前艺人猜测另一首歌
   const aggregateQuery: LyricsQuery | null =
     !query.keywords || (!match && currentQuery)
       ? { ...query, keywords: undefined }

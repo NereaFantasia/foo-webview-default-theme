@@ -1,19 +1,19 @@
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import { Button, Spinner, Switch, Tab, Tooltip } from '@fluentui/react-components';
 import {
-  AlbumRegular,
+  RecordRegular,
   MicRegular,
   ArrowClockwise16Regular,
   Globe20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useContext, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { MessageKey } from '../../../i18n/en.ts';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
 import { useService } from '../../../kit/useService.ts';
 import { LyricsPlayer } from '../../../lyrics/LyricsPlayer.tsx';
 import type { LyricsClockFace } from '../../../lyrics/lyricsDriver.ts';
-import { lyricsKey, type LyricsState } from '../../../lyrics/lyricsService.ts';
+import { lyricsEmpty } from '../../../lyrics/lyricsEmpty.ts';
+import { lyricsKey } from '../../../lyrics/lyricsService.ts';
 import { lyricsPrefsKey } from '../../../lyrics/lyricsPrefs.ts';
 import { lyricsMotionKey } from '../../../lyrics/lyricsMotion.ts';
 import { lyricsDisplayKey } from '../../../lyrics/lyricsDisplay.ts';
@@ -47,27 +47,6 @@ interface LyricsPageProps {
   onRetryPlayback(): void;
 }
 const SNAPSHOT = createSnapshotSlot<{ view: 'synced' | 'text' }>();
-
-function statusKey(state: LyricsState): MessageKey {
-  switch (state.status) {
-    case 'idle':
-      return 'lyrics.idle';
-    case 'waiting':
-      return 'lyrics.searching';
-    case 'loading':
-      return state.stage === 'local' ? 'lyrics.loading' : 'lyrics.searching';
-    case 'failed':
-      return state.stage === 'local' ? 'lyrics.localFailed' : 'lyrics.onlineFailed';
-    case 'missing':
-      return state.reason === 'metadata'
-        ? 'lyrics.metadataMissing'
-        : state.reason === 'local'
-          ? 'lyrics.localMissing'
-          : 'lyrics.onlineMissing';
-    case 'ready':
-      return 'lyrics.region';
-  }
-}
 
 export function LyricsPage(props: LyricsPageProps) {
   const { title, artist, album, active, connected, trackStatus, canSeek, clock, onSeek } = props;
@@ -148,15 +127,9 @@ export function LyricsPage(props: LyricsPageProps) {
     );
     return () => animation?.cancel();
   }, [view, reduced]);
-  const loading = connected && (state.status === 'loading' || trackStatus === 'pending');
-  const retry = !connected || trackStatus === 'failed' ? props.onRetryPlayback : service.refresh;
-  const message = !connected
-    ? 'host.unavailable'
-    : trackStatus === 'failed'
-      ? 'lyrics.trackFailed'
-      : trackStatus === 'pending'
-        ? 'lyrics.loading'
-        : statusKey(state);
+  const empty = lyricsEmpty(state, { connected, trackStatus });
+  const { loading } = empty;
+  const retry = empty.retry === 'playback' ? props.onRetryPlayback : service.refresh;
   const navigate = (id: 'lyricsSearch' | 'lyricsDetails' | 'lyricsTiming') =>
     card.history.navigate({ id, subject });
   const onlineControl = (
@@ -223,15 +196,15 @@ export function LyricsPage(props: LyricsPageProps) {
             <strong>{title || t('lyrics.untitled')}</strong>
             <div className={styles.byline}>
               {artist && (
-                <span>
+                <span className={styles.field}>
                   <MicRegular aria-label={t('trackInfo.artist')} />
-                  {artist}
+                  <span className={styles.text}>{artist}</span>
                 </span>
               )}
               {album && (
-                <span>
-                  <AlbumRegular aria-label={t('trackInfo.album')} />
-                  {album}
+                <span className={styles.field}>
+                  <RecordRegular aria-label={t('trackInfo.album')} />
+                  <span className={styles.text}>{album}</span>
                 </span>
               )}
             </div>
@@ -283,6 +256,9 @@ export function LyricsPage(props: LyricsPageProps) {
                 <LyricsPlayer
                   key={ready.key}
                   lines={ready.content.lines}
+                  fallback={
+                    <LyricsReading content={ready.content} offset={offset} interactive={false} />
+                  }
                   motion={effects}
                   clock={clock}
                   active={active}
@@ -317,11 +293,11 @@ export function LyricsPage(props: LyricsPageProps) {
         ) : (
           <div className={styles.empty}>
             {loading ? (
-              <Spinner size="small" label={t(message)} />
+              <Spinner size="small" label={t(empty.message)} />
             ) : (
-              <p role="status">{t(message)}</p>
+              <p role="status">{t(empty.message)}</p>
             )}
-            {!loading && (state.status === 'failed' || !connected || trackStatus === 'failed') && (
+            {empty.canRetry && (
               <Button
                 className={controls.field}
                 icon={<ArrowClockwise16Regular />}
@@ -333,7 +309,7 @@ export function LyricsPage(props: LyricsPageProps) {
                 {t('lyrics.retry')}
               </Button>
             )}
-            {!online && connected && (state.status === 'missing' || state.status === 'failed') && (
+            {!online && empty.canSearchOnline && (
               <Button
                 appearance="primary"
                 icon={<Globe20Regular />}

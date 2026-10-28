@@ -11,7 +11,7 @@ import {
   immersiveCoverAtom,
   startImmersiveCover,
   type CoverProbe,
-} from '../../../../src/immersive/cover/immersiveCover.ts';
+} from '../../../../src/covers/immersiveCover.ts';
 import { startPlayback } from '../../../../src/playback/playback.ts';
 import {
   coverUrl,
@@ -25,6 +25,7 @@ import {
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
+import { hostArtwork } from '../../../fixtures/trackArtwork.ts';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -73,7 +74,11 @@ async function start(host: UnitHost, sample?: CoverSampler, probe: CoverProbe = 
   host.answer('artwork.getAvailableArtwork', listedArt(['front']));
   const store = createStore();
   const playback = startPlayback(store, host.fb);
-  const cover = startImmersiveCover(store, { host: host.fb, probe });
+  const cover = startImmersiveCover(store, {
+    artwork: hostArtwork(store, host.fb),
+    host: host.fb,
+    probe,
+  });
   const source = startCoverSource(store, { sample });
   onTestFinished(() => {
     source.dispose();

@@ -60,8 +60,8 @@ export interface HomeChannelsHost extends HostReadyFace {
 }
 
 /**
- * 保存成功后才替换列表；读回失败时禁止覆盖未知存档。
- * 写入经公共写入助手，没有传入 `writer` 时每次保存都按失败处理。
+ * 保存成功后才替换列表；读回失败时禁止覆盖未知存档
+ * 写入经公共写入助手，没有传入 `writer` 时每次保存都按失败处理
  */
 export function startHomeChannels(
   store: ReturnType<typeof createStore>,
@@ -100,7 +100,7 @@ export function startHomeChannels(
   }
 
   async function write(next: readonly HomeChannel[]) {
-    // 落盘与成功后显示的是同一份校验得到的副本，不引用调用方传入的对象。
+    // 落盘与成功后显示的是同一份校验得到的副本，不引用调用方传入的对象
     const items = parseHomeChannels(next);
     if (disposed || store.get(state).status !== 'ready' || store.get(state).saving || !items)
       return false;

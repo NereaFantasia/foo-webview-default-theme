@@ -5,7 +5,7 @@ import { miniWindowAtom, miniWindowKey } from '../../host/miniWindow.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { useService } from '../../kit/useService.ts';
 
-/** 主菜单里进入迷你模式的一项；三种播放栏形态与停止时都从这里进。 */
+/** 主菜单里进入迷你模式的一项；三种播放栏形态与停止时都从这里进 */
 export function MiniPlayerMenuItem() {
   const t = useAtomValueRawSync(translateAtom);
   const mini = useService(miniWindowKey);

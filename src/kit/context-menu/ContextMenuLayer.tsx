@@ -1,10 +1,5 @@
-import {
-  Button,
-  MenuDivider,
-  MenuList,
-  MenuPopover,
-  type MenuProps,
-} from '@fluentui/react-components';
+import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
+import { Button, MenuDivider, MenuList, type MenuProps } from '@fluentui/react-components';
 import { ArrowLeft20Regular } from '@fluentui/react-icons';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ContextMenuEntryView } from './ContextMenuEntryView.tsx';
@@ -24,6 +19,7 @@ import {
 } from './contextMenuItems.ts';
 import { pageContextMenu, revealContextMenuItem } from './contextMenuKeyboard.ts';
 import { useContextMenuStyles } from './contextMenuStyles.ts';
+import { MENU_OVERLAP } from '../../theme/menuStyles.ts';
 
 export interface ContextMenuLayerProps {
   readonly owner: string;
@@ -49,7 +45,7 @@ export function ContextMenuLayer(props: ContextMenuLayerProps) {
   const surface = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const [levels, setLevels] = useState<readonly MenuLevel[]>([]);
-  const [spacing, setSpacing] = useState({ edge: 12, gap: 4 });
+  const [spacing, setSpacing] = useState({ edge: 12, gap: -MENU_OVERLAP });
   const [cascadeWidth, setCascadeWidth] = useState(0);
   const bounds = contextMenuBounds(props.viewport, spacing.edge);
   const width = Math.min(bounds.width, props.widthLimit ?? bounds.width);
@@ -88,7 +84,7 @@ export function ContextMenuLayer(props: ContextMenuLayerProps) {
     if (!element) return;
     const style = getComputedStyle(element);
     const edge = parseFloat(style.getPropertyValue('--spacingHorizontalM')) || 12;
-    const gap = parseFloat(style.getPropertyValue('--spacingHorizontalXS')) || 4;
+    const gap = -MENU_OVERLAP;
     setSpacing({ edge, gap });
     const measure = () =>
       setCascadeWidth(

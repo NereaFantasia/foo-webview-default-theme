@@ -24,6 +24,10 @@ import { ExternalLinkProvider } from '../../src/kit/external-link/ExternalLinkPr
 import { fb } from 'foo-webview-sdk/bridge';
 import { startBrowserDataWriter } from '../../src/kit/browserDataStorage.ts';
 import { createConfigWriter } from '../../src/host/configWrite.ts';
+import { bindService } from '../../src/kit/serviceKey.ts';
+import { ServicesContext, serviceMap } from '../../src/kit/useService.ts';
+import { objectOpenerKey } from '../../src/nav/objectOpener.ts';
+import { stubObjectOpener } from './objectOpenerStub.ts';
 
 const store = createStore();
 const playing = atom<Track | null>(INFO_TRACK);
@@ -126,10 +130,14 @@ function Content() {
   );
 }
 
+const services = serviceMap([bindService(objectOpenerKey, stubObjectOpener())]);
+
 export function TrackInfoHarness() {
   return (
     <Provider store={store}>
-      <Content />
+      <ServicesContext value={services}>
+        <Content />
+      </ServicesContext>
     </Provider>
   );
 }

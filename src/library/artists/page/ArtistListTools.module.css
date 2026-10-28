@@ -1,0 +1,10 @@
+.root {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  display: grid;
+  gap: var(--spacingVerticalS);
+}
+.filter {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}

@@ -2,11 +2,13 @@ import { createStore } from 'jotai/vanilla';
 import { webview } from 'foo-webview-sdk/bridge';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import metadata from '../../../package.json' with { type: 'json' };
+import { REQUIRED_HOST_VERSION } from '../../../src/host/hostInfo.ts';
 import {
   clearPanelStartup,
   confirmedStartupAtom,
   loaderConfirmationAtom,
   startLoaderConfirmation,
+  startupBlockAtom,
 } from '../../../src/update/loaderConfirmation.ts';
 import {
   cookieName,
@@ -319,11 +321,13 @@ describe('启动确认', () => {
     env.failure.path = 'install-id';
     await env.service.confirm();
     expect(env.state()).toBe('failed');
+    expect(env.store.get(startupBlockAtom)).toEqual({ reason: 'failed' });
     expect(env.files.has('install-id')).toBe(false);
     expect(readSession(json(env.cookies.get(cookieName('')) ?? null))?.sessionId).toBe(SESSION_ID);
     env.failure.path = null;
     await env.service.confirm();
     expect(env.state()).toBe('confirmed');
+    expect(env.store.get(startupBlockAtom)).toBeNull();
     expect(readSession(json(env.cookies.get(cookieName(ID)) ?? null))?.sessionId).toBe(SESSION_ID);
   });
 
@@ -354,11 +358,62 @@ describe('启动确认', () => {
       });
       await env.service.confirm();
       expect(env.state()).toBe('disabled');
+      expect(env.store.get(startupBlockAtom)).toEqual({ reason: 'source' });
       expect(env.store.get(confirmedStartupAtom)).toBeNull();
       expect(env.counts().installations['']?.[CURRENT.dir]).toBe(0);
       expect(env.writes).toEqual([]);
     },
   );
+
+  it('插件低于主题要求时记下当前版本与要求的版本，不写版本文件', async () => {
+    const env = setup();
+    expect(env.store.get(startupBlockAtom)).toBeNull();
+    const info = await env.host.fb.config.getVersionInfo();
+    if (info.success === false) throw new Error('版本应答失败');
+    env.host.answer('config.getVersionInfo', {
+      ...info,
+      plugin: { ...info.plugin, version: '2.0.0' },
+    });
+    await env.service.confirm();
+    expect(env.state()).toBe('disabled');
+    expect(env.store.get(startupBlockAtom)).toEqual({
+      reason: 'host',
+      version: '2.0.0',
+      required: REQUIRED_HOST_VERSION,
+    });
+    expect(env.store.get(confirmedStartupAtom)).toBeNull();
+    expect(env.writes).toEqual([]);
+  });
+
+  it('主题放在面板里时停用更新器，不记原因', async () => {
+    const env = setup();
+    env.host.answer('window.getMode', {
+      success: true,
+      mode: 'dui',
+      panelMode: true,
+      windowId: 'main',
+    });
+    await env.service.confirm();
+    expect(env.state()).toBe('disabled');
+    expect(env.store.get(startupBlockAtom)).toBeNull();
+    expect(env.writes).toEqual([]);
+  });
+
+  it.each([
+    ['https://foo-ui-webview2.local/index.html', 'layout'],
+    ['https://foo-ui-webview2.local/assets/index.html', 'layout'],
+    ['http://localhost:5190/', 'source'],
+  ] as const)('页面 %s 不在 /fe/<目录>/ 下时记为 %s', (address, reason) => {
+    const env = setup();
+    env.service.dispose();
+    const service = startLoaderConfirmation(env.store, {
+      ...env.options,
+      url: new globalThis.URL(address),
+    });
+    onTestFinished(service.dispose);
+    expect(env.state()).toBe('disabled');
+    expect(env.store.get(startupBlockAtom)).toEqual({ reason });
+  });
 
   it('旧宿主不尝试原子写，释放后拒收迟到结果', async () => {
     const env = setup();

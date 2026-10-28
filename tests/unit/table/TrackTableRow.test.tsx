@@ -1,62 +1,81 @@
 import { FluentProvider, Table, TableBody, webLightTheme } from '@fluentui/react-components';
+import { atom } from 'jotai/vanilla';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { createTranslate } from '../../../src/i18n/translate.ts';
 import { zhCN } from '../../../src/i18n/zhCN.ts';
+import { bindService } from '../../../src/kit/serviceKey.ts';
+import { serviceMap, ServicesContext } from '../../../src/kit/useService.ts';
+import { objectOpenerKey, type ObjectOpener } from '../../../src/nav/objectOpener.ts';
 import { TrackTableRow, type TrackTableRowProps } from '../../../src/table/TrackTableRow.tsx';
 import { PlayingMark } from '../../../src/track/PlayingMark.tsx';
-import type { TableLinks, TableTrack } from '../../../src/table/tableItems.ts';
+import type { TableTrack } from '../../../src/table/tableItems.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
 
-function rowMarkup(
-  track: TableTrack,
-  links?: TableLinks,
-  state: Partial<Pick<TrackTableRowProps, 'cells' | 'selected' | 'playing'>> = {},
-) {
-  return renderToStaticMarkup(
-    <FluentProvider theme={webLightTheme}>
-      <Table noNativeElements>
-        <TableBody>
-          <TrackTableRow
-            id="artist-row"
-            index={0}
-            rowIndex={2}
-            level={1}
-            item={{ kind: 'row', key: 'track', order: 0, track }}
-            top={0}
-            cells={['artist']}
-            firstColumn={1}
-            selected={false}
-            focused={false}
-            playing="none"
-            PlayingMark={PlayingMark}
-            rating={0}
-            ratable={false}
-            numberText={() => ''}
-            links={links}
-            artwork={undefined}
-            artSize={40}
-            handlers={{ click() {}, play() {}, menu() {}, rate() {} }}
-            t={createTranslate(zhCN, {})}
-            {...state}
-          />
-        </TableBody>
-      </Table>
-    </FluentProvider>,
-  );
-}
-
-function artistCell(track: TableTrack, links?: TableLinks) {
-  const html = rowMarkup(track, links);
-  const cell = html.match(/data-column-id="artist"[^>]*>(.*?)<\/div>/s)?.[1] ?? '';
+/** 艺人一律打得开；专辑由 `albums` 决定在不在 */
+function openerStub(albums = true): ObjectOpener {
   return {
-    text: cell.replace(/<[^>]+>/g, '').replaceAll('&amp;', '&'),
-    buttons: [...cell.matchAll(/<button\b[^>]*>/g)].map((match) => match[0]),
+    availability: (ref) => (ref.kind !== 'album' || albums ? 'ready' : 'missing'),
+    revision: atom(0),
+    isHere: () => false,
+    open: () => Promise.resolve('done'),
+    pending: atom(null),
+    notice: atom(null),
+    dismissNotice() {},
+    dispose() {},
   };
 }
 
-const links: TableLinks = { artist() {} };
+function rowMarkup(
+  track: TableTrack,
+  opener: ObjectOpener = openerStub(),
+  state: Partial<Pick<TrackTableRowProps, 'cells' | 'selected' | 'playing'>> = {},
+) {
+  return renderToStaticMarkup(
+    <ServicesContext value={serviceMap([bindService(objectOpenerKey, opener)])}>
+      <FluentProvider theme={webLightTheme}>
+        <Table noNativeElements>
+          <TableBody>
+            <TrackTableRow
+              id="artist-row"
+              index={0}
+              rowIndex={2}
+              level={1}
+              item={{ kind: 'row', key: 'track', order: 0, track }}
+              top={0}
+              cells={['artist']}
+              firstColumn={1}
+              selected={false}
+              focused={false}
+              playing="none"
+              PlayingMark={PlayingMark}
+              rating={0}
+              ratable={false}
+              numberText={() => ''}
 
+              artwork={undefined}
+              artSize={40}
+              handlers={{ click() {}, play() {}, menu() {}, rate() {} }}
+              t={createTranslate(zhCN, {})}
+              {...state}
+            />
+          </TableBody>
+        </Table>
+      </FluentProvider>
+    </ServicesContext>,
+  );
+}
+
+function cellOf(column: 'artist' | 'album', track: TableTrack, opener?: ObjectOpener) {
+  const html = rowMarkup(track, opener, { cells: [column] });
+  const pattern = new RegExp(`data-column-id="${column}"[^>]*>(.*?)</div>`, 's');
+  const cell = pattern.exec(html)?.[1] ?? '';
+  return {
+    text: cell.replace(/<[^>]+>/g, '').replaceAll('&amp;', '&'),
+    // 署名链接是行内文字（span 加 role=button），不是 button 元素
+    buttons: [...cell.matchAll(/<[a-z]+\b[^>]*\brole="button"[^>]*>/g)].map((match) => match[0]),
+  };
+}
 describe('曲目行的选中标记', () => {
   it.each(['none', 'paused', 'active'] as const)(
     '播放状态为 %s 时不画选中勾，保留行选中语义与播放标记',
@@ -75,40 +94,54 @@ describe('曲目行的选中标记', () => {
 });
 
 describe('曲目行的艺人列', () => {
-  it('有效多值分别画链接，空白项跳过，名字与顺序保持原样', () => {
+  it('有效多值分别画链接，空白项跳过，名字与顺序保持原样，不进 Tab 次序', () => {
     const track: TableTrack = {
       ...makeTrack({ artist: '旧的合并署名' }),
       artists: ['', 'Nujabes', '  Shing02  ', ' ', 'A & B / C feat. D'] as const,
     };
-    const cell = artistCell(track, links);
+    const cell = cellOf('artist', track);
     expect(cell.text).toBe('Nujabes,   Shing02  , A & B / C feat. D');
     expect(cell.buttons).toHaveLength(3);
     for (const button of cell.buttons) expect(button).toContain('tabindex="-1"');
   });
 
-  it.each([undefined, [], ['', '  ']])('多值字段为 %j 时回退完整单值署名', (artists) => {
-    const track: TableTrack = { ...makeTrack({ artist: 'A & B / C feat. D' }), artists };
-    const cell = artistCell(track, links);
-    expect(cell.text).toBe('A & B / C feat. D');
+  it.each([undefined, [], ['', '  ']])(
+    '多值字段为 %j 时整串署名只显示，不当成一位艺人',
+    (artists) => {
+      const track: TableTrack = { ...makeTrack({ artist: 'A & B / C feat. D' }), artists };
+      const cell = cellOf('artist', track);
+      expect(cell.text).toBe('A & B / C feat. D');
+      expect(cell.buttons).toHaveLength(0);
+    },
+  );
+
+  it('名字即身份：大小写不同的分开，完全相同的只留一个', () => {
+    const cell = cellOf('artist', makeTrack({ artists: ['Artist', 'artist', 'Artist'] }));
+    expect(cell.text).toBe('Artist, artist');
+    expect(cell.buttons).toHaveLength(2);
+  });
+
+  it('超过三位时整串是一个点击目标，点了弹菜单选人', () => {
+    const cell = cellOf('artist', makeTrack({ artists: ['A', 'B', 'C', 'D'] }));
+    expect(cell.text).toBe('A, B, C, D');
     expect(cell.buttons).toHaveLength(1);
-  });
-
-  it('没有艺人回调时仍显示多值，但不画链接', () => {
-    const track = makeTrack({ artist: '合并名', artists: ['Nujabes', 'Shing02'] });
-    const cell = artistCell(track, { album() {} });
-    expect(cell.text).toBe('Nujabes, Shing02');
-    expect(cell.buttons).toHaveLength(0);
-  });
-
-  it('重复的名字按原字段显示，不合并大小写或去重', () => {
-    const cell = artistCell(makeTrack({ artists: ['Artist', 'artist', 'Artist'] }), links);
-    expect(cell.text).toBe('Artist, artist, Artist');
-    expect(cell.buttons).toHaveLength(3);
+    expect(cell.buttons[0]).toContain('aria-haspopup="menu"');
+    expect(cell.buttons[0]).toContain('tabindex="-1"');
   });
 
   it('没有名字时保持空格子，不产生空链接', () => {
-    const cell = artistCell(makeTrack({ artist: '', artists: [] }), links);
+    const cell = cellOf('artist', makeTrack({ artist: '', artists: [] }));
     expect(cell.text).toBe('');
     expect(cell.buttons).toHaveLength(0);
+  });
+});
+
+describe('曲目行的专辑列', () => {
+  it('专辑在媒体库里画成链接，不在时只显示', () => {
+    const track = makeTrack({ album: 'Modal Soul' });
+    expect(cellOf('album', track).buttons).toHaveLength(1);
+    const missing = cellOf('album', track, openerStub(false));
+    expect(missing.text).toBe('Modal Soul');
+    expect(missing.buttons).toHaveLength(0);
   });
 });

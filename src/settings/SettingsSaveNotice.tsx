@@ -9,6 +9,7 @@ import {
 } from '../kit/prefStorage.ts';
 import { useService } from '../kit/useService.ts';
 import { translateAtom } from '../i18n/locale.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 import styles from './SettingsSaveNotice.module.css';
 
 interface SettingsSaveNoticeProps {
@@ -17,13 +18,14 @@ interface SettingsSaveNoticeProps {
   readonly unavailable?: boolean;
 }
 
-/** 操作反馈与当前值分开；重试成功后保留可获焦的按钮，避免键盘焦点落到页面外。 */
+/** 操作反馈与当前值分开；重试成功后保留可获焦的按钮，避免键盘焦点落到页面外 */
 export function SettingsSaveNotice({
   persistence,
   keys,
   unavailable = false,
 }: SettingsSaveNoticeProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const states = useAtomValueRawSync(persistence.state);
   const failed = keys.filter((key) => states.get(key)?.status === 'failed');
   const pending = keys.some((key) => states.get(key)?.status === 'pending');
@@ -64,6 +66,7 @@ export function SettingsSaveNotice({
       </span>
       {visible && !unavailable && (
         <Button
+          className={viewControls.icon}
           size="small"
           appearance="subtle"
           disabledFocusable={busy || pending || failed.length === 0}
@@ -76,7 +79,7 @@ export function SettingsSaveNotice({
   );
 }
 
-/** 浏览器偏好的保存状态由页面统一订阅，控件只声明自己写入的键。 */
+/** 浏览器偏好的保存状态由页面统一订阅，控件只声明自己写入的键 */
 export function LocalSaveNotice({ keys }: { readonly keys: readonly string[] }) {
   const storage = useService(prefStorageKey);
   const available = useAtomValueRawSync(prefStorageAvailableAtom);

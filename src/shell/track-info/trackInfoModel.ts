@@ -1,5 +1,6 @@
 import type { Track } from 'foo-webview-sdk';
 import type { fb } from 'foo-webview-sdk/bridge';
+import { trackAbilities, trackOrigin } from '../../host/trackOrigin.ts';
 
 type SuccessOf<T extends (...args: never[]) => unknown> = Extract<
   Awaited<ReturnType<T>>,
@@ -22,9 +23,10 @@ export interface InfoAudioExtras {
 }
 
 export type InfoSection =
-  'metadata' | 'audio' | 'credits' | 'file' | 'statistics' | 'replayGain' | 'tags';
+  'metadata' | 'source' | 'audio' | 'credits' | 'file' | 'statistics' | 'replayGain' | 'tags';
 export const INFO_SECTIONS: readonly InfoSection[] = [
   'metadata',
+  'source',
   'audio',
   'credits',
   'file',
@@ -32,7 +34,19 @@ export const INFO_SECTIONS: readonly InfoSection[] = [
   'replayGain',
   'tags',
 ];
-export const INITIAL_INFO_SECTIONS: readonly InfoSection[] = ['metadata', 'audio'];
+export const INITIAL_INFO_SECTIONS: readonly InfoSection[] = ['metadata', 'source', 'audio'];
+
+/** 来源不列文件细节时（在线曲目）去掉的几节 */
+const FILE_DETAILS: readonly InfoSection[] = ['file', 'statistics', 'replayGain'];
+
+/** 这首曲目显示哪几节，顺序同 `INFO_SECTIONS`；「来源」只有在线曲目有 */
+export function infoSections(track: Pick<Track, 'path'> | null): readonly InfoSection[] {
+  const online = track !== null && trackOrigin(track.path) === 'online';
+  const details = !track || trackAbilities(track.path).fileDetails;
+  return INFO_SECTIONS.filter(
+    (section) => (section !== 'source' || online) && (details || !FILE_DETAILS.includes(section)),
+  );
+}
 
 export interface TrackInfoState {
   readonly track: Track | null;
@@ -60,15 +74,8 @@ export function emptyTrackInfo(track: Track | null): TrackInfoState {
   };
 }
 
-/** 只把普通文件交给同步文件接口，未知协议也不尝试打开。 */
-export function infoMediaKind(track: Track): 'file' | 'container' | 'stream' {
-  const scheme = /^([a-z][a-z\d+.-]+):/i.exec(track.path)?.[1]?.toLowerCase();
-  if (!scheme || scheme === 'file' || scheme === 'file-relative') return 'file';
-  return scheme === 'unpack' || scheme === 'cdda' ? 'container' : 'stream';
-}
-
 export function infoFilePath(track: Track): string | null {
-  if (infoMediaKind(track) !== 'file') return null;
+  if (trackOrigin(track.path) !== 'file') return null;
   const path = track.absolutePath;
   return /^(?:[a-z]:[\\/]|\\\\|\/)/i.test(path) ? path : null;
 }
@@ -98,7 +105,7 @@ export interface InfoTag {
   readonly values: readonly string[];
 }
 
-/** 数组保持原顺序；逗号属于值，不拿它拆分艺人。 */
+/** 数组保持原顺序；逗号属于值，不拿它拆分艺人 */
 export function infoTags(tags: InfoMetadata['tags']): readonly InfoTag[] {
   return Object.entries(tags).map(([name, value]) => ({
     name,
@@ -119,7 +126,7 @@ export function filterInfoTags(tags: readonly InfoTag[], query: string): readonl
   );
 }
 
-/** JSON 数组在剪贴板里仍能区分单个含分隔符的值与多个值。 */
+/** JSON 数组在剪贴板里仍能区分单个含分隔符的值与多个值 */
 export function copyInfoTags(tags: readonly InfoTag[]): string {
   return JSON.stringify(
     Object.fromEntries(

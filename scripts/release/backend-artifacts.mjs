@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readComponentPackage } from '../../backend/music/componentInstall.ts';
 import { readBackendManifest, readRuntimeManifest } from '../../src/update/backendManifest.ts';
 import { buildBackend } from './build-backend.mjs';
 import { sha256 } from './artifacts.mjs';
@@ -11,11 +12,18 @@ import { zipForRelease } from './zip.mjs';
  * @param {string} version
  * @param {string} runtimePath 已生成的 runtime.json
  * @param {string} buildDirectory
+ * @param {{ ncm: string, lxserver: string }} components 组件元数据描述路径（打包为 `<组件名>.json` 供运行期组件下载器消费）
  */
-export async function backendArtifacts(version, runtimePath, buildDirectory) {
+export async function backendArtifacts(version, runtimePath, buildDirectory, components) {
   const runtimeBytes = new Uint8Array(readFileSync(runtimePath));
   const runtime = readRuntimeManifest(new TextDecoder().decode(runtimeBytes));
   if (!runtime) throw new Error('运行时清单无效');
+  const descriptors = /** @type {const} */ (['ncm', 'lxserver']).map((name) => {
+    const bytes = new Uint8Array(readFileSync(components[name]));
+    if (!readComponentPackage(new TextDecoder().decode(bytes), name))
+      throw new Error(`${name} 组件描述无效`);
+    return { path: `${name}.json`, bytes };
+  });
   await buildBackend(version, buildDirectory);
   const files = [
     ...['server.cjs', 'updater.cjs'].map((path) => ({
@@ -26,6 +34,7 @@ export async function backendArtifacts(version, runtimePath, buildDirectory) {
       path: 'LICENSE',
       bytes: new Uint8Array(readFileSync(fileURLToPath(new URL('../../LICENSE', import.meta.url)))),
     },
+    ...descriptors,
   ];
   const bytes = await zipForRelease(files);
   const name = `be-${version}.zip`;

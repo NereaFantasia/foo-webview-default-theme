@@ -37,6 +37,7 @@ import { ArtistsRoot } from './ArtistsRoot.tsx';
 import { ExternalLinkProvider } from '../kit/external-link/ExternalLinkProvider.tsx';
 import { useCommand } from '../nav/useCommand.ts';
 import { BACK_KEYS, BACK_BUTTON, FORWARD_KEYS, FORWARD_BUTTON } from '../nav/navCommands.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 function BiographyContent({ integration }: { readonly integration: BiographyIntegration }) {
   const input = useAtomValueRawSync(integration.input);
@@ -83,7 +84,8 @@ function LastfmKeyRow({
   const t = useAtomValueRawSync(translateAtom);
   const key = useAtomValueRawSync(integration.lastfmKey.key);
   const check = useAtomValueRawSync(integration.lastfmKey.check);
-  const status = lastfmKeyStatus(key, check, online, t);
+  const checkDetail = useAtomValueRawSync(integration.lastfmKey.checkDetail);
+  const status = lastfmKeyStatus(key, check, online, t, checkDetail);
   return (
     <SettingsRow
       title={t('biography.lastfmKey')}
@@ -97,7 +99,7 @@ function LastfmKeyRow({
   );
 }
 
-/** 新人引导的独立开关卡，和设置页共用开关逻辑，说明行写清数据发给谁。 */
+/** 新人引导的独立开关卡，和设置页共用开关逻辑，说明行写清数据发给谁 */
 function BiographyOnlineCard({
   integration,
   inputRef,
@@ -126,11 +128,13 @@ function BiographyOnlineCard({
 
 function BiographySetting({ integration }: { readonly integration: BiographyIntegration }) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const prefs = useAtomValueRawSync(integration.prefs.state);
   const cache = useAtomValueRawSync(integration.cacheState);
   const key = useAtomValueRawSync(integration.lastfmKey.key);
   const check = useAtomValueRawSync(integration.lastfmKey.check);
-  const keyStatus = lastfmKeyStatus(key, check, prefs.enabled, t);
+  const checkDetail = useAtomValueRawSync(integration.lastfmKey.checkDetail);
+  const keyStatus = lastfmKeyStatus(key, check, prefs.enabled, t, checkDetail);
   const error = prefs.failed
     ? t('biography.prefsFailed')
     : keyStatus.error
@@ -199,6 +203,7 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
         <SettingsRow title={t('biography.cache')} description={summary} error={cache.failed}>
           {() => (
             <Button
+              className={viewControls.field}
               icon={<Delete20Regular />}
               disabled={!cache.loaded || cache.clearing}
               onClick={() => void integration.clearCache()}
@@ -277,7 +282,7 @@ export function BiographyRoot({
     run: () => {},
   });
   useEffect(() => {
-    // 每次挂载建立新实例，清理后重挂不能复用已释放的订阅。
+    // 每次挂载建立新实例，清理后重挂不能复用已释放的订阅
     const next = startBiographyIntegration({ store, rightCard, history, configWriter });
     setIntegration(next);
     return () => next.dispose();

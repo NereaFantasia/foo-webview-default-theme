@@ -63,7 +63,7 @@
   transform: rotate(-90deg);
 }
 
-/* 叠在开合键右端，给箭头（16）与右内边距（12）让出位置，再隔 4。 */
+/* 叠在开合键右端，给箭头（16）与右内边距（12）让出位置，再隔 4 */
 .tools {
   position: absolute;
   top: 0;
@@ -73,7 +73,7 @@
   align-items: center;
 }
 
-/* 不能开合时没有箭头，工具键贴着右内边距。 */
+/* 不能开合时没有箭头，工具键贴着右内边距 */
 .bare {
   right: var(--spacingHorizontalXS);
 }

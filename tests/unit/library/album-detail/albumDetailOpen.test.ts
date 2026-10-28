@@ -3,11 +3,12 @@ import { createStore } from 'jotai/vanilla';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { historyAtom, startNavHistory } from '../../../../src/nav/navHistory.ts';
 import {
-  albumDetailNoticeAtom,
   albumDetailPendingAtom,
-  OPEN_SPINNER_DELAY_MS,
-  startAlbumDetailOpen,
+  albumKind,
+  type AlbumOpenOrigin,
 } from '../../../../src/library/album-detail/albumDetailOpen.ts';
+import { OPEN_SPINNER_DELAY_MS, startObjectOpener } from '../../../../src/nav/objectOpener.ts';
+import { READY_KINDS } from '../../../fixtures/objectKinds.ts';
 import { fetchAlbumTracks } from '../../../../src/library/albumTracks.ts';
 import { albumKeyOf, type Album } from '../../../../src/host/libraryContract.ts';
 import { albumTracksAnswer } from '../../../fixtures/albumLibrary.ts';
@@ -28,16 +29,26 @@ function setup() {
   const history = startNavHistory(store);
   const seeded: { album: Album; tracks: readonly LibraryTrack[]; stamp: number }[] = [];
   let stamps = 0;
-  const opener = startAlbumDetailOpen(
+  const kind = albumKind(
     store,
     {
-      history,
       stamp: () => ++stamps,
       seed: (album, tracks, stamp) => seeded.push({ album, tracks, stamp }),
     },
     host.fb,
   );
-  onTestFinished(() => opener.dispose());
+  const objects = startObjectOpener(store, {
+    history,
+    kinds: { ...READY_KINDS, album: kind },
+  });
+  onTestFinished(() => objects.dispose());
+  // 与详情服务的 open 同样接线：清单还没读回，靠调用方交来的这一行
+  const opener = {
+    open(album: Album, origin?: AlbumOpenOrigin) {
+      kind.hand(album);
+      return objects.open({ kind: 'album', key: albumKeyOf(album) }, { origin });
+    },
+  };
   return {
     host,
     store,
@@ -46,7 +57,8 @@ function setup() {
     seeded,
     place: () => store.get(historyAtom).place,
     pending: () => store.get(albumDetailPendingAtom),
-    notice: () => store.get(albumDetailNoticeAtom),
+    notice: () => store.get(objects.notice),
+    dismissNotice: () => objects.dismissNotice(),
   };
 }
 
@@ -54,7 +66,7 @@ describe('进详情页', () => {
   it('曲目取到了才进，数据连同发请求前的评分戳交给详情页', async () => {
     const { host, opener, seeded, place } = setup();
     const held = host.hold('library.getAlbumTracks');
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.waitFor(() => expect(held.pending).toHaveLength(1));
     expect(place()).toEqual({ id: 'albums' });
     held.release();
@@ -67,7 +79,7 @@ describe('进详情页', () => {
   it('等过 300 ms 才报被点的是哪一张，到了就撤；早到的不报', async () => {
     const { host, opener, pending, place } = setup();
     const held = host.hold('library.getAlbumTracks');
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.advanceTimersByTimeAsync(OPEN_SPINNER_DELAY_MS - 10);
     expect(pending()).toBeNull();
     await vi.advanceTimersByTimeAsync(20);
@@ -80,7 +92,7 @@ describe('进详情页', () => {
   it('转圈记着从哪儿点进来的：下拉的 › 与专辑本身分开', async () => {
     const { host, opener, pending } = setup();
     host.hold('library.getAlbumTracks');
-    opener.open(BLUE, 'dropdown');
+    void opener.open(BLUE, 'dropdown');
     await vi.advanceTimersByTimeAsync(OPEN_SPINNER_DELAY_MS + 10);
     expect(pending()).toEqual({ key: albumKeyOf(BLUE), origin: 'dropdown' });
   });
@@ -90,7 +102,7 @@ describe('进详情页', () => {
     const held = host.hold('library.getAlbumTracks');
     const earlier = fetchAlbumTracks(host.fb, BLUE);
     await vi.waitFor(() => expect(held.pending).toHaveLength(1));
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.waitFor(() => expect(held.pending).toHaveLength(2));
     const renamed = (params: HostParams) => {
       const answer = albumTracksAnswer(params);
@@ -106,7 +118,7 @@ describe('进详情页', () => {
 
   it('曲目早于 300 ms 到了：一直不报转圈', async () => {
     const { opener, pending, place } = setup();
-    opener.open(HEJIRA);
+    void opener.open(HEJIRA);
     await vi.waitFor(() => expect(place().id).toBe('album'));
     await vi.advanceTimersByTimeAsync(OPEN_SPINNER_DELAY_MS * 2);
     expect(pending()).toBeNull();
@@ -115,8 +127,8 @@ describe('进详情页', () => {
   it('连点只认最后一次：先点的晚到也不进', async () => {
     const { host, opener, seeded, place, pending } = setup();
     const held = host.hold('library.getAlbumTracks');
-    opener.open(BLUE);
-    opener.open(HEJIRA);
+    void opener.open(BLUE);
+    void opener.open(HEJIRA);
     await vi.waitFor(() => expect(held.pending).toHaveLength(2));
     await vi.advanceTimersByTimeAsync(OPEN_SPINNER_DELAY_MS + 10);
     expect(pending()).toEqual({ key: albumKeyOf(HEJIRA), origin: 'album' });
@@ -129,21 +141,21 @@ describe('进详情页', () => {
   });
 
   it('答了空或取失败：只挂提示，不进页面；下一次进成了提示清掉', async () => {
-    const { host, opener, place, notice } = setup();
+    const { host, opener, place, notice, dismissNotice } = setup();
     host.answer('library.getAlbumTracks', (params) => ({
       ...albumTracksAnswer(params),
       tracks: [],
     }));
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.waitFor(() => expect(notice()).toBe('albumDetail.notFound'));
     host.answer('library.getAlbumTracks', hostFailure('OPERATION_FAILED'));
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.waitFor(() => expect(notice()).toBe('albumDetail.openFailed'));
     expect(place()).toEqual({ id: 'albums' });
-    opener.dismissNotice();
+    dismissNotice();
     expect(notice()).toBeNull();
     host.answer('library.getAlbumTracks', albumTracksAnswer);
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.waitFor(() => expect(place().id).toBe('album'));
     expect(notice()).toBeNull();
   });
@@ -151,7 +163,7 @@ describe('进详情页', () => {
   it('等的途中去了别处：到了也不再拉过去，转圈撤掉', async () => {
     const { host, history, opener, seeded, place, pending } = setup();
     const held = host.hold('library.getAlbumTracks');
-    opener.open(BLUE);
+    void opener.open(BLUE);
     await vi.advanceTimersByTimeAsync(OPEN_SPINNER_DELAY_MS + 10);
     expect(pending()).not.toBeNull();
     history.navigate({ id: 'songs' });

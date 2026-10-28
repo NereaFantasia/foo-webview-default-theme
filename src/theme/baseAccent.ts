@@ -12,7 +12,7 @@ export const BASE_ACCENT_STORAGE_KEY = 'default-theme.base-accent.v1';
 export const BASE_ACCENT_MODES = ['teal', 'windows', 'custom'] as const;
 export type BaseAccentMode = (typeof BASE_ACCENT_MODES)[number];
 
-/** 用哪种基础色，自定义的那一色，以及上次读到的 Windows 强调色（宿主应答之前先用它）。 */
+/** 用哪种基础色，自定义的那一色，以及上次读到的 Windows 强调色（宿主应答之前先用它） */
 interface BaseAccentPrefs {
   readonly mode: BaseAccentMode;
   readonly custom: string;
@@ -27,7 +27,7 @@ function isMode(value: unknown): value is BaseAccentMode {
   return BASE_ACCENT_MODES.some((mode) => mode === value);
 }
 
-/** 用哪种认不出时整份按缺省，另两项也不读；颜色不是 `#rrggbb` 的那一项按缺省。 */
+/** 用哪种认不出时整份按缺省，另两项也不读；颜色不是 `#rrggbb` 的那一项按缺省 */
 const accentPref = defineLocalPref<BaseAccentPrefs>({
   key: BASE_ACCENT_STORAGE_KEY,
   fallback: DEFAULT_PREFS,
@@ -104,7 +104,7 @@ export interface BaseAccentOptions {
   focus?: Pick<Window, 'addEventListener' | 'removeEventListener'> | null;
 }
 
-/** Windows 无强调色变化事件；在选择、手动刷新和窗口回到前台时重新读取。 */
+/** Windows 无强调色变化事件；在选择、手动刷新和窗口回到前台时重新读取 */
 export function startBaseAccent(store: Store, options: BaseAccentOptions = {}) {
   const host = options.host ?? fb;
   const storage = options.storage;

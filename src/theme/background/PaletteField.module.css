@@ -19,7 +19,7 @@
   z-index: 1;
 }
 
-/* 缺图时透出统一中性底；暂停仍保留封面，短暂切歌由绘制器缓冲。 */
+/* 缺图时透出统一中性底；暂停仍保留封面，短暂切歌由绘制器缓冲 */
 .root > canvas[data-palette-field] {
   transition: opacity var(--motion-faster) var(--curveLinear);
 }

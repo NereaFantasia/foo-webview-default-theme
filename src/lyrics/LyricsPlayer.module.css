@@ -1,8 +1,10 @@
-/* AMLL 的样式表按自己的 CSS 变量取色；这里把它们接到 Fluent token 上，字号由组件按档位写进来。 */
+/* AMLL 的样式表按自己的 CSS 变量取色；这里把它们接到 Fluent token 上，字号由组件按档位写进来 */
 .root {
   position: relative;
   height: 100%;
   overflow: hidden;
+  /* 停靠的歌词页伸到了窗口右缘，歌词的排版宽度退回原来的右缘；别处没有这个变量 */
+  padding-right: var(--edge-bleed, 0px);
   --amll-lp-color: var(--colorNeutralForeground1);
   --amll-lp-hover-bg-color: var(--state-hover);
 }
@@ -11,7 +13,7 @@
   --amll-lp-hover-bg-color: var(--state-pressed);
 }
 
-/* AMLL 的译文紧跟主行，音译是后一条副行；两者共用副行类名。 */
+/* AMLL 的译文紧跟主行，音译是后一条副行；两者共用副行类名 */
 .root :global([class*='_lyricMainLine'] + [class*='_lyricSubLine']) {
   font-size: var(--lyrics-translation-size, max(0.5em, var(--fontSizeBase100)));
 }
@@ -22,14 +24,32 @@
   display: none;
 }
 
-/* AMLL 用 plus-lighter 叠在深色底上；浅色底上它会把深色的字提亮到看不见。 */
+/*
+ * 居中：对唱标记已清掉（`alignLyricLines`），这里把字在行内居中；缩放以行的中点为原点。
+ * 居左与居右由 AMLL 按对唱标记自己排。间奏点用独立的 translate，与 AMLL 逐帧写的 transform 叠加
+ */
+.root[data-lyrics-align='center'] :global([class*='_lyricMainLine']),
+.root[data-lyrics-align='center'] :global([class*='_lyricSubLine']) {
+  text-align: center;
+}
+
+.root[data-lyrics-align='center'] :global([class*='_lyricLine']:not([class*='Wrapper'])) {
+  transform-origin: center;
+}
+
+.root[data-lyrics-align='center'] :global([class*='_interludeDots']) {
+  left: 50%;
+  translate: -50% 0;
+}
+
+/* AMLL 用 plus-lighter 叠在深色底上；浅色底上它会把深色的字提亮到看不见 */
 .root[data-scheme='light'] :global(.amll-lyric-player) {
   mix-blend-mode: normal;
 }
 
 /*
  * 关弹簧时 AMLL 改用 CSS 过渡移动行。保留透明度与逐字遮罩的过渡，避免行离开视口或唱完时骤隐；
- * 移动的时长与曲线取当前档位。类名带构建时的哈希前缀，按 `lyricLine` 识别。
+ * 移动的时长与曲线取当前档位。类名带构建时的哈希前缀，按 `lyricLine` 识别
  */
 .root[data-spring='off'] :global(.amll-lyric-player) > *,
 .root[data-spring='off'] :global(.amll-lyric-player) [class*='lyricLine'] {

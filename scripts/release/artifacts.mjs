@@ -1,5 +1,6 @@
-// 用客户端的代码核对一个版本的全部分发物：根清单验签、候选与发行清单一致、前端包与首装包的大小、
-// 哈希、解包结果，首装包安装标记里的发行身份，以及累计更新日志附件。生成之后、上传之前各跑一遍。
+// 发行版分发工件验收管道
+//
+// 复用客户端协议与验签逻辑，全面核验根清单数字签名、候选一致性、首装包安装标记与工件哈希
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -17,6 +18,7 @@ import {
 import { INITIAL_TRUST, acceptRoot } from '../../src/update/rootTrust.ts';
 import { readZip } from '../../src/update/zipArchive.ts';
 import { readBackendManifest } from '../../src/update/backendManifest.ts';
+import { readComponentPackage } from '../../backend/music/componentInstall.ts';
 
 /** @param {Uint8Array} bytes */
 export function sha256(bytes) {
@@ -26,7 +28,9 @@ export function sha256(bytes) {
 /**
  * @typedef {{ name: string, bytes: Uint8Array, sha256: string }} Asset
  * @typedef {{ version: string, tag: string, serial: number, manifest: string,
- *   notes: Record<string, string>, assets: Asset[], runtime?: import('../../src/update/contract.ts').ReleaseFile }} VerifiedRelease
+ *   notes: Record<string, string>, assets: Asset[], runtime?: import('../../src/update/contract.ts').ReleaseFile,
+ *   components?: Record<import('../../backend/music/componentInstall.ts').ComponentName,
+ *     import('../../backend/music/componentInstall.ts').ComponentPackage> }} VerifiedRelease
  */
 
 /** @param {string} dir @param {string} name @returns {Asset} */
@@ -36,7 +40,7 @@ function asset(dir, name) {
 }
 
 /**
- * 首装包的指针必须指向本版，文件与前端更新包逐个一致；不能夹带旧安装的状态或其他版本。
+ * 核验首装包自包含性与一致性（版本指针、安装标记与前端工件逐一核对）
  * @param {readonly { path: string, bytes: Uint8Array }[]} first
  * @param {readonly { path: string, bytes: Uint8Array }[]} frontend
  * @param {string} version
@@ -74,7 +78,7 @@ function verifyFirstInstall(first, frontend, version, releaseSha256) {
 }
 
 /**
- * `dir` 是 build-release 输出的 `v<版本>` 目录。任何一项对不上都抛错，不返回半截结果。
+ * 对指定版本目录下的全量发布工件执行全链路强一致性校验
  * @param {string} dir
  * @param {readonly { keyId: string, spki: string }[]} [keys] 验根清单用的公钥，缺省是主题内置的
  * @returns {Promise<VerifiedRelease>}
@@ -126,6 +130,8 @@ export async function verifyArtifacts(dir, keys = BUILT_IN_KEYS) {
   const backendAssets = [];
   /** @type {import('../../src/update/contract.ts').ReleaseFile | undefined} */
   let runtime;
+  /** @type {VerifiedRelease['components']} */
+  let packages;
   const backendFile = frontendFiles.files.find((file) => file.path === 'backend.json');
   const releaseRaw = json(new TextDecoder().decode(releaseAsset.bytes));
   const components =
@@ -160,6 +166,14 @@ export async function verifyArtifacts(dir, keys = BUILT_IN_KEYS) {
       unpacked.files.some((file) => file.path.toLowerCase() === 'installed.json')
     )
       throw new Error('后端附件结构无效');
+    /** @param {import('../../backend/music/componentInstall.ts').ComponentName} name */
+    const descriptor = (name) => {
+      const file = unpacked.files.find((item) => item.path === `${name}.json`);
+      const value = file && readComponentPackage(new TextDecoder().decode(file.bytes), name);
+      if (!value) throw new Error(`后端附件缺少有效的 ${name} 组件描述`);
+      return value;
+    };
+    packages = { ncm: descriptor('ncm'), lxserver: descriptor('lxserver') };
     backendAssets.push(packaged);
     runtime = backend.runtime;
   } else if (components.backend !== undefined || components.runtime !== undefined) {
@@ -179,5 +193,6 @@ export async function verifyArtifacts(dir, keys = BUILT_IN_KEYS) {
     notes: release.notes,
     assets: [releaseAsset, frontend, firstInstall, changelogAsset, ...backendAssets],
     ...(runtime ? { runtime } : {}),
+    ...(packages ? { components: packages } : {}),
   };
 }

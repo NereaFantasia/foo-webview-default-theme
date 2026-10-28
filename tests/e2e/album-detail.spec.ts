@@ -122,6 +122,19 @@ test('从下拉的 › 进：页头写名字、艺人与信息胶囊，曲目表
   );
 });
 
+test('页头的流派胶囊可点，进流派页，侧边栏亮「流派」', async ({ page }) => {
+  await start(page);
+  await tile(page, 'The Wall').click();
+  await page.locator('[data-dropdown-detail]').click();
+  await page$(page).locator('[data-detail-facts]').getByRole('button', { name: 'Rock' }).click();
+  await expect(page.locator('[data-page="genres"]')).toBeVisible();
+  const nav = page.getByRole('navigation', { name: '侧边栏' });
+  await expect(nav.getByRole('button', { name: '流派', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
 test('曲目还没到时留在原处，等过 300 ms 被点的 › 转圈；到了再进', async ({ page }) => {
   const host = await start(page);
   await tile(page, 'The Wall').click();
@@ -313,11 +326,15 @@ test('列表形态切走再切回来：交还切走时的滚动，不是更早�
 
   await listScroller.evaluate((element) => element.scrollTo({ top: 100 }));
   await expect.poll(scrollTop).toBe(100);
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
   await openFromMenu(page, 'The Wall');
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(tile(page, 'The Wall')).toBeVisible();
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(list).toBeVisible();
   await expect.poll(scrollTop).toBe(100);
 });
@@ -329,7 +346,13 @@ test('库变了、这张的曲目原样回来：选中还在；换了排序才�
   await row(page, 'The Wall 2').click({ modifiers: ['Control'] });
   await host.waitForListener('library:itemsModified');
   const before = host.callsTo('library.getAlbumTracks').length;
-  await host.emit('library:itemsModified', { count: 1, timestamp: 1 });
+  await host.emit('library:itemsModified', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: 1,
+  });
   await expect.poll(() => host.callsTo('library.getAlbumTracks').length).toBeGreaterThan(before);
   await page.waitForTimeout(200);
   await expect(row(page, 'The Wall 1')).toHaveAttribute('aria-selected', 'true');
@@ -349,7 +372,12 @@ test('停在页上时这张移出了媒体库：留在原页，写明原因，�
     'library.getAlbums',
     albumsAnswer(SAMPLE_ALBUMS.filter((one) => one.name !== 'The Wall')),
   );
-  await host.emit('library:itemsRemoved', { count: 1, timestamp: 1 });
+  await host.emit('library:itemsRemoved', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    timestamp: 1,
+  });
   await expect(page$(page).locator('[data-detail-notice="missing"]')).toContainText(
     '此专辑已不在媒体库中',
   );

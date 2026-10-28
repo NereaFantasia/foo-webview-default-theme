@@ -5,11 +5,12 @@ import { startHistory, type HistoryState, type HistoryService } from '../../nav/
 
 /**
  * 右侧卡：内容卡右边的第二张卡，放队列、歌词、信息与简介四页。换页使用独立历史；开合、拖宽、收起封面
- * 不新增记录，也不改变主视图历史。
+ * 不新增记录，也不改变主视图历史
  *
- * 用户定的样子存 localStorage（与侧边栏同一类界面偏好）：宽窗里开没开、停在哪一页、宽度、封面收没收。
+ * 用户定的样子存 localStorage（与侧边栏同一类界面偏好）：宽窗里开没开、停在哪一页、宽度、封面收没收
  * 窗口窄于 1008 时卡不占位，改成盖在内容卡上的浮层：浮层开合只在内存里，不改存档，窗口变宽回来照存的摆；
- * 跨回宽档时浮层关掉。存档谁都能改，读回逐项校验，坏了哪一项用缺省补哪一项。
+ * 跨回宽档时浮层关掉。关闭状态也可悬停入口临时预览；点击才恢复停靠，跨档时关闭临时预览
+ * 存档谁都能改，读回逐项校验，坏了哪一项用缺省补哪一项
  */
 export type RightCardPage = 'queue' | 'lyrics' | 'info' | 'bio';
 
@@ -18,7 +19,7 @@ export const RIGHT_CARD_PAGES: readonly RightCardPage[] = ['queue', 'lyrics', 'i
 export interface RightCardLocation {
   readonly id:
     RightCardPage | 'lyricsSearch' | 'lyricsCandidate' | 'lyricsDetails' | 'lyricsTiming';
-  /** 歌词子页绑定曲目身份；信息页可绑定手动选中的曲目。 */
+  /** 歌词子页绑定曲目身份；信息页可绑定手动选中的曲目 */
   readonly subject?: string;
   readonly candidate?: string;
 }
@@ -39,17 +40,17 @@ const navigationAtom = atom<RightCardNavigation>({
   arrival: null,
 });
 
-/** 做好了、能停上去的几页；其余几页在分页栏里置灰。 */
+/** 做好了、能停上去的几页；其余几页在分页栏里置灰 */
 export const READY_PAGES: ReadonlySet<RightCardPage> = new Set(['queue', 'bio', 'info', 'lyrics']);
 
 export const RIGHT_CARD_STORAGE_KEY = 'default-theme.right-card.v1';
 
-/** 宽度的范围与缺省，CSS 像素；内容卡至少留 `CONTENT_MIN`，不够时右侧卡让宽。 */
+/** 宽度的范围与缺省，CSS 像素；内容卡至少留 `CONTENT_MIN`，不够时右侧卡让宽 */
 export const RIGHT_CARD_WIDTH = { min: 280, max: 480, initial: 320 } as const;
 export const CONTENT_MIN = 480;
 
 export interface RightCardPrefs {
-  /** 宽窗里开着。 */
+  /** 宽窗里开着 */
   readonly open: boolean;
   readonly page: RightCardPage;
   readonly width: number;
@@ -63,12 +64,12 @@ export const DEFAULT_RIGHT_CARD_PREFS: RightCardPrefs = {
   coverCollapsed: true,
 };
 
-/** 宽度夹进范围并取整。 */
+/** 宽度夹进范围并取整 */
 export function clampCardWidth(width: number): number {
   return Math.min(RIGHT_CARD_WIDTH.max, Math.max(RIGHT_CARD_WIDTH.min, Math.round(width)));
 }
 
-/** 校验一份存档；不是 JSON、不是对象都当没有存档。存着的页还没做好时回到队列页。 */
+/** 校验一份存档；不是 JSON、不是对象都当没有存档。存着的页还没做好时回到队列页 */
 export function parseRightCardPrefs(raw: string | null): RightCardPrefs {
   const saved = storedRecord(raw);
   const known = RIGHT_CARD_PAGES.find((candidate) => candidate === saved.page);
@@ -91,18 +92,19 @@ const prefsPref = defineLocalPref<RightCardPrefs>({
   format: (value) => JSON.stringify(value),
 });
 
-/** 卡此刻怎么呈现：宽窗里停靠在内容卡右边，窄窗里盖在内容卡上，或者不出。 */
+/** 卡此刻怎么呈现：宽窗里停靠在内容卡右边，窄窗里盖在内容卡上，或者不出 */
 export type RightCardForm = 'docked' | 'overlay' | 'none';
 
 export interface RightCardView {
   readonly prefs: RightCardPrefs;
   readonly form: RightCardForm;
+  readonly peeking: boolean;
 }
 
 const prefsAtom = prefsPref.atom;
-const overlayAtom = atom(false);
+const overlayAtom = atom<false | 'open' | 'peek'>(false);
 
-/** 窗口够宽（≥ 1008）时为真，由装配处从侧边栏的分档交进来。 */
+/** 窗口够宽（≥ 1008）时为真，由装配处从侧边栏的分档交进来 */
 export interface RightCardDeps {
   readonly wide: Atom<boolean>;
 }
@@ -111,12 +113,14 @@ export interface RightCardService {
   readonly view: Atom<RightCardView>;
   readonly navigation: Atom<RightCardNavigation>;
   readonly history: RightCardHistory;
-  /** 卡开着、又正停在这一页时收起；否则开到这一页。还没做好的页不理。 */
+  /** 卡开着、又正停在这一页时收起；否则开到这一页。还没做好的页不理 */
   toggle(page: RightCardPage): void;
-  /** 分页栏换页：卡照开着，只换页。 */
+  /** 关闭时以浮层预览，不改变停靠偏好；再次悬停可切换预览页 */
+  peek(page: RightCardPage): void;
+  /** 分页栏换页：卡照开着，只换页 */
   select(page: RightCardPage): void;
   close(): void;
-  /** 拖宽中每跨一个整像素调一次；和此刻一样就不写。 */
+  /** 拖宽中每跨一个整像素调一次；和此刻一样就不写 */
   setWidth(width: number): void;
   toggleCover(): void;
   dispose(): void;
@@ -144,11 +148,12 @@ export function startRightCard(
   );
   const view = atom<RightCardView>((get) => {
     const prefs = get(prefsAtom);
-    if (get(deps.wide)) return { prefs, form: prefs.open ? 'docked' : 'none' };
-    return { prefs, form: get(overlayAtom) ? 'overlay' : 'none' };
+    const overlay = get(overlayAtom);
+    if (get(deps.wide) && prefs.open) return { prefs, form: 'docked', peeking: false };
+    return { prefs, form: overlay ? 'overlay' : 'none', peeking: overlay === 'peek' };
   });
 
-  /** 存储被禁或写满时这一次只在内存里记。 */
+  /** 存储被禁或写满时这一次只在内存里记 */
   function save(next: RightCardPrefs): void {
     prefsPref.set(store, next, storage);
   }
@@ -160,7 +165,7 @@ export function startRightCard(
   });
 
   const stopWide = store.sub(deps.wide, () => {
-    if (store.get(deps.wide)) store.set(overlayAtom, false);
+    if (store.get(deps.wide) || store.get(overlayAtom) === 'peek') store.set(overlayAtom, false);
   });
 
   return {
@@ -170,20 +175,33 @@ export function startRightCard(
     toggle(page) {
       if (!READY_PAGES.has(page)) return;
       const prefs = store.get(prefsAtom);
-      const shown = store.get(view).form !== 'none';
+      const shown = store.get(view).form !== 'none' && !store.get(view).peeking;
       const closing = shown && prefs.page === page;
       if (!closing && rightCardPageOf(store.get(navigationAtom).place) !== page)
         history.navigate({ id: page });
-      if (store.get(deps.wide)) save({ ...prefs, open: !closing, page });
-      else {
+      if (store.get(deps.wide)) {
+        store.set(overlayAtom, false);
+        save({ ...prefs, open: !closing, page });
+      } else {
         if (prefs.page !== page) save({ ...prefs, page });
-        store.set(overlayAtom, !closing);
+        store.set(overlayAtom, closing ? false : 'open');
       }
+    },
+    peek(page) {
+      if (!READY_PAGES.has(page)) return;
+      const current = store.get(view);
+      if (current.form !== 'none' && !current.peeking) return;
+      if (current.prefs.page !== page) history.navigate({ id: page });
+      store.set(overlayAtom, 'peek');
     },
     select(page) {
       if (READY_PAGES.has(page)) history.navigate({ id: page });
     },
     close() {
+      if (store.get(overlayAtom)) {
+        store.set(overlayAtom, false);
+        return;
+      }
       if (!store.get(deps.wide)) {
         store.set(overlayAtom, false);
         return;

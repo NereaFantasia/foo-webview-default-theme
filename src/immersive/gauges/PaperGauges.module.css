@@ -26,7 +26,7 @@
   text-box-edge: text alphabetic;
 }
 
-/* Integrated 与小标同一行、贴块的右端，字号与基线跟小标走。 */
+/* Integrated 与小标同一行、贴块的右端，字号与基线跟小标走 */
 .note {
   position: absolute;
   right: 0;

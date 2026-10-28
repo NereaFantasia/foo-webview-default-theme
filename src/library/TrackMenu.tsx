@@ -3,31 +3,29 @@ import {
   ChevronDown20Regular,
   ChevronRight20Regular,
 } from '@fluentui/react-icons';
+import type { LibraryTrack } from 'foo-webview-sdk';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
+import type { Translate } from '../i18n/translate.ts';
 import { pluralAtom } from '../i18n/plural.ts';
-import { historyAtom } from '../nav/navHistory.ts';
 import type { TablePoint } from '../table/tableItems.ts';
 import { TrackContextMenu } from '../track/TrackContextMenu.tsx';
 import { divider, type TrackMenuItem } from '../track/trackMenuEntries.ts';
 import { useTrackMenuRating } from '../track/useTrackMenuRating.ts';
 import { spanText, totalSeconds } from '../track/trackSpan.ts';
 import { MENU_HANDLES_LIMIT } from './albumMenu.ts';
-import { albumsAtom } from './albums.ts';
-import { albumKeyOf, trackAlbumKeyOf, trackPathOf } from '../host/libraryContract.ts';
+import { trackPathOf } from '../host/libraryContract.ts';
 import { trackMenuAtom } from './trackMenu.ts';
 import { useService } from '../kit/useService.ts';
 import { LIBRARY_SOURCE } from '../playback/playbackSource.ts';
 import { pathHandlers, trackActionsKey } from '../track/trackActions.ts';
-import { albumDetailKey } from './album-detail/albumDetail.ts';
 import { albumListKey } from './album-list/albumList.ts';
 import { ratingsKey } from '../track/trackRatings.ts';
 
 export interface TrackMenuProps {
   readonly at: TablePoint | null;
   readonly onClose: () => void;
-  readonly goToAlbum?: boolean;
   readonly isCurrent?: () => boolean;
   readonly group?: {
     readonly label: string;
@@ -37,14 +35,23 @@ export interface TrackMenuProps {
   };
 }
 
-export function TrackMenu({ at, onClose, goToAlbum = true, isCurrent, group }: TrackMenuProps) {
+/** 发送到新播放列表时的名字：同一张专辑就用专辑名，否则写「某首等 N 首」 */
+export function batchNameOf(tracks: readonly LibraryTrack[], t: Translate): string {
+  const first = tracks[0];
+  return new Set(tracks.map((track) => track.album)).size === 1 && first?.album
+    ? first.album
+    : t('trackMenu.batchName', {
+        first: first?.title ?? '',
+        count: tracks.length,
+        rest: Math.max(0, tracks.length - 1),
+      });
+}
+
+export function TrackMenu({ at, onClose, isCurrent, group }: TrackMenuProps) {
   const t = useAtomValueRawSync(translateAtom);
   const plural = useAtomValueRawSync(pluralAtom);
   const menu = useAtomValueRawSync(trackMenuAtom);
-  const { albums: library } = useAtomValueRawSync(albumsAtom);
-  const { place } = useAtomValueRawSync(historyAtom);
   const trackActions = useService(trackActionsKey);
-  const albumDetail = useService(albumDetailKey);
   const albumList = useService(albumListKey);
   const ratings = useService(ratingsKey);
   const open = at !== null;
@@ -55,10 +62,7 @@ export function TrackMenu({ at, onClose, goToAlbum = true, isCurrent, group }: T
   const rating = useTrackMenuRating(t, ratings, tracks, menu.ratingStamp, open);
   const paths = tracks.map(trackPathOf);
   const single = tracks.length === 1 ? tracks[0] : undefined;
-  const anchorKey = anchor ? trackAlbumKeyOf(anchor) : null;
-  const anchorAlbum = library.find(
-    (album) => anchorKey !== null && albumKeyOf(album) === anchorKey,
-  );
+
   const count = t(plural(tracks.length, 'trackMenu.selectedOne', 'trackMenu.selected'), {
     count: tracks.length,
   });
@@ -68,15 +72,7 @@ export function TrackMenu({ at, onClose, goToAlbum = true, isCurrent, group }: T
     : [artists.size === 1 ? tracks[0]?.artist : '', spanText(totalSeconds(tracks), t, plural)]
         .filter(Boolean)
         .join(' · ');
-  const first = tracks[0];
-  const batchName =
-    new Set(tracks.map((track) => track.album)).size === 1 && first?.album
-      ? first.album
-      : t('trackMenu.batchName', {
-          first: first?.title ?? '',
-          count: tracks.length,
-          rest: Math.max(0, tracks.length - 1),
-        });
+  const batchName = batchNameOf(tracks, t);
   const items: TrackMenuItem[] = group
     ? [
         { action: 'play', label: t('context.playGroup') },
@@ -123,7 +119,9 @@ export function TrackMenu({ at, onClose, goToAlbum = true, isCurrent, group }: T
         'enqueue',
         divider('send-divider'),
         'send-to',
-        ...(goToAlbum ? [divider('navigation-divider'), 'go-to-album' as const] : []),
+        divider('navigation-divider'),
+        'go-to-album',
+        'go-to-artist',
         divider('properties-divider'),
         'rating',
         'properties',
@@ -150,10 +148,8 @@ export function TrackMenu({ at, onClose, goToAlbum = true, isCurrent, group }: T
       multiple={tracks.length > 1}
       targets={menu.targets}
       handlers={pathHandlers(trackActions, paths, batchName, LIBRARY_SOURCE)}
-      album={{
-        open: anchorAlbum ? () => albumDetail.open(anchorAlbum) : null,
-        here: place.id === 'album' && place.subject === anchorKey,
-      }}
+      anchor={anchor}
+
       rating={rating}
       tree={menu.tree}
       runCommand={(node) => void trackActions.runCommandIn(menu.tree, node)}

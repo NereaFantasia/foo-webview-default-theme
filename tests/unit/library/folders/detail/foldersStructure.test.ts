@@ -80,3 +80,25 @@ it('父根先选时，嵌套库根仍独立归属并保留显示顺序', () => {
   expect(result.groups.map((group) => group.children)).toEqual([[], []]);
   expect(result.tracks).toEqual([outerTrack, innerTrack]);
 });
+it('不按目录分组：曲目按目录树摊平后整体排序，同值保持树的次序，条目里没有组头', () => {
+  const alpha = foldersDirectory(folderDirectory('Alpha', 2, true));
+  const tracks = FOLDER_TRACKS.slice(0, 2);
+  const flat = (sort: Parameters<typeof foldersStructure>[2]) =>
+    foldersStructure([alpha], tracks, sort, false);
+  const titles = (sort: Parameters<typeof foldersStructure>[2]) =>
+    flat(sort).tracks.map((track) => track.title);
+  expect(titles(null)).toEqual(['Zebra', 'Amber']);
+  expect(titles({ column: 'title', descending: false })).toEqual(['Amber', 'Zebra']);
+  expect(titles({ column: 'title', descending: true })).toEqual(['Zebra', 'Amber']);
+  expect(titles({ column: 'sampleRate', descending: true })).toEqual(['Zebra', 'Amber']);
+  const result = flat({ column: 'title', descending: false });
+  expect(result.flat).toBe(true);
+  expect(result.groups[0]?.children).toHaveLength(1);
+  expect(foldersItems(result, new Set(), 0, 40).map((item) => item.kind)).toEqual(['row', 'row']);
+  expect(
+    foldersItems(result, new Set(), 0, 40).flatMap((item) =>
+      item.kind === 'row' ? [item.key] : [],
+    ),
+  ).toEqual(result.tracks.map((track) => track.handle));
+  expect(foldersStructure([alpha], tracks, null).flat).toBe(false);
+});

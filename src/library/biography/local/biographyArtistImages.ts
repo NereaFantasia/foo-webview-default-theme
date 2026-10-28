@@ -73,7 +73,7 @@ export function startBiographyArtistImages(
         );
         if (!current()) return;
         if (!answer || answer.success === false || !answer.dataUrl) continue;
-        // 地址接口不保证图片存在；只探测限尺寸的 artist 图，不回落到前封面。
+        // 地址接口不保证图片存在；只探测限尺寸的 artist 图，不回落到前封面
         const pixels = await deps.probe(answer.dataUrl).catch(() => null);
         if (!current()) return;
         if (pixels?.length) {

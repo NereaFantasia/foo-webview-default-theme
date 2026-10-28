@@ -8,6 +8,8 @@ import { UpdateRoot } from '../../src/app/UpdateRoot.tsx';
 import { updateNotice } from '../../src/app/updateIntegration.ts';
 import { startInfoCenter, infoCenterKey } from '../../src/host/infoCenter.ts';
 import { startLocale } from '../../src/i18n/locale.ts';
+import { startExternalLinkGate } from '../../src/kit/external-link/externalLinkGate.ts';
+import { ExternalLinkProvider } from '../../src/kit/external-link/ExternalLinkProvider.tsx';
 import { bindService } from '../../src/kit/serviceKey.ts';
 import { ServicesContext, serviceMap } from '../../src/kit/useService.ts';
 import { startCommandRegistry, commandsKey } from '../../src/nav/commandRegistry.ts';
@@ -40,6 +42,7 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
   const view = startChangelogView(store, updater, writer);
   const commands = startCommandRegistry(window);
   const locale = startLocale(store, fb, 'zh-CN');
+  const links = startExternalLinkGate(store, fb, writer);
   const info = startInfoCenter(
     store,
     { playcountMissing: atom(false), libraryNotConfigured: atom(false) },
@@ -79,10 +82,12 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
               matchMedia('(prefers-color-scheme: dark)').matches ? webDarkTheme : webLightTheme
             }
           >
-            <UpdateRoot>
-              <Settings />
-              <InfoCenterButton />
-            </UpdateRoot>
+            <ExternalLinkProvider service={links}>
+              <UpdateRoot>
+                <Settings />
+                <InfoCenterButton />
+              </UpdateRoot>
+            </ExternalLinkProvider>
           </FluentProvider>
         </CommandsContext>
       </ServicesContext>
@@ -94,6 +99,7 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
     () => {
       root.unmount();
       info.dispose();
+      links.dispose();
       view.dispose();
       plugin.dispose();
       updater.dispose();

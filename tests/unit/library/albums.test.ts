@@ -31,7 +31,7 @@ function setup(host: UnitHost) {
   return { store, service, state: () => store.get(albumsAtom) };
 }
 
-const changed = { count: 1, timestamp: 1 };
+const changed = { count: 1, handles: [], truncated: false, fromHook: false, timestamp: 1 };
 
 describe('初读', () => {
   it('先订四个库事件再读，按固定参数一次取全', async () => {

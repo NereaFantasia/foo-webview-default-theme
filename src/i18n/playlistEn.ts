@@ -1,5 +1,6 @@
 /**
- * 播放列表的英文文案，并进英文包：`playlist.` 是侧边栏的播放列表节，`playlistPage.` 是播放列表页。
+ * 播放列表英文文案，供主英文包合入。
+ * `playlist.` 对应侧边栏列表项，`playlistPage.` 对应播放列表页面
  */
 export const playlistEn = {
   'playlist.playing': 'Playing',
@@ -36,8 +37,10 @@ export const playlistEn = {
   'playlistPage.autoplaylist': 'Autoplaylist',
   'playlistPage.matchCount': '{count} matches',
   'playlistPage.matchCountOne': '{count} match',
-  'playlistPage.filter': 'Filter this playlist',
-  'playlistPage.filterPlaceholder': 'Filter tracks',
+  'playlistPage.filter': 'Search this playlist',
+  'playlistPage.filterPlaceholder': 'Search tracks',
+  'playlistPage.listSort': 'Sort list',
+  'playlistPage.play': 'Play',
   'playlistPage.scope': 'Search in',
   'playlistPage.scopeAll': 'All fields',
   'playlistPage.scopeArtist': 'Artist',
@@ -58,7 +61,8 @@ export const playlistEn = {
   'playlistPage.filterAlbum': 'Same album',
   'playlistPage.filterGenre': 'Same genre',
   'playlistPage.filterYear': 'Same year',
-  'playlistPage.hitsMenu': 'Result actions',
+  'playlistPage.more': 'More',
+  'playlistPage.changeList': 'Change the list (undoable)',
   'playlistPage.selectHits': 'Select all filtered tracks',
   'playlistPage.sendHits': 'Send filtered tracks to a new playlist',
   'playlistPage.hitsListName': '{name} · {filter}',

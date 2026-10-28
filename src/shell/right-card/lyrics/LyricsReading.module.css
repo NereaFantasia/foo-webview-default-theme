@@ -2,7 +2,8 @@
   height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
-  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+  padding: var(--spacingVerticalM) calc(var(--spacingHorizontalM) + var(--edge-bleed, 0px))
+    var(--spacingVerticalM) var(--spacingHorizontalM);
   font-size: max(var(--fontSizeBase100), var(--lyrics-preview-font-size));
   line-height: 1.5;
   user-select: text;

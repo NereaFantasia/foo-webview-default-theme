@@ -1,0 +1,41 @@
+/* 缩略图自带底：比设置卡深一档，淡色的未播段才看得清 */
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: var(--colorNeutralBackground4);
+}
+
+/* 已播放：强调色；未播放：前景色混 40% 的淡色。三种层各占一档：底影更淡，热色比数据墨亮一档 */
+.played.ink {
+  fill: var(--colorCompoundBrandForeground1);
+}
+
+.played.shade {
+  fill: var(--colorCompoundBrandForeground1);
+  opacity: 0.35;
+}
+
+.played.hot {
+  fill: color-mix(
+    in srgb,
+    var(--colorCompoundBrandForeground1) 55%,
+    var(--colorNeutralForeground1)
+  );
+}
+
+.idle {
+  fill: color-mix(in srgb, var(--colorNeutralForeground1) 40%, transparent);
+}
+
+.idle.shade {
+  opacity: 0.5;
+}
+
+.head {
+  stroke: var(--colorNeutralForeground1);
+  stroke-width: var(--strokeWidthThin);
+  vector-effect: non-scaling-stroke;
+}

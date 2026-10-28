@@ -8,7 +8,7 @@ English | [中文](./README.zh-CN.md)
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/NereaFantasia/foo-webview-default-theme)](https://github.com/NereaFantasia/foo-webview-default-theme/releases)
-[![foo_ui_webview2](https://img.shields.io/badge/foo__ui__webview2-2.0.0%2B-informational)](https://github.com/NereaFantasia/foo_ui_webview2)
+[![foo_ui_webview2](https://img.shields.io/badge/foo__ui__webview2-2.1.0%2B-informational)](https://github.com/NereaFantasia/foo_ui_webview2)
 
 Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2). It gives foobar2000 a WinUI 3 style interface, built with React 19 and Fluent UI React v9, and reaches the player only through [foo-webview-sdk](https://www.npmjs.com/package/foo-webview-sdk).
 
@@ -20,8 +20,9 @@ Default Theme is the default theme for [foo_ui_webview2](https://github.com/Nere
 ## Features
 
 - Cover colors — the palette follows the album art
-- Immersive view — spectrum, stereo field and waveform in real time
-- Lyrics — word-by-word highlighting, with translations
+- Immersive view — a Blueprint style with spectrum, stereo field and waveform in real time, or a lyrics-first style with a cover flow
+- Lyrics — word-by-word highlighting, with translations, and an optional desktop window
+- Online music — search and play NetEase Cloud Music, with other platforms once you import sources
 - Mini player — two layouts, your choice
 - Online updates — one-click upgrades, automatic rollback on failure
 
@@ -29,7 +30,7 @@ Default Theme is the default theme for [foo_ui_webview2](https://github.com/Nere
 
 ## Installation
 
-Requires foo_ui_webview2 2.0.0 or later, running as the standalone window (`Webview2 UI` as the default user interface). In DUI and CUI panels the theme only shows a notice that panels are not supported.
+Requires foo_ui_webview2 2.1.0 or later, running as the standalone window (`Webview2 UI` as the default user interface). In DUI and CUI panels the theme only shows a notice that panels are not supported.
 
 1. Download `foo-webview-default-theme-<version>.zip` from [Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
 2. Extract it to `<profile>\webview-ui\<template>\` so that `index.html` sits directly in that folder.
@@ -76,7 +77,7 @@ npm run test:e2e   # Browser tests (Playwright)
 
 To work against the live player, turn on **Use development server** on the Developer page of the foo_ui_webview2 preferences and enter `http://127.0.0.1:5190`.
 
-`vendor/foo-webview-sdk.tgz` is a pre-release build of foo-webview-sdk; its version and checksum are recorded in `vendor/foo-webview-sdk.json`.
+`vendor/applemusic-like-lyrics-core.tgz` is the lyrics core built from a pinned upstream commit; the commit, checksum and build steps are recorded in `vendor/applemusic-like-lyrics-core.json`.
 
 ### Tech Stack
 
@@ -87,7 +88,7 @@ To work against the live player, turn on **Use development server** on the Devel
 | Build | Vite 8, TypeScript 5.9 |
 | Lyrics | Apple Music-like Lyrics |
 | Cover colors | Material Color Utilities |
-| Host bridge | foo-webview-sdk (`vendor/`) |
+| Host bridge | foo-webview-sdk |
 | Tests | Vitest, Playwright |
 
 ### Project Structure
@@ -104,15 +105,16 @@ foo-webview-default-theme/
 │   ├── video/              # Video playback
 │   ├── settings/           # Settings pages
 │   ├── update/             # Online updater
-│   ├── playback/ track/ table/ covers/ nav/ lyrics/   # Shared domain modules
-│   └── host/ i18n/ theme/ motion/ styles/ kit/        # Foundation
+│   ├── playback/ track/ table/ covers/ nav/ lyrics/        # Shared domain modules
+│   └── host/ server/ i18n/ theme/ motion/ styles/ kit/     # Foundation
+├── backend/                # Local service: online music and updates
 ├── public/                 # Static assets
 ├── tests/
 │   ├── unit/               # Unit tests (Vitest), mirroring src/
 │   ├── e2e/                # Browser tests (Playwright)
 │   └── fixtures/           # Host test doubles
 ├── scripts/release/        # Release packages, manifests and signing
-├── vendor/                 # foo-webview-sdk package
+├── vendor/                 # Lyrics core package
 ├── vite.config.ts          # App build
 └── vite.boot.config.ts     # Loading page build
 ```

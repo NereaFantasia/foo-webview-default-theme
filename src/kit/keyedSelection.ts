@@ -1,8 +1,12 @@
-// 按一张有序键列表的多选，纯函数。语义与表格、树同一套：不带修饰键只选它并落锚；Ctrl 切换这一个，
-// 锚移到它；Shift 选锚到它的区间（替换原选中）；Ctrl+Shift 把区间并进原选中；还没有锚时 Shift 当没按。
+// 基于有序键列表的多选状态机纯函数集合。操作语义与通用列表、表格保持一致：
+// - 无修饰键：单选当前项并将其设为锚点；
+// - Ctrl：切换当前项的选中态，并将锚点移至当前项；
+// - Shift：选定锚点到当前项之间的连续区间（替换原有选择）；
+// - Ctrl+Shift：将区间追加至现有选中项集合；
+// - 未设置锚点时：忽略 Shift 修饰键
 //
-// 同一个键可以在列表里出现几次（封面墙艺术家档的副本）：区间按位置算、选中按键记，所以点哪一块副本
-// 都是同一张的选中态。知道点中的是第几个位置就传 `at`，不传按键第一次出现的位置算。
+// 列表中允许同一键出现多次（如网格多视图中的引用副本）：区间按物理位置截取，选中态按键值去重记录
+// 可选传 `at` 指定具体命中索引；若未传则按该键在列表中首次出现的位置计算
 
 export interface Modifiers {
   readonly ctrl: boolean;
@@ -11,7 +15,7 @@ export interface Modifiers {
 
 export interface KeyedSelection<K> {
   readonly selected: ReadonlySet<K>;
-  /** Shift 区间的起点：键与落锚时的位置。列表变了位置可能过时，用时按键核对再找。 */
+  /** Shift 连续区间的起始锚点（包含键名与落锚时的索引位置）。列表重排后索引可能失效，读取时重新校验 */
   readonly anchor: { readonly key: K; readonly at: number } | null;
 }
 
@@ -27,7 +31,7 @@ function only<K>(key: K, at: number): KeyedSelection<K> {
   return { selected: new Set([key]), anchor: { key, at } };
 }
 
-/** 单击或键盘移动落到 `key` 上。键不在列表里时不动。 */
+/** 激活或点击指定键，根据修饰键计算新选中状态。若目标键不存在于列表中则保持原状 */
 export function activate<K>(
   selection: KeyedSelection<K>,
   order: readonly K[],
@@ -53,9 +57,10 @@ export function activate<K>(
 }
 
 /**
- * 右键或「更多」落在 `key` 上：答改过的选中，以及菜单作用于哪些键（按列表顺序）。它已在选中里就保持
- * 整批、作用于整个选择；不在就改为只选它、只作用于它。它不在列表里（刚被过滤掉、分节还没排好）时
- * 选中不动，只作用于它：别的已选键不能被捎带进去。
+ * 计算触发右键菜单或操作项时的选中状态及生效目标列表（按列表顺序）
+ * - 目标项已在选中集合中：保持现有选择不变，菜单操作作用于整批选中项；
+ * - 目标项未被选中：将选择重置为单选该项，菜单操作仅作用于该项；
+ * - 目标项不在当前可见列表中（如刚被过滤）：保留原选择不变，菜单仅作用于该项，避免误连带其他项目
  */
 export function menuSelection<K>(
   selection: KeyedSelection<K>,
@@ -77,7 +82,7 @@ export function selectAll<K>(order: readonly K[]): KeyedSelection<K> {
     : { selected: new Set(order), anchor: { key: first, at: 0 } };
 }
 
-/** 列表变了：看不见的键从选中里去掉，锚看不见了也撤掉。没变化时原样返回，调用方可按引用判断。 */
+/** 列表条目更新时剔除已不可见的选中项与失效锚点。若无需剔除则原样返回原引用 */
 export function pruneSelection<K>(
   selection: KeyedSelection<K>,
   order: readonly K[],
@@ -89,7 +94,7 @@ export function pruneSelection<K>(
   return { selected: new Set(kept), anchor: anchorGone ? null : selection.anchor };
 }
 
-/** 选中的键按列表顺序，副本只取第一次出现。 */
+/** 将当前选中的键按列表物理顺序排列，重复出现的键仅保留首次位置 */
 export function orderedSelection<K>(selection: KeyedSelection<K>, order: readonly K[]): K[] {
   return [...new Set(order.filter((key) => selection.selected.has(key)))];
 }

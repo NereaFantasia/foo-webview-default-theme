@@ -1,8 +1,14 @@
 import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
-import { requiredVersion, statusLine, updateNotice } from '../../../src/app/updateIntegration.ts';
+import {
+  requiredVersion,
+  statusLine,
+  updateLink,
+  updateNotice,
+} from '../../../src/app/updateIntegration.ts';
 import { createTranslate } from '../../../src/i18n/translate.ts';
 import { zhCN } from '../../../src/i18n/zhCN.ts';
+import type { StartupBlock } from '../../../src/update/loaderConfirmation.ts';
 import type { UpdateStatus, UpdateMode } from '../../../src/update/updater.ts';
 import type { Changelog } from '../../../src/update/changelogFeed.ts';
 
@@ -94,8 +100,31 @@ describe('更新提示的映射', () => {
 
   it('设置卡的说明行：只写状态与出错原因，失败标成错误', () => {
     const t = createTranslate(zhCN, {});
-    const line = (status: UpdateStatus) => statusLine(status, t);
-    expect(line({ phase: 'off' })).toEqual({ text: '当前运行方式不支持更新', error: false });
+    const line = (status: UpdateStatus, block: StartupBlock | null = null) =>
+      statusLine(status, t, block);
+    // 启动确认还没结束时没有原因可说
+    expect(line({ phase: 'off' })).toEqual({ text: undefined, error: false });
+    expect(line({ phase: 'off' }, { reason: 'layout' })).toEqual({
+      text: '主题不是用完整主题包安装的，无法更新。请将完整主题包覆盖解压到模板目录',
+      error: true,
+    });
+    expect(line({ phase: 'off' }, { reason: 'host', version: '2.0.1', required: '2.1.0' })).toEqual(
+      {
+        text: '需要 foo_ui_webview2 2.1.0 或更高（当前 2.0.1）。请先更新组件',
+        error: true,
+      },
+    );
+    expect(line({ phase: 'off' }, { reason: 'failed' })).toEqual({
+      text: '启动确认失败，暂时无法更新',
+      error: true,
+    });
+    // 运行方式本身不支持的只陈述，不标成错误
+    expect(line({ phase: 'off' }, { reason: 'source' })).toEqual({
+      text: '主题不是从模板目录加载的，不支持更新',
+      error: false,
+    });
+    // 启动确认通过后更新器在运行，旧的原因不再显示
+    expect(line({ phase: 'checking' }, { reason: 'layout' }).text).toBe('正在检查更新…');
     expect(line({ phase: 'off', reason: 'storage' })).toEqual({
       text: '浏览器存储不可用，更新已停用。请检查存储权限后重新打开主题',
       error: true,
@@ -146,5 +175,24 @@ describe('更新提示的映射', () => {
         text: '主题安装信息已损坏。请将完整主题包安装到新目录后使用。',
         error: true,
       });
+  });
+
+  it('设置卡按钮：该去下载页的状态答主题页或插件页，其余不跳转', () => {
+    // 平铺要换完整主题包，插件太旧要换插件
+    expect(updateLink({ phase: 'off' }, { reason: 'layout' })).toBe('theme');
+    expect(
+      updateLink({ phase: 'off' }, { reason: 'host', version: '2.0.1', required: '2.1.0' }),
+    ).toBe('plugin');
+    const blocked = { phase: 'blocked', latest: '0.3.0', pluginRange: null } as const;
+    expect(updateLink({ ...blocked, limit: 'manual' })).toBe('theme');
+    expect(updateLink({ phase: 'manual', reason: 'trust' })).toBe('theme');
+    // 更新状态损坏走「重置」，插件版本不够时设置里有插件更新行
+    expect(updateLink({ phase: 'manual', reason: 'state' })).toBeNull();
+    expect(updateLink({ ...blocked, limit: 'plugin', pluginRange: '>=2.1.0' })).toBeNull();
+    // 来源不支持、确认失败、确认进行中，都没有可跳转的页面
+    for (const block of [{ reason: 'source' }, { reason: 'failed' }] as const)
+      expect(updateLink({ phase: 'off' }, block)).toBeNull();
+    expect(updateLink({ phase: 'off' })).toBeNull();
+    expect(updateLink({ phase: 'checking' })).toBeNull();
   });
 });

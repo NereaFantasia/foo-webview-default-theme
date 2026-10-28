@@ -5,6 +5,7 @@ export const videoZhCN: Record<keyof typeof videoEn, string> = {
   'video.loading': '正在加载画面',
   'video.buffering': '正在缓冲',
   'video.none': '此曲目没有视频',
+  'video.container': '暂不支持 {format} 格式的视频',
   'video.subsong': '暂不支持子曲目的视频',
   'video.unsupported': '无法播放这种视频格式',
   'video.failed': '视频播放失败',
@@ -22,4 +23,7 @@ export const videoZhCN: Record<keyof typeof videoEn, string> = {
   'video.collapse': '退出全窗口',
   'video.fullscreen': '全屏',
   'video.fullscreenFailed': '切换全屏失败',
+  'video.browse': '浏览视频',
+  'video.reveal': '打开所在文件夹',
+  'video.revealFailed': '无法打开所在文件夹',
 };

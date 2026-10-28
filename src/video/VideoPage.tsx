@@ -1,4 +1,11 @@
-import { FluentProvider, Portal, makeStyles, mergeClasses } from '@fluentui/react-components';
+import {
+  Button,
+  FluentProvider,
+  Portal,
+  makeStyles,
+  mergeClasses,
+} from '@fluentui/react-components';
+import { FolderOpen20Regular, FolderSearch20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
@@ -27,7 +34,7 @@ const useStyles = makeStyles({
   },
   reduced: REDUCED_MOTION_VARIABLES,
 });
-/** 画面填充方式；存储不可用时保留本次选择。 */
+/** 画面填充方式；存储不可用时保留本次选择 */
 const fitPref = defineLocalPref<VideoFit>({
   key: 'default-theme.video.fit.v1',
   fallback: 'contain',
@@ -48,6 +55,7 @@ function Page({ bindings }: { readonly bindings: VideoBindings }) {
   const alive = useRef(false);
   const [fit, setFit] = useState(() => fitPref.read());
   const [fullscreenFailed, setFullscreenFailed] = useState(false);
+  const [revealFailed, setRevealFailed] = useState(false);
   const [mediaStatus, setMediaStatus] = useState<VideoElementStatus>('loading');
   const available =
     state.status === 'ready' && mediaStatus !== 'failed' && mediaStatus !== 'unsupported';
@@ -83,6 +91,11 @@ function Page({ bindings }: { readonly bindings: VideoBindings }) {
     touch();
     if (bindings.expanded) void collapse();
     else if (available) expand(true);
+  }
+  async function reveal(): Promise<void> {
+    touch();
+    const ok = await bindings.reveal();
+    if (alive.current) setRevealFailed(!ok);
   }
   async function toggleFullscreen(): Promise<void> {
     touch();
@@ -199,11 +212,43 @@ function Page({ bindings }: { readonly bindings: VideoBindings }) {
       >
         <VideoStage bindings={bindings} active={active} fit={fit} onStatus={setMediaStatus} />
         <div className={styles.heading} inert={!visible}>
-          <span>{playback.title || t('place.video')}</span>
-          {bindings.expanded && bindings.captions}
+          <span className={styles.title}>{playback.title || t('place.video')}</span>
+          {bindings.expanded ? (
+            bindings.captions
+          ) : (
+            <div className={styles.actions}>
+              <Button
+                appearance="subtle"
+                icon={<FolderSearch20Regular />}
+                onClick={() => {
+                  touch();
+                  bindings.browse();
+                }}
+              >
+                {t('video.browse')}
+              </Button>
+              <Button
+                appearance="subtle"
+                icon={<FolderOpen20Regular />}
+                disabled={!playback.file}
+                onClick={() => void reveal()}
+              >
+                {t('video.reveal')}
+              </Button>
+            </div>
+          )}
         </div>
         <div className={styles.controls} inert={!visible}>
-          {fullscreenFailed && <div role="status">{t('video.fullscreenFailed')}</div>}
+          {fullscreenFailed && (
+            <div className={styles.toast} role="status">
+              {t('video.fullscreenFailed')}
+            </div>
+          )}
+          {revealFailed && (
+            <div className={styles.toast} role="status">
+              {t('video.revealFailed')}
+            </div>
+          )}
           <VideoControls
             bindings={bindings}
             available={available}

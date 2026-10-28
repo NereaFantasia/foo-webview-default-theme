@@ -28,6 +28,7 @@ import type { ContextMenuPoint } from '../../kit/context-menu/contextMenuGeometr
 import { ReadableText } from '../../kit/external-link/ReadableText.tsx';
 import { useExternalLinks } from '../../kit/external-link/ExternalLinkProvider.tsx';
 import { AccordionHeader, AccordionPanel } from '../../motion/FlowAccordion.tsx';
+import { roleVar } from '../../theme/roles.ts';
 import { CoverFold } from '../right-card/RightCardHead.tsx';
 import type { TrackInfoService } from './trackInfo.ts';
 import type { TrackInfoTarget } from './trackInfoTarget.ts';
@@ -36,14 +37,17 @@ import {
   filterInfoTags,
   infoFilePath,
   infoIdentity,
-  infoMediaKind,
   infoTags,
   infoTitle,
-  INFO_SECTIONS,
+  infoSections,
   type InfoSection,
   type TrackInfoState,
 } from './trackInfoModel.ts';
+import { trackAbilities } from '../../host/trackOrigin.ts';
 import { infoSectionNotice, trackInfoRows } from './trackInfoRows.ts';
+import { onlineUnblockedAtom } from '../../playback/onlineFailures.ts';
+import { onlineSourceOf } from '../../playback/onlineTracks.ts';
+import { TrackAlbum, TrackArtists } from '../../track/TrackCredits.tsx';
 import styles from './TrackInfoPanel.module.css';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
@@ -71,7 +75,7 @@ const useStyles = makeStyles({
   search: { width: '100%', minWidth: '0', boxSizing: 'border-box' },
   returning: { width: '100%', justifyContent: 'flex-start', minWidth: '0' },
   section: {
-    borderBottom: `${tokens.strokeWidthThin} solid color-mix(in srgb, ${tokens.colorNeutralStroke2} 35%, transparent)`,
+    borderBottom: `${tokens.strokeWidthThin} solid ${roleVar('line-subtle')}`,
   },
 });
 
@@ -157,7 +161,7 @@ function TagList({
             disabled={
               state.metadata.status === 'loading' ||
               !state.track ||
-              infoMediaKind(state.track) === 'stream'
+              !trackAbilities(state.track.path).opensLocally
             }
             onClick={() => service.refresh()}
           />
@@ -213,7 +217,9 @@ function InfoSectionContent({
 }) {
   const controls = useViewControlStyles();
   const notice = infoSectionNotice(state, section);
-  const rows = trackInfoRows(state, section, t, locale);
+  const unblocked = useAtomValueRawSync(onlineUnblockedAtom);
+  const source = state.track ? onlineSourceOf(state.track.path, unblocked) : null;
+  const rows = trackInfoRows(state, section, t, locale, source);
   const classes = useStyles();
   const external = useExternalLinks();
   if (section === 'tags') return <TagList state={state} service={service} t={t} />;
@@ -359,11 +365,11 @@ export function TrackInfoPanel({
         </div>
         {track && (
           <>
-            <div className={styles.subtitle} title={track.artist}>
-              {track.artist}
+            <div className={styles.subtitle}>
+              <TrackArtists track={track} />
             </div>
-            <div className={styles.subtitle} title={track.album}>
-              {track.album}
+            <div className={styles.subtitle}>
+              <TrackAlbum track={track} />
             </div>
             {rating.status === 'ready' && rating.value.rating > 0 && (
               <Tooltip
@@ -434,10 +440,10 @@ export function TrackInfoPanel({
             collapsible
             openItems={[...sections]}
             onToggle={(_, data) =>
-              service.setSections(INFO_SECTIONS.filter((key) => data.openItems.includes(key)))
+              service.setSections(infoSections(track).filter((key) => data.openItems.includes(key)))
             }
           >
-            {INFO_SECTIONS.map((section) => (
+            {infoSections(track).map((section) => (
               <AccordionItem value={section} key={section}>
                 <AccordionHeader
                   className={classes.header}

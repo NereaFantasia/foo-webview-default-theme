@@ -10,7 +10,7 @@ export const lyricsCoverKey = (target: LyricsCoverTarget) =>
 
 export interface LyricsCoverAccess {
   readonly state: Atom<ReadonlyMap<string, string>>;
-  /** 可见图块借用封面，返回的函数在离开视口或卸载时释放借用。 */
+  /** 可见图块借用封面，返回的函数在离开视口或卸载时释放借用 */
   acquire(target: LyricsCoverTarget): () => void;
 }
 
@@ -28,7 +28,7 @@ const IDLE_LIMIT = 24;
 const IDLE_BYTES = 4 * 1024 * 1024;
 const IMAGE_BYTES = 1024 * 1024;
 
-/** 地址查询和图片下载共用名额；缓存只在当前歌词检索主体内保留。 */
+/** 地址查询和图片下载共用名额；缓存只在当前歌词检索主体内保留 */
 export function startLyricsCandidateCovers(
   store: Store,
   host: LyricsHttpHost,
@@ -155,7 +155,7 @@ export function startLyricsCandidateCovers(
       entries.delete(key);
       entries.set(key, entry);
       entry.borrowers++;
-      // 延到微任务再发请求，连续的挂载、清理和重新挂载只使用最终仍有借用者的条目。
+      // 延到微任务再发请求，连续的挂载、清理和重新挂载只使用最终仍有借用者的条目
       queueMicrotask(pump);
       let released = false;
       return () => {

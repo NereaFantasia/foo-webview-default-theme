@@ -129,7 +129,14 @@ describe('startPlaylistSelection', () => {
     // 本地的推送先落地，别处那次改动引来的回查才回来。
     await settle();
     expect(host.callsTo('playlist.setSelection').at(-1)).toMatchObject({ indices: [1] });
-    held.respond(0, { playlistGuid: guidOf(0), success: true, items: [8], count: 1, playlist: 0 });
+    held.respond(0, {
+      playlistGuid: guidOf(0),
+      success: true,
+      items: [8],
+      count: 1,
+      playlist: 0,
+      contentVersion: '1',
+    });
     await settle();
     expect(local()).toStrictEqual([1]);
     held.release();
@@ -193,7 +200,7 @@ describe('startPlaylistSelection', () => {
     selection.activate(1, PLAIN);
     expect(await service.settle(MAIN)).toBe(false);
     expect(store.get(service.failedAtom)).toBe(true);
-    host.answer('playlist.setSelection', () => ({ success: true }));
+    host.answer('playlist.setSelection', () => ({ success: true, contentVersion: '1' }));
     expect(await service.settle(MAIN)).toBe(true);
     service.dismissFailure();
     expect(store.get(service.failedAtom)).toBe(false);

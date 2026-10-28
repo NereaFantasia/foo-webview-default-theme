@@ -1,0 +1,14 @@
+.still,
+.swap {
+  display: inline-flex;
+}
+
+.swap {
+  animation: swap-in var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes swap-in {
+  from {
+    opacity: 0;
+  }
+}

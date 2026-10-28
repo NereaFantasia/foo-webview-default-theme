@@ -1,0 +1,107 @@
+/* 填满外面给的宽度，两行都是单行、行高固定。颜色只用外框给的这一组：曲名 `--text-primary`，副标题与标记
+   `--text-secondary`，描边 `--line`。放得下时标记贴着字，放不下时字缩短、标记贴在行尾；居中版式里整行居中。 */
+.root {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--spacingVerticalXS);
+  width: 100%;
+  min-width: 0;
+}
+
+.root[data-size='large'] {
+  --info-title: 28px;
+  --info-title-line: 34px;
+  --info-sub: 16px;
+  --info-sub-line: 22px;
+}
+
+.root[data-size='medium'] {
+  --info-title: 22px;
+  --info-title-line: 27px;
+  --info-sub: 14px;
+  --info-sub-line: 20px;
+}
+
+.root[data-size='small'] {
+  --info-title: 20px;
+  --info-title-line: 24px;
+  --info-sub: 13px;
+  --info-sub-line: 18px;
+}
+
+.titleRow,
+.subRow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.root[data-align='center'] .titleRow,
+.root[data-align='center'] .subRow {
+  justify-content: center;
+}
+
+.titleRow {
+  height: var(--info-title-line);
+}
+
+.subRow {
+  height: var(--info-sub-line);
+}
+
+.title {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--info-title);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--info-title-line);
+}
+
+.title[data-idle] {
+  color: var(--text-secondary);
+}
+
+/* 艺人与专辑名的图标比字大 2，与播放栏同一比例 */
+.sub {
+  --metadata-icon-size: calc(var(--info-sub) + 2px);
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--info-sub);
+  line-height: var(--info-sub-line);
+}
+
+/* 曲名后面的格式标记：编码框，再跟位深与采样率；整个标记与曲名隔 10 */
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  column-gap: var(--spacingHorizontalSNudge);
+  margin-inline-start: var(--spacingHorizontalMNudge);
+}
+
+.codec {
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 var(--spacingHorizontalSNudge);
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusMedium);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 18px;
+}
+
+.detail {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: var(--fontWeightRegular);
+}
+
+/* 星级与艺人 · 专辑隔 12；没评分的星由评分件按 `data-rating-host` 淡入淡出 */
+.rating {
+  display: inline-flex;
+  flex: none;
+  margin-inline-start: var(--spacingHorizontalM);
+}

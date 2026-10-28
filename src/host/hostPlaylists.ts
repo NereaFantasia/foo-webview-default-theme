@@ -1,14 +1,20 @@
 /**
- * 宿主自己建来用的播放列表，界面上一律不列：播放列表节、发送到的清单、来源名都不出现它们。
- *
- * - `[WebView Queue]`：`queue.add` 缺省先把路径追加到这张再入队（插件 `QueueApi.h` 的
- *   `QUEUE_PLAYLIST_NAME`）。
- * - `__webview_buffer__`：JIT 队列的影子列表，带锁、删不掉（插件 `QueueManager.h` 的
- *   `SHADOW_PLAYLIST_NAME`）。
- *
- * 宿主按名字找它们，主题也只能按名字认：用户自己建一张同名的，宿主同样会拿去用，一并不列。
+ * 媒体库与在线音乐起播时专用的后台影子播放列表名称（供宿主按序衔接播放）
+ * 保持硬编码名称而不纳入国际化，确保多语言切换时能准确命中同一张列表
  */
-export const HOST_PLAYLIST_NAMES: readonly string[] = ['[WebView Queue]', '__webview_buffer__'];
+export const LIBRARY_VIEW_PLAYLIST = '[Library View]';
+
+/**
+ * 宿主与主题内部专用的保留播放列表名称集合（在侧边栏、发送目标列表等界面交互中一律隐藏过滤）
+ * - `[WebView Queue]`: `queue.add` 内部入队缓冲列表
+ * - `__webview_buffer__`: JIT 队列影子列表（宿主内部只读加锁）
+ * - `LIBRARY_VIEW_PLAYLIST`: 媒体库/在线曲目起播承载列表
+ */
+export const HOST_PLAYLIST_NAMES: readonly string[] = [
+  '[WebView Queue]',
+  '__webview_buffer__',
+  LIBRARY_VIEW_PLAYLIST,
+];
 
 export function isHostPlaylist(name: string): boolean {
   return HOST_PLAYLIST_NAMES.includes(name);

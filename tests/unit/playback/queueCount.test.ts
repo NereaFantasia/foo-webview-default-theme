@@ -15,7 +15,11 @@ describe('startQueueCount', () => {
     const service = startQueueCount(store, host.fb);
     await service.ready;
     expect(store.get(queueCountAtom)).toBe(3);
-    host.emit('playback:queueChanged', { origin: 'playback_advance', count: 2 });
+    host.emit('playback:queueChanged', {
+      origin: 'playback_advance',
+      count: 2,
+      contentVersion: '1',
+    });
     expect(store.get(queueCountAtom)).toBe(2);
     service.dispose();
   });
@@ -28,7 +32,7 @@ describe('startQueueCount', () => {
     const store = createStore();
     const service = startQueueCount(store, host.fb);
     await settle();
-    host.emit('playback:queueChanged', { origin: 'user_added', count: 1 });
+    host.emit('playback:queueChanged', { origin: 'user_added', count: 1, contentVersion: '1' });
     held.release();
     await service.ready;
     expect(store.get(queueCountAtom)).toBe(1);
@@ -50,7 +54,7 @@ describe('startQueueCount', () => {
     const service = startQueueCount(store, host.fb);
     await service.ready;
     service.dispose();
-    host.emit('playback:queueChanged', { origin: 'user_added', count: 4 });
+    host.emit('playback:queueChanged', { origin: 'user_added', count: 4, contentVersion: '1' });
     expect(store.get(queueCountAtom)).toBe(0);
   });
 });

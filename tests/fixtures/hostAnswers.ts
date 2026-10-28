@@ -16,7 +16,7 @@ import type { AnswerTable, HostParams, HostResponse } from './fakeHost.ts';
 export type ConfigValue = Extract<HostResponse<'config.get'>, { success: true }>['value'];
 
 /** 缺省应答报的组件版本，与 package.json 的 hostRequirements 下限一致。 */
-export const HOST_VERSION = '2.0.0';
+export const HOST_VERSION = '2.1.0';
 
 /**
  * 一像素透明 PNG。普通浏览器打不开宿主的 fb2k:// 地址，缺省的封面地址换成它，`<img>` 才能真的加载完。
@@ -71,6 +71,8 @@ function isConfigValue(value: unknown): value is ConfigValue {
 }
 
 const OK: { readonly success: true } = { success: true };
+/** 宿主执行菜单命令后只答「不知道完成没有」 */
+const COMMAND_RAN = { success: true, completion: 'unknown' } as const;
 
 /** 缺省的两个输出模块：DirectSound 与 WASAPI（共享）。GUID 是替身自造的，好认就行。 */
 export const OUTPUT_MODULES = {
@@ -257,7 +259,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
         withAvailability: true,
         items: [],
       }),
-      runMainMenuCommand: OK,
+      runMainMenuCommand: COMMAND_RAN,
       getContextMenu: {
         success: true,
         mode: 'selection',
@@ -266,7 +268,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
         withAvailability: true,
         items: [],
       },
-      runContextCommandById: OK,
+      runContextCommandById: COMMAND_RAN,
     },
     misc: {
       getProfilePath: {
@@ -357,7 +359,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
       playTrack: OK,
     },
     queue: {
-      get: { success: true, items: [], count: 0 },
+      get: { success: true, items: [], count: 0, contentVersion: '0' },
       getCount: { success: true, count: 0, hasItems: false },
       add: (params) => {
         const added = listParam(params, 'tracks').length || 1;
@@ -371,6 +373,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
           movedCount: 0,
           queueCount: inserted,
           invalidCount: 0,
+          contentVersion: '0',
         };
       },
     },
@@ -456,7 +459,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
           },
         };
       },
-      getZoom: () => ({ success: true, zoom }),
+      getZoom: () => ({ success: true, zoom, textScaleFactor: 1 }),
       setZoom: (params) => {
         const next = numberParam(params, 'zoom');
         if (next === undefined) return hostFailure('INVALID_PARAMS');

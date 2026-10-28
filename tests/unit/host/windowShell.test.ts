@@ -154,6 +154,42 @@ describe('startWindowShell', () => {
     ]);
   });
 
+  it('盖住标题栏的视图开着时撤掉最大化键的矩形，关掉后补报；重复盖不重发，盖着时的新矩形不发', async () => {
+    const host = installFakeHost();
+    host.answer('window.setMaximizeButtonRegion', (params) => ({
+      success: true,
+      hasRegion: params['region'] !== undefined,
+      snapLayouts: true,
+      scale: 1,
+    }));
+    const store = createStore();
+    const shell = startWindowShell(store, host.fb, () => 1);
+    await shell.ready;
+    shell.setMaximizeButtonRegion({ x: 1188, y: 0, width: 46, height: 56 });
+    await settle();
+    expect(store.get(windowShellAtom).snapLayouts).toBe(true);
+
+    shell.coverMaximizeButton(true);
+    await settle();
+    expect(host.callsTo('window.setMaximizeButtonRegion')).toEqual([
+      { region: { x: 1188, y: 0, width: 46, height: 56 } },
+      {},
+    ]);
+    expect(store.get(windowShellAtom).snapLayouts).toBe(false);
+
+    shell.coverMaximizeButton(true);
+    shell.setMaximizeButtonRegion({ x: 1188, y: 0, width: 46, height: 48 });
+    await settle();
+    expect(host.callsTo('window.setMaximizeButtonRegion')).toHaveLength(2);
+
+    shell.coverMaximizeButton(false);
+    await settle();
+    expect(host.callsTo('window.setMaximizeButtonRegion').at(-1)).toEqual({
+      region: { x: 1188, y: 0, width: 46, height: 48 },
+    });
+    expect(store.get(windowShellAtom).snapLayouts).toBe(true);
+  });
+
   it('贴靠布局只看最后发出的那次应答；空矩形不算有贴靠布局', async () => {
     const host = installFakeHost();
     const held = host.hold('window.setMaximizeButtonRegion');

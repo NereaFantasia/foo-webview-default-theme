@@ -1,0 +1,53 @@
+/* 与本地结果页的分类行、滚动区同一套内缩；`--search-inset` 由结果页根元素给 */
+.controls {
+  padding-inline: var(--search-inset);
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+/* 页签之后隔一条竖线是命令：与本地结果页的分类行同一写法 */
+.divider {
+  flex: none;
+  width: var(--strokeWidthThin);
+  height: 20px;
+  background: var(--line);
+}
+.tools {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.scroller {
+  padding-inline: var(--search-inset);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-top: var(--spacingVerticalM);
+  padding-bottom: calc(var(--player-inset, 0px) + var(--spacingVerticalXXL));
+}
+/* 滚动区外的列头：两层都留出滚动条的槽，列宽才与行对齐；上边距挪到列头这一层 */
+.head {
+  padding-inline: var(--search-inset);
+  padding-top: var(--spacingVerticalM);
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+.scroller[data-headed] {
+  padding-top: 0;
+  scrollbar-gutter: stable;
+}
+.table {
+  display: flex;
+  flex-direction: column;
+}
+.spinner {
+  padding: var(--spacingVerticalXXL);
+}
+.notices {
+  padding-inline: var(--search-inset);
+}
+.notice {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalS);
+}

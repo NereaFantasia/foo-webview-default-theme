@@ -1,4 +1,4 @@
-/* 按钮固定在卡片上方，组与组之间的空白允许操作下方页面。 */
+/* 按钮固定在卡片上方，组与组之间的空白允许操作下方页面 */
 .root {
   position: absolute;
   inset: 0 0 auto;
@@ -37,7 +37,7 @@
   pointer-events: auto;
 }
 
-/* 侧边栏键：36 × 36 的描边圆，键离描边内侧四周 2。 */
+/* 侧边栏键：36 × 36 的描边圆，键离描边内侧四周 2 */
 .ring {
   box-sizing: border-box;
   display: grid;

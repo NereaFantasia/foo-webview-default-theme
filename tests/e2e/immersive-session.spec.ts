@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { spectrumAnswer, waveformAnswer } from '../fixtures/audioAnswers.ts';
+import { makeTrack } from '../fixtures/tracks.ts';
 
 for (const fullscreenAtStart of [false, true]) {
   test(`迷你往返保留沉浸会话：进入前全屏=${fullscreenAtStart}`, async ({ page }) => {
@@ -397,4 +398,47 @@ test('主线程山脊 GPU 删除纹理、程序、缓冲和顶点对象，重复
       result?.created.filter((method) => method === `create${resource}`).length,
     );
   }
+});
+
+test('窗口隐藏时封面流动底色释放 WebGL 画布，恢复后重建', async ({ page }) => {
+  const x = await openPlayer(page);
+  const cover = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('无法创建画布');
+    context.fillStyle = '#d02030';
+    context.fillRect(0, 0, 64, 64);
+    return canvas.toDataURL();
+  });
+  x.host.answer('artwork.getFb2kUrlByPath', (params) => ({
+    success: true,
+    available: true,
+    type: 'front',
+    path: String(params['path']),
+    dataUrl: cover,
+  }));
+  const track = makeTrack({ path: 'file://E:/Music/Wash/current.flac', title: 'Wash' });
+  x.state.track = track;
+  await x.host.emit('playback:trackChanged', track);
+  await page.locator('[data-player-bar] [data-player-key="cover"]').click();
+  const view = page.getByRole('region', { name: '正在播放', exact: true });
+  await expect(view).toBeVisible();
+  const flow = view.locator('[data-wash] canvas');
+  await expect(flow).toHaveCount(1);
+  const mode = await view.locator('[data-wash]').getAttribute('data-wash');
+  test.skip(mode !== 'flow', '浏览器建不出流动档所需的 WebGL 上下文');
+  const visible = (value: boolean) =>
+    page.evaluate((show) => {
+      if (show) Reflect.deleteProperty(document, 'hidden');
+      else Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, value);
+  for (let round = 0; round < 3; round += 1) {
+    await visible(false);
+    await expect(flow).toHaveCount(0);
+    await visible(true);
+    await expect(flow).toHaveCount(1);
+  }
+  expect(x.errors).toEqual([]);
 });

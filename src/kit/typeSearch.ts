@@ -1,28 +1,29 @@
-/** 打字即跳的串最长这么多个字符，再按字母键就吞掉，不再追加。 */
+/** 键盘键入即搜（Type-ahead）缓冲区的最大字符长度上限。超出长度的后续输入将被忽略拦截 */
 export const TYPE_SEARCH_MAX_CHARS = 20;
-/** 匹配完之后多久没有新键就清串，毫秒。 */
+/** 连续输入键入即搜的空闲过期重置窗口时长（毫秒，默认 1000 ms） */
 export const TYPE_SEARCH_EXPIRY_MS = 1000;
 
 export interface TypeSearchState {
   readonly text: string;
-  /** 最近一次匹配没找到；界面据此提示「没有以…开头的项」。 */
+  /** 最近一次前缀匹配未命中任何条目；调用方据此展示无匹配反馈 */
   readonly noMatch: boolean;
 }
 
 export interface TypeSearch {
   readonly state: TypeSearchState;
-  /** 收下这个键就答 true（调用方据此 `preventDefault`）；不归打字即跳的键答 false。 */
+  /** 处理按键输入。若识别并消费该键返回 true（调用方据此阻止默认行为），否则返回 false */
   input(key: string): boolean;
   clear(): void;
-  /** 状态变了就叫；返回退订函数。 */
+  /** 注册状态变更监听器，返回注销函数 */
   subscribe(listener: () => void): () => void;
   dispose(): void;
 }
 
 /**
- * 数据全在内存里的打字即跳：串一变就同步找一次，找到交给 `apply` 落焦点，找不到亮 `noMatch`；
- * 1 s 没有新键清串。只收单个可打印字符（码点不小于 32 且不是 DEL），首字符不能是空白；
- * Backspace 退一格，串空时不归它。Esc 不归它：列表部件不许认领 Esc，Esc 只关浮层。
+ * 创建基于内存的键入即搜（Type-ahead / Type-to-search）状态机
+ * 缓冲文本变更时同步调用 `find` 执行前缀检索：命中时调用 `apply` 转移选中/焦点，未命中则将 `noMatch` 置为 true；
+ * 空闲超时（1000 ms）自动清空缓冲
+ * 仅接收单个可打印字符（首字符不可为空白）；支持 Backspace 逐字回退；不处理 Esc 键（保持由外层浮层统一响应）
  */
 export function createTypeSearch<T>(
   find: (text: string) => T | undefined,

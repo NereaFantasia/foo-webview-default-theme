@@ -34,7 +34,7 @@ export const HOME_EXPLORE_COUNT = 3;
 export const HOME_TRACK_COUNT = 6;
 const HALF_YEAR_MS = 26 * 7 * 24 * 60 * 60 * 1000;
 
-/** 按专辑等概率抽样，时长单位为分钟；未知时长不进入限时结果。 */
+/** 按专辑等概率抽样，时长单位为分钟；未知时长不进入限时结果 */
 export function sampleHomeAlbums(
   albums: readonly Album[],
   duration: HomeDuration,

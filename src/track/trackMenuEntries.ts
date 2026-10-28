@@ -1,8 +1,9 @@
 import {
   Add20Regular,
   AddSquare20Regular,
-  Album20Regular,
+  Record20Regular,
   Info20Regular,
+  Mic20Regular,
   MoreHorizontal20Regular,
   Next20Regular,
   Play20Regular,
@@ -13,6 +14,7 @@ import {
 import type { MenuCommand } from 'foo-webview-sdk';
 import { createElement, type ReactElement } from 'react';
 import type { RatingCommands } from '../host/contextMenu.ts';
+import type { MessageKey } from '../i18n/en.ts';
 import type { Translate } from '../i18n/translate.ts';
 import type {
   ContextMenuBranch,
@@ -23,18 +25,19 @@ import type {
 import type { SendTarget } from './trackListActions.ts';
 import type { MenuRating } from './trackMenuRating.ts';
 
-/** 各处曲目菜单共用的标准项。页面按显示顺序写这些 id，中间夹本页自己的条目。 */
+/** 各处曲目菜单共用的标准项。页面按显示顺序写这些 id，中间夹本页自己的条目 */
 export type TrackActionId =
   | 'play'
   | 'play-next'
   | 'enqueue'
   | 'send-to'
   | 'go-to-album'
+  | 'go-to-artist'
   | 'rating'
   | 'properties'
   | 'more-commands';
 
-/** 播放、入队、发送怎么执行：作用对象各处不同（一批路径、列表选区、队列句柄），由页面给。 */
+/** 播放、入队、发送怎么执行：作用对象各处不同（一批路径、列表选区、队列句柄），由页面给 */
 export interface TrackMenuHandlers {
   play(): void;
   next(): void;
@@ -43,38 +46,47 @@ export interface TrackMenuHandlers {
   sendTo(target: SendTarget): void;
 }
 
-/** 「转到专辑」：去的动作（媒体库里找不到这张专辑为 null），以及此刻是否已在它的详情页上（在就不出这一项）。 */
-export interface TrackMenuAlbum {
+/** 「转到」的一个去处：打不开时 `open` 为 null，此刻已在那里时 `here` 为真 */
+export interface GoToTarget {
+  readonly name: string;
   readonly open: (() => void) | null;
   readonly here: boolean;
+  /** 专辑打不开时写在置灰项上的原因；不给用「媒体库中没有对应的专辑」，在线曲目没有专辑页时要换 */
+  readonly unavailable?: MessageKey;
 }
 
-/** 标准项按它现算。 */
+/** 「转到」一组：所点那一首的专辑与各位艺人，艺人按标签顺序 */
+export interface TrackMenuGoTo {
+  readonly album: GoToTarget | null;
+  readonly artists: readonly GoToTarget[];
+}
+
+/** 标准项按它现算 */
 export interface TrackActionContext {
   readonly t: Translate;
-  /** 作用对象已到手、可以执行；否则播放、入队与发送置灰。 */
+  /** 作用对象已到手、可以执行；否则播放、入队与发送置灰 */
   readonly usable: boolean;
-  /** 作用于多首：播放写「播放所选」，「转到专辑」注明去的是右键的那一首。 */
+  /** 作用于多首：播放写「播放所选」，「转到」注明去的是右键的那一首 */
   readonly multiple: boolean;
   readonly targets: readonly SendTarget[];
   readonly handlers: TrackMenuHandlers;
-  readonly album: TrackMenuAlbum | null;
+  readonly goTo: TrackMenuGoTo | null;
   readonly rating: ContextMenuBranch | null;
-  /** 宿主树里认出的「属性」；认不出为 null，这一项置灰。 */
+  /** 宿主树里认出的「属性」；认不出为 null，这一项置灰 */
   readonly properties: (() => void) | null;
-  /** 「更多命令」子菜单的内容，为空就不出这一项。 */
+  /** 「更多命令」子菜单的内容，为空就不出这一项 */
   readonly more: readonly ContextMenuEntry[];
 }
 
-/** 一条标准命令：文字、图标、可用与否和执行都按菜单此刻的上下文算。 */
+/** 一条标准命令：文字、图标、可用与否和执行都按菜单此刻的上下文算 */
 interface TrackCommandAction {
   readonly icon: FluentIcon;
   label(context: TrackActionContext): string;
   enabled(context: TrackActionContext): boolean;
   run(context: TrackActionContext): void;
-  /** 为真时整项不出。 */
+  /** 为真时整项不出 */
   hidden?(context: TrackActionContext): boolean;
-  /** 置灰时的说明。 */
+  /** 置灰时的说明 */
   reason?(context: TrackActionContext): string | undefined;
   detail?(context: TrackActionContext): string | undefined;
 }
@@ -101,12 +113,13 @@ const COMMANDS: Readonly<Record<TrackCommandId, TrackCommandAction>> = {
     run: ({ handlers }) => handlers.enqueue(),
   },
   'go-to-album': {
-    icon: Album20Regular,
+    icon: Record20Regular,
     label: ({ t }) => t('trackMenu.goToAlbum'),
-    enabled: ({ album }) => !!album?.open,
-    run: ({ album }) => album?.open?.(),
-    hidden: ({ album }) => !album || album.here,
-    reason: ({ t, album }) => (!album?.open ? t('context.albumUnavailable') : undefined),
+    enabled: ({ goTo }) => !!goTo?.album?.open,
+    run: ({ goTo }) => goTo?.album?.open?.(),
+    hidden: ({ goTo }) => !goTo?.album || goTo.album.here,
+    reason: ({ t, goTo }) =>
+      goTo?.album?.open ? undefined : t(goTo?.album?.unavailable ?? 'context.albumUnavailable'),
     detail: ({ t, multiple }) => (multiple ? t('trackMenu.clickedTrack') : undefined),
   },
   properties: {
@@ -160,10 +173,56 @@ function sendToEntry({ t, usable, targets, handlers }: TrackActionContext): Cont
   };
 }
 
+/**
+ * 「转到艺人」：一位是单项，已在他的页面上就不出；两位起收成子菜单，按标签顺序逐位列出，打不开的置灰，
+ * 已在那里的标「当前」
+ */
+function goToArtistEntries({ t, goTo, multiple }: TrackActionContext): ContextMenuEntry[] {
+  const artists = goTo?.artists ?? [];
+  const detail = multiple ? t('trackMenu.clickedTrack') : undefined;
+  const [only] = artists;
+  if (artists.length === 1 && only) {
+    if (only.here) return [];
+    return [
+      {
+        kind: 'command',
+        id: 'go-to-artist',
+        label: t('trackMenu.goToArtist'),
+        icon: createElement(Mic20Regular),
+        disabled: !only.open,
+        reason: only.open ? undefined : t('trackMenu.noArtistPage'),
+        detail,
+        onSelect: () => only.open?.(),
+      },
+    ];
+  }
+  if (artists.length === 0) return [];
+  return [
+    {
+      kind: 'submenu',
+      id: 'go-to-artist',
+      label: t('trackMenu.goToArtist'),
+      icon: createElement(Mic20Regular),
+      detail,
+      items: artists.map((artist, index): ContextMenuCommand => ({
+        kind: 'command',
+        id: `go-to-artist:${index}`,
+        label: artist.name,
+        disabled: !artist.open,
+        reason: artist.open ? undefined : t('trackMenu.noArtistPage'),
+        badge: artist.here ? t('trackMenu.currentPlace') : undefined,
+        onSelect: () => artist.open?.(),
+      })),
+    },
+  ];
+}
+
 function actionEntries(id: TrackActionId, context: TrackActionContext): ContextMenuEntry[] {
   switch (id) {
     case 'send-to':
       return [sendToEntry(context)];
+    case 'go-to-artist':
+      return goToArtistEntries(context);
     case 'rating':
       return context.rating ? [context.rating] : [];
     case 'more-commands':
@@ -183,7 +242,7 @@ function actionEntries(id: TrackActionId, context: TrackActionContext): ContextM
   }
 }
 
-/** 改写一条标准命令的文字、图标或可用与否；执行与作用对象不变。 */
+/** 改写一条标准命令的文字、图标或可用与否；执行与作用对象不变 */
 export interface TrackActionPatch {
   readonly action: 'play' | 'play-next' | 'enqueue';
   readonly label?: string;
@@ -192,10 +251,10 @@ export interface TrackActionPatch {
   readonly reason?: string;
 }
 
-/** 曲目菜单的一项：标准项的 id、改写过的标准命令，或本页自己的条目。 */
+/** 曲目菜单的一项：标准项的 id、改写过的标准命令，或本页自己的条目 */
 export type TrackMenuItem = TrackActionId | TrackActionPatch | ContextMenuEntry;
 
-/** 把页面写的项展开成菜单条目；分隔线由页面写，相邻、首尾的多余分隔线由菜单外壳压掉。 */
+/** 把页面写的项展开成菜单条目；分隔线由页面写，相邻、首尾的多余分隔线由菜单外壳压掉 */
 export function trackMenuEntries(
   items: readonly TrackMenuItem[],
   context: TrackActionContext,
@@ -216,7 +275,7 @@ export function divider(id: string): ContextMenuSeparator {
 
 /**
  * 评分子菜单。`current` 为 null 时写「评分未知」，`'mixed'` 写「评分不同」，0 写「未评分」；点一档写入，
- * 点此刻已勾的那一档不重复写。`available` 是能选的几档，`clear` 为假时清除置灰。
+ * 点此刻已勾的那一档不重复写。`available` 是能选的几档，`clear` 为假时清除置灰
  */
 export function trackRatingEntries(
   t: Translate,
@@ -270,8 +329,8 @@ export function trackRatingEntries(
 }
 
 /**
- * 按宿主树里认出的评分子菜单出评分项：勾宿主此刻的那一档，点一档交回树里对应的命令与它的值（清除是 0）。
- * 认不出评分子菜单时整项置灰。
+ * 按宿主树里认出的评分子菜单出评分项：勾宿主此刻的那一档，点一档交回树里对应的命令与它的值（清除是 0）
+ * 认不出评分子菜单时整项置灰
  */
 export function hostRatingEntry(
   t: Translate,

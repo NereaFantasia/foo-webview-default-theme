@@ -10,7 +10,7 @@ function useShowSearch(): () => void {
   return () => session.show();
 }
 
-/** 外壳的插槽由这里填：外壳不导入其他业务，页面与侧边栏里的业务件经它放进去。 */
+/** 外壳的插槽由这里填：外壳不导入其他业务，页面与侧边栏里的业务件经它放进去 */
 export const SHELL_SLOTS: ShellSlots = {
   pages: PAGES,
   SidebarSearch: SearchInput,

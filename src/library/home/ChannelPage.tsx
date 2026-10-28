@@ -1,3 +1,4 @@
+import { COLUMN_PREFS } from '../../table/columns/columnMigration.ts';
 import { Button, Spinner, Tooltip } from '@fluentui/react-components';
 import { ArrowClockwise20Regular, Edit20Regular, Play20Filled } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
@@ -8,12 +9,12 @@ import { createSnapshotSlot } from '../../nav/navHistory.ts';
 import { trackNumberText } from '../../table/cellText.ts';
 import { createColumnsModel } from '../../table/columns/columnsModel.ts';
 import { createRowSelection } from '../../table/rowSelection.ts';
-import type { TableArtwork, TableLinks } from '../../table/tableItems.ts';
+import type { TableArtwork } from '../../table/tableItems.ts';
 import { TrackTable, type TrackTableHandle } from '../../table/TrackTable.tsx';
 import { useTableSnapshot, type TableView } from '../../table/useTableSnapshot.ts';
 import { PrimaryPlayButton } from '../../theme/PrimaryPlayButton.tsx';
 import { libraryTracksAtom } from '../libraryTracks.ts';
-import { SongArt } from '../songs/SongArt.tsx';
+import { SongArt } from '../SongArt.tsx';
 import { buildSongsView } from '../songs/songsView.ts';
 import { HomeChannelDialog } from './HomeChannelDialog.tsx';
 import { HomeContext, useHomeServices } from './homeContext.ts';
@@ -70,9 +71,8 @@ function ChannelContent({
   );
   const [columns] = useState(() =>
     createColumnsModel(store, {
-      key: 'default-theme.channel-columns.v1',
+      ...COLUMN_PREFS.channel,
       offered: ['status', 'art', 'title', 'artist', 'album', 'duration', 'rating'],
-      compact: { width: 650, columns: ['album'] },
     }),
   );
   const [selection] = useState(() => createRowSelection(store, { total: 0 }));
@@ -82,15 +82,6 @@ function ChannelContent({
   }, [selection, view.items]);
   const artwork = useCallback<TableArtwork>(
     (track, size) => <SongArt album={albumDetail.findAlbum(track) ?? undefined} size={size} />,
-    [albumDetail],
-  );
-  const links = useMemo<TableLinks>(
-    () => ({
-      album: (track) => {
-        const album = albumDetail.findAlbum(track);
-        if (album) albumDetail.open(album);
-      },
-    }),
     [albumDetail],
   );
   useTableSnapshot(CHANNEL_SLOT, {
@@ -179,7 +170,6 @@ function ChannelContent({
           ratingStamp={library.stamp}
           numberText={trackNumberText}
           artwork={artwork}
-          links={links}
           loading={result.status === 'loading' || library.status === 'loading'}
           empty={result.status === 'ready' ? t('home.previewEmpty') : null}
           onPlay={play}

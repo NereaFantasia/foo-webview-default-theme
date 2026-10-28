@@ -1,4 +1,4 @@
-import { Button, Field, makeStyles, Radio, RadioGroup, tokens } from '@fluentui/react-components';
+import { Button, Field, makeStyles, tokens } from '@fluentui/react-components';
 import {
   ArrowMinimize20Regular,
   DismissSquare20Regular,
@@ -8,22 +8,17 @@ import {
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useContext, useEffect, useId, useRef, useState } from 'react';
-import type { MessageKey } from '../../i18n/en.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom, type PluralPick } from '../../i18n/plural.ts';
 import type { Translate } from '../../i18n/translate.ts';
 import { openLibraryPreferences } from '../../host/libraryContract.ts';
 import { useService } from '../../kit/useService.ts';
-import {
-  choosePlayerBarStyle,
-  PLAYER_BAR_STYLES,
-  playerBarStyleAtom,
-  type PlayerBarStyle,
-} from '../../theme/playerBarStyle.ts';
-import { ColorModeCard, CoverAccentCard } from '../AppearanceSection.tsx';
+import { choosePlayerBarStyle, playerBarStyleAtom } from '../../theme/playerBarStyle.ts';
+import { ColorModeCard, CoverAccentCard, usePlayerBarOptions } from '../AppearanceSection.tsx';
 import { TraySwitchCard } from '../GeneralSection.tsx';
 import { LanguageCard } from '../LanguageCard.tsx';
 import { SettingsCard } from '../SettingsCard.tsx';
+import { SettingsChoice } from '../SettingsChoice.tsx';
 import { useSettingsLayout } from '../useSettingsLayout.ts';
 import { onboardingKey } from './onboarding.ts';
 import type { OnboardingLibrary } from './onboardingLibrary.ts';
@@ -51,7 +46,7 @@ function libraryLine(library: OnboardingLibrary, t: Translate, plural: PluralPic
 
 /**
  * 第 1 步：媒体库文件夹。主题不能自己添加文件夹，按钮打开 foobar2000 首选项的媒体库页；还没添加时它是
- * 主按钮，添加之后换成「管理文件夹」。窄窗时界面语言从页头挪到这里。
+ * 主按钮，添加之后换成「管理文件夹」。窄窗时界面语言从页头挪到这里
  */
 export function LibraryStep() {
   const t = useAtomValueRawSync(translateAtom);
@@ -60,7 +55,7 @@ export function LibraryStep() {
   const library = useAtomValueRawSync(onboarding.library);
   const { compact } = useSettingsLayout();
   const [openFailed, setOpenFailed] = useState(false);
-  // 首选项的应答可能在换步之后才回来，那时不再改状态。
+  // 首选项的应答可能在换步之后才回来，那时不再改状态
   const alive = useRef(false);
   const buttonId = useId();
   useEffect(() => {
@@ -124,81 +119,35 @@ export function LibraryStep() {
   );
 }
 
-// 单选组是 Fluent 组件，改它的排法走 makeStyles：三张缩略图等分一行。
+// 组名的 `Field` 是 Fluent 组件，留白走 makeStyles
 const usePickerStyles = makeStyles({
   field: { paddingBottom: tokens.spacingVerticalM },
-  group: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    columnGap: tokens.spacingHorizontalM,
-  },
 });
 
-const STYLE_LABELS: Readonly<Record<PlayerBarStyle, MessageKey>> = {
-  bottom: 'settings.playerBarBottom',
-  titlebar: 'settings.playerBarTitlebar',
-  capsule: 'settings.playerBarCapsule',
-};
-
-/** 播放栏位置的缩略图：一扇小窗，侧边栏、内容卡与播放栏各一块。只是示意，读屏念的是单选的名称。 */
-function PlayerBarThumbnail({ style }: { readonly style: PlayerBarStyle }) {
-  return (
-    <span className={styles.window} data-style={style} aria-hidden>
-      <span className={styles.titlebar}>
-        <span className={styles.lcd} />
-      </span>
-      <span className={styles.sidebar} />
-      <span className={styles.card}>
-        <span className={styles.capsule} />
-      </span>
-      <span className={styles.bar} />
-    </span>
-  );
-}
-
 /**
- * 播放栏位置三选一：缩略图在上、单选在下。缩略图是单选的 label，点它与点单选一样；方向键在三项之间换，
- * 由单选组负责。
- * 换了即时生效，背后的外壳跟着变。
+ * 播放栏位置三选一：缩略图在上、单选在下，选项与设置页是同一份。换了即时生效，背后的外壳跟着变
  */
 function PlayerBarPicker() {
   const t = useAtomValueRawSync(translateAtom);
   const value = useAtomValueRawSync(playerBarStyleAtom);
+  const options = usePlayerBarOptions();
   const store = useStore();
   const classes = usePickerStyles();
-  const idBase = useId();
   return (
     <Field
       className={classes.field}
       label={{ children: t('settings.playerBar'), weight: 'semibold' }}
     >
-      <RadioGroup
-        className={classes.group}
-        layout="horizontal"
+      <SettingsChoice
+        options={options}
         value={value}
-        onChange={(_, data) => {
-          const style = PLAYER_BAR_STYLES.find((item) => item === data.value);
-          if (style) choosePlayerBarStyle(store, style);
-        }}
-      >
-        {PLAYER_BAR_STYLES.map((style) => (
-          <div key={style} className={styles.style} data-selected={style === value || undefined}>
-            <label className={styles.thumbnail} htmlFor={`${idBase}-${style}`}>
-              <PlayerBarThumbnail style={style} />
-            </label>
-            <Radio
-              value={style}
-              label={t(STYLE_LABELS[style])}
-              input={{ id: `${idBase}-${style}` }}
-            />
-          </div>
-        ))}
-      </RadioGroup>
+        onChange={(style) => choosePlayerBarStyle(store, style)}
+      />
     </Field>
   );
 }
 
-/** 第 2 步：播放栏位置、颜色模式与跟随封面颜色。两张卡与设置页是同一张。 */
+/** 第 2 步：播放栏位置、颜色模式与跟随封面颜色。两张卡与设置页是同一张 */
 export function AppearanceStep() {
   return (
     <>
@@ -209,7 +158,7 @@ export function AppearanceStep() {
   );
 }
 
-/** 第 3 步：托盘的两只开关，与设置页是同一张卡。 */
+/** 第 3 步：托盘的两只开关，与设置页是同一张卡 */
 export function TrayStep() {
   const t = useAtomValueRawSync(translateAtom);
   return (
@@ -228,7 +177,7 @@ export function TrayStep() {
   );
 }
 
-/** 第 4 步：更新方式与主题更新卡、在线艺人简介，都由装配层放进来。 */
+/** 第 4 步：更新方式与主题更新卡、在线艺人简介，都由装配层放进来 */
 export function UpdateStep() {
   const update = useContext(OnboardingUpdateContext);
   const online = useContext(OnboardingOnlineContext);

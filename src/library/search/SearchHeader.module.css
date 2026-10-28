@@ -1,0 +1,51 @@
+.header {
+  padding-inline: var(--search-inset);
+  display: flex;
+  flex: none;
+  /* 顶端对齐：范围切换与标题行同高，两个范围下标题块高矮不同时它也不上下挪 */
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  padding-bottom: var(--spacingVerticalM);
+}
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* 标题与编辑键一行，标题过长时截断，编辑键跟在标题后面 */
+.heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalXS);
+}
+.heading > :last-child {
+  flex: none;
+}
+/* 范围切换按字数占宽，不跟标题一起被压窄，免得「在线音乐」折成两行 */
+.scope {
+  flex: none;
+  margin-inline-start: auto;
+}
+.title h1 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fontSizeBase600);
+  line-height: var(--lineHeightBase600);
+  font-weight: var(--fontWeightSemibold);
+}
+.count {
+  min-height: var(--lineHeightBase300);
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  margin-top: var(--spacingVerticalXS);
+}
+@media (max-width: 640px) {
+  .title h1 {
+    font-size: var(--fontSizeBase500);
+    line-height: var(--lineHeightBase500);
+  }
+}

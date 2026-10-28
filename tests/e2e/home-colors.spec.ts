@@ -62,12 +62,13 @@ async function openColoredHome(
   return { ...home, analysis, card, releaseRed };
 }
 
+// 键没有被悬停、聚焦时淡出后隐藏，按名字取不到，所以按属性取
 function playOf(card: Locator) {
-  return card.getByRole('button', { name: '播放', exact: true });
+  return card.locator('[data-tile-play]');
 }
 
 function moreOf(card: Locator) {
-  return card.getByRole('button', { name: '更多', exact: true });
+  return card.locator('[data-tile-more]');
 }
 
 function playColor(button: Locator) {

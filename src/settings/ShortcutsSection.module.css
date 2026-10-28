@@ -1,4 +1,4 @@
-/* 小节之间一条线。每行的文字与卡头的标题左对齐：空出图标那一列。 */
+/* 小节之间一条线。每行的文字与卡头的标题左对齐：空出图标那一列 */
 .section {
   display: flex;
   flex-direction: column;
@@ -61,7 +61,7 @@
   font-size: var(--fontSizeBase200);
 }
 
-/* 键名沿用界面字体，避免中英文键名混用等宽字体时字形不一致。 */
+/* 键名沿用界面字体，避免中英文键名混用等宽字体时字形不一致 */
 .key-cap {
   box-sizing: border-box;
   display: inline-flex;
@@ -80,4 +80,39 @@
   font-weight: var(--fontWeightSemibold);
   line-height: var(--lineHeightBase200);
   white-space: nowrap;
+}
+
+/* 可录键的一行：键帽与按钮在右，宿主拒收时原因写在这一行下面，与操作名左对齐 */
+.entry {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--spacingVerticalXS);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  padding-left: calc(var(--spacingHorizontalXL) + var(--spacingHorizontalL));
+  color: var(--error);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+/* 录键时拿着焦点的那一块：看上去是一个空输入框，里面提示按下组合键 */
+.recorder {
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 0 var(--spacingHorizontalS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-bottom-color: var(--accent);
+  border-radius: var(--radius-control);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+}
+
+.recorder:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
 }

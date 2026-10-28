@@ -1,0 +1,89 @@
+/* 首页探索音乐横排候选卡：固定 128px 封面，右侧展示曲目数与总时长元数据 */
+.root {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.cover {
+  --tile-size: 128px;
+  position: relative;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+.open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: var(--borderRadiusMedium);
+  cursor: pointer;
+  outline: none;
+}
+
+.open:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+
+.metadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+
+.title {
+  text-align: start;
+  border: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  font-weight: var(--fontWeightSemibold);
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.title:hover {
+  text-decoration: underline;
+}
+
+.title:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+  border-radius: var(--borderRadiusSmall);
+}
+
+.titleText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artist {
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: none) {
+  .cover [data-home-keys][data-hidden] {
+    display: block;
+    opacity: 1;
+  }
+}

@@ -1,0 +1,164 @@
+/* 预设 1「分栏」的框：封面列 0.45、侧栏 0.55，侧栏收起时封面列占满整宽。尺寸与间隔由模板写进来的变量给
+   （`splitLayout.ts`），这里不写字面像素。
+
+   表面：背景每帧在变，行与键静止时透明；歌词工具条及其弹出的面板、队列与历史页的列头药丸用毛玻璃（Acrylic，帧率守门
+   跳闸后降成近实底）；队列与历史页的列只在半透明的底后面做模糊，不着色，跳闸后去掉模糊。外框给一组变量，元素只用
+   这一组画底与状态：文字取前景色的 100%、72%、48%，悬停 10%、按下 6%，选中取封面强调色的 22%；播放与评分取强调色
+   （`--accent`）。 */
+.split {
+  --text-primary: var(--colorNeutralForeground1);
+  --text-secondary: color-mix(in srgb, var(--colorNeutralForeground1) 72%, transparent);
+  --text-muted: color-mix(in srgb, var(--colorNeutralForeground1) 48%, transparent);
+  --line: color-mix(in srgb, var(--colorNeutralForeground1) 32%, transparent);
+  --state-hover: color-mix(in srgb, var(--colorNeutralForeground1) 10%, transparent);
+  --state-pressed: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
+  --bg-hover: var(--state-hover);
+  --bg-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+  --bg-surface: color-mix(in srgb, var(--colorNeutralForeground1) 8%, transparent);
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 0.55fr);
+}
+
+.split[data-centered] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 有侧栏时封面列的右缘往侧栏里伸（`--split-reach`，0.05 倍窗宽）：整组在「窗口左缘到窗口正中线」之间居中，
+   比 0.45 栏的正中靠右。顶部页签在正中线上，只按 0.45 栏居中，眼睛里整组偏左。侧栏收起时不伸。 */
+.split:not([data-centered]) .column {
+  margin-inline-end: calc(-1 * var(--split-reach));
+}
+
+/* 封面列：整组的上沿由 `stackOf` 算好写进 `--split-stack-top`（垂直居中，至少让开控制层），不靠 flex 居中，
+   歌词工具条与队列、历史页的列用的是同一个数 */
+.column {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--split-stack-top);
+}
+
+/* 列宽就是封面宽，封面下方的所有元素都不超过它 */
+.stack {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--split-cover);
+}
+
+.cover {
+  flex: none;
+  width: var(--split-cover);
+  height: var(--split-cover);
+}
+
+/* 曲目信息与更多键一行：更多键在行右，与两行字整体垂直居中；居中版式里左边留同宽的空位，文字仍居中在封面轴线上 */
+.infoRow {
+  display: flex;
+  align-items: center;
+  column-gap: var(--spacingHorizontalXS);
+  height: var(--split-row-info);
+  margin-top: var(--split-gap-cover);
+}
+
+.balance {
+  flex: none;
+  width: var(--split-key);
+}
+
+.info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.progress {
+  height: var(--split-row-progress);
+  margin-top: var(--split-gap-info);
+}
+
+.keys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--split-row-keys);
+  margin-top: var(--split-gap-keys);
+}
+
+/* 音量前隔 16；封面窄到不够时间隔先去掉 */
+.volume {
+  display: inline-flex;
+}
+
+.volume[data-gap] {
+  margin-inline-start: var(--spacingHorizontalL);
+}
+
+/* 侧栏占满整栏的高，歌词、队列、历史各自管自己的边距与滚动 */
+.side {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 侧栏随居中与常规互转进退场：不进视图过渡的快照，是页面里的活元素，封面列的几个件在过渡层里，永远盖在它上面。
+   进场从正中线放大回来，退场朝正中线缩小；栏占窗宽的后 0.55，正中线在 0.5 处，也就是栏宽的 1/11。
+   时长是点到点的时长放慢到五成（`--split-speed`），与封面列同步；缩放比 `--split-side-scale` 在这里调 */
+.side[data-phase] {
+  --split-side-scale: 0.6;
+
+  transform-origin: calc(100% / 11) 50%;
+}
+
+/* 进场只填充到开始前（backwards）：播完就不再有动画作用在这一层上。填充到结束后（both）的不透明度与缩放动画
+   会一直留着，里面的 `backdrop-filter`（歌词工具条的 Acrylic）因此取不到背后的背景，模糊就丢了 */
+.side[data-phase='enter'] {
+  animation:
+    side-grow calc(var(--motion-normal) / var(--split-speed)) var(--motion-curve-point-to-point)
+      backwards,
+    side-fade-in calc(var(--motion-faster) / var(--split-speed)) var(--curveLinear) backwards;
+}
+
+/* 收起后栏不再占格子，原样铺在原来的位置上缩完再卸；不接指针 */
+.side[data-phase='leave'] {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 45% 0;
+  height: auto;
+  pointer-events: none;
+  animation:
+    side-shrink calc(var(--motion-normal) / var(--split-speed)) var(--motion-curve-point-to-point)
+      both,
+    side-fade-out calc(var(--motion-fast) / var(--split-speed)) var(--curveLinear) both;
+}
+
+@keyframes side-grow {
+  from {
+    scale: var(--split-side-scale);
+  }
+}
+
+@keyframes side-shrink {
+  to {
+    scale: var(--split-side-scale);
+  }
+}
+
+@keyframes side-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes side-fade-out {
+  to {
+    opacity: 0;
+  }
+}

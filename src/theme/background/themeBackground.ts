@@ -19,7 +19,7 @@ function tint(value: unknown, fallback: number): number {
     : fallback;
 }
 
-/** 颜色跟随现有强调色，只将染色强度深浅各存一份；旧窗口背景与材质存档不变。 */
+/** 颜色跟随现有强调色，只将染色强度深浅各存一份；旧窗口背景与材质存档不变 */
 const pref = defineLocalPref<ThemeBackgroundPreferences>({
   key: THEME_BACKGROUND_KEY,
   fallback: DEFAULTS,

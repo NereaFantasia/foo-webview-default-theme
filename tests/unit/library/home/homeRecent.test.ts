@@ -77,7 +77,7 @@ it('已有内容刷新失败保留，库变更只提示待刷新', async () => {
   const { recent, host, store, album, state } = setup();
   await recent.refresh();
   await vi.waitFor(() => expect(store.get(recent.albums)).toEqual([album]));
-  host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
+  host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
   expect(state().dirty).toBe(true);
   host.answer('library.getRecentlyAdded', hostFailure('OPERATION_FAILED'));
   await recent.refresh();

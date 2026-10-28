@@ -322,7 +322,7 @@ describe('createPlaylistActions', () => {
     ]);
   });
 
-  it('宿主收下播放后把这张记成播放来源；空列表、专用列表与被拒的不记', async () => {
+  it('宿主收下播放后把这张记成播放来源；专用列表不在清单里，与空列表、被拒的一样不播不记', async () => {
     const host = installFakeHost();
     const record = vi.fn<(source: RecordedSource) => void>();
     const { fake, actions } = await start(host, { record });
@@ -333,7 +333,7 @@ describe('createPlaylistActions', () => {
     fake.items = [...fake.items, makePlaylist(5, LIBRARY_VIEW_PLAYLIST)];
     host.emit('playlist:created', { guid: guidOf(5), index: 5, name: LIBRARY_VIEW_PLAYLIST });
     await settle();
-    expect(await actions.play(guidOf(5))).toBe(true);
+    expect(await actions.play(guidOf(5))).toBe(false);
     expect(await actions.play(guidOf(4))).toBe(false);
     host.answer('playlist.playTrack', hostFailure('NOT_FOUND'));
     expect(await actions.play(guidOf(0))).toBe(false);

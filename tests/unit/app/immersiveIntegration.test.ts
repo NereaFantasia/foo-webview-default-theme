@@ -53,7 +53,12 @@ function setup() {
     seek: vi.fn(async () => {}),
     stepVolume: vi.fn(async () => {}),
   };
-  const integration = startImmersiveIntegration(store, { history, commands, playback }, host.fb);
+  const windowShell = { coverMaximizeButton: vi.fn() };
+  const integration = startImmersiveIntegration(
+    store,
+    { history, commands, playback, windowShell },
+    host.fb,
+  );
   const entry = () => store.get(historyAtom).entry;
   const open = () => {
     history.navigate({ id: 'nowPlaying' });
@@ -85,6 +90,7 @@ function setup() {
     store,
     history,
     commands,
+    windowShell,
     integration,
     entry,
     open,
@@ -115,6 +121,18 @@ describe('沉浸会话装配', () => {
     expect(x.integration.enter(x.entry())).toBe(shell);
     expect(x.host.listenerCount('window:stateChanged')).toBe(1);
     expect(x.commands.list()).toHaveLength(8);
+  });
+
+  it('会话开着时盖住最大化键：进入时盖上，换记录与应用释放时放开', () => {
+    const x = setup();
+    expect(x.windowShell.coverMaximizeButton).not.toHaveBeenCalled();
+    x.open();
+    expect(x.windowShell.coverMaximizeButton.mock.calls).toEqual([[true]]);
+    x.history.navigate({ id: 'albums' });
+    expect(x.windowShell.coverMaximizeButton.mock.calls).toEqual([[true], [false]]);
+    x.open();
+    x.integration.dispose();
+    expect(x.windowShell.coverMaximizeButton.mock.calls.at(-1)).toEqual([false]);
   });
 
   it('离开后拒绝旧页面的迟到启动，应用释放后也不能重启', () => {
@@ -288,6 +306,34 @@ describe('沉浸会话装配', () => {
     expect(start).toHaveBeenCalledTimes(1);
     x.integration.dispose();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('场景不要取数服务时给 null：起着的随即停，不给则不动，换回要取数的场景再起；壳不受影响', () => {
+    const x = setup();
+    x.open();
+    const dispose = vi.fn();
+    const start = vi.fn(() => ({ view: VIEW, dispose }));
+    const entry = x.entry();
+    const session = x.integration.enter(entry, start);
+    expect(session?.resources?.view).toBe(VIEW);
+    expect(x.integration.enter(entry, null)?.resources).toBeUndefined();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(x.integration.enter(entry)?.resources).toBeUndefined();
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(x.integration.enter(entry, start)?.resources?.view).toBe(VIEW);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(x.integration.enter(entry, null)?.shell).toBe(session?.shell);
+    expect(dispose).toHaveBeenCalledTimes(2);
+    x.integration.dispose();
+    expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('第一次进来就给 null：只建壳，没有取数服务', () => {
+    const x = setup();
+    x.open();
+    const session = x.integration.enter(x.entry(), null);
+    expect(session?.shell).toBeDefined();
+    expect(session?.resources).toBeUndefined();
   });
 
   it('隐藏时页面就绪，音频工厂初读即为休眠，应用释放仍清理', () => {

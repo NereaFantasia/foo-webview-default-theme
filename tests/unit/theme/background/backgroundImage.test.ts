@@ -132,21 +132,58 @@ test('超过字节限制时不解码，明确返回文件大小错误', async ()
   expect(host.callsTo('file.write')).toHaveLength(0);
 });
 
-test('超过像素限制时关闭位图，不保存新图', async () => {
-  const { host, store } = setup(true);
+/** 替身只模拟图片头已读出尺寸的 `load`；`blob:` 地址须是读尺寸用的对象地址。 */
+function stubBrowserImage(width: number, height: number) {
+  class FakeImage {
+    naturalWidth = width;
+    naturalHeight = height;
+    onload: (() => void) | null = null;
+    set src(value: string) {
+      expect(value).toMatch(/^blob:/);
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+  class FakeReader {
+    result: string | null = null;
+    onload: (() => void) | null = null;
+    readAsDataURL() {
+      this.result = 'data:image/png;base64,AQID';
+      queueMicrotask(() => this.onload?.());
+    }
+  }
   const close = vi.fn();
-  vi.stubGlobal(
-    'createImageBitmap',
-    vi.fn().mockResolvedValue({ width: 8001, height: 8000, close }),
-  );
+  const decodeBitmap = vi.fn().mockResolvedValue({ close });
+  vi.stubGlobal('Image', FakeImage);
+  vi.stubGlobal('FileReader', FakeReader);
+  vi.stubGlobal('createImageBitmap', decodeBitmap);
   onTestFinished(() => {
     vi.unstubAllGlobals();
   });
+  return { close, decodeBitmap };
+}
+
+test('超过像素限制时不解码整图，不保存新图', async () => {
+  const { host, store } = setup(true);
+  const { decodeBitmap } = stubBrowserImage(8001, 8000);
   requestBackgroundImage(store, true);
   await flush();
   expect(store.get(backgroundImageAtom).failure).toBe('pixels');
-  expect(close).toHaveBeenCalledOnce();
+  expect(decodeBitmap).not.toHaveBeenCalled();
   expect(host.callsTo('file.write')).toHaveLength(0);
+});
+
+test('尺寸合格才解码整图，解完立即关闭位图再保存', async () => {
+  const { host, store } = setup(true);
+  const { close, decodeBitmap } = stubBrowserImage(4000, 3000);
+  requestBackgroundImage(store, true);
+  await flush();
+  expect(decodeBitmap).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
+  expect(store.get(backgroundImageAtom)).toEqual({
+    status: 'ready',
+    url: 'data:image/png;base64,AQID',
+  });
+  expect(host.callsTo('file.write')).toHaveLength(1);
 });
 
 test('释放后到达的解码结果不能保存或发布', async () => {

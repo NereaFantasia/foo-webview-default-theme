@@ -117,6 +117,7 @@ export function useAlbumWallInput(options: AlbumWallInputOptions): AlbumWallInpu
       },
       acquire: (album) => albums.covers.acquire(album),
       settle: (album, outcome) => albums.covers.settle(album, outcome),
+      shown: (album) => albums.covers.shown(album),
       wait: (retry) => albums.covers.wait(retry),
       openMenu,
     };

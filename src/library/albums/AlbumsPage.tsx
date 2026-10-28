@@ -1,3 +1,5 @@
+import { Button } from '@fluentui/react-components';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -8,40 +10,73 @@ import { AlbumList } from '../album-list/AlbumList.tsx';
 import { AlbumMenu } from '../AlbumMenu.tsx';
 import { AlbumNotices } from './AlbumNotices.tsx';
 import { AlbumPageHeader } from './AlbumPageHeader.tsx';
+import { COMMAND_BAR_TIERS, type CommandBarTier } from '../../kit/CommandBar.tsx';
+import { FilterSurface, useFilterSurface } from '../../track/FilterSurface.tsx';
+import { useWidthTier } from '../../kit/useWidthTier.ts';
+import { albumsFilterDockedAtom } from './browserPrefs.ts';
+import { albumsAtom } from '../albums.ts';
 import styles from './AlbumsPage.module.css';
 import { AlbumWall } from '../album-wall/AlbumWall.tsx';
 import { albumBrowseAtom } from './albumBrowse.ts';
 import type { MenuPoint } from '../albumMenu.ts';
-import { browserPrefsAtom } from './browserPrefs.ts';
-import { FacetBar } from './FacetBar.tsx';
+import { isStatsField, needsAlbumTracks } from '../album-list/listSort.ts';
+import { libraryTracksAtom } from '../libraryTracks.ts';
+import { playStatsAtom } from '../playStats.ts';
+import { browserPrefsAtom, wallSortAtom } from './browserPrefs.ts';
+import { AlbumFacetConditions, FacetBar } from './FacetBar.tsx';
 import { hasFacetSelection } from './facets.ts';
 import type { WallView } from '../album-wall/useAlbumWallView.ts';
 import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 
-/** 回到这条历史记录时交还的过滤词；滚动与焦点归封面墙自己的那一份。 */
+/** 回到这条历史记录时交还的过滤词；滚动与焦点归封面墙自己的那一份 */
 const PAGE_SLOT = createSnapshotSlot<{ readonly term: string }>();
 
 /**
  * 专辑页：页头、筛选条、横幅，下面是封面墙或列表形态。形态按页面记住、切换不进历史；切到列表再切回来，
  * 封面墙的滚动与焦点由这里记着的一份交还。专辑菜单整页一份，封面墙的右键与悬停的「更多」、列表形态的右键
- * 封面与专辑分组头都开它。
+ * 封面与专辑分组头都开它
  */
 export function AlbumsPage() {
   const t = useAtomValueRawSync(translateAtom);
+  const controls = useViewControlStyles();
   const { form } = useAtomValueRawSync(browserPrefsAtom);
+  const { sort } = useAtomValueRawSync(wallSortAtom);
+  const loaded = useAtomValueRawSync(libraryTracksAtom);
+  const { available } = useAtomValueRawSync(playStatsAtom);
   const { term, facets } = useAtomValueRawSync(albumBrowseAtom);
   const refetch = useAtomValueRawSync(ratingsRefetchAtom);
   const albums = useService(albumsKey);
   const albumList = useService(albumListKey);
   const [facetsOpen, setFacetsOpen] = useState(() => hasFacetSelection(facets));
+  const [measure, tier] = useWidthTier<CommandBarTier>(COMMAND_BAR_TIERS);
+  const { shown } = useAtomValueRawSync(albumBrowseAtom);
+  const { albums: all } = useAtomValueRawSync(albumsAtom);
+  const surface = useFilterSurface({
+    docked: useAtomValueRawSync(albumsFilterDockedAtom),
+    expanded: facetsOpen,
+    narrow: tier === 'narrow',
+    onDock: albums.prefs.setFilterDocked,
+    onExpand: setFacetsOpen,
+  });
+  const numbers = new Intl.NumberFormat();
   const memory = useRef<WallView | null>(null);
   const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
 
   // 评分事件没报全时重取列表形态的曲目。页面接这个信号：不在列表形态、甚至不在专辑页时来的，回到页面时
-  // 按变没变补上。
+  // 按变没变补上
   useEffect(() => albumList.tracks.syncRefetch(refetch), [albumList, refetch]);
+
+  const needsTracks = form === 'wall' && needsAlbumTracks(sort.field);
+  useEffect(() => (needsTracks ? albumList.tracks.want() : undefined), [albumList, needsTracks]);
+  useEffect(() => {
+    void albumList.stats.probe();
+  }, [albumList]);
+  useEffect(() => {
+    if (form === 'wall' && isStatsField(sort.field) && available && loaded.status === 'ready')
+      void albumList.stats.fetch([...loaded.byHandle.values()], loaded.generation);
+  }, [albumList, form, sort.field, loaded, available]);
 
   usePageSnapshot(
     PAGE_SLOT,
@@ -50,9 +85,41 @@ export function AlbumsPage() {
   );
 
   return (
-    <section className={styles.root} aria-label={t('place.albums')} data-page="albums">
-      <AlbumPageHeader facetsOpen={facetsOpen} onFacetsOpenChange={setFacetsOpen} />
-      {facetsOpen && <FacetBar />}
+    <section
+      ref={measure}
+      className={styles.root}
+      aria-label={t('place.albums')}
+      data-page="albums"
+    >
+      <AlbumPageHeader tier={tier} surface={surface} />
+      <div className={styles.filter}>
+        <FilterSurface
+          id="albums"
+          state={surface}
+          footer={
+            <>
+              <span className={styles.result}>
+                {t('album.filterResult', {
+                  count: numbers.format(shown),
+                  total: numbers.format(all.length),
+                })}
+              </span>
+              <Button
+                appearance="subtle"
+                size="small"
+                className={controls.icon}
+                disabled={!hasFacetSelection(facets)}
+                onClick={() => albums.browse.clearFacets()}
+              >
+                {t('album.facetClear')}
+              </Button>
+            </>
+          }
+        >
+          <FacetBar tabs={surface.narrow} />
+        </FilterSurface>
+      </div>
+      <AlbumFacetConditions onAdd={() => surface.setOpen(true)} />
       <AlbumNotices />
       {form === 'wall' ? (
         <AlbumWall memory={memory} onMenu={setMenuAt} />

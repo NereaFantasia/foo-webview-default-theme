@@ -1,4 +1,4 @@
-/* 搜索框外面包一层，换形态时整个淡出淡入；框本身撑满这一层。 */
+/* 搜索框外面包一层，换形态时整个淡出淡入；框本身撑满这一层 */
 .search {
   display: flex;
   flex: none;
@@ -13,7 +13,7 @@
   color: var(--colorNeutralForegroundDisabled);
 }
 
-/* 组里各项之间隔 2，分组之间隔 6。 */
+/* 组里各项之间隔 2，分组之间隔 6 */
 .group {
   flex: none;
   display: flex;
@@ -26,8 +26,9 @@
   margin-top: var(--spacingVerticalSNudge);
 }
 
-/* 播放列表节占满中间的余量、自己滚动；设置钉在底部。外面这一层换形态时整个淡出淡入。 */
+/* 播放列表节占满中间的余量、自己滚动；设置钉在底部。外面这一层换形态时整个淡出淡入 */
 .playlists {
+  --sidebar-scroll-end: var(--spacingHorizontalXS);
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;

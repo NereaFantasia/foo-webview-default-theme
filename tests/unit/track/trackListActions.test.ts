@@ -51,6 +51,7 @@ describe('queueNext', () => {
         movedCount: moved,
         queueCount: count,
         invalidCount: 0,
+        contentVersion: '1',
       };
     });
     expect(await queueNext(host.fb, paths(600))).toBe(true);
@@ -68,7 +69,14 @@ describe('queueNext', () => {
       calls += 1;
       return calls === 2
         ? hostFailure('INVALID_PARAMS')
-        : { success: true, insertedCount: 256, movedCount: 0, queueCount: 256, invalidCount: 0 };
+        : {
+            success: true,
+            insertedCount: 256,
+            movedCount: 0,
+            queueCount: 256,
+            invalidCount: 0,
+            contentVersion: '1',
+          };
     });
     expect(await queueNext(host.fb, paths(700))).toBe(false);
     expect(host.callsTo('queue.insertNext')).toHaveLength(2);
@@ -93,12 +101,11 @@ describe('queueLast', () => {
 });
 
 describe('发送到', () => {
-  it('目标清单按 GUID 认，带锁定标记；读不到就是空的', async () => {
+  it('目标清单按 GUID 认，带锁定标记，不列主题的专用列表；读不到就是空的', async () => {
     const host = hostWithView();
     expect(await readSendTargets(host.fb)).toEqual([
       { guid: playlistGuid(0), name: 'Default', locked: false },
       { guid: playlistGuid(1), name: 'Locked', locked: true },
-      { guid: playlistGuid(2), name: LIBRARY_VIEW_PLAYLIST, locked: false },
     ]);
     host.answer('playlist.getAll', hostFailure('INTERNAL_ERROR'));
     expect(await readSendTargets(host.fb)).toEqual([]);

@@ -6,6 +6,7 @@ import type { Album } from '../host/libraryContract.ts';
 import { useService } from '../kit/useService.ts';
 import { albumsKey } from './albumServices.ts';
 
+/** 专辑封面的页内取色。看过的专辑当帧就是封面色；档案在专辑清单整份换时清掉（`albumCovers`） */
 export function AlbumColorTheme({
   album,
   children,
@@ -16,5 +17,9 @@ export function AlbumColorTheme({
   const albums = useService(albumsKey);
   useAtomValueRawSync(albumCoversVersionAtom);
   const cover = album ? albums.covers.coverOf(album, 256) : undefined;
-  return <CoverTheme url={cover?.status === 'ready' ? cover.url : ''}>{children}</CoverTheme>;
+  return (
+    <CoverTheme url={cover?.status === 'ready' ? cover.url : ''} reuse>
+      {children}
+    </CoverTheme>
+  );
 }

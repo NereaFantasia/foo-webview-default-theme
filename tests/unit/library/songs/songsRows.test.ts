@@ -106,7 +106,7 @@ describe('按查询取顺序', () => {
       tracks: [{ index: 0, handle: 'c' }],
       total: 1,
     });
-    host.emit('library:itemsRemoved', { count: 2, timestamp: 2 });
+    host.emit('library:itemsRemoved', { count: 2, handles: [], truncated: false, timestamp: 2 });
     held.release();
     await pending;
     expect(state().handles).toEqual(['a', 'b', 'c']);
@@ -150,11 +150,11 @@ describe('按查询取顺序', () => {
     rows.request(ALL);
     await vi.waitFor(() => expect(state().status).toBe('ready'));
     vi.useFakeTimers();
-    host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(host.callsTo('library.query')).toHaveLength(2);
     release();
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 2 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 2 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS * 2);
     expect(host.callsTo('library.query')).toHaveLength(2);
     rows.acquire();

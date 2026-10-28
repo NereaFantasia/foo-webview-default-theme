@@ -61,7 +61,7 @@ export function startWindowActivity(
     const wasVisible = documentVisible;
     documentVisible = !source.document.hidden;
     browserFocused = source.document.hasFocus();
-    // 先更新浏览器事实，再撤销宿主旧快照；同步订阅方不应再看到恢复前的可见性。
+    // 先更新浏览器事实，再撤销宿主旧快照；同步订阅方不应再看到恢复前的可见性
     if (documentVisible && !wasVisible) void shell.refreshState();
     publish();
   }

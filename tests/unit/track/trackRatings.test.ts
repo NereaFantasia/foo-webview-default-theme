@@ -69,8 +69,10 @@ async function setup(storage: 'stats' | 'file' = 'stats') {
   const event = (items: readonly ChangedItem[], count = items.length) =>
     host.emit('metadb:changed', {
       tracks: items.map((item) => ({ handle: item.path, subsong: 0, ...item })),
+      handles: items.map((item) => item.handle ?? item.path),
       count,
       fromHook: false,
+      truncated: false,
       timestamp: 0,
     });
   return { host, store, ratings, event };

@@ -22,19 +22,19 @@ import { controlsVisibleAtom } from '../page/immersiveShell.ts';
 import { useViewServices } from '../page/viewServices.ts';
 import styles from './PaperTransport.module.css';
 
-/** 只随播放态变：`playbackAtom` 每 100 ms 随进度更新一次，整份读会让三颗键跟着重画。 */
+/** 只随播放态变：`playbackAtom` 每 100 ms 随进度更新一次，整份读会让三颗键跟着重画 */
 const playingAtom = atom((get) => get(playbackAtom).state === 'playing');
 
-/** 不给 `size` 时的原尺寸，单位像素：两侧键 56、中键 80、整组 240 宽，都乘 `scale`。 */
+/** 不给 `size` 时的原尺寸，单位像素：两侧键 56、中键 80、整组 240 宽，都乘 `scale` */
 const BASE_SIZE = { side: 56, play: 80, width: 240 } as const;
 
 const RING = 'var(--paper-ring)';
-/** 按下态的选择器，与 Fluent `Button` 样式里的逐字相同：合并类名时同一选择器的同一属性才会被顶掉。 */
+/** 按下态的选择器，与 Fluent `Button` 样式里的逐字相同：合并类名时同一选择器的同一属性才会被顶掉 */
 const PRESSED = ':hover:active,:active:focus-visible';
 
-// 键径取根上的 --side / --play，图标按原尺寸的比例（24 / 56、32 / 80）跟着键径缩放。
-// Fluent 的 transparent 键悬停、按下时会换品牌色并撤掉底色，这组键三态钉成同一套颜色。
-// 禁用时两侧键留着环线、中键换成禁用底色，字色与图标色交给 Fluent 的禁用样式。
+// 键径取根上的 --side / --play，图标按原尺寸的比例（24 / 56、32 / 80）跟着键径缩放
+// Fluent 的 transparent 键悬停、按下时会换品牌色并撤掉底色，这组键三态钉成同一套颜色
+// 禁用时两侧键留着环线、中键换成禁用底色，字色与图标色交给 Fluent 的禁用样式
 const useStyles = makeStyles({
   side: {
     width: 'var(--side)',
@@ -51,7 +51,7 @@ const useStyles = makeStyles({
     ':hover': { color: tokens.colorNeutralForeground1 },
     [PRESSED]: { color: tokens.colorNeutralForeground1 },
   },
-  // 中键实心：底取中性前景色、图标反过来取底色，不用品牌色。
+  // 中键实心：底取中性前景色、图标反过来取底色，不用品牌色
   play: {
     width: 'var(--play)',
     minWidth: 'var(--play)',
@@ -115,22 +115,22 @@ function TransportKey({ label, icon, className, iconClassName, disabled, onClick
 }
 
 export interface PaperTransportProps {
-  /** 两侧键与中键的直径、整组的宽，单位像素；给了就不看 `scale`。 */
+  /** 两侧键与中键的直径、整组的宽，单位像素；给了就不看 `scale` */
   readonly size?: { side: number; play: number; width: number };
-  /** `data-decor-guard` 的外扩，单位像素：生成式网格不在这组键周围这么远以内放装饰。 */
+  /** `data-decor-guard` 的外扩，单位像素：生成式网格不在这组键周围这么远以内放装饰 */
   readonly guard?: number;
-  /** 不给 `size` 时原尺寸乘的倍数：版心档 1，紧凑档 0.8。 */
+  /** 不给 `size` 时原尺寸乘的倍数：版心档 1，紧凑档 0.8 */
   readonly scale?: number;
-  /** 这一组放在哪由外层定，定位经这两项传进来。 */
+  /** 这一组放在哪由外层定，定位经这两项传进来 */
   readonly className?: string;
   readonly style?: CSSProperties;
 }
 
 /**
- * 罗盘下的三颗圆键：上一首、播放 / 暂停、下一首。这里只管键的大小与排布，放在哪由罗盘件定。
- * 播放键的图标与名字跟着宿主报的状态走；命令不做乐观更新，没连上宿主时三键禁用。
+ * 罗盘下的三颗圆键：上一首、播放 / 暂停、下一首。这里只管键的大小与排布，放在哪由罗盘件定
+ * 播放键的图标与名字跟着宿主报的状态走；命令不做乐观更新，没连上宿主时三键禁用
  *
- * 三颗键随控件层一起藏：控件层藏起时淡出且不接指针；用键盘把焦点移到其中一颗键上时不藏。
+ * 三颗键随控件层一起藏：控件层藏起时淡出且不接指针；用键盘把焦点移到其中一颗键上时不藏
  */
 export function PaperTransport({
   size,
@@ -160,11 +160,11 @@ export function PaperTransport({
   const disabled = !connected;
   const sideKey = mergeClasses(classes.side, !disabled && classes.sideLive);
   const shown = controlsVisible || focused;
-  // 只有键盘带来的焦点算：鼠标点过的键会一直留着焦点，算上的话这组键就再也不藏了。
+  // 只有键盘带来的焦点算：鼠标点过的键会一直留着焦点，算上的话这组键就再也不藏了
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (event.target.matches(':focus-visible')) setFocused(true);
   };
-  // 焦点在组内两颗键之间移动时不算离开，免得中间那一下把整组判成藏起。
+  // 焦点在组内两颗键之间移动时不算离开，免得中间那一下把整组判成藏起
   const onBlur = (event: FocusEvent<HTMLDivElement>) => {
     const next = event.relatedTarget;
     if (!(next instanceof Node && event.currentTarget.contains(next))) setFocused(false);

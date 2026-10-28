@@ -90,6 +90,19 @@ describe('搜索菜单', () => {
     expect(host.callsTo('library.getAlbumTracks')).toHaveLength(0);
   });
 
+  it('艺人没有曲目菜单；选区里混进的艺人不算', async () => {
+    const { menu, state, first } = await setup();
+    const named: SearchHit = {
+      kind: 'artist',
+      artist: { name: 'Artist', albumCount: 1, trackCount: 2, duration: 0, albums: [] },
+    };
+    await menu.open(named);
+    expect(state().hit).toBeNull();
+    const track: SearchHit = { kind: 'track', track: first };
+    await menu.open(track, [track, named]);
+    expect(state().hits).toEqual([track]);
+  });
+
   it('多选同专辑曲目只读一次，命令树包含整个选择且保持给定顺序', async () => {
     const { menu, state, host, second, first } = await setup();
     const hits: SearchHit[] = [second, first].map((track) => ({ kind: 'track', track }));

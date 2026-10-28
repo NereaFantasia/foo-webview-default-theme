@@ -147,6 +147,13 @@ export function LyricsDetailPage({
           {ready.content.kind === 'synced' && (
             <LyricsPlayer
               lines={ready.content.lines}
+              fallback={
+                <LyricsReading
+                  content={ready.content}
+                  offset={offset}
+                  onSeek={canSeek ? (seconds) => onSeek(ready.key, seconds) : undefined}
+                />
+              }
               clock={clock}
               active={active}
               motion={motion}

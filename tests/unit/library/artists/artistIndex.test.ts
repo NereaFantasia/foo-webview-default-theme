@@ -25,6 +25,24 @@ function info(name: string, albums: [string, string][], trackCount = 10): Artist
 }
 
 describe('艺人清单', () => {
+  it('两种艺人口径都保留同显示名称专辑的独立标识', () => {
+    const albums = [
+      { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' },
+      { ...albumRow('\uFFFD', 'X'), albumId: 'album1:ba0058' },
+    ];
+    const item = {
+      ...info('Guest', []),
+      albums: albums.map((album) => ({
+        name: album.name,
+        artist: album.albumArtist,
+        albumId: album.albumId,
+      })),
+    };
+    const keys = ['album1:b90058', 'album1:ba0058'];
+    expect(albumArtistRows(albums)[0]?.albums).toEqual(keys);
+    expect(creditedRows([item])[0]?.albums).toEqual(keys);
+  });
+
   it('专辑艺术家口径按专辑行归人，曲目数与时长累加，空专辑艺术家归到「没写艺术家」', () => {
     const rows = albumArtistRows([
       albumRow('Modal Soul', 'Nujabes', { trackCount: 14, duration: 3600 }),
@@ -86,13 +104,19 @@ describe('艺人清单', () => {
     ]);
     expect(store.get(service.state)).toMatchObject({ status: 'ready', truncated: false });
     host.answer('library.getArtists', hostFailure('OPERATION_FAILED'));
-    host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
-    host.emit('library:itemsModified', { count: 1, timestamp: 2 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
+    host.emit('library:itemsModified', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      fromHook: false,
+      timestamp: 2,
+    });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(host.callsTo('library.getArtists')).toHaveLength(2);
     expect(store.get(service.state)).toMatchObject({ status: 'failed', rows: [{ name: 'A' }] });
     store.set(needed, false);
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 3 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 3 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(host.callsTo('library.getArtists')).toHaveLength(2);
     host.answer('library.getArtists', {

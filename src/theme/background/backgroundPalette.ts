@@ -4,7 +4,7 @@ import type { ColorScheme } from '../themes.ts';
 
 export type PaletteCorners = readonly number[];
 
-/** 背景使用面积排序；强调色的小色块不能扩大成四分之一的窗口。 */
+/** 背景使用面积排序；强调色的小色块不能扩大成四分之一的窗口 */
 export function backgroundPalette(
   profile: CoverProfile | null,
   base: CoverTone,
@@ -32,7 +32,7 @@ export function backgroundPalette(
   });
 }
 
-/** 连续双线性场只变形采样坐标；没有封面纹理、独立光斑或逐帧随机数。 */
+/** 连续双线性场只变形采样坐标；没有封面纹理、独立光斑或逐帧随机数 */
 export function paintBackgroundPalette(
   pixels: Uint8ClampedArray,
   width: number,

@@ -1,0 +1,11 @@
+/* 截图是 16:10 的窗口，方框也是 16:10，铺满即可；底色只在图没解出来的那一刻露出 */
+.shot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: var(--colorNeutralBackground4);
+  user-select: none;
+}

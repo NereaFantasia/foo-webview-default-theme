@@ -14,7 +14,7 @@ export const LYRIC_STATUS_MESSAGES = {
 export type LyricLogState = 'none' | 'plain' | 'synced' | keyof typeof LYRIC_STATUS_MESSAGES;
 
 interface LyricLine {
-  /** 秒。 */
+  /** 秒 */
   readonly time: number;
   readonly end: number;
   readonly text: string;
@@ -27,19 +27,19 @@ export interface LyricRows {
   next: LyricLine | null;
 }
 
-/** 歌词卡的两行：主行是当前行；副行有译文放译文，没有放下一句，都没有就空、卡按一行排。 */
+/** 歌词卡的两行：主行是当前行；副行有译文放译文，没有放下一句，都没有就空、卡按一行排 */
 export interface LyricCardLines {
   main: string;
   sub: string;
-  /** 副行放的是什么：译文与下一句的颜色不同。 */
+  /** 副行放的是什么：译文与下一句的颜色不同 */
   subKind: 'translation' | 'next' | 'none';
 }
 
 export interface LyricLog {
   readonly state: LyricLogState;
-  /** 本地或在线来源；尚未取得歌词时为空串。 */
+  /** 本地或在线来源；尚未取得歌词时为空串 */
   readonly source: string;
-  /** 无时间轴时的非空行数；有时间轴与无词时为 0。 */
+  /** 无时间轴时的非空行数；有时间轴与无词时为 0 */
   readonly lineCount: number;
 }
 
@@ -62,7 +62,7 @@ export const lyricLogAtom: Atom<LyricLog> = atom((get) => {
   return { state, source, lineCount };
 });
 
-/** 首行之前与无时间轴时为 -1；最后一句结束后为行数，使当前行留空。 */
+/** 首行之前与无时间轴时为 -1；最后一句结束后为行数，使当前行留空 */
 const indexAtom = atom((get) => {
   const { state, lines } = get(loadedAtom);
   if (state !== 'synced') return -1;
@@ -72,7 +72,7 @@ const indexAtom = atom((get) => {
   return last && position >= last.end ? lines.length : at;
 });
 
-/** 有时间轴时按播放位置取的三行；首行之前当前行为空、下一行是首行。 */
+/** 有时间轴时按播放位置取的三行；首行之前当前行为空、下一行是首行 */
 export const lyricRowsAtom: Atom<LyricRows> = atom((get) => {
   const { state, lines } = get(loadedAtom);
   if (state !== 'synced') return NO_ROWS;
@@ -84,7 +84,7 @@ export const lyricRowsAtom: Atom<LyricRows> = atom((get) => {
   };
 });
 
-/** 有时间轴且已播到首行才有；首行之前、无时间轴与无词时为 null，无时间轴那一行由调用方按 `lineCount` 写。 */
+/** 有时间轴且已播到首行才有；首行之前、无时间轴与无词时为 null，无时间轴那一行由调用方按 `lineCount` 写 */
 export const lyricCardAtom: Atom<LyricCardLines | null> = atom((get) => {
   const { current, next } = get(lyricRowsAtom);
   if (!current) return null;
@@ -104,7 +104,7 @@ function project(result: LyricsState): Loaded {
   const { content, source } = result;
   if (content.kind === 'plain')
     return { ...EMPTY, state: 'plain', source, lineCount: content.lines.length };
-  // 双行卡和日志只跟随主唱，避免背景人声把当前句顶掉；不改共享的逐字数据。
+  // 双行卡和日志只跟随主唱，避免背景人声把当前句顶掉；不改共享的逐字数据
   const main = content.lines.filter((line) => !line.isBG);
   const sorted = (main.length ? main : content.lines)
     .map((line) => ({
@@ -117,7 +117,7 @@ function project(result: LyricsState): Loaded {
       translation: line.translatedLyric,
     }))
     .sort((a, b) => a.time - b.time);
-  // 解析器把间奏空行记在上一句的结束时间，日志将这段空隙还原为独立的一行。
+  // 解析器把间奏空行记在上一句的结束时间，日志将这段空隙还原为独立的一行
   const lines = sorted.flatMap((line, index) => {
     const next = sorted[index + 1];
     return next && line.end > line.time && line.end < next.time
@@ -134,7 +134,7 @@ function project(result: LyricsState): Loaded {
 
 /**
  * 把共用歌词投影为双行卡与三行日志。只在沉浸视图可见时订阅，离开后冻结退场内容；
- * 重新进入先订阅再初读。同一行内只更新位置，行下标不变就不重新发布行内容。
+ * 重新进入先订阅再初读。同一行内只更新位置，行下标不变就不重新发布行内容
  */
 export function startLyricLog(
   store: Store,
@@ -184,7 +184,7 @@ export function startLyricLog(
   };
 }
 
-/** `position`（秒）落在哪一行：时间不晚于它的最后一行；首行之前是 -1。 */
+/** `position`（秒）落在哪一行：时间不晚于它的最后一行；首行之前是 -1 */
 function currentIndex(lines: readonly LyricLine[], position: number): number {
   let low = 0;
   let high = lines.length - 1;
@@ -201,7 +201,7 @@ function currentIndex(lines: readonly LyricLine[], position: number): number {
   return found;
 }
 
-/** 时间码显示成 mm:ss；日志的行宽不放百分秒。 */
+/** 时间码显示成 mm:ss；日志的行宽不放百分秒 */
 export function formatLyricTime(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(whole / 60);

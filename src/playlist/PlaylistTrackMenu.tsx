@@ -32,7 +32,6 @@ import { trackActionsKey } from '../track/trackActions.ts';
 import { playlistPageKey } from './playlistPageServices.ts';
 import { playlistActionsKey } from './playlistActions.ts';
 import { playlistRowsKey } from './playlistRows.ts';
-import { albumNavigationKey } from '../track/albumNavigation.ts';
 import { ratingsKey } from '../track/trackRatings.ts';
 
 export interface PlaylistMenuTarget {
@@ -74,9 +73,7 @@ export function PlaylistTrackMenu({
   const playlistActions = useService(playlistActionsKey);
   const playlistRows = useService(playlistRowsKey);
   const trackActions = useService(trackActionsKey);
-  const albumNavigation = useService(albumNavigationKey);
   const ratings = useService(ratingsKey);
-  useAtomValueRawSync(albumNavigation.catalog);
   const selectedTracks = usePlaylistMenuTracks(guid, target);
   const directRating = useTrackMenuRating(
     t,
@@ -122,7 +119,6 @@ export function PlaylistTrackMenu({
   const entry = lists.find((item) => item.guid === guid);
   const locked = entry?.isLocked ?? true;
   const anchor = target ? view.trackOf(target.row) : undefined;
-  const album = anchor ? albumNavigation.findAlbum(anchor) : null;
   const single = count === 1 ? anchor : undefined;
   const first = view.trackOf(ranges[0]?.start ?? -1);
   const name =
@@ -174,6 +170,7 @@ export function PlaylistTrackMenu({
         },
     divider('navigation-divider'),
     'go-to-album',
+    'go-to-artist',
     divider('rating-divider'),
     'rating',
     'properties',
@@ -258,7 +255,7 @@ export function PlaylistTrackMenu({
           play: () => {
             const attempt = ++playAttempt.current;
             setPlayFailed(false);
-            void playPlaylistSelection(fb.playlist, guid, ranges, valid, (paths) =>
+            void playPlaylistSelection(fb, guid, ranges, valid, (paths) =>
               trackActions.playPaths(paths, 0, LIBRARY_SOURCE),
             ).then((ok) => {
               if (attempt === playAttempt.current) setPlayFailed(!ok);
@@ -269,7 +266,7 @@ export function PlaylistTrackMenu({
           sendToNew: () => void page.tracks.sendToNew(guid, ranges, name),
           sendTo: (into) => void page.tracks.sendTo(guid, ranges, into.guid),
         }}
-        album={{ open: album ? () => albumNavigation.open(album) : null, here: false }}
+        anchor={anchor ?? null}
         rating={inline ? rating : hostRatingEntry(t, known.rating, (node) => run(node))}
         ratingCovers={!inline || !directRating.disabled}
         covered={[{ command: !inline ? known.sendToDialog : null, label: t('albumDetail.sendTo') }]}

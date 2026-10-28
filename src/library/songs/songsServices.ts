@@ -1,3 +1,4 @@
+import { trackQueryOf, type TrackQuery } from '../../track/trackFilter.ts';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import type { NavHistoryService } from '../../nav/navHistory.ts';
@@ -14,30 +15,28 @@ import {
 import {
   songsFilterAtom,
   EMPTY_SONGS_FILTER,
-  songsQueryOf,
   startSongsFilter,
   type SongsFilterService,
-  type SongsQuery,
 } from './songsFilter.ts';
 import { songsPrefsAtom, startSongsPrefs, type SongsPrefsService } from './songsPrefs.ts';
 import { startSongsRows, type SongsRowsFace, type SongsRowsService } from './songsRows.ts';
-import { songsSortPattern } from './songsSort.ts';
+import { trackSortPattern } from '../../track/trackSort.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
 
-/** 打字到问宿主之间的静默期，毫秒；勾预设、点分面、换排序不等。 */
+/** 打字到问宿主之间的静默期，毫秒；勾预设、点分面、换排序不等 */
 export const TYPING_DEBOUNCE_MS = QUERY_DEBOUNCE_MS;
 
-/** 此刻的筛选拼成的查询。 */
-export const songsQueryAtom: Atom<SongsQuery> = atom((get) =>
-  songsQueryOf(get(songsFilterAtom), get(songsPrefsAtom).scope),
+/** 此刻的筛选拼成的查询 */
+export const songsQueryAtom: Atom<TrackQuery> = atom((get) =>
+  trackQueryOf(get(songsFilterAtom), get(songsPrefsAtom).scope),
 );
 
-/** 此刻交给宿主的那一份：查询、排序串与方向。表格的顺序与填表起播都按它。 */
+/** 此刻交给宿主的那一份：查询、排序串与方向。表格的顺序与填表起播都按它 */
 export const songsFillAtom: Atom<QueryFill> = atom((get) => {
   const { sort } = get(songsPrefsAtom);
   return {
     query: get(songsQueryAtom).query,
-    sort: songsSortPattern(sort.column),
+    sort: trackSortPattern(sort.column),
     descending: sort.descending,
   };
 });
@@ -49,7 +48,7 @@ export interface SongsServices {
   readonly filter: SongsFilterService;
   readonly rows: SongsRowsService;
   readonly actions: SongsActionsService;
-  /** 打开歌曲页，仅保留指定流派（栏内或）；值不能写成精确查询时不改变筛选或地点，答假。 */
+  /** 打开歌曲页，仅保留指定流派（栏内或）；值不能写成精确查询时不改变筛选或地点，答假 */
   openWithGenres(names: readonly string[]): boolean;
   dispose(): void;
 }
@@ -60,7 +59,7 @@ export interface SongsDeps extends SongsActionsDeps {
 
 /**
  * 歌曲页的服务：偏好、筛选、宿主排好的顺序与成批命令。筛选或排序一变就按新的查询向顺序服务要一次；只改了框里的字
- * 时等 `TYPING_DEBOUNCE_MS`，回车由页面调 `rows.flush()`。
+ * 时等 `TYPING_DEBOUNCE_MS`，回车由页面调 `rows.flush()`
  */
 export function startSongs(store: Store, deps: SongsDeps, host: SongsFace = fb): SongsServices {
   const prefs = startSongsPrefs(store);
@@ -85,7 +84,7 @@ export function startSongs(store: Store, deps: SongsDeps, host: SongsFace = fb):
     actions,
     openWithGenres(names) {
       if (disposed || names.length === 0 || !names.every(isQueryableValue)) return false;
-      // 先离开旧记录，让它捕获原筛选；新记录只带调用方指定的流派。
+      // 先离开旧记录，让它捕获原筛选；新记录只带调用方指定的流派
       deps.history.navigate({ id: 'songs' });
       filter.restore({
         ...EMPTY_SONGS_FILTER,
@@ -100,6 +99,7 @@ export function startSongs(store: Store, deps: SongsDeps, host: SongsFace = fb):
       offFilter();
       actions.dispose();
       rows.dispose();
+      filter.dispose();
     },
   };
 }

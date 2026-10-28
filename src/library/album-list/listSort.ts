@@ -2,14 +2,14 @@ import type { LibraryTrack } from 'foo-webview-sdk';
 import { collator, parentDirectoryOf, type AlbumSection } from '../albumSections.ts';
 import { albumArtistOf, albumKeyOf, albumYearOf, type Album } from '../../host/libraryContract.ts';
 
-// 列表形态的排序：专辑、文件、播放统计三组字段外加随机，各字段怎么取专辑级的值，节按名称还是张数排。
-// 入参数组一律不改，返回新数组。
+// 列表形态的排序：专辑、文件、播放统计三组字段外加随机，各字段怎么取专辑级的值，节按名称还是张数排
+// 入参数组一律不改，返回新数组
 
-/** 三组字段，按菜单里的先后；取值与 config 里存的一致，改名要写迁移。 */
+/** 三组字段，按菜单里的先后；取值与 config 里存的一致，改名要写迁移 */
 export const LIST_SORT_GROUPS = {
-  album: ['albumArtist', 'name', 'year', 'genre', 'trackCount', 'duration'],
+  album: ['albumArtist', 'name', 'year', 'genre', 'trackCount', 'duration', 'rating'],
   file: ['folder', 'codec', 'bitrate', 'sampleRate', 'fileSize'],
-  stats: ['added', 'lastPlayed', 'firstPlayed', 'playCount', 'rating'],
+  stats: ['added', 'lastPlayed', 'firstPlayed', 'playCount'],
 } as const;
 
 export const LIST_SORT_FIELDS = [
@@ -19,23 +19,36 @@ export const LIST_SORT_FIELDS = [
   'random',
 ] as const;
 export type ListSortField = (typeof LIST_SORT_FIELDS)[number];
-/** 要装 foo_playcount 才取得到的那一组（评分放在这一组里，与菜单一致）。 */
+/** 要装 foo_playcount 才取得到的播放统计字段 */
 export type StatsField = (typeof LIST_SORT_GROUPS.stats)[number];
+
+/** 换到这个字段时从大的、新的在前起：年份、张数、评分，以及添加时间、最近与首次播放、播放次数 */
+export function startsDescending(field: ListSortField): boolean {
+  return field === 'year' || field === 'trackCount' || field === 'rating' || isStatsField(field);
+}
 
 export function isStatsField(field: ListSortField): field is StatsField {
   return LIST_SORT_GROUPS.stats.some((stats) => stats === field);
 }
 
-/** 写成 type 而不是 interface：要直接存进 config，interface 没有隐式的索引签名。 */
+export function needsAlbumTracks(field: ListSortField): boolean {
+  return (
+    field === 'rating' ||
+    isStatsField(field) ||
+    LIST_SORT_GROUPS.file.some((value) => value === field && value !== 'folder')
+  );
+}
+
+/** 写成 type 而不是 interface：要直接存进 config，interface 没有隐式的索引签名 */
 export type ListSort = {
   readonly field: ListSortField;
-  /** 降序；随机时不看它。 */
+  /** 降序；随机时不看它 */
   readonly descending: boolean;
 };
 
 export const DEFAULT_LIST_SORT: ListSort = { field: 'albumArtist', descending: false };
 
-/** 读存档与用户设值都过它：字段不认得就当没存，方向不是布尔值就当升序。 */
+/** 读存档与用户设值都过它：字段不认得就当没存，方向不是布尔值就当升序 */
 export function parseListSort(raw: unknown): ListSort | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
   const field: unknown = Reflect.get(raw, 'field');
@@ -44,13 +57,13 @@ export function parseListSort(raw: unknown): ListSort | undefined {
   return { field: known, descending: Reflect.get(raw, 'descending') === true };
 }
 
-/** 节的顺序：按名称（中文按拼音），或按张数、多的在前；「未知」节恒在最后。 */
+/** 节的顺序：按名称（中文按拼音），或按张数、多的在前；「未知」节恒在最后 */
 export const SECTION_ORDERS = ['name', 'count'] as const;
 export type SectionOrder = (typeof SECTION_ORDERS)[number];
 
 /**
- * 一首曲目的播放统计。时间照 foo_playcount 的写法「YYYY-MM-DD HH:MM:SS」，按字面比就是先后；空串是没有。
- * `added` 在没有添加时间时已换成文件修改时间。
+ * 一首曲目的播放统计。时间照 foo_playcount 的写法「YYYY-MM-DD HH:MM:SS」，按字面比就是先后；空串是没有
+ * `added` 在没有添加时间时已换成文件修改时间
  */
 export interface TrackStats {
   readonly added: string;
@@ -59,19 +72,19 @@ export interface TrackStats {
   readonly playCount: number;
 }
 
-/** 排序时各张专辑要的外部数据。 */
+/** 排序时各张专辑要的外部数据 */
 export interface ListSortContext {
-  /** 这张专辑的曲目，按碟号、曲号排好；还没取到时为 undefined。 */
+  /** 这张专辑的曲目，按碟号、曲号排好；还没取到时为 undefined */
   readonly tracksOf: (album: Album) => readonly LibraryTrack[] | undefined;
-  /** 一首的播放统计；没取、或没装 foo_playcount 时为 undefined。 */
+  /** 一首的播放统计；没取、或没装 foo_playcount 时为 undefined */
   readonly statsOf: (track: LibraryTrack) => TrackStats | undefined;
-  /** 随机的种子：同一个种子排出同一个顺序，换了种子重洗。 */
+  /** 随机的种子：同一个种子排出同一个顺序，换了种子重洗 */
   readonly seed: number;
 }
 
 type SortValue = number | string | undefined;
 
-/** 把各首的值折成一个：取不到的首不算，一首都取不到时为 undefined。 */
+/** 把各首的值折成一个：取不到的首不算，一首都取不到时为 undefined */
 function fold<T extends number | string>(
   tracks: readonly LibraryTrack[] | undefined,
   pick: (track: LibraryTrack) => T | undefined,
@@ -90,7 +103,7 @@ const highest = (values: readonly number[]) => Math.max(...values);
 const latest = (values: readonly string[]) => values.reduce((a, b) => (b > a ? b : a));
 const earliest = (values: readonly string[]) => values.reduce((a, b) => (b < a ? b : a));
 
-/** 种子与专辑键合成的一个 32 位数：FNV-1a 再过一遍 murmur3 的收尾，相近的键也散得开。 */
+/** 种子与专辑键合成的一个 32 位数：FNV-1a 再过一遍 murmur3 的收尾，相近的键也散得开 */
 export function shuffleRank(seed: number, key: string): number {
   let hash = (seed ^ 0x811c9dc5) >>> 0;
   for (let at = 0; at < key.length; at += 1) {
@@ -103,7 +116,7 @@ export function shuffleRank(seed: number, key: string): number {
 
 /**
  * 一张专辑在某个字段上的值。总时长、文件大小、播放次数求和；评分取评过分的曲目的平均；添加时间、最近播放
- * 取最新，首次播放取最早；比特率取平均、采样率取最高；格式与文件夹路径取第一首。取不到为 undefined。
+ * 取最新，首次播放取最早；比特率取平均、采样率取最高；格式与文件夹路径取第一首。取不到为 undefined
  */
 export function albumSortValue(
   field: ListSortField,
@@ -155,7 +168,7 @@ export function albumSortValue(
 
 /**
  * 按字段排一节里的专辑。取不到值的恒排最后，升降序都一样；值相同再按专辑名、专辑艺术家，都相同时保持入参
- * 顺序。随机只看种子。
+ * 顺序。随机只看种子
  */
 export function sortListAlbums(
   albums: readonly Album[],
@@ -180,13 +193,19 @@ export function sortListAlbums(
   );
 }
 
-/** 节的顺序。按名称时沿用分节给的顺序（它已按名称排好）；按张数时多的在前，张数相同按名称。 */
+/**
+ * 计算分节排序顺序
+ * 按名称时保持分节预设名称序；按专辑数量排序时，数量相同的分节维持名称序；`descending` 为 null 时取该模式默认方向（名称升序，数量降序）；「未知」节恒排在末尾
+ */
 export function orderSections(
   sections: readonly AlbumSection[],
   order: SectionOrder,
+  descending: boolean | null = null,
 ): AlbumSection[] {
-  if (order === 'name') return [...sections];
+  const reverse = descending ?? order === 'count';
   const known = sections.filter((section) => section.key !== null);
   const unknown = sections.filter((section) => section.key === null);
-  return [...known.sort((a, b) => b.albums.length - a.albums.length), ...unknown];
+  if (order === 'name') return reverse ? [...known.reverse(), ...unknown] : [...sections];
+  const sign = reverse ? -1 : 1;
+  return [...known.sort((a, b) => sign * (a.albums.length - b.albums.length)), ...unknown];
 }

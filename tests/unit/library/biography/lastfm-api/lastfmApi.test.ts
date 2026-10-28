@@ -72,6 +72,11 @@ describe('Last.fm API 请求', () => {
       [reply(200, '<html>not json</html>'), 'invalid'],
       [reply(200, '[1,2]'), 'invalid'],
       [hostFailure('OPERATION_FAILED'), 'network'],
+      [
+        hostFailure('PERMISSION_DENIED', 'Target host resolves to a private/local network address'),
+        'localRelay',
+      ],
+      [hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'), 'dns'],
     ] as const;
     for (const [answer, problem] of cases) {
       const host = installFakeHost();

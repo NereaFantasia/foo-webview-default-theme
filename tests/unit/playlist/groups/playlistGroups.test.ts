@@ -113,8 +113,18 @@ describe('startPlaylistGroups', () => {
     setup(host);
     await start(host);
     const before = runCalls(host).length;
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 5 });
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 5 });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 5,
+      contentVersion: '1',
+    });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 5,
+      contentVersion: '1',
+    });
     await coalesced();
     expect(runCalls(host)).toHaveLength(before + 1);
   });
@@ -128,6 +138,7 @@ describe('startPlaylistGroups', () => {
       playlist: 0,
       total: 99,
       runs: [],
+      contentVersion: '1',
     });
     const { state } = await start(host);
     await coalesced();
@@ -186,7 +197,12 @@ describe('startPlaylistGroups', () => {
     const before = runCalls(host).length;
     groups.setEnabled(false);
     expect(state()).toMatchObject({ runs: [], loading: false });
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 5 });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 5,
+      contentVersion: '1',
+    });
     await coalesced();
     expect(runCalls(host)).toHaveLength(before);
     groups.setEnabled(true);
@@ -241,7 +257,12 @@ describe('startPlaylistGroups', () => {
     setup(host);
     const { groups, state } = await start(host);
     const held = host.hold('playlist.getGroupRuns');
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 5 });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 5,
+      contentVersion: '1',
+    });
     await coalesced();
     expect(held.pending).toHaveLength(1);
     const mode = GROUP_MODES.findIndex((candidate) => candidate.id === 'albumSimple');
@@ -255,6 +276,7 @@ describe('startPlaylistGroups', () => {
       playlist: 0,
       total: 5,
       runs: [{ start: 0, count: 5, key: 'stale' }],
+      contentVersion: '1',
     });
     await wait();
     expect(keys(state().runs)).toStrictEqual([]);

@@ -1,4 +1,4 @@
-/* 格顶留 11、值在小标下 3、Genre 与下一行隔 18、两个时间隔 14：都没有等值的 spacing token，写成本件的几何变量。 */
+/* 格顶留 11、值在小标下 3、Genre 与下一行隔 18、两个时间隔 14：都没有等值的 spacing token，写成本件的几何变量 */
 .row {
   --cell-lead: 11px;
   --value-lead: 3px;
@@ -32,13 +32,13 @@
   padding-top: var(--cell-lead);
 }
 
-/* 分隔线离上下两条横线各留约 11，不顶满整行。 */
+/* 分隔线离上下两条横线各留约 11，不顶满整行 */
 .cell + .cell {
   padding-left: var(--spacingHorizontalL);
   background: linear-gradient(var(--paper-cross), var(--paper-cross)) 0 11px / 1px 120px no-repeat;
 }
 
-/* Year 只有四位数字，列给窄一点，厂牌名才不会折行。 */
+/* Year 只有四位数字，列给窄一点，厂牌名才不会折行 */
 .meta {
   display: grid;
   grid-template-columns: 88px 1fr;

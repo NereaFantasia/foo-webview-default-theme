@@ -4,7 +4,7 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { useMemo, useState } from 'react';
 import { useExternalLinks } from '../../../kit/external-link/ExternalLinkProvider.tsx';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
-import { SongArt } from '../../songs/SongArt.tsx';
+import { SongArt } from '../../SongArt.tsx';
 import { useArtists } from '../artistsContext.ts';
 import { ArtistHighlightTable } from './ArtistHighlightTable.tsx';
 import styles from './ArtistHighlights.module.css';

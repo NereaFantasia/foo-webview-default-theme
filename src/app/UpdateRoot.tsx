@@ -3,9 +3,11 @@ import {
   ArrowClockwise16Regular,
   ArrowDownload20Regular,
   ArrowSync16Regular,
+  Open16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useExternalLinks } from '../kit/external-link/ExternalLinkProvider.tsx';
 import { useInsertMotion } from '../motion/useInsertMotion.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
@@ -20,8 +22,9 @@ import { UPDATE_MODES, updaterKey, type UpdateMode } from '../update/updater.ts'
 import { onboardingKey } from '../settings/onboarding/onboarding.ts';
 import { OnboardingUpdateContext } from '../settings/onboarding/onboardingSlots.ts';
 import { ChangelogDialog } from '../update/ChangelogDialog.tsx';
+import { startupBlockAtom } from '../update/loaderConfirmation.ts';
 import { changelogViewKey } from '../update/changelogView.ts';
-import { statusLine } from './updateIntegration.ts';
+import { statusLine, updateLink } from './updateIntegration.ts';
 import { backendBootstrapKey } from '../update/backendBootstrap.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { PluginUpdateRow } from './PluginUpdateRow.tsx';
@@ -34,7 +37,7 @@ const MODE_TEXT: Readonly<
   auto: { label: 'update.modeAuto', description: 'update.modeAutoHint' },
 };
 
-/** 更新方式三选一，选中即保存；这个窗口不运行更新器时禁用。 */
+/** 更新方式单选切换，选中即保存；更新器未运行时禁用 */
 function UpdateModeRow() {
   const t = useAtomValueRawSync(translateAtom);
   const updater = useService(updaterKey);
@@ -60,22 +63,29 @@ function UpdateModeRow() {
 }
 
 interface UpdateStatusCardProps {
-  /** 按钮一律用次要样式：新人引导里主按钮留给「完成」。 */
+  /** 按钮使用次要样式，向导流程将主要样式留给完成动作 */
   readonly quiet?: boolean;
-  /** 重启前要先做完的事，新人引导用它先写下引导记录。 */
+  /** 重启前的前置回调，例如向导流程写入完成标记 */
   readonly beforeRestart?: () => Promise<unknown>;
 }
 
+/** 完整主题包发行页面，与在线更新共用分发源 */
+const RELEASES_PAGE = 'https://cnb.cool/foo-ui-webview2/default-theme/-/releases';
+/** 插件版本不够时手动下载插件的页面；应用内的插件更新要等启动确认通过 */
+const PLUGIN_RELEASES_PAGE = 'https://github.com/NereaFantasia/foo_ui_webview2/releases';
+
 /**
- * 按钮平时是「检查更新」；查到新版但没下载时换成「下载并安装」，已下载新版本时换成「立即重启」，更新状态损坏时换成「重置更新状态」。检查、
- * 下载与安装进行中，或者这个窗口不运行更新器时禁用。
+ * 汇总更新状态卡片文案与交互操作
+ * 按钮文案与动作随更新阶段动态派发，更新执行中或更新器未运行时禁用
  */
 function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps = {}) {
   const t = useAtomValueRawSync(translateAtom);
   const updater = useService(updaterKey);
+  const links = useExternalLinks();
   const status = useAtomValueRawSync(updater.status);
+  const block = useAtomValueRawSync(startupBlockAtom);
   const [restartFailed, setRestartFailed] = useState(false);
-  // 重启的应答可能在离开设置页之后才回来，那时不再改状态。
+  // 卸载后丢弃迟到的重启响应，避免组件销毁后更新状态
   const alive = useRef(false);
   const buttonId = useId();
   useEffect(() => {
@@ -84,16 +94,20 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
       alive.current = false;
     };
   }, []);
-  const ready = status.phase === 'ready';
+  const ready = status.phase === 'ready' || status.phase === 'replaced';
   const available = status.phase === 'available';
   const broken = status.phase === 'manual' && status.reason === 'state';
-  const busy = ['off', 'checking', 'downloading', 'installing', 'shared', 'maintenance'].includes(
-    status.phase,
-  );
+  const link = updateLink(status, block);
+  const manual = link !== null;
+  const busy =
+    !manual &&
+    ['off', 'checking', 'downloading', 'installing', 'shared', 'maintenance'].includes(
+      status.phase,
+    );
   const line =
     restartFailed && ready
       ? { text: t('update.restartFailed'), error: true }
-      : statusLine(status, t);
+      : statusLine(status, t, block);
   const restart = async () => {
     await beforeRestart?.();
     const done = await updater.restart();
@@ -105,8 +119,10 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
     control: ({ labelId, descriptionId }: SettingsCardIds) => (
       <Button
         id={buttonId}
-        appearance={(ready || available) && !quiet ? 'primary' : 'secondary'}
-        icon={ready ? <ArrowClockwise16Regular /> : <ArrowSync16Regular />}
+        appearance={(ready || available || manual) && !quiet ? 'primary' : 'secondary'}
+        icon={
+          ready ? <ArrowClockwise16Regular /> : manual ? <Open16Regular /> : <ArrowSync16Regular />
+        }
         iconPosition="after"
         disabledFocusable={busy}
         aria-labelledby={`${buttonId} ${labelId}`}
@@ -116,9 +132,11 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
             ? void restart()
             : available
               ? void updater.install()
-              : broken
-                ? void updater.reset()
-                : void updater.check()
+              : manual
+                ? links.open(link === 'plugin' ? PLUGIN_RELEASES_PAGE : RELEASES_PAGE)
+                : broken
+                  ? void updater.reset()
+                  : void updater.check()
         }
       >
         {t(
@@ -126,9 +144,13 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
             ? 'update.restartNow'
             : available
               ? 'update.installNow'
-              : broken
-                ? 'update.reset'
-                : 'update.checkNow',
+              : manual
+                ? link === 'plugin'
+                  ? 'update.openPluginReleases'
+                  : 'update.openReleases'
+                : broken
+                  ? 'update.reset'
+                  : 'update.checkNow',
         )}
       </Button>
     ),
@@ -246,8 +268,8 @@ const useOnboardingStyles = makeStyles({
 });
 
 /**
- * 新人引导第 4 步的更新部分：三选一，选中即保存；选了提醒或自动下载就马上检查一次。检查过一次之后，
- * 下面出现与设置页同一张的主题更新卡，切回「手动检查」也留着。
+ * 引导向导更新配置步：变更策略即时持久化，选择定时提醒或自动下载时触发即时检查
+ * 触发首次检查后挂载更新状态卡片，后续切回手动检查仍持续保留
  */
 function OnboardingUpdate() {
   const t = useAtomValueRawSync(translateAtom);
@@ -255,11 +277,12 @@ function OnboardingUpdate() {
   const onboarding = useService(onboardingKey);
   const mode = useAtomValueRawSync(updater.mode);
   const status = useAtomValueRawSync(updater.status);
+  const block = useAtomValueRawSync(startupBlockAtom);
   const classes = useOnboardingStyles();
   const off = status.phase === 'off';
   const checked =
     !off && !(status.phase === 'idle' && status.checkedAt === null && !status.failure);
-  // 随第 4 步一起出现时直接在；在这一步里选了提醒或自动下载才插进来，那时让位再淡入。
+  // 初始已触发检查时直接展示，由用户操作触发时执行排版让位与淡入过渡
   const shownWithStep = useRef(checked);
   const insert = useInsertMotion<HTMLDivElement>(!shownWithStep.current);
   const choose = async (value: UpdateMode) => {
@@ -269,7 +292,7 @@ function OnboardingUpdate() {
     <>
       <Field
         label={{ children: t('update.modeTitle'), weight: 'semibold' }}
-        hint={off ? statusLine(status, t).text : undefined}
+        hint={off ? statusLine(status, t, block).text : undefined}
       >
         <RadioGroup
           value={mode}
@@ -302,7 +325,7 @@ function OnboardingUpdate() {
   );
 }
 
-/** 把更新设置放进设置页「关于」与新人引导第 4 步的插槽；更新服务由 `app/services.ts` 创建。 */
+/** 注册更新设置卡片至关于页与引导向导插槽；更新服务实例由装配层提供 */
 export function UpdateRoot({ children }: { readonly children: ReactNode }) {
   return (
     <UpdateSettingsContext value={<UpdateSettingsExpander />}>

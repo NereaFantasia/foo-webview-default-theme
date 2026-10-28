@@ -2,19 +2,20 @@ import { atom, type Atom } from 'jotai/vanilla';
 import type { UpdateNotice } from '../host/infoCenter.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import type { Translate } from '../i18n/translate.ts';
+import type { StartupBlock } from '../update/loaderConfirmation.ts';
 import type { UpdateFailure } from '../update/updateState.ts';
 import type { UpdateStatus, UpdaterService } from '../update/updater.ts';
 import { localeAtom } from '../i18n/locale.ts';
 import { notesFor } from '../update/changelog.ts';
 
-/** 插件版本范围写成 `>=X.Y.Z`，提示里只写版本号。 */
+/** 提取范围表达式中的主版本号，将 `>=X.Y.Z` 格式化为用于界面提示的版本文本 */
 export function requiredVersion(range: string | null): string {
   return (range ?? '').replace(/^>=/, '');
 }
 
 /**
- * 更新状态里要用户去处理的几种交给信息中心：有新版等用户安装、已下载等重启、插件版本不够、只能手动更新、与另一个
- * foobar2000 共用目录、同一版本多次失败。暂时性的失败只在设置里显示，不在信息中心里催。
+ * 转换需人工介入的更新阶段为信息中心条目
+ * 覆盖待安装、待重启、宿主版本受限、配置损坏或实例冲突等阻断阶段；重试期临时错误仅在设置页展示
  */
 export function updateNotice(
   updater: Pick<UpdaterService, 'status' | 'mode' | 'changelog'>,
@@ -78,19 +79,58 @@ const FAILURE_TEXT: Readonly<Record<UpdateFailure, MessageKey>> = {
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
-/** 设置里「主题更新」卡的说明行：只写状态与出错原因；还没检查过、也没出错时不出说明行。 */
+/** 更新器不运行的原因：用户能自己改的标成错误，运行方式本身不支持的只陈述 */
+const OFF_LINE: Readonly<
+  Record<StartupBlock['reason'], { readonly key: MessageKey; readonly error: boolean }>
+> = {
+  layout: { key: 'update.offLayout', error: true },
+  host: { key: 'update.offHost', error: true },
+  failed: { key: 'update.offUnconfirmed', error: true },
+  source: { key: 'update.offSource', error: false },
+};
+
+/**
+ * 状态需要用户去下载页处理时，答去主题发行页还是插件发行页；不需要时答 null
+ * 更新器不运行（off）时原因在启动确认里，由 `block` 传入
+ */
+export function updateLink(
+  status: UpdateStatus,
+  block: StartupBlock | null = null,
+): 'theme' | 'plugin' | null {
+  switch (status.phase) {
+    case 'manual':
+      return status.reason === 'state' ? null : 'theme';
+    case 'blocked':
+      return status.limit === 'plugin' ? null : 'theme';
+    case 'off':
+      if (block?.reason === 'layout') return 'theme';
+      return block?.reason === 'host' ? 'plugin' : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 派发主题更新卡状态说明行文本与错误标示；未检查或无异常阶段返回空契约
+ * 更新器不运行（off）时原因在启动确认里，由 `block` 传入
+ */
 export function statusLine(
   status: UpdateStatus,
   t: Translate,
+  block: StartupBlock | null = null,
 ): { readonly text?: string; readonly error: boolean } {
   switch (status.phase) {
     case 'maintenance':
       return { text: t('update.pluginMaintenance'), error: false };
-    case 'off':
-      return {
-        text: t(status.reason === 'storage' ? 'update.storageUnavailable' : 'update.unavailable'),
-        error: status.reason === 'storage',
-      };
+    case 'off': {
+      if (status.reason === 'storage') return { text: t('update.storageUnavailable'), error: true };
+      // 启动确认还没结束，没有原因可说
+      if (!block) return { text: undefined, error: false };
+      const { key, error } = OFF_LINE[block.reason];
+      const params =
+        block.reason === 'host' ? { version: block.version, required: block.required } : undefined;
+      return { text: t(key, params), error };
+    }
     case 'idle': {
       if (status.failure) {
         const reason = t(FAILURE_TEXT[status.failure]);
@@ -148,5 +188,7 @@ export function statusLine(
       };
     case 'shared':
       return { text: t('update.shared'), error: false };
+    case 'replaced':
+      return { text: t('update.replaced'), error: false };
   }
 }

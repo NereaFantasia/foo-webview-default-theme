@@ -44,6 +44,40 @@ describe('sidebarFormOf', () => {
 });
 
 describe('startSidebarView', () => {
+  it('完全隐藏时悬停预览不改偏好；恢复停靠、跨档或导航会关闭预览', () => {
+    const { view, prefs, store, state, resize, history } = start();
+    view.peekOverlay();
+    expect(state().overlay).toBe(false);
+    prefs.toggleHidden();
+    const saved = store.get(sidebarPrefsAtom);
+    view.peekOverlay();
+    expect(state()).toMatchObject({ overlay: true, peeking: true });
+    expect(store.get(sidebarPrefsAtom)).toBe(saved);
+    prefs.toggleHidden();
+    expect(state()).toMatchObject({ overlay: false, peeking: false });
+    prefs.toggleHidden();
+    view.peekOverlay();
+    resize('hidden');
+    expect(state()).toMatchObject({ overlay: false, peeking: false });
+    view.peekOverlay();
+    history.navigate({ id: 'songs' });
+    expect(state()).toMatchObject({ overlay: false, peeking: false });
+    view.dispose();
+  });
+
+  it('极窄档点击把悬停预览留在屏幕上；中窄档图标栏不启用悬停预览', () => {
+    const { view, state, resize } = start('hidden');
+    view.peekOverlay();
+    view.toggleOverlay();
+    expect(state()).toMatchObject({ overlay: true, peeking: false });
+    view.toggleOverlay();
+    expect(state().overlay).toBe(false);
+    resize('tight');
+    view.peekOverlay();
+    expect(state().overlay).toBe(false);
+    view.dispose();
+  });
+
   it('首帧之前就按视口宽度定档；没有 matchMedia 时恒为宽档', () => {
     expect(start('wide').state().tier).toBe('wide');
     expect(start('tight').state().tier).toBe('tight');

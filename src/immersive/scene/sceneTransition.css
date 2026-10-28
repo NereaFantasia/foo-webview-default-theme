@@ -1,0 +1,50 @@
+/* 场景动作过渡期间：根不截图，页面照常实时绘制；过渡的伪元素不接指针；已在场元素点到点移动的时长与曲线由脚本写进变量 */
+html[data-scene-transition] {
+  view-transition-name: none;
+}
+
+html[data-scene-transition]::view-transition,
+html[data-scene-transition]::view-transition-group(*),
+html[data-scene-transition]::view-transition-image-pair(*),
+html[data-scene-transition]::view-transition-old(*),
+html[data-scene-transition]::view-transition-new(*) {
+  pointer-events: none;
+}
+
+html[data-scene-transition]::view-transition-group(*) {
+  animation-duration: var(--scene-glide-duration);
+  animation-timing-function: var(--scene-glide-easing);
+}
+
+/* 信息行在居中与常规里对齐不同，新旧两份画面叠着淡变会同时出现两份字：缩成一次短淡变，位置照常点到点移动。
+   默认的叠加混合（plus-lighter，两份的不透明度加起来始终是 1）是靠默认动画挂上的，换掉动画要自己补回 */
+html[data-scene-transition]::view-transition-old(scene-info),
+html[data-scene-transition]::view-transition-new(scene-info) {
+  mix-blend-mode: plus-lighter;
+}
+
+html[data-scene-transition]::view-transition-old(scene-info) {
+  animation: scene-fade-out var(--scene-fade-duration) linear both;
+}
+
+html[data-scene-transition]::view-transition-new(scene-info) {
+  animation: scene-fade-in var(--scene-fade-duration) linear both;
+}
+
+/* 当前封面没有可配对的旧画面时（退出 Coverflow 时正在播放的封面不在视图内，名字已经放掉），模板里的封面短淡入，
+   不用过渡默认的时长，跟侧封面的淡出同一个节奏 */
+html[data-scene-transition]::view-transition-new(scene-cover):only-child {
+  animation: scene-fade-in var(--scene-fade-duration) linear both;
+}
+
+@keyframes scene-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes scene-fade-out {
+  to {
+    opacity: 0;
+  }
+}

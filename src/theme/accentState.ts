@@ -7,15 +7,15 @@ import { isCoverProfile, type CoverProfile, type CoverSeed } from './coverPalett
 
 export const COVER_ACCENT_STORAGE_KEY = 'default-theme.cover-accent.v1';
 export const COVER_PROFILE_STORAGE_KEY = 'default-theme.cover-profile.v1';
-/** 缺省开：没有存档、存档认不出或存储读不了都按开，只有明确的 `off` 才关。 */
+/** 缺省开：没有存档、存档认不出或存储读不了都按开，只有明确的 `off` 才关 */
 const enabledPref = defineLocalPref<boolean>({
   key: COVER_ACCENT_STORAGE_KEY,
   fallback: true,
   ...ON_OFF,
 });
-/** 读过或选过开关之后为真，启动服务时不再拿存档盖掉。 */
+/** 读过或选过开关之后为真，启动服务时不再拿存档盖掉 */
 const enabledSettledAtom = atom(false);
-/** 上次播放的封面配色，只用于等宿主应答期间，不作为当前曲目已确认的结果。 */
+/** 上次播放的封面配色，只用于等宿主应答期间，不作为当前曲目已确认的结果 */
 const profileCache = defineLocalPref<CoverProfile | null>({
   key: COVER_PROFILE_STORAGE_KEY,
   fallback: null,
@@ -50,7 +50,7 @@ export function loadCoverAccentEnabled(store: Store, storage?: PrefStorage | nul
   enabledPref.load(store, storage);
 }
 
-/** 与此刻相同不写存档；存不下这一次照常生效。 */
+/** 与此刻相同不写存档；存不下这一次照常生效 */
 export function chooseCoverAccentEnabled(
   store: Store,
   next: boolean,
@@ -67,7 +67,7 @@ export function publishCoverProfile(store: Store, profile: CoverProfile | null):
   if (next?.hue !== current?.hue || next?.chroma !== current?.chroma) store.set(seedAtom, next);
 }
 
-/** 在 React 首帧之前调。 */
+/** 在 React 首帧之前调 */
 export function initializeAccent(store: Store, storage?: PrefStorage | null): void {
   if (store.get(initializedAtom)) return;
   store.set(initializedAtom, true);
@@ -76,7 +76,7 @@ export function initializeAccent(store: Store, storage?: PrefStorage | null): vo
   if (cached) publishCoverProfile(store, cached);
 }
 
-/** 写不进只影响下次启动，颜色仍在内存中生效。 */
+/** 写不进只影响下次启动，颜色仍在内存中生效 */
 export function saveCoverProfile(profile: CoverProfile | null, storage?: PrefStorage | null): void {
   profileCache.write(profile, storage);
 }

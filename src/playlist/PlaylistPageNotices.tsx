@@ -1,4 +1,5 @@
 import { Button, MessageBar, MessageBarActions, MessageBarBody } from '@fluentui/react-components';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
@@ -18,12 +19,13 @@ interface NoticeProps {
 
 function Notice({ intent, kind, text, params, action }: NoticeProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   return (
     <MessageBar className={styles.notice} intent={intent} data-playlist-notice={kind}>
       <MessageBarBody>{t(text, params)}</MessageBarBody>
       {action && (
         <MessageBarActions>
-          <Button size="small" onClick={action.run}>
+          <Button className={viewControls.field} size="small" onClick={action.run}>
             {t(action.label)}
           </Button>
         </MessageBarActions>
@@ -35,14 +37,15 @@ function Notice({ intent, kind, text, params, action }: NoticeProps) {
 export interface PlaylistPageNoticesProps {
   readonly guid: string;
   readonly model: PlaylistPageModel;
+  readonly selectionPlay: { readonly failed: boolean; readonly dismiss: () => void };
 }
 
 /**
  * 播放列表页表格上方的横幅：列表删了、连不上宿主、取行失败（带重试）、分组退回扁平、选中可能与宿主不一致、
  * 命令没办成、定位没找到，以及命中太多只显示了前一截。可收起的都带「关闭」，下一次成功时不自动收起的由
- * 各服务的失败标记管。
+ * 各服务的失败标记管
  */
-export function PlaylistPageNotices({ guid, model }: PlaylistPageNoticesProps) {
+export function PlaylistPageNotices({ guid, model, selectionPlay }: PlaylistPageNoticesProps) {
   const playlistRows = useService(playlistRowsKey);
   const page = useService(playlistPageKey);
   const selectionFailed = useAtomValueRawSync(page.selection.failedAtom);
@@ -86,7 +89,7 @@ export function PlaylistPageNotices({ guid, model }: PlaylistPageNoticesProps) {
           action={dismiss(() => page.selection.dismissFailure())}
         />
       )}
-      {(tracksFailed || menuFailed) && (
+      {(tracksFailed || menuFailed || selectionPlay.failed) && (
         <Notice
           intent="warning"
           kind="command"
@@ -94,6 +97,7 @@ export function PlaylistPageNotices({ guid, model }: PlaylistPageNoticesProps) {
           action={dismiss(() => {
             page.tracks.dismissFailure();
             page.menu.dismissFailure();
+            selectionPlay.dismiss();
           })}
         />
       )}

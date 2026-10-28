@@ -41,7 +41,9 @@ export interface OpenPlayerOptions {
   readonly harness?: boolean;
 }
 
-const HARNESS_ENTRY = "import '/tests/fixtures/appHarnessEntry.ts';";
+const HARNESS_ENTRY = `import '/tests/fixtures/appHarnessEntry.ts';
+  import { startupOverlay } from '/src/app/startupOverlay.ts';
+  startupOverlay.dismiss();`;
 
 const ORDER_NAMES = [
   'default',
@@ -68,6 +70,9 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
     ...options.state,
   };
   const host = await installPageHost(page);
+  // 应答与事件的 hostTime 取页内的时刻：冻结时钟的用例里页内与 Node 的 Date 不同步，
+  // 取 Node 的时刻会把 SDK 进度时钟的新到界线推到未来，之后的合法事件都被丢掉。
+  const pageNow = () => page.evaluate(() => Date.now());
   host.answer('playback.getState', () => ({
     success: true,
     state: state.state,
@@ -79,9 +84,9 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
       ? { success: true, found: true, track: state.track }
       : { success: true, found: false },
   );
-  host.answer('playback.getPosition', () => ({
+  host.answer('playback.getPosition', async () => ({
     success: true,
-    hostTime: Date.now(),
+    hostTime: await pageNow(),
     position: state.position,
     duration: state.track?.duration ?? 0,
     subsong: state.track?.subsong ?? 0,
@@ -92,16 +97,20 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
     const requested = Number(params['position'] ?? 0);
     const oldPosition = state.position;
     state.position = Math.min(duration, Math.max(0, requested));
-    return {
+    // 真宿主应用跳转后随即发 seeked；进度时钟靠这条事件重新对准。
+    void pageNow().then((hostTime) =>
+      host.emit('playback:seeked', { hostTime, position: state.position }),
+    );
+    return pageNow().then((hostTime) => ({
       success: true,
       requestedPosition: requested,
-      hostTime: Date.now(),
+      hostTime,
       actualPosition: state.position,
       oldPosition,
       newPosition: state.position,
       duration,
       subsong: state.track?.subsong ?? 0,
-    };
+    }));
   });
   host.answer('playback.getVolume', () => ({
     success: true,

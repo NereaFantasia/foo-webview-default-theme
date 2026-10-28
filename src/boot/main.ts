@@ -20,7 +20,7 @@ const title = document.getElementById('title');
 const detail = document.getElementById('detail');
 const list = document.getElementById('attempts');
 const retry = document.getElementById('retry');
-// 等待层盖在说明上面；出错时摘掉它，宿主也据此显示窗口。
+// 等待层盖在说明上面；出错时摘掉它，宿主也据此显示窗口
 const overlay = document.getElementById('server-loading');
 const stage = document.getElementById('stage');
 let installId = '';
@@ -35,7 +35,7 @@ async function read(path: string, missing = false): Promise<string | null> {
       signal: AbortSignal.timeout(5000),
     });
   } catch (error) {
-    // 虚拟主机的缺失文件会拒绝 fetch；应用确认时还会经宿主核对安装标识。
+    // 虚拟主机的缺失文件会拒绝 fetch；应用确认时还会经宿主核对安装标识
     if (missing && ROOT.origin === 'https://foo-ui-webview2.local' && error instanceof TypeError)
       return null;
     throw error;
@@ -108,7 +108,7 @@ async function boot(): Promise<void> {
       try {
         if (installed(json(await read(`fe/${ref.dir}/installed.json`)), ref)) complete.add(ref.dir);
       } catch {
-        /* 缺失或损坏的目录不能启动。 */
+        /* 缺失或损坏的目录不能启动 */
       }
     }),
   );

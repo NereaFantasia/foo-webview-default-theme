@@ -45,25 +45,29 @@ test('窄窗里换成标题栏形态：通栏换成卡片底部的胶囊，卡�
   page,
 }) => {
   const { errors } = await openPlayer(page, { width: 900, harness: true });
-  // 内容卡是 main 的最后一个子元素（宽窗时前面还有分栏握柄）。
+  // 内容卡是 main 里最后一个子元素（右侧卡的停靠容器）的第一个子元素；放一个高为 --player-inset 的探针量出来，
+  // 不认计算值的写法。
   const inset = () =>
-    page.locator('main').evaluate((main) =>
-      getComputedStyle(main.lastElementChild ?? main)
-        .getPropertyValue('--player-inset')
-        .trim(),
-    );
+    page.locator('main > :last-child > :first-child').evaluate((card) => {
+      const probe = document.createElement('div');
+      probe.style.height = 'var(--player-inset)';
+      card.append(probe);
+      const { height } = probe.getBoundingClientRect();
+      probe.remove();
+      return height;
+    });
   await expect(page.locator('[data-player-bar]')).toBeVisible();
-  expect(await inset()).toBe('0px');
+  expect(await inset()).toBe(0);
 
   await switchPreference(page, 'player-bar', 'titlebar');
   await expect(page.locator('[data-player-capsule]')).toContainText(PLAYING_TRACK.title);
   await expect(page.locator('[data-player-bar]')).toHaveCount(0);
-  expect(await inset()).not.toBe('0px');
+  expect(await inset()).not.toBe(0);
 
   await switchPreference(page, 'player-bar', 'bottom');
   await expect(page.locator('[data-player-capsule]')).toHaveCount(0);
   await expect(page.locator('[data-player-bar]')).toBeVisible();
-  expect(await inset()).toBe('0px');
+  expect(await inset()).toBe(0);
   expect(errors).toEqual([]);
 });
 

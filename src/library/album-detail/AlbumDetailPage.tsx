@@ -1,3 +1,4 @@
+import { COLUMN_PREFS } from '../../table/columns/columnMigration.ts';
 import {
   Button,
   MessageBar,
@@ -9,12 +10,9 @@ import type { LibraryTrack } from 'foo-webview-sdk';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
-import { CoverGlow } from '../../covers/CoverGlow.tsx';
-import { colorSchemeAtom } from '../../theme/colorScheme.ts';
 import { createSnapshotSlot } from '../../nav/navHistory.ts';
 import type { PageProps } from '../../nav/places.ts';
-import { useElementWidth } from '../../kit/useElementWidth.ts';
-import type { ColumnId } from '../../table/columns/columns.ts';
+import { columnDef, type ColumnId } from '../../table/columns/columns.ts';
 import { createColumnsModel } from '../../table/columns/columnsModel.ts';
 import { rowsOf } from '../../table/rangeSelection.ts';
 import { createRowSelection } from '../../table/rowSelection.ts';
@@ -25,10 +23,14 @@ import { useTableSnapshot, type TableView } from '../../table/useTableSnapshot.t
 import type { TableMenuTarget } from '../../table/useTrackTableInput.ts';
 import { albumDetailsAtom, albumDetailKey } from './albumDetail.ts';
 import { AlbumDetailHeader } from './AlbumDetailHeader.tsx';
-import { AlbumDetailTools } from './AlbumDetailTools.tsx';
+import { DetailFrame } from '../detail/DetailFrame.tsx';
+import { DetailTools } from '../detail/DetailTools.tsx';
 import {
   buildDetailRows,
+  DETAIL_SORT_FIELDS,
   detailNumberText,
+  detailSort,
+  detailSortField,
   filterDetailTracks,
   nextDetailSort,
   type DiscGroup,
@@ -44,20 +46,19 @@ import { useService } from '../../kit/useService.ts';
 import { trackActionsKey, trackActionsNoticeAtom } from '../../track/trackActions.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 import { ratingsKey } from '../../track/trackRatings.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
-/** 列存档的键：详情页各张专辑共用一份。 */
-const COLUMNS_KEY = 'default-theme.album-detail-columns.v1';
+/** 列存档的键：详情页各张专辑共用一份 */
+const COLUMNS_KEY = COLUMN_PREFS.albumDetail;
 const OFFERED: readonly ColumnId[] = ['number', 'title', 'artist', 'rating', 'duration'];
 const ROW_HEIGHT = 40;
-/** 页面窄于它时头部缩小，CSS 像素。 */
-const NARROW_WIDTH = 760;
 
 interface DetailView {
   readonly sort: TableSort | null;
   readonly query: string;
 }
 
-/** 查找与排序随滚动一起恢复，否则原焦点可能不在恢复后的条目流里。 */
+/** 查找与排序随滚动一起恢复，否则原焦点可能不在恢复后的条目流里 */
 const DETAIL_SLOT = createSnapshotSlot<TableView<DetailView>>();
 const NO_TRACKS: readonly LibraryTrack[] = [];
 
@@ -66,13 +67,13 @@ const sameSort = (a: TableSort | null, b: TableSort | null) =>
 
 /**
  * 专辑详情页：头部在上，下面整宽的曲目表，整页一起滚，列头滚到顶时吸住。数据由详情服务取，页面挂上时
- * 登记要看这一张。列头单击就地排序，再点反向，点 # 回到碟、曲顺序；多碟专辑在碟、曲顺序下按碟分节。
- * 这张不在媒体库了时留在这一页，写明原因。
+ * 登记要看这一张。列头单击就地排序，再点反向，点 # 回到碟、曲顺序；多碟专辑在碟、曲顺序下按碟分节
+ * 这张不在媒体库了时留在这一页，写明原因
  */
 export function AlbumDetailPage({ place }: PageProps) {
   const key = place.subject ?? '';
   const t = useAtomValueRawSync(translateAtom);
-  const scheme = useAtomValueRawSync(colorSchemeAtom);
+  const viewControls = useViewControlStyles();
   const store = useStore();
   const trackActions = useService(trackActionsKey);
   const albumList = useService(albumListKey);
@@ -83,14 +84,9 @@ export function AlbumDetailPage({ place }: PageProps) {
   useEffect(() => albumDetail.want(key), [albumDetail, key]);
 
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const [intro, setIntro] = useState<HTMLDivElement | null>(null);
-  const background = useRef<HTMLDivElement>(null);
-  // 量到宽度之前是 null：头部的高随宽窄变，交还的滚动要等它定下来。
+  // 量到宽度之前是 null：头部的高随宽窄变，交还的滚动要等它定下来
   const [narrow, setNarrow] = useState<boolean | null>(null);
-  const measured = useElementWidth<HTMLElement>((width) => setNarrow(width < NARROW_WIDTH));
-  const [columns] = useState(() =>
-    createColumnsModel(store, { key: COLUMNS_KEY, offered: OFFERED }),
-  );
+  const [columns] = useState(() => createColumnsModel(store, { ...COLUMNS_KEY, offered: OFFERED }));
   const [selection] = useState(() => createRowSelection(store, { total: 0 }));
   const [sort, setSort] = useState<TableSort | null>(null);
   const [query, setQuery] = useState('');
@@ -99,27 +95,6 @@ export function AlbumDetailPage({ place }: PageProps) {
   const handle = useRef<TrackTableHandle>(null);
 
   const album = detail?.album ?? null;
-  useLayoutEffect(() => {
-    const glow = background.current;
-    if (!scroller || !intro || !glow) return;
-    const resize = () => {
-      glow.style.height = `${intro.offsetTop + intro.offsetHeight}px`;
-    };
-    const scroll = () => {
-      glow.style.setProperty('--detail-scroll-y', `${-scroller.scrollTop}px`);
-    };
-    resize();
-    scroll();
-    // 背景位于滚动区外，覆盖滚动条预留区；悬浮导航形态由外壳固定背景，正文仍照常滚动。
-    const observer = new ResizeObserver(resize);
-    observer.observe(intro);
-    observer.observe(scroller);
-    scroller.addEventListener('scroll', scroll, { passive: true });
-    return () => {
-      observer.disconnect();
-      scroller.removeEventListener('scroll', scroll);
-    };
-  }, [album, intro, scroller]);
   const tracks = detail?.tracks ?? NO_TRACKS;
   const loading = detail?.phase === 'loading';
   const discCount = useMemo(() => new Set(tracks.map((track) => track.discNumber)).size, [tracks]);
@@ -134,14 +109,14 @@ export function AlbumDetailPage({ place }: PageProps) {
     [filtered, sort, discCount, skeleton, ratings, stamp],
   );
   const numberText = useMemo(() => detailNumberText(sort, discCount), [sort, discCount]);
-  // 行序号换了（排序变了、曲目增删）才清空选中；库一变曲目重取，同样的曲目按同样的顺序回来时选中留着。
+  // 行序号换了（排序变了、曲目增删）才清空选中；库一变曲目重取，同样的曲目按同样的顺序回来时选中留着
   const order = rows.tracks.map((track) => track.handle).join('\n');
   useLayoutEffect(() => {
     selection.clear();
     selection.setTotal(order === '' ? 0 : order.split('\n').length);
   }, [selection, order]);
 
-  // 交还：滚动与焦点等曲目到了、宽窄定了、排序也换成快照里的那一种再落。
+  // 交还：滚动与焦点等曲目到了、宽窄定了、排序也换成快照里的那一种再落
   useTableSnapshot(DETAIL_SLOT, {
     handle,
     items: rows.items,
@@ -196,23 +171,12 @@ export function AlbumDetailPage({ place }: PageProps) {
 
   return (
     <AlbumColorTheme album={album}>
-      <section
-        ref={measured}
-        className={styles.root}
-        aria-label={album?.name || t('place.album')}
-        data-page="album"
-        data-scheme={scheme}
-        data-narrow={narrow || undefined}
-      >
-        {album && <CoverGlow ref={background} className={styles.glow} />}
-        <div
-          ref={setScroller}
-          className={styles.scroller}
-          tabIndex={-1}
-          data-detail-scroller
-          data-page-scrolls-header
-        >
-          <div ref={setIntro} className={styles.intro} data-detail-intro>
+      <DetailFrame
+        label={album?.name || t('place.album')}
+        page="album"
+        glow={album !== null}
+        intro={
+          <>
             {album ? (
               <AlbumDetailHeader
                 album={album}
@@ -233,7 +197,11 @@ export function AlbumDetailPage({ place }: PageProps) {
               <MessageBar className={styles.notice} intent="error" data-detail-notice="read">
                 <MessageBarBody>{t('albumDetail.readFailed')}</MessageBarBody>
                 <MessageBarActions>
-                  <Button size="small" onClick={() => albumDetail.retry(key)}>
+                  <Button
+                    className={viewControls.field}
+                    size="small"
+                    onClick={() => albumDetail.retry(key)}
+                  >
                     {t('album.retry')}
                   </Button>
                 </MessageBarActions>
@@ -243,44 +211,66 @@ export function AlbumDetailPage({ place }: PageProps) {
               <MessageBar className={styles.notice} intent="warning" data-detail-notice="action">
                 <MessageBarBody>{t(notice)}</MessageBarBody>
                 <MessageBarActions>
-                  <Button size="small" onClick={trackActions.dismissNotice}>
+                  <Button
+                    className={viewControls.field}
+                    size="small"
+                    onClick={trackActions.dismissNotice}
+                  >
                     {t('album.dismiss')}
                   </Button>
                 </MessageBarActions>
               </MessageBar>
             )}
             {album && detail?.phase !== 'missing' && (
-              <AlbumDetailTools query={query} onQuery={setQuery} sort={sort} onSort={setSort} />
+              <DetailTools
+                query={query}
+                onQuery={setQuery}
+                fields={DETAIL_SORT_FIELDS}
+                field={detailSortField(sort)}
+                descending={sort?.descending ?? false}
+                sorted={sort !== null}
+                label={(column) =>
+                  t(column === 'number' ? 'albumDetail.albumOrder' : columnDef(column).label)
+                }
+                onSort={(column, descending) => setSort(detailSort(column, descending))}
+              />
             )}
-          </div>
-          {album && detail?.phase !== 'missing' && (
-            <TrackTable
-              handle={handle}
-              scrollParent={scroller}
-              columns={columns}
-              items={rows.items}
-              selection={selection}
-              label={t('albumDetail.table')}
-              rowHeight={ROW_HEIGHT}
-              renderGroup={renderGroup}
-              ratingStamp={stamp}
-              numberText={numberText}
-              sort={sort}
-              onSort={(column) => setSort((now) => nextDetailSort(now, column))}
-              loading={loading}
-              empty={
-                !loading && !detail?.failed && query.trim() !== '' ? (
-                  <span data-detail-no-matches>{t('albumDetail.noMatches')}</span>
-                ) : undefined
-              }
-              onPlay={play}
-              onMenu={openTrackMenu}
-            />
-          )}
-        </div>
-        <AlbumMenu at={menuAt} onClose={() => setMenuAt(null)} />
-        <TrackMenu at={trackMenuAt} onClose={() => setTrackMenuAt(null)} />
-      </section>
+          </>
+        }
+        overlay={
+          <>
+            <AlbumMenu at={menuAt} onClose={() => setMenuAt(null)} />
+            <TrackMenu at={trackMenuAt} onClose={() => setTrackMenuAt(null)} />
+          </>
+        }
+        onScroller={setScroller}
+        onNarrow={setNarrow}
+      >
+        {album && detail?.phase !== 'missing' && (
+          <TrackTable
+            handle={handle}
+            scrollParent={scroller}
+            columns={columns}
+            items={rows.items}
+            selection={selection}
+            label={t('albumDetail.table')}
+            rowHeight={ROW_HEIGHT}
+            renderGroup={renderGroup}
+            ratingStamp={stamp}
+            numberText={numberText}
+            sort={sort}
+            onSort={(column) => setSort((now) => nextDetailSort(now, column))}
+            loading={loading}
+            empty={
+              !loading && !detail?.failed && query.trim() !== '' ? (
+                <span data-detail-no-matches>{t('albumDetail.noMatches')}</span>
+              ) : undefined
+            }
+            onPlay={play}
+            onMenu={openTrackMenu}
+          />
+        )}
+      </DetailFrame>
     </AlbumColorTheme>
   );
 }

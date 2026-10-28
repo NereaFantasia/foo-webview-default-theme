@@ -7,6 +7,7 @@ import {
   facetOptionsOf,
   facetSelectionCount,
   hasFacetSelection,
+  pruneFacetSelection,
   toggleFacet,
 } from '../../../../src/library/albums/facets.ts';
 import { albumRow } from '../../../fixtures/libraryRows.ts';
@@ -48,6 +49,22 @@ describe('facetOptionsOf', () => {
       albumRow(`A${at}`, `Artist ${at}`),
     );
     expect(facetOptionsOf(many).albumArtist).toHaveLength(FACET_LIMIT);
+  });
+
+  it('已勾的值排在 FACET_LIMIT 之后时接在末尾，勾选不被剔掉；库里没有了才剔', () => {
+    const many = Array.from({ length: FACET_LIMIT + 5 }, (_, at) =>
+      albumRow(`A${at}`, `Artist ${at}`),
+    );
+    const tail = `Artist ${FACET_LIMIT + 4}`;
+    const selection = toggleFacet(EMPTY_FACET_SELECTION, 'albumArtist', tail);
+    const options = facetOptionsOf(many, selection);
+    expect(options.albumArtist).toHaveLength(FACET_LIMIT + 1);
+    expect(options.albumArtist.at(-1)).toEqual({ name: tail, albumCount: 1 });
+    expect(pruneFacetSelection(selection, options)).toBe(selection);
+    const shrunk = many.slice(0, FACET_LIMIT);
+    expect(pruneFacetSelection(selection, facetOptionsOf(shrunk, selection)).albumArtist.size).toBe(
+      0,
+    );
   });
 });
 

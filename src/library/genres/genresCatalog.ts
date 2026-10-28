@@ -1,16 +1,9 @@
-import type { LibraryTrack } from 'foo-webview-sdk';
-import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
-import { settle } from '../../host/hostCall.ts';
 import type { Store } from '../../kit/store.ts';
 import { albumsAtom } from '../albums.ts';
-import { trackPathOf } from '../../host/libraryContract.ts';
-import { libraryTracksAtom, type LibraryTracksService } from '../libraryTracks.ts';
+import { genreValuesAtom, type GenreValuesService } from '../genreValues.ts';
+import { libraryTracksAtom } from '../libraryTracks.ts';
 import { buildGenres, type GenreEntry } from './genresModel.ts';
-
-/** 逗号也可以属于单个标签值；只对显示串含分隔符的曲目补读真正的多值。 */
-export const GENRES_VALUES_PATTERN = '$if($meta_num(genre),$meta_sep(genre,$char(31)),)';
-const BATCH_SIZE = 128;
 
 export interface GenresCatalogState {
   readonly status: 'idle' | 'loading' | 'ready' | 'failed';
@@ -20,125 +13,73 @@ export interface GenresCatalogState {
 const stateAtom = atom<GenresCatalogState>({ status: 'idle', entries: [], generation: 0 });
 export const genresCatalogAtom: Atom<GenresCatalogState> = atom((get) => get(stateAtom));
 
-export interface GenresCatalogFace {
-  titleformat: Pick<typeof fb.titleformat, 'evalBatch'>;
-}
 export interface GenresCatalogService {
   want(): void;
   retry(): Promise<void>;
   dispose(): void;
 }
 
-/** 跟随整库曲目的代次建索引，库加载期间保留旧清单；释放与库换代都使未完成的补读作废。 */
+/**
+ * 流派目录：整库曲目按流派标签值归类。标签值的读取归共用的流派值服务；读失败、整库重读与补读途中都保留
+ * 旧目录，同一份标签值与专辑清单不重建
+ */
 export function startGenresCatalog(
   store: Store,
-  tracksService: Pick<LibraryTracksService, 'want' | 'retry'>,
-  host: GenresCatalogFace = fb,
+  values: Pick<GenreValuesService, 'want' | 'retry'>,
 ): GenresCatalogService {
   store.set(stateAtom, { status: 'idle', entries: [], generation: 0 });
   let wanted = false;
-  let releaseTracks: (() => void) | undefined;
-  let disposed = false;
-  let serial = 0;
-  let loaded = -1;
-  let values: ReadonlyMap<string, readonly string[]> = new Map();
+  let built: { readonly values: unknown; readonly albums: unknown } | null = null;
   const update = (change: Partial<GenresCatalogState>) =>
     store.set(stateAtom, { ...store.get(stateAtom), ...change });
 
-  async function load(force = false): Promise<void> {
+  const mark = (status: GenresCatalogState['status']) => {
+    if (store.get(stateAtom).status !== status) update({ status });
+  };
+
+  function sync(): void {
+    if (!wanted) return;
     const library = store.get(libraryTracksAtom);
-    if (!wanted || disposed || library.generation === 0 || library.status !== 'ready') return;
-    if (!force && loaded === library.generation) return;
-    loaded = library.generation;
-    const mine = ++serial;
-    const valid = () =>
-      !disposed &&
-      mine === serial &&
-      store.get(libraryTracksAtom).status === 'ready' &&
-      store.get(libraryTracksAtom).generation === library.generation;
-    update({ status: 'loading' });
-    const tracks = [...library.byHandle.values()];
-    const next = new Map<string, readonly string[]>();
-    const ambiguous: LibraryTrack[] = [];
-    for (const track of tracks) {
-      if (track.genre.includes(', ')) ambiguous.push(track);
-      else next.set(track.handle, track.genre ? [track.genre] : []);
-    }
-    for (let start = 0; start < ambiguous.length; start += BATCH_SIZE) {
-      if (!valid()) return;
-      const batch = ambiguous.slice(start, start + BATCH_SIZE);
-      const answer = await settle(() =>
-        host.titleformat.evalBatch(GENRES_VALUES_PATTERN, batch.map(trackPathOf)),
-      );
-      if (!valid()) return;
-      if (
-        !answer ||
-        answer.success === false ||
-        answer.results.length !== batch.length ||
-        answer.results.some((row) => row.success === false || row.infoAvailable === false)
-      ) {
-        update({ status: 'failed' });
-        return;
-      }
-      for (const [index, track] of batch.entries()) {
-        const row = answer.results[index];
-        if (!row || !row.success) continue;
-        next.set(track.handle, row.result ? row.result.split('\u001f').filter(Boolean) : []);
+    const read = store.get(genreValuesAtom);
+    if (library.status === 'failed' || read.status === 'failed') mark('failed');
+    else if (library.generation === 0 || read.status === 'loading') mark('loading');
+    else if (
+      library.status === 'ready' &&
+      read.status === 'ready' &&
+      read.generation === library.generation
+    ) {
+      const { albums } = store.get(albumsAtom);
+      if (built?.values === read.values && built.albums === albums) mark('ready');
+      else {
+        built = { values: read.values, albums };
+        update({
+          status: 'ready',
+          entries: buildGenres([...library.byHandle.values()], read.values, albums),
+          generation: read.generation,
+        });
       }
     }
-    if (!valid()) return;
-    values = next;
-    update({
-      status: 'ready',
-      entries: buildGenres(tracks, values, store.get(albumsAtom).albums),
-      generation: library.generation,
-    });
+    // 其余是整库重读途中：旧目录照旧，等新一代的标签值
   }
 
-  const offTracks = store.sub(libraryTracksAtom, () => {
-    const library = store.get(libraryTracksAtom);
-    if (!wanted) return;
-    if (library.status === 'failed') {
-      serial += 1;
-      update({ status: 'failed' });
-    } else if (library.generation === 0) update({ status: 'loading' });
-    else void load();
-  });
-  const offAlbums = store.sub(albumsAtom, () => {
-    const library = store.get(libraryTracksAtom);
-    if (
-      !wanted ||
-      library.generation === 0 ||
-      store.get(stateAtom).generation !== library.generation
-    )
-      return;
-    update({
-      entries: buildGenres([...library.byHandle.values()], values, store.get(albumsAtom).albums),
-    });
-  });
+  const offs = [
+    store.sub(libraryTracksAtom, sync),
+    store.sub(genreValuesAtom, sync),
+    store.sub(albumsAtom, sync),
+  ];
   return {
     want() {
-      if (disposed) return;
+      if (!offs.length) return;
       wanted = true;
-      // 流派页每次挂载都会调 want；整库曲目只登记一次，到 dispose 才释放。
-      releaseTracks ??= tracksService.want();
-      const library = store.get(libraryTracksAtom);
-      if (library.status === 'failed') update({ status: 'failed' });
-      else if (library.generation === 0) update({ status: 'loading' });
-      void load();
+      values.want();
+      sync();
     },
     async retry() {
-      if (disposed) return;
-      await tracksService.retry();
-      if (!disposed && store.get(stateAtom).status !== 'ready') await load(true);
+      if (offs.length) await values.retry();
     },
     dispose() {
-      disposed = true;
-      serial += 1;
-      releaseTracks?.();
-      releaseTracks = undefined;
-      offTracks();
-      offAlbums();
+      wanted = false;
+      for (const off of offs.splice(0)) off();
     },
   };
 }

@@ -1,4 +1,4 @@
-/* 两行上下排，行间隔 2。浮层里整块在高度有限时让设备列表先缩。 */
+/* 两行上下排，行间隔 2。浮层里整块在高度有限时让设备列表先缩 */
 .root {
   display: flex;
   flex: 1 1 auto;
@@ -33,7 +33,7 @@
   background: var(--line);
 }
 
-/* 设备行是一只键：去掉原生按钮的底与边，字体跟着外面。 */
+/* 设备行是一只键：去掉原生按钮的底与边，字体跟着外面 */
 .device {
   box-sizing: border-box;
   width: 100%;
@@ -50,9 +50,18 @@
   border-radius: var(--radius-control);
 }
 
-.root[data-variant='flyout'] .device:hover,
-.root[data-variant='flyout'] .device[aria-expanded='true'] {
-  background: var(--colorSubtleBackgroundHover);
+@media (forced-colors: none) {
+  .root[data-variant='flyout'] .device:hover {
+    background-color: var(--state-hover);
+  }
+
+  .root[data-variant='flyout'] .device:active {
+    background-color: var(--state-pressed);
+  }
+
+  .root[data-variant='flyout'] .device[aria-expanded='true'] {
+    background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+  }
 }
 
 .root[data-variant='panel'] .device:hover .name {
@@ -70,7 +79,7 @@
   color: var(--text-secondary);
 }
 
-/* 设备名放不下先截断，输出模块留着。 */
+/* 设备名放不下先截断，输出模块留着 */
 .label {
   display: flex;
   grid-column: 2;
@@ -103,7 +112,7 @@
   font-size: 11px;
 }
 
-/* 面板里 12、淡色；浮层里 14、次要色。 */
+/* 面板里 12、淡色；浮层里 14、次要色 */
 .chevron {
   grid-column: 3;
   color: var(--text-muted);

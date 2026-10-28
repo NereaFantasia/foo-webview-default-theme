@@ -1,10 +1,10 @@
 /**
- * 山脊图 GPU 画法（`terrainGpu.ts`）的着色器：各遍共用的几何与轮廓两遍；画线那一遍在 `terrainLineShaders.ts`。
+ * 山脊图 GPU 画法（`terrainGpu.ts`）的着色器：各遍共用的几何与轮廓两遍；画线那一遍在 `terrainLineShaders.ts`
  * 几何与 `terrain.ts` 的 `rowGeometry` / `drawTerrain`、`skyline.ts` 的 `tracePolyline` / 轮廓逐一对应，
- * 改那边的公式要同步改这里。长度一律 CSS 像素，只有画线那一遍换成物理像素；行 k = 0 最近。
+ * 改那边的公式要同步改这里。长度一律 CSS 像素，只有画线那一遍换成物理像素；行 k = 0 最近
  */
 
-/** 各遍共用：历史缓冲、行几何、折线的点与轮廓。 */
+/** 各遍共用：历史缓冲、行几何、折线的点与轮廓 */
 export const TERRAIN_COMMON = `
 precision highp float;
 precision highp int;
@@ -25,7 +25,7 @@ uniform float uAmplitude;
 uniform float uAlphaNear;
 uniform float uAlphaFar;
 
-// 「还没画过」的轮廓高度，同 skyline.ts 的 OPEN。
+// 「还没画过」的轮廓高度，同 skyline.ts 的 OPEN
 const float OPEN = 1e9;
 const float OCCLUSION_MARGIN = 0.01;
 
@@ -51,7 +51,7 @@ Row rowAt(int k) {
   r.step = width / float(uPoints - 1);
   r.amplitude = uAmplitude * uSize.y * (0.5 + 0.5 * near);
   r.alpha = uAlphaFar + (uAlphaNear - uAlphaFar) * near;
-  // 滑过最远一行的那一行已经出了地平线，与 drawTerrain 一样不画。
+  // 滑过最远一行的那一行已经出了地平线，与 drawTerrain 一样不画
   r.live = k < uDrawn && position <= float(uRows - 1);
   return r;
 }
@@ -69,7 +69,7 @@ int vertexCount() {
   return curved() ? 4 * (uPoints - 2) + 2 : uPoints;
 }
 
-// 折线第 v 个点：P0 起，第 i 段以 Pi 为控制点、到 Pi 与 Pi+1 的中点，每段切 4 份，末段直线到最后一点。
+// 折线第 v 个点：P0 起，第 i 段以 Pi 为控制点、到 Pi 与 Pi+1 的中点，每段切 4 份，末段直线到最后一点
 vec2 vertexAt(Row r, int k, int v) {
   if (!curved()) return pointAt(r, k, v);
   if (v <= 0) return pointAt(r, k, 0);
@@ -86,8 +86,8 @@ vec2 vertexAt(Row r, int k, int v) {
   return a * start + b * control + c * end;
 }
 
-// 以点距为单位的横坐标 u 落在折线第 v0 段（v0 到 v0 + 1 两点之间）的比例 f；行宽以外夹到首末段。
-// 点距均匀，第 2 段起 x 随参数线性走；首段从 P0 起，u = 2t − t² / 2。
+// 以点距为单位的横坐标 u 落在折线第 v0 段（v0 到 v0 + 1 两点之间）的比例 f；行宽以外夹到首末段
+// 点距均匀，第 2 段起 x 随参数线性走；首段从 P0 起，u = 2t − t² / 2
 void locate(float u, out int v0, out float f) {
   float last = float(uPoints - 1);
   if (!curved()) {
@@ -113,7 +113,7 @@ void locate(float u, out int v0, out float f) {
   }
 }
 
-// 折线在 x 处的 y（点与点之间线性插值），行宽以外是 OPEN。
+// 折线在 x 处的 y（点与点之间线性插值），行宽以外是 OPEN
 float lineYAt(Row r, int k, float x) {
   float u = (x - r.left) / r.step;
   if (u < 0.0 || u > float(uPoints - 1)) return OPEN;
@@ -123,7 +123,7 @@ float lineYAt(Row r, int k, float x) {
   return mix(vertexAt(r, k, v0).y, vertexAt(r, k, v0 + 1).y, clamp(f, 0.0, 1.0));
 }
 
-// 行 k 前面各行的合成轮廓在 x 处的高度：相邻两列线性插值，同 skyline.ts 的 at。
+// 行 k 前面各行的合成轮廓在 x 处的高度：相邻两列线性插值，同 skyline.ts 的 at
 float skyAt(int k, float x) {
   int last = textureSize(uSkyline, 0).x - 2;
   int column = int(clamp(floor(x), 0.0, float(last)));
@@ -134,7 +134,7 @@ float skyAt(int k, float x) {
 }
 `;
 
-/** 盖满目标的一个大三角形；轮廓各遍按片元坐标取列与行。 */
+/** 盖满目标的一个大三角形；轮廓各遍按片元坐标取列与行 */
 export const FULLSCREEN_VERTEX = `#version 300 es
 void main() {
   vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
@@ -142,7 +142,7 @@ void main() {
 }
 `;
 
-/** 轮廓第一遍：纹素 (列 c, 行 k) 写行 k − 1 的折线在 x = c 处的 y；行 0 前面没有行。 */
+/** 轮廓第一遍：纹素 (列 c, 行 k) 写行 k − 1 的折线在 x = c 处的 y；行 0 前面没有行 */
 export const SKYLINE_SEED_FRAGMENT = `#version 300 es
 ${TERRAIN_COMMON}
 out float outHeight;
@@ -157,7 +157,7 @@ void main() {
 }
 `;
 
-/** 轮廓的前缀最小值：每遍与上方 `uStride` 行取小，步长逐遍翻倍，几遍之后行 k 是前面各行的最高点。 */
+/** 轮廓的前缀最小值：每遍与上方 `uStride` 行取小，步长逐遍翻倍，几遍之后行 k 是前面各行的最高点 */
 export const SKYLINE_SCAN_FRAGMENT = `#version 300 es
 precision highp float;
 precision highp int;

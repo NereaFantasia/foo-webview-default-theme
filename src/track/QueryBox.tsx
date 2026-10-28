@@ -1,20 +1,13 @@
 import {
-  Badge,
   Button,
   Input,
-  ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
   shorthands,
   tokens,
 } from '@fluentui/react-components';
-import {
-  Code16Regular,
-  Dismiss16Regular,
-  Filter16Filled,
-  Filter16Regular,
-} from '@fluentui/react-icons';
+import { Dismiss16Regular, Search16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import {
   useId,
@@ -27,9 +20,7 @@ import {
 import { translateAtom } from '../i18n/locale.ts';
 import { useCommand } from '../nav/useCommand.ts';
 import styles from './QueryBox.module.css';
-import { QueryMenu, queryOptionId } from './QueryMenu.tsx';
-import { queryMenuEntries, stepEntry, type QueryMenuEntry } from './queryMenuEntries.ts';
-import { fillQuery, needsConnector, type PresetId, type QuerySnippet } from './queryPresets.ts';
+import { fillQuery, needsConnector, type QuerySnippet } from './queryPresets.ts';
 import { changeQueryText, queryInputText, type QueryInput } from './queryInput.ts';
 import { QueryScopeMenu } from './QueryScopeMenu.tsx';
 import type { QueryScope } from './trackQuery.ts';
@@ -43,10 +34,7 @@ const useStyles = makeStyles({
     minWidth: 0,
     flex: 1,
   },
-  toggle: { width: '32px', minWidth: '32px', height: '32px', flexShrink: 0 },
-  funnel: { width: '40px', minWidth: '40px' },
-  clear: { visibility: 'hidden', pointerEvents: 'none' },
-  active: { color: tokens.colorBrandForeground1 },
+  clear: { display: 'none' },
   invalid: {
     '&:focus-within, &:hover:focus-within': shorthands.borderColor(tokens.colorPaletteRedBorder2),
     '&::after, &:focus-within:active::after': { borderBottomColor: tokens.colorPaletteRedBorder2 },
@@ -56,47 +44,36 @@ const useStyles = makeStyles({
 export interface QueryBoxProps {
   readonly input: QueryInput;
   readonly scope: QueryScope;
-  /** 勾上的预设数与菜单开合状态独立。 */
-  readonly checked: ReadonlySet<PresetId>;
-  /** 装没装 foo_playcount；没装时要它的那一节预设置灰。 */
-  readonly playcount: boolean | null;
-  /** 宿主认不出框里这串查询。 */
+  /** 宿主认不出框里这串查询 */
   readonly invalid: boolean;
+  /** 末尾那份范围与模式菜单开着没有；页面的「查询帮助」靠它打开 */
   readonly menuOpen: boolean;
   readonly placeholder: string;
   readonly label: string;
   readonly inputRef?: RefObject<HTMLInputElement | null>;
   readonly onChange: (input: QueryInput) => void;
-  /** 回车，且没有落在菜单的某一条上。 */
+  /** 回车 */
   readonly onEnter: () => void;
   readonly onScope: (scope: QueryScope) => void;
-  readonly onTogglePreset: (id: PresetId) => void;
   readonly onMenuOpenChange: (open: boolean) => void;
 }
 
-/** 模式与两份草稿由页面持有；输入法组词期间只更新本地显示，不发布中间输入。 */
+/**
+ * 命令栏的搜索框：只管输入文字。末尾的键切换搜索范围与高级查询，高级查询时插入语法示例
+ * 模式与两份草稿由页面持有；输入法组词期间只更新本地显示，不发布中间输入
+ */
 export function QueryBox(props: QueryBoxProps) {
   const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
-  const { scope, menuOpen, onMenuOpenChange } = props;
   const value = queryInputText(props.input);
-  const menuId = useId();
+  const id = useId();
   const own = useRef<HTMLInputElement>(null);
   const input = props.inputRef ?? own;
-  const [box, setBox] = useState<HTMLDivElement | null>(null);
-  const [active, setActive] = useState(-1);
   const selectAfter = useRef<readonly [number, number] | null>(null);
   const composing = useRef(false);
   const [composition, setComposition] = useState<string | null>(null);
   const advanced = props.input.mode === 'advanced';
-  const invalid = props.invalid;
-  const connectable = props.input.advancedText.trim() !== '';
-  const entries = queryMenuEntries({
-    playcount: props.playcount,
-    connectable,
-  });
-  const shown = menuOpen && entries.length > 0;
 
   useLayoutEffect(() => {
     const range = selectAfter.current;
@@ -106,60 +83,42 @@ export function QueryBox(props: QueryBoxProps) {
   });
 
   useCommand({
-    id: `query.clear.${menuId}`,
+    id: `query.clear.${id}`,
     layer: 'input',
     keys: [{ key: 'Escape' }],
     enabled: () =>
-      !menuOpen && !composing.current && value !== '' && document.activeElement === input.current,
+      !props.menuOpen &&
+      !composing.current &&
+      value !== '' &&
+      document.activeElement === input.current,
     run: () => props.onChange(changeQueryText(props.input, '')),
   });
 
-  const open = (next: boolean) => {
-    setActive(-1);
-    if (next !== menuOpen) onMenuOpenChange(next);
-  };
-  const fill = (piece: Pick<QuerySnippet, 'text' | 'select'>, connector: boolean) => {
-    const filled = fillQuery(props.input.advancedText, piece, connector);
+  const snippet = (piece: QuerySnippet) => {
+    const filled = fillQuery(props.input.advancedText, piece, needsConnector(piece.id));
     selectAfter.current = [filled.start, filled.end];
     props.onChange({ ...props.input, mode: 'advanced', advancedText: filled.text });
-    open(false);
     input.current?.focus();
-  };
-  const pick = (entry: QueryMenuEntry) => {
-    if (entry.kind === 'preset') props.onTogglePreset(entry.preset.id);
-    else fill(entry.snippet, needsConnector(entry.snippet.id));
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (composing.current || event.nativeEvent.isComposing) return;
-    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
-    const entry = entries[active];
-    if (shown && step !== 0) setActive(stepEntry(entries, active, step));
-    else if (shown && event.key === 'Enter' && entry && !entry.disabled) pick(entry);
-    else if (menuOpen && event.key === 'Escape') open(false);
-    else if (!menuOpen && event.altKey && event.key === 'ArrowDown') open(true);
+    if (event.altKey && event.key === 'ArrowDown') props.onMenuOpenChange(true);
     else if (event.key === 'Enter') props.onEnter();
     else return;
     event.preventDefault();
   };
 
-  const count = props.checked.size;
-  const funnel = count > 0 ? t('query.openWithCount', { count }) : t('query.open');
   return (
-    <div ref={setBox} className={styles.box} data-query-box>
+    <div className={styles.box} data-query-box>
       <Input
         ref={input}
-        className={mergeClasses(classes.surface, invalid && classes.invalid, controls.field)}
-        role="combobox"
+        className={mergeClasses(classes.surface, props.invalid && classes.invalid, controls.field)}
+        role="searchbox"
         aria-label={props.label}
-        aria-invalid={invalid || undefined}
-        aria-expanded={shown}
-        aria-controls={shown ? menuId : undefined}
-        aria-activedescendant={shown && active >= 0 ? queryOptionId(menuId, active) : undefined}
-        aria-autocomplete="list"
+        aria-invalid={props.invalid || undefined}
         placeholder={advanced ? t('query.mode') : props.placeholder}
         value={composition ?? value}
         onChange={(_, data) => {
-          setActive(-1);
           if (composing.current) setComposition(data.value);
           else props.onChange(changeQueryText(props.input, data.value));
         }}
@@ -173,26 +132,7 @@ export function QueryBox(props: QueryBoxProps) {
           props.onChange(changeQueryText(props.input, event.currentTarget.value));
         }}
         onKeyDown={onKeyDown}
-        onBlur={() => open(false)}
-        contentBefore={
-          <Tooltip content={funnel} relationship="label">
-            <Button
-              appearance="transparent"
-              size="small"
-              className={mergeClasses(classes.funnel, menuOpen && classes.active, controls.icon)}
-              icon={menuOpen ? <Filter16Filled /> : <Filter16Regular />}
-              aria-expanded={shown}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                input.current?.focus();
-                open(!menuOpen);
-              }}
-              data-query-funnel
-            >
-              {count > 0 ? count : undefined}
-            </Button>
-          </Tooltip>
-        }
+        contentBefore={<Search16Regular />}
         contentAfter={{
           className: classes.trailing,
           children: (
@@ -217,49 +157,26 @@ export function QueryBox(props: QueryBoxProps) {
                   data-query-clear
                 />
               </Tooltip>
-              {advanced ? (
-                <Badge
-                  className={classes.control}
-                  appearance="tint"
-                  color={props.invalid ? 'danger' : 'brand'}
-                  data-query-mode={props.invalid ? 'invalid' : 'query'}
-                >
-                  {props.invalid ? t('query.modeInvalid') : t('query.mode')}
-                </Badge>
-              ) : (
-                <QueryScopeMenu scope={scope} onScope={props.onScope} />
-              )}
+              <QueryScopeMenu
+                scope={props.scope}
+                onScope={props.onScope}
+                open={props.menuOpen}
+                onOpenChange={props.onMenuOpenChange}
+                advanced={{
+                  active: advanced,
+                  invalid: props.invalid,
+                  connectable: props.input.advancedText.trim() !== '',
+                  onMode: (next) => {
+                    props.onChange({ ...props.input, mode: next ? 'advanced' : 'text' });
+                    input.current?.focus();
+                  },
+                  onSnippet: snippet,
+                }}
+              />
             </>
           ),
         }}
         data-query-input
-      />
-      <Tooltip content={t('query.advanced')} relationship="label">
-        <ToggleButton
-          className={mergeClasses(classes.toggle, controls.icon)}
-          appearance="subtle"
-          checked={advanced}
-          icon={<Code16Regular />}
-          disabled={composition !== null}
-          data-query-mode-toggle
-          onClick={() => {
-            open(false);
-            props.onChange({ ...props.input, mode: advanced ? 'text' : 'advanced' });
-            input.current?.focus();
-          }}
-        />
-      </Tooltip>
-      <QueryMenu
-        open={shown}
-        onDismiss={() => open(false)}
-        target={box}
-        id={menuId}
-        entries={entries}
-        active={active}
-        onActive={setActive}
-        checked={props.checked}
-        onPick={pick}
-        onEdit={(entry) => entry.kind === 'preset' && fill({ text: entry.preset.query }, true)}
       />
     </div>
   );

@@ -1,3 +1,4 @@
+import { onlineZhCN } from './onlineZhCN.ts';
 import type { Messages } from './en.ts';
 import { trackInfoZhCN } from './trackInfoZhCN.ts';
 import { genresZhCN } from './genresZhCN.ts';
@@ -11,6 +12,8 @@ import { songsZhCN } from './songsZhCN.ts';
 import { contextMenuZhCN } from './contextMenuZhCN.ts';
 import { queueZhCN } from './queueZhCN.ts';
 import { searchZhCN } from './searchZhCN.ts';
+import { artistAlbumsZhCN } from './artistAlbumsZhCN.ts';
+import { detailZhCN } from './detailZhCN.ts';
 import { biographyZhCN } from './biographyZhCN.ts';
 import { videoZhCN } from './videoZhCN.ts';
 import { artistsZhCN } from './artistsZhCN.ts';
@@ -20,12 +23,15 @@ import { savingZhCN } from './savingZhCN.ts';
 import { startupZhCN } from './startupZhCN.ts';
 import { updateZhCN } from './updateZhCN.ts';
 import { miniPlayerZhCN } from './miniPlayerZhCN.ts';
+import { desktopLyricsZhCN } from './desktopLyricsZhCN.ts';
 import { lyricsZhCN } from './lyricsZhCN.ts';
 
-/** 简体中文包。按 `Messages` 标注：英文包加了键而这里没跟上，编译不过。 */
+/** 简体中文语言包，遵循 `Messages` 契约补齐所有键 */
 export const zhCN: Messages = {
+  ...onlineZhCN,
   ...lyricsZhCN,
   ...miniPlayerZhCN,
+  ...desktopLyricsZhCN,
   ...updateZhCN,
   ...startupZhCN,
   ...savingZhCN,
@@ -36,6 +42,8 @@ export const zhCN: Messages = {
   ...externalLinksZhCN,
   ...biographyZhCN,
   ...searchZhCN,
+  ...artistAlbumsZhCN,
+  ...detailZhCN,
   ...contextMenuZhCN,
   ...foldersZhCN,
   ...genresZhCN,
@@ -57,7 +65,6 @@ export const zhCN: Messages = {
   'place.album': '专辑详情',
   'place.songs': '歌曲',
   'place.genres': '流派',
-  'place.genre': '流派',
   'place.folders': '文件夹',
   'place.playlists': '所有播放列表',
   'place.playlist': '播放列表',
@@ -74,19 +81,20 @@ export const zhCN: Messages = {
   'album.newPlaylist': '新建播放列表',
   'album.batchName': '{first} 等 {count} 张',
   'album.title': '专辑',
+  'album.playAll': '播放全部',
+  'album.shuffleAll': '随机播放',
+  'album.filterResult': '显示 {count} 张 · 共 {total} 张',
   'album.countOne': '{count} 张',
   'album.count': '{count} 张',
   'album.selectedCount': '已选 {count} 张',
-  'album.sectionedBy': '按{dimension}分节',
   'album.loading': '正在读取…',
   'album.truncated': '只显示前 {count} 张',
   'album.tools': '专辑视图选项',
   'album.form': '视图',
   'album.formWall': '封面墙',
   'album.formList': '列表',
-  'album.filter': '筛选专辑',
+  'album.filter': '搜索专辑',
   'album.dimension': '分节',
-  'album.dimensionValue': '分节：{value}',
   'album.dimAlbum': '不分节',
   'album.dimAlbumArtist': '专辑艺人',
   'album.dimArtist': '艺人',
@@ -103,13 +111,11 @@ export const zhCN: Messages = {
   'album.sortTrackCountShort': '曲目数',
   'album.tileSize': '封面大小',
   'album.tileSizeValue': '{size} px',
-  'album.pageMenu': '更多选项',
   'album.style': '显示样式',
   'album.styleGrid': '网格',
   'album.styleCompact': '紧凑',
   'album.styleSpaced': '宽松',
   'album.styleGridNoText': '仅封面',
-  'album.showFacets': '分类筛选',
   'album.facets': '筛选',
   'album.facetGenre': '流派',
   'album.facetDecade': '年代',
@@ -266,17 +272,12 @@ export const zhCN: Messages = {
   'table.nowPlaying': '正在播放',
   'table.ratingFailed': '评分保存失败',
   'table.ratingTagFailed': '评分已清除，但文件中的 RATING 标签删除失败',
-  'table.columnsSection': '列',
-  'table.sortSection': '排序',
   'table.shuffle': '随机排序',
   'table.reverse': '反向',
-  'table.grouping': '启用分组',
   'table.groupBy': '分组依据',
   'table.collapseAll': '全部折叠',
   'table.expandAll': '全部展开',
   'albumList.table': '专辑列表',
-  'albumList.selectedTracks': '已选 {count} 首',
-  'albumList.expand': '展开 / 折叠',
   'albumList.expandAll': '全部展开',
   'albumList.onlySections': '只展开{dimension}',
   'albumList.collapseAlbums': '折叠全部专辑',
@@ -288,14 +289,15 @@ export const zhCN: Messages = {
   'albumList.onlySectionHint': '其他节折叠',
   'albumList.expandAlbum': '展开',
   'albumList.collapseAlbum': '折叠',
-  'albumList.dimensionShared': '分节依据',
-  'albumList.dimensionScope': '同时应用于封面墙',
   'albumList.dimAlbumHint': '只按专辑分组',
   'albumList.sectionOrder': '分节顺序',
   'albumList.orderName': '按名称',
   'albumList.orderNameHint': '中文按拼音',
   'albumList.orderCount': '按专辑数',
-  'albumList.orderCountHint': '降序',
+  'albumList.sectionDirection': '分节方向',
+  'albumList.albumGroups': '专辑分组',
+  'albumList.byAlbum': '按专辑',
+  'albumList.ungrouped': '不分组',
   'albumList.groupAlbum': '专辑',
   'albumList.groupFile': '文件',
   'albumList.groupStats': '播放统计',
@@ -328,6 +330,10 @@ export const zhCN: Messages = {
   'trackMenu.selectedOne': '已选 {count} 首',
   'trackMenu.selected': '已选 {count} 首',
   'trackMenu.goToAlbum': '转到专辑',
+  'trackMenu.goToArtist': '转到艺人',
+  'trackMenu.currentPlace': '当前',
+  'trackMenu.noArtistPage': '没有艺人页',
+  'trackMenu.noAlbumPage': '没有专辑页',
   'trackMenu.clickedTrack': '仅针对所指曲目',
   'trackMenu.rating': '评分',
   'trackMenu.ratingOne': '1 星',

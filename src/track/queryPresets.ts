@@ -1,4 +1,4 @@
-// 查询菜单里的预设与写法。预设可以勾上、叠加为条件；写法只填进过滤框接着改。两样都是一份清单，各页共用。
+// 查询菜单里的预设与写法。预设可以勾上、叠加为条件；写法只填进过滤框接着改。两样都是一份清单，各页共用
 
 export type PresetGroup = 'rating' | 'plays' | 'quality' | 'tags';
 
@@ -20,12 +20,12 @@ export interface QueryPreset {
   readonly query: string;
 }
 
-/** 播放与加入时间那一节要 foo_playcount：没装时它的字段不存在，几条都一首不中，整节置灰。 */
+/** 播放与加入时间那一节要 foo_playcount：没装时它的字段不存在，几条都一首不中，整节置灰 */
 export const PLAYCOUNT_GROUP: PresetGroup = 'plays';
 
 export const PRESET_GROUPS: readonly PresetGroup[] = ['rating', 'plays', 'quality', 'tags'];
 
-/** 阈值与写法都在宿主上核过能用。 */
+/** 阈值与写法都在宿主上核过能用 */
 export const QUERY_PRESETS: readonly QueryPreset[] = [
   { id: 'highRated', group: 'rating', query: '%rating% GREATER 3' },
   { id: 'unrated', group: 'rating', query: '%rating% MISSING' },
@@ -49,14 +49,14 @@ export function isPresetId(value: unknown): value is PresetId {
   return QUERY_PRESETS.some((preset) => preset.id === value);
 }
 
-/** 两条同时勾上一定一首不中：勾上一条时把与它冲突的取消。 */
+/** 两条同时勾上一定一首不中：勾上一条时把与它冲突的取消 */
 const CONFLICTS: readonly (readonly [PresetId, PresetId])[] = [
   ['highRated', 'unrated'],
   ['frequent', 'neverPlayed'],
   ['recentlyPlayed', 'neverPlayed'],
 ];
 
-/** 勾上或取消一条；勾上时去掉与它冲突的。返回新的一份，次序按清单。 */
+/** 勾上或取消一条；勾上时去掉与它冲突的。返回新的一份，次序按清单 */
 export function togglePreset(selected: ReadonlySet<PresetId>, id: PresetId): Set<PresetId> {
   const next = new Set(selected);
   if (next.delete(id)) return next;
@@ -72,7 +72,7 @@ export type SnippetId = 'decade' | 'format' | 'and' | 'or' | 'not';
 
 /**
  * 「写法」一节：填进框里的一段。`text` 是要接上的那一段，`select` 是填进去之后选中的那一截在 `text` 里的起止，
- * 用户直接打字就换掉它；不给时光标落在末尾。`and`、`or` 只接连接词，前面得已有查询。
+ * 用户直接打字就换掉它；不给时光标落在末尾。`and`、`or` 只接连接词，前面得已有查询
  */
 export interface QuerySnippet {
   readonly id: SnippetId;
@@ -91,14 +91,14 @@ export const QUERY_SNIPPETS: readonly QuerySnippet[] = [
   { id: 'not', text: 'NOT ' },
 ];
 
-/** 写进框里之后的样子：框里的字与要选中的一截（光标落在末尾时起止相同）。 */
+/** 写进框里之后的样子：框里的字与要选中的一截（光标落在末尾时起止相同） */
 export interface FilledQuery {
   readonly text: string;
   readonly start: number;
   readonly end: number;
 }
 
-/** 只编辑高级草稿，不转换文字草稿；返回待选中的参数范围。 */
+/** 只编辑高级草稿，不转换文字草稿；返回待选中的参数范围 */
 export function fillQuery(
   current: string,
   piece: Pick<QuerySnippet, 'text' | 'select'>,
@@ -111,7 +111,7 @@ export function fillQuery(
   return { text, start: head.length + from, end: head.length + to };
 }
 
-/** 一段写法填进框时要不要先接 AND：连接词自己就是连接，不再加。 */
+/** 一段写法填进框时要不要先接 AND：连接词自己就是连接，不再加 */
 export function needsConnector(id: SnippetId): boolean {
   return id !== 'and' && id !== 'or';
 }

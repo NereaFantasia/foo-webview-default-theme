@@ -43,6 +43,7 @@ const render = () =>
       clock,
       active: true,
       fontSize: 24,
+      fallback: createElement('p', null, '歌词文字预览'),
     }),
   );
 Reflect.set(window, '__lyricsProbe', {

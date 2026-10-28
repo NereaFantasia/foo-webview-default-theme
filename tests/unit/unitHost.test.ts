@@ -56,10 +56,10 @@ describe('UnitHost：事件', () => {
     const received: unknown[] = [];
     const off = host.fb.on('library:itemsAdded', (payload) => received.push(payload));
     expect(host.listenerCount('library:itemsAdded')).toBe(1);
-    host.emit('library:itemsAdded', { count: 3, timestamp: 1 });
+    host.emit('library:itemsAdded', { count: 3, handles: [], truncated: false, timestamp: 1 });
     off();
-    host.emit('library:itemsAdded', { count: 4, timestamp: 2 });
-    expect(received).toEqual([{ count: 3, timestamp: 1 }]);
+    host.emit('library:itemsAdded', { count: 4, handles: [], truncated: false, timestamp: 2 });
+    expect(received).toEqual([{ count: 3, handles: [], truncated: false, timestamp: 1 }]);
     expect(host.listenerCount('library:itemsAdded')).toBe(0);
   });
 

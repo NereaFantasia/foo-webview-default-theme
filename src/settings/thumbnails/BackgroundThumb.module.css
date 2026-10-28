@@ -1,0 +1,74 @@
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background-color: var(--colorNeutralBackgroundStatic);
+}
+
+.skeleton {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 窗格与块不随深浅变：背景画什么，它们都是半透明的深玻璃加白色的块 */
+.pane {
+  fill: color-mix(in srgb, var(--colorNeutralBackgroundStatic) 40%, transparent);
+  stroke: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 24%, transparent);
+  stroke-width: var(--strokeWidthThin);
+  vector-effect: non-scaling-stroke;
+}
+
+.soft {
+  fill: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 20%, transparent);
+}
+
+.mid {
+  fill: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 32%, transparent);
+}
+
+.hard {
+  fill: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 62%, transparent);
+}
+
+.theme {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--colorBrandBackground) 46%, var(--colorNeutralBackgroundStatic)),
+    color-mix(in srgb, var(--colorBrandBackground) 14%, var(--colorNeutralBackgroundStatic))
+  );
+}
+
+/* 比桌面小一圈的磨砂窗口：边缘露出壁纸，里面是半透明的窗格 */
+.window {
+  position: absolute;
+  inset: 8% 7%;
+  display: block;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid
+    color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 28%, transparent);
+  border-radius: var(--borderRadiusSmall);
+  background-color: color-mix(in srgb, var(--colorNeutralBackgroundStatic) 50%, transparent);
+  backdrop-filter: blur(6px) saturate(1.3);
+  box-shadow: var(--shadow8);
+}
+
+/* 底图铺满方框；图片与系统材质那两张的壁纸压暗一档，与真实窗口里的遮罩同一个意思 */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+.dim {
+  filter: brightness(0.82);
+}

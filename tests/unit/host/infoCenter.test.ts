@@ -403,7 +403,7 @@ describe('startInfoCenter', () => {
     await probePlaycount(host, again.store);
     expect(again.kinds()).toEqual([]);
 
-    versionIs(host, '2.1.0');
+    versionIs(host, '2.2.0');
     const upgraded = await start(host);
     await probePlaycount(host, upgraded.store);
     expect(upgraded.kinds()).toEqual(['playcountMissing']);

@@ -11,6 +11,7 @@ import {
   divider,
   hostRatingEntry,
   trackMenuEntries,
+  type GoToTarget,
   type TrackActionContext,
 } from '../../../src/track/trackMenuEntries.ts';
 
@@ -29,7 +30,7 @@ function context(change: Partial<TrackActionContext> = {}): TrackActionContext {
       sendToNew: vi.fn(),
       sendTo: vi.fn(),
     },
-    album: null,
+    goTo: null,
     rating: null,
     properties: null,
     more: [],
@@ -114,11 +115,20 @@ describe('标准项', () => {
 
   it('转到专辑在当前专辑省略，找不到目标时解释原因，多选时说明采用落点', () => {
     const open = vi.fn();
-    expect(trackMenuEntries(['go-to-album'], context({ album: { open, here: true } }))).toEqual([]);
+    const goTo = (album: GoToTarget | null) => ({ album, artists: [] });
+    const album = (change: Partial<GoToTarget>): GoToTarget => ({
+      name: 'A',
+      open,
+      here: false,
+      ...change,
+    });
+    expect(
+      trackMenuEntries(['go-to-album'], context({ goTo: goTo(album({ here: true })) })),
+    ).toEqual([]);
     expect(trackMenuEntries(['go-to-album'], context())).toEqual([]);
     const missing = trackMenuEntries(
       ['go-to-album'],
-      context({ album: { open: null, here: false } }),
+      context({ goTo: goTo(album({ open: null })) }),
     );
     expect(command(missing, 'go-to-album')).toMatchObject({
       disabled: true,
@@ -126,7 +136,7 @@ describe('标准项', () => {
     });
     const entries = trackMenuEntries(
       ['go-to-album'],
-      context({ album: { open, here: false }, multiple: true }),
+      context({ goTo: goTo(album({})), multiple: true }),
     );
     const entry = command(entries, 'go-to-album');
     expect(entry).toMatchObject({ disabled: false, label: '转到专辑' });
@@ -135,6 +145,53 @@ describe('标准项', () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 
+  it('转到艺人：一位是单项，已在他的页面上不出；没有艺人不出', () => {
+    const open = vi.fn();
+    const one = (here: boolean) => ({
+      album: null,
+      artists: [{ name: 'Nujabes', open, here }],
+    });
+    expect(trackMenuEntries(['go-to-artist'], context())).toEqual([]);
+    expect(trackMenuEntries(['go-to-artist'], context({ goTo: one(true) }))).toEqual([]);
+    const entry = command(
+      trackMenuEntries(['go-to-artist'], context({ goTo: one(false) })),
+      'go-to-artist',
+    );
+    expect(entry).toMatchObject({ disabled: false, label: '转到艺人' });
+    entry.onSelect();
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('转到艺人：两位起收成子菜单，按顺序列出，打不开的置灰并说明，所在的那位标「当前」', () => {
+    const open = vi.fn();
+    const [branch] = trackMenuEntries(
+      ['go-to-artist'],
+      context({
+        goTo: {
+          album: null,
+          artists: [
+            { name: 'A', open, here: true },
+            { name: 'B', open: null, here: false },
+            { name: 'C', open, here: false },
+          ],
+        },
+      }),
+    );
+    if (branch?.kind !== 'submenu') throw new Error('缺少转到艺人子菜单');
+    expect(branch.label).toBe('转到艺人');
+    expect(branch.items.map((item) => item.kind !== 'separator' && item.label)).toEqual([
+      'A',
+      'B',
+      'C',
+    ]);
+    expect(command(branch.items, 'go-to-artist:0')).toMatchObject({ badge: '当前' });
+    expect(command(branch.items, 'go-to-artist:1')).toMatchObject({
+      disabled: true,
+      reason: '没有艺人页',
+    });
+    command(branch.items, 'go-to-artist:2').onSelect();
+    expect(open).toHaveBeenCalledTimes(1);
+  });
   it('属性认不出时置灰；更多命令为空不出，评分没给不出', () => {
     const entries = trackMenuEntries(['rating', 'properties', 'more-commands'], context());
     expect(entries.map((entry) => entry.id)).toEqual(['properties']);

@@ -1,0 +1,13 @@
+/* 铺满场景、压在内容之下；渲染器的 canvas 自己带 pointer-events: none 与负的层级 */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.backdrop > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

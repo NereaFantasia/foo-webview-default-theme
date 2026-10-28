@@ -1,6 +1,6 @@
 const ATTEMPTS_KEY = 'default-theme.update.v1';
 
-/** 只访问引导页的运行状态；业务偏好不能使用这组不记代数的接口。 */
+/** 引导页运行状态专用存储接口；未引入代数版本机制，禁止用于常规业务偏好数据 */
 export interface LoaderStorage {
   readAttempts(): string | null;
   writeAttempts(value: string): void;

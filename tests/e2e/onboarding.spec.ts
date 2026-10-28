@@ -57,7 +57,12 @@ test('第一次启动打开引导，停在第 1 步；添加文件夹之后「�
 
   library.enabled = true;
   library.count = 3698;
-  await host.emit('library:itemsAdded', { count: 3698, timestamp: 1 });
+  await host.emit('library:itemsAdded', {
+    count: 3698,
+    handles: [],
+    truncated: false,
+    timestamp: 1,
+  });
   await expect(dialog).toContainText('共 3,698 首');
   await expect(dialog.getByRole('button', { name: /管理文件夹/ })).toBeVisible();
   expect(errors).toEqual([]);

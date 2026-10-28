@@ -1,11 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openPlayer } from '../fixtures/playerPage.ts';
-import { enterSettings } from '../fixtures/settingsPage.ts';
+import { enterSettings, chooseBackground } from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
 async function choose(page: Page, label: string) {
-  await page.getByRole('combobox', { name: '窗口背景', exact: true }).click();
-  await page.getByRole('option', { name: label, exact: true }).click();
+  await chooseBackground(page, label);
 }
 async function finishFade(page: Page) {
   await page.evaluate(() => {
@@ -26,6 +25,14 @@ async function prepare(page: Page) {
       'default-theme.window-background.v1',
       JSON.stringify({ source: 'palette' }),
     );
+    // 宿主报了可用的窗口材质才画透明的材质层；检测不到 Windows 11 时界面会用纯色底，淡变的对象就变了
+    Object.defineProperty(navigator, 'userAgentData', {
+      configurable: true,
+      value: {
+        platform: 'Windows',
+        getHighEntropyValues: async () => ({ platformVersion: '13.0.0' }),
+      },
+    });
     const live = new Set<WebGLTexture>();
     const create = WebGL2RenderingContext.prototype.createTexture;
     const remove = WebGL2RenderingContext.prototype.deleteTexture;
@@ -46,6 +53,13 @@ async function prepare(page: Page) {
     Reflect.set(window, '__backgroundTextures', () => live.size);
   });
   const player = await openPlayer(page);
+  await player.host.waitForListener('window:backdropStateChanged');
+  await player.host.emit('window:backdropStateChanged', {
+    windowId: 'main',
+    active: true,
+    mode: 'active',
+    effect: 'mica',
+  });
   const url = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 64;
@@ -117,7 +131,7 @@ test('背景来源双向淡变，色场退场保留预览并立即释放GPU', as
   await finishFade(page);
   await expect(retiring).toHaveCount(0);
 
-  await choose(page, 'Mica');
+  await choose(page, '系统材质');
   await expect(retiring).toHaveCSS('opacity', '0.5');
   await expect(page.locator('[data-background-source="material"]')).toHaveCSS(
     'background-color',
@@ -159,7 +173,7 @@ test('等待目标封面时保持原画面，取消后迟到解码不能复活�
   });
   await expect(page.locator('[data-background-source="cover"]')).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await choose(page, 'Mica');
+  await choose(page, '系统材质');
   await expect(page.locator('[data-background-leaving]')).toHaveCount(0);
   await choose(page, '流动色场');
   const field = page.locator('[data-window-background="palette"]');
@@ -174,7 +188,7 @@ test('淡变途中快速选择只交接到最后一项，最多两层且旧资�
   await holdFades(page);
   await choose(page, '正在播放的封面');
   await expect(page.locator('[data-window-background="cover"]')).toHaveCSS('opacity', '0.5');
-  await choose(page, 'Mica');
+  await choose(page, '系统材质');
   await choose(page, '流动色场');
   await expect(page.locator('[data-background-source]')).toHaveCount(2);
   await expect(page.locator('[data-window-background="cover"]')).toHaveCSS('opacity', '0.5');

@@ -182,7 +182,7 @@ describe('简介服务', () => {
       {
         url: 'https://www.last.fm/zh/music/Queen/+wiki',
         timeout: 12_000,
-        redirect: 'error',
+        redirect: 'manual',
         headers: {
           'User-Agent': 'foo-webview-default-theme/0.1 (+https://github.com/NereaFantasia)',
           Accept: 'text/html',
@@ -250,6 +250,66 @@ describe('简介服务', () => {
     });
     expect(env.state().document?.paragraphs[0]).toBe('第一段简介。');
     expect(env.host.callsTo('file.write')).toEqual([]);
+  });
+
+  it('传输失败时状态带细分错误码与宿主原文', async () => {
+    const env = setupBiography();
+    await env.service.ready;
+    env.host.answer(
+      'http.get',
+      hostFailure('PERMISSION_DENIED', 'Target host resolves to a private/local network address'),
+    );
+    env.store.set(env.enabled, true);
+    await tick();
+    expect(env.state()).toMatchObject({
+      status: 'error',
+      problem: 'localRelay',
+      problemDetail: 'Target host resolves to a private/local network address',
+    });
+  });
+
+  it('名字规范化跳转后正文归属请求名，缓存存读一个来回', async () => {
+    const first = setupBiography();
+    await first.service.ready;
+    const noHeaders: Record<string, string> = {};
+    first.host.answer('http.get', (params) =>
+      String(params['url']).includes('%E4%BC%A6')
+        ? {
+            success: true as const,
+            status: 301,
+            headers: { Location: `/zh/music/${encodeURIComponent('周杰倫')}/+wiki` },
+            body: '',
+            responseType: 'text' as const,
+          }
+        : {
+            success: true as const,
+            status: 200,
+            headers: noHeaders,
+            body: '繁体正文',
+            responseType: 'text' as const,
+          },
+    );
+    first.store.set(first.input, { artist: '周杰伦', sourceArtist: '周杰伦', language: 'zh' });
+    first.store.set(first.enabled, true);
+    await tick();
+    expect(first.state()).toMatchObject({
+      status: 'ready',
+      document: { artist: '周杰伦', paragraphs: ['繁体正文'] },
+    });
+    const cached = first.files.get(BIOGRAPHY_FILE) ?? '';
+    expect(cached).toContain(encodeURIComponent('周杰伦'));
+
+    // 关掉再按缓存开：水合的条目照常显示，不再发请求。
+    const second = setupBiography(cached);
+    await second.service.ready;
+    second.store.set(second.input, { artist: '周杰伦', sourceArtist: '周杰伦', language: 'zh' });
+    second.store.set(second.enabled, true);
+    await tick();
+    expect(second.state()).toMatchObject({
+      status: 'ready',
+      document: { artist: '周杰伦', paragraphs: ['繁体正文'] },
+    });
+    expect(second.host.callsTo('http.get')).toEqual([]);
   });
 
   it('同名不同语言不共用正文，简繁来源名也不自动合并', async () => {

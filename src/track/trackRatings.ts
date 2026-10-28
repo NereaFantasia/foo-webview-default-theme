@@ -12,9 +12,10 @@ import { createTagWrites } from './tagWrites.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
 /**
- * 写成功之后等宿主确认的时限，毫秒。写进统计项的，确认是报出同一个值的 `metadb:changed` 回声，装了
- * foo_playcount 时清零还会先回一条报旧标签值的事件；写进标签的，完成事件触发补读，值一致才确认。
- * 统计项到时仍无回声：期间宿主报来过不同的值就以宿主的为准，否则按确认处理。
+ * 写入成功后等待宿主确认的超时时限（毫秒）
+ * 若写入统计项，宿主通过回报相同值的 `metadb:changed` 作为回声确认（安装 foo_playcount 时清零可能先回传旧标签值）；
+ * 若写入标签，则由完成事件触发补读校验，值一致时完成确认
+ * 超时后仍无回声：若期间宿主回报过其他值则以宿主为准，否则视为确认完成
  */
 export const CONFIRM_MS = 3000;
 
@@ -32,22 +33,22 @@ const versionAtom = atom(0);
 const noticeAtom = atom<MessageKey | null>(null);
 const refetchAtom = atom(0);
 
-/** 评分的已知偏离变了就加一：读 `ratingOf` 的组件订它来重画。 */
+/** 当评分偏离记录变更时递增，读取 `ratingOf` 的组件订阅此原子以触发重新渲染 */
 export const ratingsVersionAtom: Atom<number> = atom((get) => get(versionAtom));
-/** 最近一次写评分失败的提示；下一次写入或关掉提示后清掉。 */
+/** 记录最近一次写入评分失败的提示信息；后续写入或主动关闭提示后重置为 null */
 export const ratingsNoticeAtom: Atom<MessageKey | null> = atom((get) => get(noticeAtom));
 /**
- * 事件没报全时加一：报出来的之外还有曲目的评分变了，行里带的值可能过期。表格的调用方看到它变了就重取行，
- * 并换一个新戳。
+ * 当事件未完整回报时递增（提示存在其他曲目评分变更，行内数据可能已过期）
+ * 表格调用方监听到变更后需重新拉取曲目行并获取新时间戳
  */
 export const ratingsRefetchAtom: Atom<number> = atom((get) => get(refetchAtom));
 
 interface Reread {
-  /** 在途时又来了事件：这一次读回的可能已经旧了，丢掉、再读一次。 */
+  /** 在途读取期间再次收到事件时置 true，表明当前读回的数据可能陈旧，需作废并重新补读 */
   again: boolean;
 }
 
-/** 标签里有没有一项叫 RATING（不论大小写）且不为空的值。 */
+/** 检查标签字典中是否存在非空的 RATING 字段（忽略大小写） */
 function hasRatingTag(tags: Readonly<Record<string, unknown>>): boolean {
   return Object.entries(tags).some(([name, value]) => {
     if (name.toUpperCase() !== 'RATING') return false;
@@ -57,28 +58,27 @@ function hasRatingTag(tags: Readonly<Record<string, unknown>>): boolean {
 }
 
 export interface TrackRatingsService {
-  /** 连上宿主、订上 `metadb:changed` 与 `metadata:writeComplete` 时兑现，不会拒绝。 */
+  /** 连接宿主并成功挂载 `metadb:changed` 与 `metadata:writeComplete` 监听时兑现，不会拒绝 */
   readonly ready: Promise<void>;
   /**
-   * 取一批曲目之前拿一个戳，与这批行一起记着，问 `ratingOf` 时带上：戳之后才记下的偏离盖过行里的值，戳之前
-   * 的让位给行里的值。自己写的、宿主还没确认的值不看戳，一律为准。
+   * 生成曲目版本时间戳。调用方在批量拉取曲目行前获取该戳并与数据行关联，调用 `ratingOf` 时传入：
+   * 晚于该时间戳记录的偏离覆盖行内值，早于该时间戳的偏离由行内值接管；本地主动发起的未确认写入始终优先
    */
   stamp(): number;
-  /** 这一首现在是几星，0 到 5。 */
+  /** 获取曲目的当前星级评分（0 至 5 之间整数） */
   ratingOf(track: RatedTrack, stamp: number): number;
-  /** 只有本地文件能评分：流媒体没有承载评分的标签或统计项。 */
+  /** 判断曲目是否支持评分（仅本地文件支持；在线流媒体不支持标签或统计项评分） */
   canRate(track: Pick<Track, 'path'>): boolean;
   /**
-   * 写一首：先记下让界面立刻变，再发宿主。失败回到最后一次写成的值并留提示；应答回来前又写过时，这次的应答
-   * 不回滚也不提示。
+   * 写入单首曲目评分：先乐观更新本地状态以保证界面即时响应，随后异步提交宿主
+   * 写入失败时回滚至上次成功值并提示；若在响应返回前已有新写入，则当前响应不触发回滚或提示
    */
   setRating(track: RatedTrack, value: number): Promise<boolean>;
-  /** 别处（右键菜单里的评分命令）已经写成功了，只记下值、不发宿主；清零时照样补删 RATING 标签。 */
+  /** 同步外部（如上下文菜单）已成功写入的评分；更新本地记录而不重复向宿主发送写请求；评分清零时同步补删 RATING 标签 */
   assume(tracks: readonly RatedTrack[], value: number): void;
   /**
-   * 登记正在显示的曲目，`stamps` 是这批行取回时的戳：整批一个，或与 `tracks` 逐首对齐的一份；返回注销函数。
-   * 事件报到一个文件、而这个文件里有好几首时分不出是哪一首，登记着的那几首逐首补读；没登记时错过了事件的，
-   * 登记时补读。分页取的表要一次登记整张表显示的曲目：同一个文件落在两页里也要认出它不止一首。
+   * 登记当前可视区域显示的曲目行。`stamps` 对应数据拉取时的时间戳（支持全批单戳或逐首对齐数组），返回取消监听函数
+   * 针对包含多个 subsong 的单文件曲目（如 CUE 分轨），通过 `rating.get` 逐首补读以精确识别变动
    */
   watch(tracks: readonly RatedTrack[], stamps: number | readonly number[]): () => void;
   dismissNotice(): void;
@@ -86,12 +86,11 @@ export interface TrackRatingsService {
 }
 
 /**
- * 曲目评分在页面这一侧的一份真值，随页面存活，所有表格与面板共用。行自己带着取回时的 `rating`，这里只记
- * 已知的偏离（怎么记见 `RatingLedger`）。`metadb:changed` 的路径不带 subsong：整文件就是一首的直接套用报的值，
- * 一个文件里有好几首的（cue 之类），登记在显示的那几首逐首用 `rating.get` 补读。
+ * 曲目评分的前端状态管理服务，随页面生命周期存活，供所有表格与面板共享
+ * 数据行自带拉取时刻的基准评分，本服务维护已知的时间偏离（具体机制见 `RatingLedger`）
+ * 针对 `metadb:changed` 不携带 subsong 的限制，单曲目文件直接套用回报值，复合文件通过补读对齐
  *
- * 发给宿主的曲目都显式带 `cueIndex: subsong`：subsong 为 0 时路径不带后缀，宿主会按旧规则把文件名结尾的
- * 「#数字」当成 subsong 切掉。
+ * 下发给宿主的曲目均显式附带 `cueIndex: subsong`，防止文件名末尾的数字后缀被宿主误判定为分轨索引
  */
 export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): TrackRatingsService {
   store.set(versionAtom, 0);
@@ -109,13 +108,13 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
   const bump = () => store.set(versionAtom, store.get(versionAtom) + 1);
   const canRate = (track: Pick<Track, 'path'>) => /^file(?:-relative)?:\/\//i.test(track.path);
 
-  /** 新写入清掉提示时推进代次，旧的删标签失败不再挂到新写入之后。 */
+  /** 提示信息清理时推进代次，防止过期的异步删除失败回调冲掉新写入的状态 */
   function notice(key: MessageKey | null): void {
     if (key === null) generation += 1;
     store.set(noticeAtom, key);
   }
 
-  /** 同一首同时只读一次：在途时来的事件合并成读完之后的再一次，一串事件不会发出一串补读。 */
+  /** 单曲目并发读取去重：在途请求合并，读取完成后统一补读最新状态，避免高频事件引发请求风暴 */
   async function reread(track: RatedTrack): Promise<void> {
     const running = reads.get(track.handle);
     if (running) {
@@ -175,8 +174,8 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
   }
 
   /**
-   * 删 RATING 标签。派发后补读确认，等待不阻塞调用方。失败的提示
-   * 只在这期间没有新写入时才挂：新一次写入已经清过提示，旧的失败不该跟在它后面冒出来。
+   * 异步删除 RATING 标签：派发后通过事件与补读进行确认，不阻塞主流程
+   * 仅在操作期间未发生新写入时才报告失败提示，避免覆盖用户最新的操作反馈
    */
   async function removeTags(tracks: readonly RatedTrack[]): Promise<void> {
     const mine = generation;
@@ -211,9 +210,8 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
   }
 
   /**
-   * 清零写进统计项之后，RATING 标签还在才删。删标签会重写整份标签、改动音频文件，文件里本来没有这一项时不该
-   * 碰它。直接读标签，不看 `rating.get`：它在统计项不为 0 时答的是统计项，清零被后来的写入顶掉时分不清标签
-   * 在不在。读不回来的不删。
+   * 评分清零写入统计项后，若文件中仍保留有 RATING 标签则执行补删
+   * 删标签涉及整包重写音频文件，若原本无该标签则不执行多余写入；通过直接读取原始标签判断，避免 `rating.get` 统计项优先读取逻辑的干扰
    */
   async function clearTags(tracks: readonly RatedTrack[]): Promise<void> {
     const answers = await Promise.all(
@@ -237,13 +235,13 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
   async function writeRating(track: RatedTrack, value: number): Promise<boolean> {
     const rating = clampRating(value);
     const write = ledger.begin(track, rating);
-    // 写入前的补读作废，不能拿旧值盖过本次写入。
+    // 写入前作废在途补读，防止旧值覆盖本次最新写入
     reads.delete(track.handle);
     clearTimeout(timers.get(track.handle));
     notice(null);
     bump();
     const path = trackPathOf(track);
-    // 先登记再发；其他窗口或较早写入的完成事件只能触发补读，不能确认本次目标值。
+    // 遵循先登记期待项再下发写请求的顺序；其他窗口广播的完成事件仅触发补读，不直接确认本次目标值
     const tag = tagWrites.expect(fileKeyOf(track), track.subsong, async () => {
       const answer = await settle(() => host.metadata.readRaw(path, { cueIndex: track.subsong }));
       if (!answer || answer.success === false) return null;
@@ -262,9 +260,9 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
     const written = tagged ? await tag.done : null;
     if (disposed) return false;
     const ok = answer !== null && answer.success !== false && (!tagged || written === true);
-    // 被顶掉时不确认、不回滚、不提示，归后来那次；清零写成了照样补删标签，后来那次失败时回到的就是这个 0。
+    // 若当前写入已被后续操作覆盖，则不执行确认、回滚或提示；评分清零成功时仍正常补删标签
     if (ledger.finish(track, write, rating, ok) !== 'superseded') {
-      // 标签写成就是宿主确认了；写进统计项的等回声，到时限也算确认。
+      // 标签写入成功即代表宿主完成确认；统计项等待回声事件确认，超时亦视为确认
       if (tagged && ok) ledger.confirm(track.handle);
       else awaitConfirm(track.handle);
       if (!ok) {
@@ -272,8 +270,7 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
         notice('table.ratingFailed');
       }
     }
-    // 装了 foo_playcount 时清零只清统计项，读评分又是「统计项为 0 才读 RATING 标签」，标签留着就会读回
-    // 旧值，所以补删标签。没装时宿主写的就是标签，已经删过了。
+    // 安装 foo_playcount 时清零仅清空统计项；若文件中残留 RATING 标签，读取时会再次回退读到旧值，因此须补删标签
     const stats = ok && answer.storage === 'stats';
     if (rating === 0 && stats) await clearTags([track]);
     return ok;
@@ -306,7 +303,7 @@ export function startTrackRatings(store: Store, host: TrackRatingsFace = fb): Tr
         awaitConfirm(track.handle);
       }
       bump();
-      // 菜单里的评分命令走的是 foo_playcount，清零时标签同样留着。
+      // 上下文菜单内置的评分命令由 foo_playcount 承接，评分清零时同样需补删残留标签
       if (rating === 0) void clearTags(rated);
     },
     watch(tracks, stamps) {

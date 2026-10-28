@@ -1,0 +1,20 @@
+/* 宽度由内层标尺测量，容器外层留白由所属页面定义 */
+.root {
+  min-width: 0;
+}
+
+.list {
+  position: relative;
+}
+
+/* 图块单元格在列表中绝对定位，通过 transform 设置坐标；横向为行偏移叠加列间距取整，纵向直接映射行高 */
+.cell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(
+    round(calc(var(--row-offset) + var(--tile-column) * var(--tile-pitch)), 1px),
+    var(--tile-y)
+  );
+  width: var(--tile-size);
+}

@@ -21,8 +21,15 @@ export interface GenresPrefs {
   readonly sort: GenreSort;
   readonly descending: boolean;
   readonly group: GenreGrouping;
+  /** 右栏曲目表里各组的先后反过来；排序方向另在工具栏，两者互不影响 */
+  readonly groupDescending: boolean;
 }
-const DEFAULTS: GenresPrefs = { sort: 'name', descending: false, group: 'album' };
+const DEFAULTS: GenresPrefs = {
+  sort: 'name',
+  descending: false,
+  group: 'album',
+  groupDescending: false,
+};
 
 export function isGenreGrouping(value: unknown): value is GenreGrouping {
   return GENRE_GROUPS.some((choice) => choice === value);
@@ -33,10 +40,12 @@ export function readGenresPrefs(raw: string | null): GenresPrefs {
   const sort = source['sort'];
   const descending = source['descending'];
   const group = source['group'];
+  const groupDescending = source['groupDescending'];
   return {
     sort: sort === 'name' || sort === 'tracks' || sort === 'albums' ? sort : 'name',
     descending: typeof descending === 'boolean' ? descending : false,
     group: isGenreGrouping(group) ? group : 'album',
+    groupDescending: groupDescending === true,
   };
 }
 

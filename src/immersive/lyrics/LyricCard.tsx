@@ -10,17 +10,17 @@ import styles from './LyricCard.module.css';
 
 const CARD_MIN = 420;
 const CARD_MAX = 1520;
-/** 左内边距 46，右内边距 46 + 34。 */
+/** 左内边距 46，右内边距 46 + 34 */
 const CARD_PADDING = 46 * 2 + 34;
 const MAIN_FIT = { max: LYRIC_FONT.main, min: LYRIC_FONT.minMain, step: 1 };
 const SUB_FIT = { max: LYRIC_FONT.sub, min: LYRIC_FONT.minSub, step: 1 };
 
 /**
- * 字号与卡宽分两步量：`font` 按原字号排、量出超宽的行按比例降字号；`width` 按降好的字宽定卡宽。
- * 两步都在布局副作用里做完，画出来的第一帧就是量好的样子。
+ * 字号与卡宽分两步量：`font` 按原字号排、量出超宽的行按比例降字号；`width` 按降好的字宽定卡宽
+ * 两步都在布局副作用里做完，画出来的第一帧就是量好的样子
  */
 interface CardFit {
-  /** 量的是哪一份内容；内容一变从 `font` 重来。 */
+  /** 量的是哪一份内容；内容一变从 `font` 重来 */
   key: string;
   step: 'font' | 'width' | 'done';
   main: number;
@@ -36,7 +36,7 @@ const freshFit = (key: string, width: number, sub: number): CardFit => ({
   width,
 });
 
-/** 两行里较宽的一行（不超过正文宽上限）加内边距，夹在卡宽上下限之间；没有正文的一行卡取下限。 */
+/** 两行里较宽的一行（不超过正文宽上限）加内边距，夹在卡宽上下限之间；没有正文的一行卡取下限 */
 function cardWidth(main: HTMLElement | null, sub: HTMLElement | null): number {
   const text = Math.max(main?.scrollWidth ?? 0, sub?.scrollWidth ?? 0);
   return Math.min(CARD_MAX, Math.max(CARD_MIN, Math.min(text, LYRIC_TEXT_WIDTH) + CARD_PADDING));
@@ -44,10 +44,10 @@ function cardWidth(main: HTMLElement | null, sub: HTMLElement | null): number {
 
 /**
  * full 档舞台底部的歌词卡。主行是当前行（热色）；副行有译文放译文，没有放下一句（颜色更弱）；
- * 首行之前与无词时卡不出，无时间轴时一行卡只写「纯文本 · n 行」。
+ * 首行之前与无词时卡不出，无时间轴时一行卡只写「纯文本 · n 行」
  *
  * 卡宽随字：两行里较宽的一行加左内边距 46 与右内边距 46 + 34，夹在 420…1520 之间；字宽超过 1394 时
- * 按比例降字号（主行最低 20、副行最低 16），仍超就尾部省略。
+ * 按比例降字号（主行最低 20、副行最低 16），仍超就尾部省略
  */
 export function LyricCard() {
   const t = useAtomValueRawSync(translateAtom);
@@ -98,7 +98,7 @@ export function LyricCard() {
           min: Math.min(subSize, SUB_FIT.min),
         })
       : fit.sub;
-    // 字号没降就不用按新字号再排一遍，眼下量到的字宽就是终值。
+    // 字号没降就不用按新字号再排一遍，眼下量到的字宽就是终值
     if (mainSize === fit.main && fittedSub === fit.sub) {
       setFit({ ...fit, step: 'done', width: cardWidth(main, sub) });
     } else {

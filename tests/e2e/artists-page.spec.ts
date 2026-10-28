@@ -6,6 +6,43 @@ import { LASTFM_KEY_PREF } from '../../src/library/biography/lastfm-api/lastfmKe
 import { apiReply, artistInfoSample } from '../fixtures/lastfmApiSamples.ts';
 import { artistAlbumTracks } from '../fixtures/artistsLibrary.ts';
 
+test('左栏分段选择保留键盘导航，排序字段、方向与列出依据独立选择', async ({ page }) => {
+  const env = await openArtists(page);
+  const tabs = env.view.getByRole('tablist', { name: '艺人', exact: true });
+  const all = tabs.getByRole('tab', { name: /^全部/ });
+  await all.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Space');
+  await expect(tabs.getByRole('tab', { name: /^需要整理/ })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await all.click();
+  const sort = env.view.getByRole('button', { name: '排序与艺人来源' });
+  await sort.click();
+  await page.getByRole('menuitemradio', { name: '专辑数', exact: true }).click();
+  await expect(sort).toContainText('专辑数');
+  await sort.click();
+  await page.getByRole('menuitemradio', { name: '降序', exact: true }).click();
+  await sort.click();
+  await expect(page.getByRole('menuitemradio', { name: '专辑数', exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(page.getByRole('menuitemradio', { name: '降序', exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(page.getByText('列出依据', { exact: true })).toBeVisible();
+  await page.getByRole('menuitemradio', { name: '曲目艺人', exact: true }).click();
+  await sort.click();
+  await expect(page.getByRole('menuitemradio', { name: '曲目艺人', exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  expect(env.errors).toEqual([]);
+});
+
 test('艺人同页切换、筛选和紧凑专辑列表', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   const env = await openArtists(page);
@@ -46,7 +83,13 @@ test('重取失败保留旧曲目并提示，恢复后清掉错误', async ({ pa
     env.view.locator('[data-artist-albums]').getByText('Metaphorical Music', { exact: true }),
   ).toBeVisible();
   env.host.answer('library.getAlbumTracks', hostFailure('OPERATION_FAILED'));
-  await env.host.emit('library:itemsModified', { count: 1, timestamp: Date.now() });
+  await env.host.emit('library:itemsModified', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: Date.now(),
+  });
   await expect(env.view.getByText('刷新失败，显示上次读取的曲目')).toBeVisible();
   await expect(
     env.view.locator('[data-artist-albums]').getByText('Metaphorical Music', { exact: true }),
@@ -117,7 +160,7 @@ test('署名口径改名先显示单值与多值分界，取消不写标签', as
   expect(env.errors).toEqual([]);
 });
 
-test('无图保持紧凑且可播放；合辑保留四格封面', async ({ page }) => {
+test('无图与有图共用宽幅布局且可播放；合辑保留四格封面', async ({ page }) => {
   const env = await openArtists(page, 1280, (host) => {
     host.answer('artwork.getForTrack', (params) => ({
       success: true,
@@ -130,10 +173,12 @@ test('无图保持紧凑且可播放；合辑保留四格封面', async ({ page 
   await env.artist('Nujabes').click();
   const header = env.view.locator('[data-artist-header]');
   await expect(header.locator('[data-artist-photo-state="empty"]')).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 800 });
   const trigger = header.getByRole('button', { name: '打开艺人照片', exact: true });
+  await expect(header).not.toHaveAttribute('data-compact', 'true');
+  await expect(trigger).toHaveCSS('height', '306px');
+  await page.setViewportSize({ width: 390, height: 800 });
   await expect(trigger).toBeDisabled();
-  await expect(trigger).toHaveCSS('height', '72px');
+  await expect(trigger).toHaveCSS('height', '216px');
   await expect(header.getByRole('button', { name: '播放', exact: true })).toBeEnabled();
   await header.getByRole('button', { name: '更多', exact: true }).click();
   await page.locator('[data-action="compilation"]').click();

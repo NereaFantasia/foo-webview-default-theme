@@ -24,22 +24,22 @@ import { usePlaybackJumps } from './usePlaybackJumps.ts';
 import styles from './PaperSpectrum.module.css';
 
 const DB_TICKS = [0, -10, -20, -30, -40, -50, -60] as const;
-/** 纵轴刻度：`level` 是柱高（0…1）。 */
+/** 纵轴刻度：`level` 是柱高（0…1） */
 const AMPLITUDE_TICKS = DB_TICKS.map((db) => ({ label: `${db}`, level: levelOfDb(db) }));
 const CAPTION = 'band power · dB';
-/** 轴说明左缘在 200 刻度右边这么远（CSS 像素），让开刻度字。 */
+/** 轴说明左缘在 200 刻度右边这么远（CSS 像素），让开刻度字 */
 const CAPTION_AFTER_HZ = 200;
 const CAPTION_GAP = 40;
-/** 每格一条格线：格高按刻度数分。 */
+/** 每格一条格线：格高按刻度数分 */
 const PLOT_STYLE: CSSProperties & Record<`--${string}`, string> = {
   '--grid-step': `${100 / (AMPLITUDE_TICKS.length - 1)}%`,
 };
-/** 峰值点的高度（CSS 像素）与它在柱顶之上留的缝。 */
+/** 峰值点的高度（CSS 像素）与它在柱顶之上留的缝 */
 const PEAK_MARK = 2;
 const PEAK_GAP = 1;
 
 const playStateAtom = atom((get) => get(playbackAtom).state);
-// 横轴右端是可视化流采样率的一半，以帧自报的为准；帧里没有时按曲目标称采样率估，输出链里有重采样时这个估值会偏。
+// 横轴右端是可视化流采样率的一半，以帧自报的为准；帧里没有时按曲目标称采样率估，输出链里有重采样时这个估值会偏
 const nyquistAtom = atom((get) => {
   const reported = get(spectrumMaxFrequencyAtom);
   if (reported !== null) return reported;
@@ -49,26 +49,26 @@ const nyquistAtom = atom((get) => {
 
 interface Phase {
   readonly status: SpectrumStatus;
-  /** 在播放出帧。 */
+  /** 在播放出帧 */
   readonly on: boolean;
-  /** 暂停中；停止不算。 */
+  /** 暂停中；停止不算 */
   readonly paused: boolean;
 }
 
 /**
  * 图纸频谱：上方 Hz 刻度按柱的横轴落位（低频一个频点一根柱、往上按对数，`barAxis.ts`），中间 200 根柱，
  * 左侧纵轴每 10 dB 一格（带内频点功率之和）。轴说明跟在 200 刻度后面：低频段按频点铺开之后，
- * 20 与 200 两个刻度之间窄到放不下它，高采样率时更窄。没有取数时柱区右上角写一行说明。
+ * 20 与 200 两个刻度之间窄到放不下它，高采样率时更窄。没有取数时柱区右上角写一行说明
  *
  * 文字与轴线是 DOM，只有柱画在 canvas 上。柱缓冲与帧距从 `useViewServices().spectrum` 现读，不经 React 状态：
- * 每来一帧排一次重画，柱的推进（回落、峰值点、暂停定格、断点后缓起音）在 `spectrumMotion.ts`。
- * 断点来自 `usePlaybackJumps`，另把「从没在出帧变成在播放出帧」也算一次；缓起音的时长取 `DURATION_MS.normal`。
+ * 每来一帧排一次重画，柱的推进（回落、峰值点、暂停定格、断点后缓起音）在 `spectrumMotion.ts`
+ * 断点来自 `usePlaybackJumps`，另把「从没在出帧变成在播放出帧」也算一次；缓起音的时长取 `DURATION_MS.normal`
  *
- * 柱与峰值点共用一条竖向渐变：柱区底边 `--colorNeutralForeground2`，顶边 `--paper-ink`，柱越高顶上的颜色越浓。
+ * 柱与峰值点共用一条竖向渐变：柱区底边 `--colorNeutralForeground2`，顶边 `--paper-ink`，柱越高顶上的颜色越浓
  * canvas 读不到 CSS 变量，尺寸、舞台缩放、封面 ramp、深浅档变了都按新尺寸重开 canvas、重读颜色；
- * 柱的推进状态跟着组件走，不随之清零。
+ * 柱的推进状态跟着组件走，不随之清零
  *
- * 几何全由放件的外框经 `--spectrum-*` 变量给（见样式表），件里不写缺省。
+ * 几何全由放件的外框经 `--spectrum-*` 变量给（见样式表），件里不写缺省
  */
 export function PaperSpectrum() {
   const store = useStore();
@@ -91,7 +91,7 @@ export function PaperSpectrum() {
   }, [nyquist, plotWidth]);
   const captionLeft = (ticks.find((tick) => tick.hz === CAPTION_AFTER_HZ)?.x ?? 0) + CAPTION_GAP;
 
-  // `ramp` 与 `scheme` 在这里只当重开的时机：它们变了之后 canvas 的颜色要重读。
+  // `ramp` 与 `scheme` 在这里只当重开的时机：它们变了之后 canvas 的颜色要重读
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -166,7 +166,7 @@ export function PaperSpectrum() {
       const style = getComputedStyle(canvas);
       const ink = style.getPropertyValue('--paper-ink').trim();
       const low = style.getPropertyValue('--colorNeutralForeground2').trim() || ink;
-      // `addColorStop` 收到空串会抛错：取不到数据墨时不建渐变。
+      // `addColorStop` 收到空串会抛错：取不到数据墨时不建渐变
       if (!ctx || height === 0 || !ink) {
         fill = ink;
         return;
@@ -177,7 +177,7 @@ export function PaperSpectrum() {
       fill = gradient;
     };
 
-    // 重设 canvas 的物理尺寸会清空它：在这一回调里当场补画，不留一帧空白。
+    // 重设 canvas 的物理尺寸会清空它：在这一回调里当场补画，不留一帧空白
     const observer = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
       if (!box || !running()) return;
@@ -201,7 +201,7 @@ export function PaperSpectrum() {
       if (next.paused && !last.paused) motion.pause(now, smooth());
       else if (!next.paused && last.paused) motion.resume(now);
       if (next.status === 'idle' || next.status === 'unavailable') motion.release();
-      // 开始在播放出帧算断点；从暂停恢复不算，柱接着暂停前的画面走。
+      // 开始在播放出帧算断点；从暂停恢复不算，柱接着暂停前的画面走
       if (next.on && !last.on && !last.paused) soften();
       else schedule();
       last = next;

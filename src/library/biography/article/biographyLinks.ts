@@ -10,7 +10,7 @@ export interface BiographyTextLink extends TextLinkRange {
 }
 export type BiographyTextPart = TextLinkPart;
 
-/** 原文已清理为文字；把来源中的链接按出现顺序对回文字，界面只渲染文字和已验证的地址。 */
+/** 原文已清理为文字；把来源中的链接按出现顺序对回文字，界面只渲染文字和已验证的地址 */
 export function matchBiographyLinks(
   paragraphs: readonly string[],
   links: Iterable<{ readonly label: string; readonly url: string }>,

@@ -43,6 +43,8 @@ function scrollThrough(page: Page, step: number): Promise<number> {
 test('8000 张专辑下快速滚到底：只画视口附近的图块，文档元素与回收后的节点数有上限', async ({
   page,
 }) => {
+  // 加载与逐帧滚过 8000 张专辑在绑定能效核的机器上要二十几秒，默认的 30 s 不够；断言只看与快慢无关的数
+  test.setTimeout(120_000);
   const errors = collectPageErrors(page);
   await installPageHost(page, {
     answers: libraryAnswers(manyAlbums(COUNT)),

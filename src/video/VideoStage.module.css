@@ -21,28 +21,53 @@
 .picture[data-fit='original'] {
   object-fit: none;
 }
+/* 占位画面与入口按钮在竖直方向上作一组居中；画面较矮时封面先缩，按钮不被挤出去 */
 .poster {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingVerticalXXL);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
   color: var(--colorNeutralForeground3);
 }
 .poster img {
   width: min(40%, 280px);
+  min-height: 0;
+  max-height: 60%;
   aspect-ratio: 1;
   object-fit: contain;
 }
+.posterIcon {
+  flex: none;
+  font-size: 64px;
+}
+/* 状态文字：写在占位画面里，在封面或图标之下、按钮之上 */
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalS);
+  max-width: 100%;
+  color: var(--colorNeutralForeground2);
+  text-align: center;
+}
+
+/* 缓冲时盖在画面正中的小卡片，质地与下方控制条一致 */
 .notice {
   position: absolute;
-  inset: 45% var(--spacingHorizontalL) auto;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   align-items: center;
   gap: var(--spacingHorizontalS);
-  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
-  background: var(--colorNeutralBackground1);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
+  border-radius: var(--borderRadiusMedium);
+  background: color-mix(in srgb, var(--colorNeutralBackground1) 80%, transparent);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow16);
   color: var(--colorNeutralForeground1);
-  text-align: center;
+  white-space: nowrap;
 }

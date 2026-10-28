@@ -1,0 +1,7 @@
+/* 命令栏在上，条件行只在有条件时出；下面直接接曲目表 */
+.root {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalS);
+}

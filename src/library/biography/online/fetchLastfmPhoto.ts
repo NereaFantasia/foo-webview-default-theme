@@ -1,5 +1,6 @@
 import { fb } from 'foo-webview-sdk/bridge';
-import { settle } from '../../../host/hostCall.ts';
+import { settleDetailed } from '../../../host/hostCall.ts';
+import { classifyHostHttpFailure } from '../../../host/hostHttpFailure.ts';
 import { biographyFreshness, biographyHeader, biographyRetryAt } from '../biographyCacheFormat.ts';
 import type { BiographyProblem } from '../biographyModel.ts';
 import { lastfmPhotoId, type LastfmPhoto } from './lastfmPhoto.ts';
@@ -8,15 +9,21 @@ export const BIOGRAPHY_PHOTO_BYTES = 4 * 1024 * 1024;
 export type BiographyPhotoProblem = BiographyProblem | 'photoMissing';
 export type LastfmPhotoResult =
   | { readonly ok: true; readonly blob: Blob; readonly store: boolean; readonly expiresAt: number }
-  | { readonly ok: false; readonly problem: BiographyPhotoProblem; readonly retryAt: number };
+  | {
+      readonly ok: false;
+      readonly problem: BiographyPhotoProblem;
+      readonly retryAt: number;
+      /** 传输失败的宿主原文；HTTP 层失败（403、429 等）没有原文 */
+      readonly detail?: string | null;
+    };
 
 export async function fetchLastfmPhoto(
   source: LastfmPhoto,
   host: Pick<typeof fb, 'http'> = fb,
 ): Promise<LastfmPhotoResult> {
   if (!lastfmPhotoId(source.url))
-    return { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000 };
-  const answer = await settle(() =>
+    return { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000, detail: null };
+  const called = await settleDetailed(() =>
     host.http.request(source.url, {
       responseType: 'arraybuffer',
       timeout: 12_000,
@@ -28,13 +35,20 @@ export async function fetchLastfmPhoto(
     }),
   );
   const now = Date.now();
-  const headers = answer?.headers ?? {};
-  const fail = (problem: BiographyPhotoProblem, delay: number): LastfmPhotoResult => ({
+  const headers = called.answer?.headers ?? {};
+  const fail = (
+    problem: BiographyPhotoProblem,
+    delay: number,
+    detail: string | null = null,
+  ): LastfmPhotoResult => ({
     ok: false,
     problem,
     retryAt: biographyRetryAt(headers, now, delay),
+    detail,
   });
-  if (!answer) return fail('network', 30_000);
+  if (called.failure)
+    return fail(classifyHostHttpFailure(called.failure) ?? 'network', 30_000, called.failure.text);
+  const answer = called.answer;
   if (answer.status === 429) return fail('rateLimited', 60_000);
   if (answer.status === 403) return fail('blocked', 900_000);
   if (answer.status === 404) return fail('photoMissing', 3_600_000);

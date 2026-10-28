@@ -1,4 +1,5 @@
-import { Dropdown, makeStyles, mergeClasses, Option, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, Option, tokens } from '@fluentui/react-components';
+import { ScrollDropdown as Dropdown } from '../kit/ScrollDropdown.tsx';
 import type { SettingsCardIds } from './SettingsCard.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
@@ -6,7 +7,7 @@ import { useViewControlStyles } from '../theme/controlStyles.ts';
 export interface SettingsOption<T extends string> {
   readonly value: T;
   readonly label: string;
-  /** 一句说明，显示在下拉列表里选项名的下面；输入框里只显示选项名。 */
+  /** 一句说明，显示在下拉列表里选项名的下面；输入框里只显示选项名 */
   readonly description?: string;
   readonly disabled?: boolean;
 }
@@ -15,11 +16,11 @@ export interface SettingsSelectProps<T extends string> extends SettingsCardIds {
   readonly options: readonly SettingsOption<T>[];
   readonly value: T;
   readonly disabled?: boolean;
-  /** 用户选了别的一项；选回当前这一项不报。 */
+  /** 用户选了别的一项；选回当前这一项不报 */
   onChange(value: T): void;
 }
 
-// Fluent 的下拉框缺省最窄 250；设置卡里固定 220，卡窄、换到标题下面时占满一行。
+// Fluent 的下拉框缺省最窄 250；设置卡里固定 220，卡窄、换到标题下面时占满一行
 const useStyles = makeStyles({
   root: { minWidth: 0, width: '220px' },
   fill: { width: '100%' },
@@ -33,7 +34,7 @@ const useStyles = makeStyles({
 
 /**
  * 设置卡里的下拉框：几选一，选中即生效。选中态完全由 `value` 决定，外面的值变了它跟着变，不触发
- * `onChange`。
+ * `onChange`
  */
 export function SettingsSelect<T extends string>({
   options,

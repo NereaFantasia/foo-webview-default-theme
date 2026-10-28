@@ -13,6 +13,12 @@ import {
 
 const panel = (page: Page) => page.locator('[data-biography]');
 const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true });
+/** 上一次点击留下的悬停提示会盖在分页栏上，等它收了再点，免得点到提示上 */
+async function clickTab(page: Page, name: string) {
+  await page.mouse.move(640, 700);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await tab(page, name).click();
+}
 const toggle = (page: Page) => page.getByRole('switch', { name: '在线艺人简介' });
 
 async function start(page: Page) {
@@ -55,7 +61,7 @@ async function start(page: Page) {
 
 async function openBiography(page: Page) {
   await page.locator('[data-right-card-key="queue"]').click();
-  await tab(page, '简介').click();
+  await clickTab(page, '简介');
   await expect(panel(page)).toBeVisible();
 }
 
@@ -127,11 +133,11 @@ test('换曲后立即撤掉旧艺人，换页和收起期间不联网，停止�
   const held = player.host.hold('http.get');
   await confirm(page);
   await expect.poll(() => held.pending.length).toBe(1);
-  await tab(page, '队列').click();
+  await clickTab(page, '队列');
   held.respond(0);
   held.release();
   await expect(panel(page)).toHaveCount(0);
-  await tab(page, '简介').click();
+  await clickTab(page, '简介');
   await expect(panel(page).getByText('Other 的正文')).toBeVisible();
   await settled(page);
   const count = lastfmCalls(player.host.callsTo('http.get')).length;
@@ -179,7 +185,9 @@ test('界面语言决定来源语言，关闭在线设置使在途正文失效',
   expect(errors).toEqual([]);
 });
 
-test('沉浸视图或隐藏页面暂停采集，返回时恢复已有正文', async ({ page }) => {
+test('沉浸视图或隐藏页面暂停采集；暂停期间落地的刷新只写缓存，返回时显示缓存里的正文', async ({
+  page,
+}) => {
   const { host, errors } = await start(page);
   await toggle(page).check();
   await openBiography(page);
@@ -195,26 +203,30 @@ test('沉浸视图或隐藏页面暂停采集，返回时恢复已有正文', as
     success: true,
     status: 200,
     headers: {},
-    body: biographyHtml('Queen', '<p>不应采纳的晚到正文</p>'),
+    body: biographyHtml('Queen', '<p>刷新后落地的正文</p>'),
     responseType: 'text',
   });
   held.release();
+  // 指针还停在刚点的入口上，它的悬停提示会先吃掉第一下 Esc；挪开等提示收了再按
+  await page.mouse.move(640, 700);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await expect(panel(page).getByText('Queen 的正文')).toBeVisible();
-  await expect(panel(page).getByText('不应采纳的晚到正文')).toHaveCount(0);
+  // 在视图里时界面不采纳；落地的请求仍写了缓存，返回后读到的是它
+  await expect(panel(page).getByText('刷新后落地的正文')).toBeVisible();
+  await expect(panel(page).getByText('Queen 的正文')).toHaveCount(0);
   const count = lastfmCalls(host.callsTo('http.get')).length;
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(panel(page).getByText('Queen 的正文')).toHaveCount(0);
+  await expect(panel(page).getByText('刷新后落地的正文')).toHaveCount(0);
   await page.waitForTimeout(400);
   expect(lastfmCalls(host.callsTo('http.get'))).toHaveLength(count);
   await page.evaluate(() => {
     Reflect.deleteProperty(document, 'visibilityState');
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(panel(page).getByText('Queen 的正文')).toBeVisible();
+  await expect(panel(page).getByText('刷新后落地的正文')).toBeVisible();
   expect(errors).toEqual([]);
 });
 

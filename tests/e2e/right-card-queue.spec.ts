@@ -19,7 +19,7 @@ async function openQueue(
   const { host, errors } = await openPlayer(page, { width: options.width });
   const queue = installFakeQueue(host, queueTracks('Teardrop', 'Glory Box', 'Accordion'));
   await host.waitForListener('playback:queueChanged');
-  await host.emit('playback:queueChanged', { origin: 'user_added', count: 3 });
+  await host.emit('playback:queueChanged', { origin: 'user_added', count: 3, contentVersion: '1' });
   await queueKey(page).click();
   await expect(rows(page)).toHaveCount(3);
   return { host, queue, errors };
@@ -42,7 +42,7 @@ test('底栏形态：队列键在标题栏、窗口三键左边，开合停靠�
   const panel = await card(page).locator('..').boundingBox();
   if (!content || !panel) throw new Error('卡没画出来');
   expect(Math.round(panel.width)).toBe(320);
-  expect(Math.round(panel.x + panel.width)).toBe(Math.round(content.x + content.width) - 8);
+  expect(Math.round(panel.x + panel.width)).toBe(Math.round(content.x + content.width) - 16);
   await key.click();
   await expect(card(page)).toHaveCount(0);
   await expect(key).toHaveAttribute('aria-pressed', 'false');

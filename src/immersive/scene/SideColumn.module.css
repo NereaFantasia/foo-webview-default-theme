@@ -1,0 +1,77 @@
+/* 侧栏里的一列：上沿与高度由预设写进来的变量给（对齐封面列整组）；左缘、右边距与宽度上限同歌词栏的文字区与
+   歌词工具条（`--column-start`、`--column-end`、`--column-max`，数值在 `sideBox.ts`）：靠左，宽度取栏宽扣两边
+   边距与上限里小的，超宽屏多出的空白留在右边。外壳是列头加列的竖排，列头 36 高、与列隔 16。用相对定位下移而不用
+   上外边距：外边距会穿过没有边框的父元素。 */
+.frame {
+  --column-gap: var(--spacingVerticalL);
+  --column-fade: var(--spacingVerticalM);
+  --column-bg: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
+
+  position: relative;
+  inset-block-start: var(--column-top);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(calc(100% - var(--column-start) - var(--column-end)), var(--column-max));
+  height: var(--column-height);
+  min-width: 0;
+  margin-inline-start: var(--column-start);
+  row-gap: var(--column-gap);
+}
+
+.head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  column-gap: var(--spacingHorizontalS);
+  height: 36px;
+}
+
+/* 列：半透明的前景色铺底，背后做 CSS 模糊（`--column-blur` 取胶囊材质的模糊值，不加饱和、不着色，底的透明度
+   不变），投影 `--column-shadow` 与歌词工具条、药丸同一份。帧率守门跳闸（`data-degraded`）与减弱透明度时去掉模糊，
+   只剩半透明的底与投影。圆角裁住里面的滚动容器 */
+.panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--borderRadius3XLarge);
+  background: var(--column-bg);
+  box-shadow: var(--column-shadow, none);
+  backdrop-filter: var(--column-blur, none);
+}
+
+.frame[data-degraded] .panel {
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .panel {
+    backdrop-filter: none;
+  }
+}
+
+/* 内容在列里滚。遮罩只取透明度；上沿渐隐，底部渐隐可关（`.fadeEnd` 才有）。静止时内容整个落在渐隐带之下，
+   上沿让出一条渐隐带的高度。滚动条沉浸视图统一不画 */
+.scroller {
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--column-fade) var(--spacingHorizontalS) var(--spacingVerticalS);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--colorNeutralForeground1) var(--column-fade)
+  );
+}
+
+.fadeEnd {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--colorNeutralForeground1) var(--column-fade),
+    var(--colorNeutralForeground1) calc(100% - var(--column-fade)),
+    transparent
+  );
+}

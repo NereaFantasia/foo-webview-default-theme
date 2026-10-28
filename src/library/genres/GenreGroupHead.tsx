@@ -1,9 +1,12 @@
 import { ChevronRight16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
+import { albumArtistOf } from '../../host/libraryContract.ts';
 import { translateAtom } from '../../i18n/locale.ts';
+import { ObjectLink } from '../../nav/ObjectLink.tsx';
 import type { TableGroupItem, TablePoint } from '../../table/tableItems.ts';
 import type { TableGroupState } from '../../table/TrackTable.tsx';
-import { SongArt } from '../songs/SongArt.tsx';
+import { albumArtistLink } from '../../track/trackLinks.ts';
+import { SongArt } from '../SongArt.tsx';
 import type { GenreGroup } from './genresGroups.ts';
 import styles from './GenreGroupHead.module.css';
 import { useService } from '../../kit/useService.ts';
@@ -58,7 +61,13 @@ export function GenreGroupHead({ item, state, coverWidth, onAlbumMenu }: GenreGr
         ) : (
           <span className={styles.name}>{label}</span>
         )}
-        {album && <span className={styles.artist}>{album.albumArtist || album.artist}</span>}
+        {album && (
+          <span className={styles.artist}>
+            <ObjectLink to={albumArtistLink(album)?.ref ?? null} tabIndex={-1}>
+              {albumArtistOf(album)}
+            </ObjectLink>
+          </span>
+        )}
         <span className={styles.line} />
         <span className={styles.count}>
           {t('genres.tracks', { count: group.end - group.start })}

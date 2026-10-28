@@ -30,10 +30,10 @@ const BODIES: Readonly<Record<OnboardingStep, () => ReactElement>> = {
   update: UpdateStep,
 };
 
-/** 最高一步的设计高度。对话框的顶边按它居中算出后固定，换步时只有底边伸缩，不上下跳。 */
+/** 最高一步的设计高度。对话框的顶边按它居中算出后固定，换步时只有底边伸缩，不上下跳 */
 const TALLEST_STEP = '560px';
 
-/** 顶边：按最高一步居中，窗口太矮时不高过标题栏下沿。 */
+/** 顶边：按最高一步居中，窗口太矮时不高过标题栏下沿 */
 const SURFACE_TOP = `max(calc(${tokens.spacingVerticalXXXL} * 2), calc((100dvh - ${TALLEST_STEP}) / 2))`;
 
 const useStyles = makeStyles({
@@ -49,11 +49,11 @@ const useStyles = makeStyles({
     padding: tokens.spacingHorizontalXXL,
     overflow: 'hidden',
   },
-  // 标题只为换步时接焦点、让读屏念出来，不是可操作的控件，不画焦点框。
+  // 标题只为换步时接焦点、让读屏念出来，不是可操作的控件，不画焦点框
   title: { ':focus-visible': { outlineStyle: 'none' } },
 });
 
-/** 第 1 步页头右侧的界面语言；窄窗时挪进正文，成为一张语言卡。 */
+/** 第 1 步页头右侧的界面语言；窄窗时挪进正文，成为一张语言卡 */
 function LanguageField() {
   const t = useAtomValueRawSync(translateAtom);
   const language = useLanguageChoice();
@@ -79,9 +79,9 @@ function LanguageField() {
 }
 
 /**
- * 打开期间在浮层一层截住后退、前进与搜索：它们是全局命令，会让压暗层背后的外壳换地点或打开搜索。
+ * 打开期间在浮层一层截住后退、前进与搜索：它们是全局命令，会让压暗层背后的外壳换地点或打开搜索
  * 全屏不截，那是窗口级的操作。Esc 也在这里接：对话框只在焦点落在它里面时处理 Esc，点过压暗层之后
- * 焦点不在里面，同样要能跳过。
+ * 焦点不在里面，同样要能跳过
  */
 function useBlockedKeys(open: boolean, skip: () => void) {
   const block = { layer: 'overlay', enabled: () => open, run: () => {} } as const;
@@ -96,7 +96,7 @@ function useBlockedKeys(open: boolean, skip: () => void) {
   useCommand({ ...block, id: 'onboarding.block.search', keys: [{ key: 'f', ctrl: true }] });
 }
 
-/** 换步与打开时把焦点放到标题上，读屏念出这一步的标题与步数。 */
+/** 换步与打开时把焦点放到标题上，读屏念出这一步的标题与步数 */
 function useTitleFocus(open: boolean, step: OnboardingStep) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -107,7 +107,7 @@ function useTitleFocus(open: boolean, step: OnboardingStep) {
 
 /**
  * 新人引导：外壳上的模态对话框，四步。Esc 等同「跳过引导」，点压暗层不关。打开期间截住后退、前进与搜索
- * 的全局键，免得背后的外壳换了地点；窗口重新获得焦点时重读一次媒体库，从首选项回来就看得到结果。
+ * 的全局键，免得背后的外壳换了地点；窗口重新获得焦点时重读一次媒体库，从首选项回来就看得到结果
  */
 export function OnboardingDialog() {
   const t = useAtomValueRawSync(translateAtom);
@@ -139,7 +139,7 @@ export function OnboardingDialog() {
 
   const index = ONBOARDING_STEPS.indexOf(step);
   const last = index === ONBOARDING_STEPS.length - 1;
-  // 第 1 步还没添加文件夹时，主按钮是卡上的「添加文件夹」，「下一步」退成次要。
+  // 第 1 步还没添加文件夹时，主按钮是卡上的「添加文件夹」，「下一步」退成次要
   const nextPrimary = step !== 'library' || library.phase === 'enabled';
   const Body = BODIES[step];
   return (

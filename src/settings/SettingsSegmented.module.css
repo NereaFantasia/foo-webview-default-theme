@@ -1,0 +1,7 @@
+/* fieldset 只借它的禁用语义，外观清成什么都没有 */
+.group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

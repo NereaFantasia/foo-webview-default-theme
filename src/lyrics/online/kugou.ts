@@ -1,6 +1,6 @@
 // KRC 的解密照 Lyricify Lyrics Helper（https://github.com/WXRIW/Lyricify-Lyrics-Helper，Apache License 2.0，
 // Copyright 2023 XY Wang, WXRIW）
-// 提交 53a2f81 的 Decrypter/Krc/Decrypter.cs 改写为 TypeScript，解压改用浏览器的 DecompressionStream。
+// 提交 53a2f81 的 Decrypter/Krc/Decrypter.cs 改写为 TypeScript，解压改用浏览器的 DecompressionStream
 import type { LyricLine, LyricWord } from '@applemusic-like-lyrics/core';
 import { syncedContent } from '../lyricsText.ts';
 import {
@@ -17,12 +17,12 @@ import type { LyricsCandidate, LyricsQuery, LyricsSource } from './lyricsSource.
 const SEARCH_URL = 'https://lyrics.kugou.com/search';
 const DOWNLOAD_URL = 'https://lyrics.kugou.com/download';
 
-/** KRC 的固定密钥：解开 base64、去掉 4 字节的 `krc1` 头之后，逐字节按它循环异或，再 zlib 解压。 */
+/** KRC 的固定密钥：解开 base64、去掉 4 字节的 `krc1` 头之后，逐字节按它循环异或，再 zlib 解压 */
 const KRC_KEY = [
   0x40, 0x47, 0x61, 0x77, 0x5e, 0x32, 0x74, 0x47, 0x51, 0x36, 0x31, 0x2d, 0xce, 0xd2, 0x6e, 0x69,
 ];
 
-/** 把酷狗下载接口给的 base64 正文解成 KRC 文本；格式不对或解压失败答 null。 */
+/** 把酷狗下载接口给的 base64 正文解成 KRC 文本；格式不对或解压失败答 null */
 export async function decryptKrc(base64: string): Promise<string | null> {
   try {
     const raw = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
@@ -37,11 +37,11 @@ export async function decryptKrc(base64: string): Promise<string | null> {
   }
 }
 
-/** 行头 `[开始,时长]`，毫秒；字头 `<相对行首的偏移,时长,0>`。 */
+/** 行头 `[开始,时长]`，毫秒；字头 `<相对行首的偏移,时长,0>` */
 const LINE = /^\[(\d+),(\d+)\](.*)$/;
 const WORD = /<(\d+),(\d+),\d+>([^<]*)/g;
 
-/** `[language:]` 里的翻译与音译：按行序与歌词行一一对应。type 1 是译文（每行一段），type 0 是音译（每行按字给）。 */
+/** `[language:]` 里的翻译与音译：按行序与歌词行一一对应。type 1 是译文（每行一段），type 0 是音译（每行按字给） */
 function languageLines(header: string): { translation: string[]; roman: string[] } {
   const empty = { translation: [], roman: [] };
   try {
@@ -72,7 +72,7 @@ function languageLines(header: string): { translation: string[]; roman: string[]
   }
 }
 
-/** KRC 文本解析成 AMLL 的行；逐字时间换成绝对毫秒。没有一行带时间时答空数组。 */
+/** KRC 文本解析成 AMLL 的行；逐字时间换成绝对毫秒。没有一行带时间时答空数组 */
 export function parseKrc(text: string): LyricLine[] {
   let extra: { translation: string[]; roman: string[] } = { translation: [], roman: [] };
   const lines: LyricLine[] = [];
@@ -109,8 +109,8 @@ export function parseKrc(text: string): LyricLine[] {
 }
 
 /**
- * 候选的 `ref` 是下载要的 id 与 accesskey，中间用冒号隔开。酷狗的候选不带专辑，合作艺人用顿号连写。
- * 来源标成 ugc 的是未经审核的用户上传，有时挂着别的歌的词，不要。
+ * 候选的 `ref` 是下载要的 id 与 accesskey，中间用冒号隔开。酷狗的候选不带专辑，合作艺人用顿号连写
+ * 来源标成 ugc 的是未经审核的用户上传，有时挂着别的歌的词，不要
  */
 function candidateOf(item: unknown): LyricsCandidate | null {
   if (asText(field(item, 'product_from')) === 'ugc') return null;
@@ -129,7 +129,7 @@ function candidateOf(item: unknown): LyricsCandidate | null {
   };
 }
 
-/** 酷狗歌词库：按「艺人 - 曲名」与时长（毫秒）搜，下载 KRC 逐字词。 */
+/** 酷狗歌词库：按「艺人 - 曲名」与时长（毫秒）搜，下载 KRC 逐字词 */
 export function createKugouSource(host: LyricsHttpHost): LyricsSource {
   return {
     id: 'kugou',

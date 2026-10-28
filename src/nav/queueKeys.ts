@@ -1,4 +1,4 @@
-/** 队列交互与快捷键一览共用；焦点移动沿用列表的通用按键。 */
+/** 队列交互与快捷键一览共用；焦点移动沿用列表的通用按键 */
 export const QUEUE_KEYS = {
   play: [{ key: 'Enter' }],
   remove: [{ key: 'Delete' }],

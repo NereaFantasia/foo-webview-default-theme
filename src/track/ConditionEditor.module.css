@@ -1,0 +1,6 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+  width: min(280px, 70vw);
+}

@@ -8,8 +8,7 @@ import {
 } from '../fixtures/hostAnswers.ts';
 import { choosePlayerBar, openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
 
-// 输出设备与音量的几处件：标题栏的输出面板（音量在上、设备在下，两行同一套列），胶囊与窄窗通栏的音量浮层
-// （两栏，设备栏原地展开），宽窗通栏的输出设备键。设备列表按模块分组、当前设备标出、选了按两个 GUID 切换、
+// 输出设备与音量的几处件：标题栏、胶囊与窄窗通栏的音量浮层（两栏，设备栏原地展开），宽窗通栏的输出设备键。设备列表按模块分组、当前设备标出、选了按两个 GUID 切换、
 // 勾以宿主回读为准。对齐按像素断言；观感实机看。
 
 const SPEAKERS = '{0000000D-0000-0000-0000-000000000001}';
@@ -59,45 +58,18 @@ async function settled(locator: Locator): Promise<void> {
 
 const deviceRow = (page: Page, key: string) => page.locator(`[data-output-device="${key}"]`);
 
-test('输出面板：音量在上、设备在下，两行的图标、起点与右缘都对齐；设备行写当前设备与输出模块', async ({
-  page,
-}) => {
-  await choosePlayerBar(page, 'titlebar');
-  const { errors } = await openPlayer(page);
-  await page.locator('header [data-player-key="volume"]').click();
-  const panel = page.locator('[data-output-panel]');
-  await settled(panel);
-  const mute = panel.locator('[data-player-key="mute"] svg');
-  const slider = panel.getByRole('slider', { name: '音量' });
-  const device = panel.locator('[data-player-key="output"]');
-  const deviceIcon = device.locator('svg').first();
-  const deviceName = device.locator('span span').first();
-  const chevron = device.locator('svg').last();
-  const [m, s, i, n, c] = await Promise.all(
-    [mute, slider, deviceIcon, deviceName, chevron].map(edgesOf),
-  );
-  expect(s.top).toBeLessThan(i.top);
-  expect(Math.abs((m?.middle ?? 0) - (i?.middle ?? 0))).toBeLessThanOrEqual(1);
-  expect(Math.abs((s?.left ?? 0) - (n?.left ?? 0))).toBeLessThanOrEqual(1);
-  expect(Math.abs((s?.right ?? 0) - (c?.right ?? 0))).toBeLessThanOrEqual(1);
-  await expect(device).toContainText('Primary Sound Driver');
-  await expect(device).toContainText('DirectSound');
-  await expect(device).toHaveAttribute('aria-expanded', 'false');
-  expect(errors).toEqual([]);
-});
-
-test('输出面板的设备行弹出分组列表：当前设备标出，选另一个按两个 GUID 切换，回读后设备行跟着换', async ({
+test('标题栏音量浮层的设备栏弹出分组列表：当前设备标出，选另一个按两个 GUID 切换，回读后设备栏跟着换', async ({
   page,
 }) => {
   await choosePlayerBar(page, 'titlebar');
   const player = await openPlayer(page);
   switchableDevices(player);
   await page.locator('header [data-player-key="volume"]').click();
-  const panel = page.locator('[data-output-panel]');
+  const panel = page.locator('[data-volume-popover]');
   await settled(panel);
   const device = panel.locator('[data-player-key="output"]');
   await device.click();
-  const list = page.locator('[data-device-list]');
+  const list = panel.getByRole('group', { name: '输出设备', exact: true });
   await expect(list).toBeVisible();
   await expect(device).toHaveAttribute('aria-expanded', 'true');
   await expect(list.getByRole('group', { name: 'DirectSound' })).toBeVisible();
@@ -105,7 +77,7 @@ test('输出面板的设备行弹出分组列表：当前设备标出，选另�
   await expect(
     deviceRow(page, `${OUTPUT_MODULES.directSound}|${DEFAULT_DEVICE_ID}`),
   ).toHaveAttribute('aria-current', 'true');
-  // 列表开着时指针离开，面板照样开着。
+  // 列表开着时指针离开，浮层照样开着。
   await page.mouse.move(640, 400);
   await page.waitForTimeout(700);
   await expect(panel).toBeVisible();
@@ -117,11 +89,10 @@ test('输出面板的设备行弹出分组列表：当前设备标出，选另�
   await expect(list).toHaveCount(0);
   await expect(device).toBeFocused();
   await expect(device).toContainText('Speakers (Realtek(R) Audio) [exclusive]');
-  await expect(device).toContainText('WASAPI (shared)');
-  // 列表是在指针底下收起的；指针本来就不在面板上，面板照常等 500 ms 收回。
+  // 选完只收列表，浮层留着，等用户自己 Esc 或点别处
   await page.mouse.move(640, 400);
   await page.waitForTimeout(700);
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toBeVisible();
   expect(player.errors).toEqual([]);
 });
 
@@ -130,11 +101,11 @@ test('宿主没接受切换：列表留着、顶上写原因，勾不挪；下�
   const player = await openPlayer(page);
   player.host.answer('config.setOutputDevice', hostFailure('OPERATION_FAILED'));
   await page.locator('header [data-player-key="volume"]').click();
-  const panel = page.locator('[data-output-panel]');
+  const panel = page.locator('[data-volume-popover]');
   await settled(panel);
   const device = panel.locator('[data-player-key="output"]');
   await device.click();
-  const list = page.locator('[data-device-list]');
+  const list = panel.getByRole('group', { name: '输出设备', exact: true });
   await deviceRow(page, `${OUTPUT_MODULES.wasapi}|${EXCLUSIVE}`).click();
   await expect(list.getByRole('alert')).toHaveText('切换输出设备失败');
   await expect(
@@ -167,17 +138,17 @@ test('设备很多、当前设备排在中段：打开时当前设备滚到列�
     count: many.length,
   });
   await page.locator('header [data-player-key="volume"]').click();
-  const panel = page.locator('[data-output-panel]');
+  const panel = page.locator('[data-volume-popover]');
   await settled(panel);
   await panel.locator('[data-player-key="output"]').click();
-  const list = page.locator('[data-device-list]');
+  const list = panel.getByRole('group', { name: '输出设备', exact: true });
   const current = list.locator('[aria-current="true"]');
   await expect(current).toHaveText('Device 12');
-  await expect(current).toBeFocused();
-  const scroller = list.locator('[role="group"][aria-label="输出设备"]');
-  const [box, row] = await Promise.all([edgesOf(scroller), edgesOf(current)]);
+  // 从设备栏点开时焦点还在设备栏上，列表只滚到位；走进列表后上下键才在各行之间挪
+  const [box, row] = await Promise.all([edgesOf(list), edgesOf(current)]);
   const middle = box.top + box.height / 2;
   expect(Math.abs(row.top + row.height / 2 - middle)).toBeLessThanOrEqual(row.height);
+  await current.focus();
   await page.keyboard.press('ArrowDown');
   await expect(list.getByRole('button', { name: 'Device 13' })).toBeFocused();
   await page.keyboard.press('Home');
@@ -189,40 +160,35 @@ test('设备列表开着时窗口跨过 1008：焦点跟到胶囊的音量键上
   await choosePlayerBar(page, 'titlebar');
   const { errors } = await openPlayer(page);
   await page.locator('header [data-player-key="volume"]').click();
-  const panel = page.locator('[data-output-panel]');
+  const panel = page.locator('[data-volume-popover]');
   await settled(panel);
   await panel.locator('[data-player-key="output"]').click();
-  const list = page.locator('[data-device-list]');
-  await expect(list.locator('[aria-current="true"]')).toBeFocused();
+  const list = panel.getByRole('group', { name: '输出设备', exact: true });
+  await list.locator('[aria-current="true"]').focus();
   await page.setViewportSize({ width: 900, height: 800 });
   await expect(page.locator('[data-player-capsule] [data-player-key="volume"]')).toBeFocused();
   expect(errors).toEqual([]);
 });
 
-test('设备列表开着按 Esc 只收列表、焦点回到设备行；再按一次收面板、焦点回到方块键', async ({
-  page,
-}) => {
+test('设备列表开着按 Esc 收起整个浮层、焦点回到音量键', async ({ page }) => {
   await choosePlayerBar(page, 'titlebar');
   const { errors } = await openPlayer(page);
   const square = page.locator('header [data-player-key="volume"]');
-  // 用键盘走进方块键，面板才按键盘聚焦展开；再 Tab 过静音键与滑条到设备行。
-  await page.locator('header [data-player-key="more"]').focus();
+  // 键盘走进音量键（在下一首键之后）按 Enter 打开浮层，焦点进到浮层里，再到设备栏。
+  await page.locator('header [data-player-key="next"]').focus();
   await page.keyboard.press('Tab');
   await expect(square).toBeFocused();
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  const panel = page.locator('[data-output-panel]');
+  await page.keyboard.press('Enter');
+  const panel = page.locator('[data-volume-popover]');
+  await settled(panel);
   const device = panel.locator('[data-player-key="output"]');
+  await device.focus();
   await expect(device).toBeFocused();
   await page.keyboard.press('Enter');
-  const list = page.locator('[data-device-list]');
+  const list = panel.getByRole('group', { name: '输出设备', exact: true });
   await expect(list).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(list).toHaveCount(0);
-  await expect(panel).toBeVisible();
-  await expect(device).toBeFocused();
-  await page.keyboard.press('Escape');
+  // Esc 由浮层整体接住，列表开着也一并收起
   await expect(panel).toHaveCount(0);
   await expect(square).toBeFocused();
   expect(errors).toEqual([]);

@@ -13,12 +13,19 @@
   cursor: none;
 }
 
+/* 沉浸视图里的滚动区不显示滚动条：整页是播放界面，靠滚轮、触控与键盘滚动。scrollbar-width 不继承，
+   各滚动区自己要设，所以挂在所有后代上 */
+.view,
+.view * {
+  scrollbar-width: none;
+}
+
 .content {
   position: absolute;
   inset: 0;
 }
 
-/* Tab 回绕的哨兵：只拿一下焦点就交出去，看不见、不占位。 */
+/* Tab 回绕的哨兵：只拿一下焦点就交出去，看不见、不占位 */
 .guard {
   position: absolute;
   width: 1px;

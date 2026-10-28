@@ -7,14 +7,15 @@ import styles from './AlbumDropdown.module.css';
 import { AlbumDropdownArt } from './AlbumDropdownArt.tsx';
 import { AlbumDropdownContent } from './AlbumDropdownContent.tsx';
 import { DROPDOWN_METRICS, dropdownCoverSize } from '../albumDropdown.ts';
-import type { RowLayout } from '../albumGridLayout.ts';
+import type { RowLayout } from '../../cover-tile/tileGeometry.ts';
 import type { MenuPoint } from '../../albumMenu.ts';
 import { albumKeyOf, type Album } from '../../../host/libraryContract.ts';
 import type { FoldSlotView } from './wallFold.ts';
-import { dropdownReflowKey, REFLOW_KEY_ATTR } from '../wallReflow.ts';
+import { REFLOW_KEY_ATTR } from '../../cover-tile/tileReflow.ts';
+import { dropdownReflowKey } from '../wallReflow.ts';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
-/** 同一行点了另一张，它的曲目过了这么久还没到，毫秒：旧内容压暗、头部转圈。 */
+/** 同行切换不同专辑时曲目加载超时阈值，单位毫秒；超时后旧内容置灰且头部显示加载动画 */
 const DIM_AFTER_MS = 300;
 
 const useStyles = makeStyles({
@@ -23,17 +24,17 @@ const useStyles = makeStyles({
 
 export interface AlbumDropdownProps {
   readonly view: FoldSlotView;
-  /** 箭头指着这一行的第几块。 */
+  /** 详情面板顶部指示箭头对齐的图块列索引 */
   readonly column: number;
-  /** 条目在行层里的纵坐标，CSS 像素。 */
+  /** 条目在行层坐标系中的垂直坐标，单位 CSS 像素 */
   readonly top: number;
-  /** 上面有几条下拉，即跟哪一组平移（见 `foldGroups`）；0 是不动。 */
+  /** 上方已展开的面板数量，用于折叠分组联动平移（见 `foldGroups`） */
   readonly group: number;
   readonly row: RowLayout;
   readonly rowIndex: number;
   /**
-   * 此刻露出的高。开合与改高的逐帧值由时钟直接写进 `--fold-visible`，这里只在挂上时读一次作起点，
-   * 之后的渲染不改它。
+   * 当前展开高度计算函数
+   * 展开收起与高度过渡逐帧值由时钟直接写入 `--fold-visible`，此处仅在挂载时读取初始值
    */
   readonly visibleOf: (id: number) => number;
   readonly onClose: () => void;
@@ -41,9 +42,9 @@ export interface AlbumDropdownProps {
 }
 
 /**
- * 封面墙的一条下拉：条目流里给它留的高在第 0 帧就到终值，面板按 `--fold-visible` 从顶边往下裁剪露出，
- * 内容锚在顶部、不缩放；面板比露出的高还高时（改矮的途中）照露出的高画，下面的行才接得上。箭头在
- * 行间距里，指着被点的那一块。同一行换一张时新旧内容叠着，朝箭头移动的方向短距离滑入滑出。
+ * 封面墙行内展开详情面板
+ * 布局高度在首帧即设定为目标值，面板通过 `--fold-visible` 从顶部裁剪渐显，内容锚定顶部不缩放
+ * 箭头位于行间距内指向所选图块；同行切换专辑时新旧内容叠加并沿箭头移动方向执行滑入滑出过渡
  */
 export const AlbumDropdown = memo(function AlbumDropdown(props: AlbumDropdownProps) {
   const { view, row } = props;
@@ -52,7 +53,7 @@ export const AlbumDropdown = memo(function AlbumDropdown(props: AlbumDropdownPro
   const controls = useViewControlStyles();
   const [shown, setShown] = useState({ album: view.album, column: props.column });
   const [previous, setPrevious] = useState<{ album: Album; column: number } | null>(null);
-  /** 最近一次换内容时箭头往哪边走；新内容挂上时按它滑入，只播这一次。 */
+  /** 最近一次切换专辑时的滑动方向，用于触发新内容单次滑入过渡 */
   const [enter, setEnter] = useState<'left' | 'right' | undefined>(undefined);
   if (albumKeyOf(shown.album) !== albumKeyOf(view.album)) {
     setPrevious(shown);

@@ -1,0 +1,26 @@
+/* 页头只有节名与两枚信息胶囊；上下留白由详情框架给 */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalL);
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fontSizeHero700);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightHero700);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalSNudge);
+}
+
+.notice {
+  margin-bottom: var(--spacingVerticalM);
+}

@@ -1,3 +1,4 @@
+import { trackQueryOf, type TrackFilter } from '../../track/trackFilter.ts';
 import { useContext, useLayoutEffect, useRef, type RefObject } from 'react';
 import { useAtomValueRawSync } from 'jotai/react';
 import { createSnapshotSlot } from '../../nav/navHistory.ts';
@@ -8,10 +9,11 @@ import { foldersFocusAtom, foldersKey } from './foldersServices.ts';
 import { foldersFilterAtom } from './tree/foldersFilter.ts';
 import { foldersTreeAtom } from './tree/foldersTree.ts';
 import { foldersPreviewAtom } from './detail/foldersPreview.ts';
+import type { FoldersMedia } from './detail/foldersResults.ts';
 import type { FoldersTreeHandle } from './tree/FoldersTree.tsx';
 import type { FoldersView } from './detail/useFoldersView.ts';
 import { foldersSubjects } from './tree/foldersModel.ts';
-import { songsQueryOf, type SongsFilter } from '../songs/songsFilter.ts';
+
 import type { QueryScope } from '../../track/trackQuery.ts';
 import { useService } from '../../kit/useService.ts';
 
@@ -24,7 +26,8 @@ interface FoldersSnapshot {
   readonly contentTop: number;
   readonly track: string | null;
   readonly sort: TableSort | null;
-  readonly conditions: SongsFilter;
+  readonly conditions: TrackFilter;
+  readonly media: FoldersMedia;
   readonly collapsed: ReadonlySet<string>;
   readonly scope: QueryScope;
   readonly recursive: boolean;
@@ -63,6 +66,7 @@ export function useFoldersSnapshot(
           treeFocus: treeHandle.current?.focusedKey() ?? null,
           sort,
           conditions: model.conditions,
+          media: model.media,
           collapsed: model.collapsed,
           scope: model.prefs.scope,
           recursive: model.prefs.recursive,
@@ -94,6 +98,7 @@ export function useFoldersSnapshot(
       folders.filter.setText(saved.text);
       folders.prefs.change({ scope: saved.scope, recursive: saved.recursive });
       folders.results.restore(saved.conditions);
+      folders.results.setMedia(saved.media);
       restoring.current = false;
     });
     return () => {
@@ -121,7 +126,7 @@ export function useFoldersSnapshot(
       preview.status === 'ready' &&
       (model.results.status === 'loading' ||
         (model.results.status === 'ready' &&
-          model.results.answered !== songsQueryOf(saved.conditions, saved.scope).query))
+          model.results.answered !== trackQueryOf(saved.conditions, saved.scope).query))
     )
       return;
     if (tree.current) tree.current.scrollTop = saved.treeTop;

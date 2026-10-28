@@ -1,8 +1,8 @@
 import { Button, MessageBar, MessageBarActions, MessageBarBody } from '@fluentui/react-components';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { MessageKey } from '../../i18n/en.ts';
 import { translateAtom } from '../../i18n/locale.ts';
-import { albumDetailNoticeAtom } from '../album-detail/albumDetailOpen.ts';
 import { songsActionsNoticeAtom } from './songsActions.ts';
 import styles from './SongsPage.module.css';
 import type { SongsPageModel } from './useSongsPage.ts';
@@ -10,7 +10,7 @@ import { useService } from '../../kit/useService.ts';
 import { trackActionsKey, trackActionsNoticeAtom } from '../../track/trackActions.ts';
 import { songsKey } from './songsServices.ts';
 import { albumListKey } from '../album-list/albumList.ts';
-import { albumDetailKey } from '../album-detail/albumDetail.ts';
+import { objectOpenerKey } from '../../nav/objectOpener.ts';
 
 interface NoticeProps {
   readonly kind: string;
@@ -20,11 +20,12 @@ interface NoticeProps {
 
 function Notice({ kind, text, action }: NoticeProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   return (
     <MessageBar className={styles.notice} intent="error" data-songs-notice={kind}>
       <MessageBarBody>{t(text)}</MessageBarBody>
       <MessageBarActions>
-        <Button size="small" onClick={action.run}>
+        <Button className={viewControls.field} size="small" onClick={action.run}>
           {t(action.label)}
         </Button>
       </MessageBarActions>
@@ -33,16 +34,17 @@ function Notice({ kind, text, action }: NoticeProps) {
 }
 
 /**
- * 表格上方的横幅：整库曲目或歌曲页的顺序读取失败（带重试，手上的旧结果照旧显示），起播与成批命令没办成（可关）。
+ * 表格上方的横幅：整库曲目、歌曲页的顺序或显示中的播放统计读取失败（带重试，手上的旧结果照旧显示），
+ * 起播与成批命令没办成（可关）
  */
 export function SongsNotices({ model }: { readonly model: SongsPageModel }) {
   const songs = useService(songsKey);
   const albumList = useService(albumListKey);
   const trackActions = useService(trackActionsKey);
-  const albumDetail = useService(albumDetailKey);
+  const objects = useService(objectOpenerKey);
   const notice = useAtomValueRawSync(songsActionsNoticeAtom);
   const menuNotice = useAtomValueRawSync(trackActionsNoticeAtom);
-  const detailNotice = useAtomValueRawSync(albumDetailNoticeAtom);
+  const detailNotice = useAtomValueRawSync(objects.notice);
   return (
     <>
       {model.library.status === 'failed' && (
@@ -57,6 +59,13 @@ export function SongsNotices({ model }: { readonly model: SongsPageModel }) {
           kind="rows"
           text="songs.readFailed"
           action={{ label: 'album.retry', run: () => void songs.rows.retry() }}
+        />
+      )}
+      {model.stats.failed && (
+        <Notice
+          kind="stats"
+          text={model.stats.failed}
+          action={{ label: 'album.retry', run: model.stats.retry }}
         />
       )}
       {notice && (
@@ -77,7 +86,7 @@ export function SongsNotices({ model }: { readonly model: SongsPageModel }) {
         <Notice
           kind="detail"
           text={detailNotice}
-          action={{ label: 'album.dismiss', run: albumDetail.dismissNotice }}
+          action={{ label: 'album.dismiss', run: objects.dismissNotice }}
         />
       )}
     </>

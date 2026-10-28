@@ -18,9 +18,10 @@ export function lastfmPhotoId(value: string): string | null {
       url.hash
     )
       return null;
-    const match = /^\/i\/u\/(?:ar0|\d+x\d+(?:s)?)\/([a-f0-9]{32})\.(?:jpg|png|webp)$/.exec(
-      url.pathname,
-    );
+    const match =
+      /^\/i\/u\/(?:ar0|avatar\d+s|\d+x\d+s?)\/([a-f0-9]{32})(?:\.(?:jpg|png|webp))?$/.exec(
+        url.pathname,
+      );
     const id = match?.[1];
     return id && id !== '2a96cbd8b46e442fc41c2b86b821562f' ? id : null;
   } catch {
@@ -44,13 +45,18 @@ export function readLastfmPhotoValue(
     : null;
 }
 
+/**
+ * 取网页里的艺人主图。校验用 `pageArtist`（取到的那一页的艺人名，名字规范化跳转后是
+ * Last.fm 的规范名）；归属与链接用 `artist`（请求名），缓存读回按同一规则重建校验
+ */
 export function readLastfmPhoto(
   root: ParentNode,
   artist: string,
   language: BiographyLanguage,
+  pageArtist: string = artist,
 ): LastfmPhoto | null {
   const canonical = root.querySelector('link[rel="canonical"]')?.getAttribute('href');
-  if (!canonical || lastfmArtistFromUrl(canonical)?.toLowerCase() !== artist.toLowerCase())
+  if (!canonical || lastfmArtistFromUrl(canonical)?.toLowerCase() !== pageArtist.toLowerCase())
     return null;
   const candidates = [
     root.querySelector('.header-new-background-image[itemprop="image"]')?.getAttribute('content'),
@@ -60,7 +66,7 @@ export function readLastfmPhoto(
     if (!candidate) continue;
     const id = lastfmPhotoId(candidate);
     if (!id) continue;
-    // 主图必须同时有属于该艺人的照片页链接，不能误取站点图标或推荐艺人的图片。
+    // 主图必须同时有属于该艺人的照片页链接，不能误取站点图标或推荐艺人的图片
     for (const link of root.querySelectorAll('a[href*="/+images/"]')) {
       if (link.closest('[hidden],[aria-hidden="true"],template')) continue;
       try {
@@ -80,7 +86,7 @@ export function readLastfmPhoto(
         const owner = lastfmArtistFromUrl(
           `${page.origin}${page.pathname.slice(0, -suffix.length)}`,
         );
-        if (owner?.toLowerCase() === artist.toLowerCase())
+        if (owner?.toLowerCase() === pageArtist.toLowerCase())
           return { url: candidate, pageUrl: `${lastfmArtistUrl(artist, language)}${suffix}` };
       } catch {
         continue;

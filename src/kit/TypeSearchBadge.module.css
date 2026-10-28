@@ -1,4 +1,4 @@
-/* 盖在网格上方，不接指针，不挡点击。 */
+/* 盖在网格上方，不接指针，不挡点击 */
 .root {
   position: absolute;
   top: var(--spacingVerticalS);

@@ -89,20 +89,22 @@ test('同页目录后退交还各自的筛选与树焦点，树 DOM 保持原对
     });
   });
   await env.folder('Alpha').click();
-  await env.view.getByRole('combobox', { name: '筛选此目录中的曲目' }).fill('Amber');
+  await env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' }).fill('Amber');
   await expect(env.grid.getByText('Amber', { exact: true })).toBeVisible();
   await expect(env.grid.getByText('Zebra', { exact: true })).toHaveCount(0);
   const tree = await env.tree.elementHandle();
   await env.folder('Beta').click();
-  await env.view.getByRole('combobox', { name: '筛选此目录中的曲目' }).fill('Blue');
+  await env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' }).fill('Blue');
   await expect(env.grid.getByText('Blue', { exact: true })).toBeVisible();
   await page.keyboard.press('Alt+ArrowLeft');
-  await expect(env.view.getByRole('combobox', { name: '筛选此目录中的曲目' })).toHaveValue('Amber');
+  await expect(env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' })).toHaveValue(
+    'Amber',
+  );
   await expect(env.grid.getByText('Amber', { exact: true })).toBeVisible();
   await expect(env.folder('Alpha')).toHaveAttribute('data-focused', 'true');
   expect(await env.tree.evaluate((element, original) => element === original, tree)).toBe(true);
   await page.keyboard.press('Alt+ArrowRight');
-  await expect(env.view.getByRole('combobox', { name: '筛选此目录中的曲目' })).toHaveValue('Blue');
+  await expect(env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' })).toHaveValue('Blue');
   await expect(env.grid.getByText('Blue', { exact: true })).toBeVisible();
   expect(env.errors).toEqual([]);
 });
@@ -110,6 +112,15 @@ test('同页目录后退交还各自的筛选与树焦点，树 DOM 保持原对
 test('目录双击仍按该目录起播', async ({ page }) => {
   const env = await openFolders(page);
   await env.folder('Alpha').dblclick();
+  await expect
+    .poll(
+      () =>
+        env.host
+          .callsTo('library.browseTree')
+          .filter((call) => call.includeFiles === true)
+          .at(-1)?.pathId,
+    )
+    .toBe('Alpha');
   await expect
     .poll(() => env.host.callsTo('library.addToPlaylist').at(-1)?.paths)
     .toEqual(FOLDER_TRACKS.slice(0, 2).map((track) => track.path));

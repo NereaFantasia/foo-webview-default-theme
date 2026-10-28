@@ -1,0 +1,5 @@
+/* 键紧挨着，不留空；与播放顺序、音量之间的间隔由模板排 */
+.group {
+  display: inline-flex;
+  align-items: center;
+}

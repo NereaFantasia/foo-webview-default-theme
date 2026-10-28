@@ -19,15 +19,30 @@ describe('trayMenuCss', () => {
       expect(block(css, '.fb-menu')).toContain('padding: 6px 4px;');
       expect(block(css, '.fb-item')).toContain('gap: 12px;');
       expect(block(css, '.fb-item')).toContain('padding: 0 12px;');
-      expect(block(css, '.fb-sep')).toContain('margin: 6px 8px;');
+      expect(block(css, '.fb-sep')).toContain('margin: 4px 8px;');
       expect(block(css, '.fb-item[data-item-id="np"]')).toContain('padding: 8px 12px;');
       const playback = block(css, '.fb-zone[data-zone="playback"]');
-      expect(playback).toContain('gap: 8px;');
+      expect(playback).toContain('gap: 12px;');
       expect(playback).toContain('padding: 6px 0;');
       expect(block(css, '.fb-item.fb-slider')).toContain('gap: 8px;');
       expect(block(css, '.fb-slider-track')).toContain('border-radius: 2px;');
       expect(block(css, '.fb-slider-fill')).toContain('border-radius: 2px;');
     }
+  });
+
+  it('面板宽 240，子菜单的下限是它加两侧内边距与边框；菜单项高 32，歌曲卡与播放键各自定高不跟着变', () => {
+    const css = trayMenuCss(lightTheme, false);
+    expect(block(css, '.fb-zone')).toContain('width: 240px;');
+    expect(block(css, '.fb-submenu')).toContain('min-width: 250px;');
+    expect(block(css, '.fb-item')).toContain('min-height: 32px;');
+    expect(block(css, '.fb-item[data-item-id="np"]')).toContain('min-height: 60px;');
+    expect(css).toMatch(/data-zone="playback"\] \.fb-item \{ width: 36px; height: 36px;/);
+  });
+
+  it('歌曲卡封面是宿主内联的背景图：铺满、居中、不重复，缺了只会露出左上角', () => {
+    const cover = block(trayMenuCss(lightTheme, false), '.fb-np-cover');
+    expect(cover).toContain('center / cover no-repeat;');
+    expect(cover).not.toContain('object-fit');
   });
 
   it('菜单项不画浏览器的焦点框：指针打开菜单时宿主也把焦点放到第一项', () => {

@@ -23,24 +23,24 @@ import {
   type SectionBatch,
 } from './listCollapse.ts';
 
-/** 列表形态在当前分节依据下的两层折叠。 */
+/** 列表形态在当前分节依据下的两层折叠 */
 export const albumListCollapseAtom: Atom<ListCollapse> = atom((get) =>
   listCollapseOf(get(collapsedValueAtom), get(browserPrefsAtom).dimension),
 );
 
-/** 单击节头时的修饰键：Alt 连同节里的专辑一起，Ctrl 让所有节跟着这一节。 */
+/** 单击节头时的修饰键：Alt 连同节里的专辑一起，Ctrl 让所有节跟着这一节 */
 export interface SectionClick {
   readonly alt: boolean;
   readonly ctrl: boolean;
 }
 
-/** 列表形态的开合命令：单击与修饰键、键盘、页头键与节头菜单都走这里。 */
+/** 列表形态的开合命令：单击与修饰键、键盘、页头键与节头菜单都走这里 */
 export interface ListFolding {
   toggleSection(key: string | null, click: SectionClick): void;
-  /** `siblings` 为真时同一节的专辑都跟着这一张。 */
+  /** `siblings` 为真时同一节的专辑都跟着这一张 */
   toggleAlbum(entry: ListAlbum, siblings: boolean): void;
   setGroup(group: AlbumListGroup, collapsed: boolean): void;
-  /** 展开同级：所有节，或这一节里的所有专辑。 */
+  /** 展开同级：所有节，或这一节里的所有专辑 */
   expandSiblings(group: AlbumListGroup): void;
   batch(batch: ListBatch): void;
   sectionBatch(key: string | null, batch: SectionBatch): void;
@@ -48,7 +48,7 @@ export interface ListFolding {
 
 /**
  * `orders` 答此刻的行序号（有哪些节、节里是哪几张），`updateCollapsed` 改折叠存档的整份。每次改都顺手清掉
- * 例外里已不在库里的专辑；专辑清单还没读回时不清，免得把整份都当成不在了。
+ * 例外里已不在库里的专辑；专辑清单还没读回时不清，免得把整份都当成不在了
  */
 export function createListFolding(
   store: Store,

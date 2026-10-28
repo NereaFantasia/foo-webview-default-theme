@@ -1,9 +1,9 @@
+import { Menu } from '../../../motion/Surfaces.tsx';
+import { MenuSurface as MenuPopover } from '../../../theme/MenuSurface.tsx';
 import {
   Button,
-  Menu,
   MenuItem,
   MenuList,
-  MenuPopover,
   MenuTrigger,
   makeStyles,
   tokens,

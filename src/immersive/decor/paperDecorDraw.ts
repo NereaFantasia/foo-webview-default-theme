@@ -1,25 +1,25 @@
 import { cellKey, type Decor } from './paperDecor.ts';
 /**
  * 按 `buildDecor` 的布局画生成式网格。先清屏，自下而上是径向微光、仪表弧、格线、填色格与对角线、
- * 散点记号；各件的颜色与透明度照 catbot-3 网页版，格线颜色取 `--paper-grid`。
- * 纯函数，canvas 2D 上下文由调用方注入，只经 `DecorContext` 这一面画。
+ * 散点记号；各件的颜色与透明度照 catbot-3 网页版，格线颜色取 `--paper-grid`
+ * 纯函数，canvas 2D 上下文由调用方注入，只经 `DecorContext` 这一面画
  */
 
 export interface DecorStyle {
-  /** 格线色：自带透明度的 token，原样用。 */
+  /** 格线色：自带透明度的 token，原样用 */
   grid: string;
   /**
    * 数据墨、热色、中性墨：不带透明度，各件的透明度走 `globalAlpha`。要六位十六进制，即 `fillStyle` 规整
-   * 不透明色的写法；别的写法下，微光的透明端退回透明黑。
+   * 不透明色的写法；别的写法下，微光的透明端退回透明黑
    */
   ink: string;
   hot: string;
   neutral: string;
-  /** 箭头字符的等宽字体栈。 */
+  /** 箭头字符的等宽字体栈 */
   mono: string;
 }
 
-/** 画装饰用到的 canvas 2D 面；`CanvasRenderingContext2D` 满足它。 */
+/** 画装饰用到的 canvas 2D 面；`CanvasRenderingContext2D` 满足它 */
 export interface DecorContext {
   globalAlpha: number;
   strokeStyle: string | CanvasGradient | CanvasPattern;
@@ -45,10 +45,10 @@ export interface DecorContext {
   ): CanvasGradient;
 }
 
-/** 以下长度都是网页版像素，作画时乘 `decor.unit`：刻度线在弧内外各伸出的长度、`>>` 记号的字号。 */
+/** 以下长度都是网页版像素，作画时乘 `decor.unit`：刻度线在弧内外各伸出的长度、`>>` 记号的字号 */
 const TICK_REACH = 14;
 const CHEVRON_FONT_PX = 13;
-/** 径向微光：内圆偏左上一点、半径 80，外圆半径 1040（网页版数），58% 处淡到全透明。 */
+/** 径向微光：内圆偏左上一点、半径 80，外圆半径 1040（网页版数），58% 处淡到全透明 */
 const GLOW_SHIFT = 20;
 const GLOW_INNER = 80;
 const GLOW_OUTER = 1040;
@@ -56,14 +56,14 @@ const GLOW_FADE_AT = 0.58;
 
 /**
  * 同一颜色的全透明版。canvas 渐变按未预乘的 RGBA 插值，两端若是「某色」与「透明黑」，中段会发灰，
- * 所以透明端要取同色：六位十六进制补上 `00` 透明度。别的写法退回透明黑。
+ * 所以透明端要取同色：六位十六进制补上 `00` 透明度。别的写法退回透明黑
  */
 export function transparentOf(color: string): string {
   const trimmed = color.trim();
   return /^#[0-9a-f]{6}$/i.test(trimmed) ? `${trimmed}00` : 'transparent';
 }
 
-/** 1 px 线压在像素中间才不发虚：坐标取整再挪半个像素。 */
+/** 1 px 线压在像素中间才不发虚：坐标取整再挪半个像素 */
 const crisp = (value: number): number => Math.floor(value) + 0.5;
 
 function drawGlow(ctx: DecorContext, decor: Decor, style: DecorStyle): void {
@@ -116,7 +116,7 @@ function drawArcs(ctx: DecorContext, decor: Decor, style: DecorStyle): void {
   }
 }
 
-/** 格线按段画：两格之间的那一段，两边任一格打开就不画，打开的格因此四条边都没有。 */
+/** 格线按段画：两格之间的那一段，两边任一格打开就不画，打开的格因此四条边都没有 */
 function drawGrid(ctx: DecorContext, decor: Decor, style: DecorStyle): void {
   const { origin, columns, rows, open, cell } = decor;
   const isOpen = (column: number, row: number): boolean => open.has(cellKey(column, row));

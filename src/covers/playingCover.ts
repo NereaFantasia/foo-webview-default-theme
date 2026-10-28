@@ -1,4 +1,3 @@
-import { fb } from 'foo-webview-sdk/bridge';
 import type { Atom, createStore } from 'jotai/vanilla';
 import { settle } from '../host/hostCall.ts';
 import type { PrefStorage } from '../kit/localPref.ts';
@@ -11,6 +10,7 @@ import {
 import type { CoverProfile } from '../theme/coverPalette.ts';
 import { backgroundCoverAtom } from '../theme/background/windowBackground.ts';
 import { coverAnalysis, type CoverAnalysis } from './coverAnalysis.ts';
+import type { TrackArtwork } from './trackArtwork.ts';
 
 export interface PlayingCoverInput {
   readonly status: 'pending' | 'ready' | 'unavailable';
@@ -19,7 +19,8 @@ export interface PlayingCoverInput {
 }
 
 export interface PlayingCoverOptions {
-  host?: { artwork: Pick<typeof fb.artwork, 'getFb2kUrlByPath'> };
+  /** 取曲目封面，在线曲目也认得。 */
+  artwork: TrackArtwork;
   analysis?: Pick<CoverAnalysis, 'read'>;
   storage?: PrefStorage | null;
 }
@@ -28,9 +29,9 @@ export interface PlayingCoverOptions {
 export function startPlayingCover(
   store: ReturnType<typeof createStore>,
   input: Atom<PlayingCoverInput>,
-  options: PlayingCoverOptions = {},
+  options: PlayingCoverOptions,
 ): { dispose(): void } {
-  const host = options.host ?? fb;
+  const { artwork } = options;
   const analysis = options.analysis ?? coverAnalysis;
   const storage = options.storage;
   initializeAccent(store, storage);
@@ -51,9 +52,7 @@ export function startPlayingCover(
       return;
     }
     try {
-      const answer = await settle(() =>
-        host.artwork.getFb2kUrlByPath(handle, 'front', { maxSize: 512 }),
-      );
+      const answer = await settle(() => artwork.urlOf(handle, 'front', { maxSize: 512 }));
       if (disposed || mine !== generation) return;
       const url = answer && answer.success !== false && answer.available ? answer.dataUrl : '';
       // 原图解码与像素分析独立，取色失败不能撤掉仍可显示的封面。

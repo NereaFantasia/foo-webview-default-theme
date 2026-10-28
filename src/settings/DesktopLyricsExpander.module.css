@@ -1,0 +1,43 @@
+/* 底板浓度一行：滑块加数值，宽同下拉框；卡窄、换到标题下面时占满一行 */
+.slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5ch;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  width: 220px;
+  max-width: 100%;
+}
+
+.fill {
+  width: 100%;
+}
+
+.value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 字号一栏每项前的「Aa」：按档位递增，只是示意，不是真实字号；字号要收在 20 像素的图标槽里 */
+.aa {
+  display: inline-block;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.small {
+  font-size: 10px;
+}
+
+.medium {
+  font-size: 12px;
+}
+
+.large {
+  font-size: 14px;
+}
+
+.xlarge {
+  font-size: 16px;
+}

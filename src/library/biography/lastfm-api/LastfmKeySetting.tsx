@@ -8,7 +8,7 @@ import type { LastfmKeyCheck, LastfmKeyService } from './lastfmKey.ts';
 import styles from './LastfmKeySetting.module.css';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
-/** Last.fm 发 API key 的页面。 */
+/** Last.fm 发 API key 的页面 */
 const APPLY_URL = 'https://www.last.fm/api/account/create';
 
 const useStyles = makeStyles({
@@ -35,7 +35,7 @@ export function LastfmKeySetting({
   const links = useExternalLinks();
   const key = useAtomValueRawSync(service.key);
   const check = useAtomValueRawSync(service.check);
-  // 没在改时显示存着的 key；改到一半时显示草稿，填完（回车或离开输入框）才提交。
+  // 没在改时显示存着的 key；改到一半时显示草稿，填完（回车或离开输入框）才提交
   const [draft, setDraft] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
   const commit = () => {
@@ -86,12 +86,13 @@ export function LastfmKeySetting({
   );
 }
 
-/** 卡片说明行写的状态，以及它是不是出错的原因。 */
+/** 卡片说明行写的状态，以及它是不是出错的原因。连不上时 detail 带宿主失败原文 */
 export function lastfmKeyStatus(
   key: string,
   check: LastfmKeyCheck,
   online: boolean,
   t: BiographyTranslate,
+  detail: string | null = null,
 ): { readonly text: string | undefined; readonly error: boolean } {
   if (check === 'malformed') return { text: t('biography.keyMalformed'), error: true };
   if (!online) return { text: t('biography.keyOffline'), error: false };
@@ -99,6 +100,10 @@ export function lastfmKeyStatus(
   if (check === 'valid') return { text: t('biography.keyValid'), error: false };
   if (check === 'invalid') return { text: t('biography.keyInvalid'), error: true };
   if (check === 'suspended') return { text: t('biography.keySuspended'), error: true };
-  if (check === 'unverified') return { text: t('biography.keyUnverified'), error: false };
+  if (check === 'unverified')
+    return {
+      text: detail ? `${t('biography.keyUnverified')} · ${detail}` : t('biography.keyUnverified'),
+      error: false,
+    };
   return { text: key ? undefined : t('biography.keyEmpty'), error: false };
 }

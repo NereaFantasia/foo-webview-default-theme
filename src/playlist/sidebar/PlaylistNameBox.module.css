@@ -1,4 +1,4 @@
-/* 与导航项同高、同一套左右留白，图标落在同一处。 */
+/* 与导航项同高、同一套左右留白，图标落在同一处 */
 .row {
   display: flex;
   align-items: center;
@@ -7,7 +7,7 @@
   padding: 0 var(--spacingHorizontalS) 0 var(--spacingHorizontalMNudge);
 }
 
-/* 行首的状态图标，与导航项的图标槽同样大小。 */
+/* 行首的状态图标，与导航项的图标槽同样大小 */
 .icon {
   display: inline-flex;
   flex: none;

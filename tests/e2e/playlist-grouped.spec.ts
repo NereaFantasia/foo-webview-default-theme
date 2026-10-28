@@ -24,19 +24,21 @@ test('组头排成一条：专辑、艺术家、首数与年份；点组头折�
   expect(errors).toEqual([]);
 });
 
-test('列头菜单关掉分组：没有组头也没有封面列；再打开回到分组', async ({ page }) => {
+test('视图面板选「不分组」：没有组头也没有封面列；再选回缺省依据回到分组', async ({ page }) => {
   const { view, grid, group, errors } = await openPlaylist(page, 'Mix', albumTracks('Mix', 3, 4));
   const cover = grid.locator('[role="columnheader"][data-column-id="cover"]');
   await expect(cover).toHaveCount(1);
-  await view.getByRole('columnheader', { name: '标题' }).click({ button: 'right' });
-  await page.getByRole('menuitemcheckbox', { name: '启用分组' }).click();
+  await view.locator('[data-playlist-view]').click();
+  await page.locator('[data-view-grouping]').click();
+  await page.getByRole('option', { name: '不分组', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(group(A1)).toHaveCount(0);
   await expect(cover).toHaveCount(0);
   await expect(grid.locator('[role="row"][aria-level="1"]').first()).toBeVisible();
 
-  await view.getByRole('columnheader', { name: '标题' }).click({ button: 'right' });
-  await page.getByRole('menuitemcheckbox', { name: '启用分组' }).click();
+  await view.locator('[data-playlist-view]').click();
+  await page.locator('[data-view-grouping]').click();
+  await page.getByRole('option', { name: '专辑艺人、专辑、光盘', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(group(A1)).toBeVisible();
   expect(errors).toEqual([]);
@@ -50,9 +52,10 @@ test('全部折叠后只取组头那几行所在的页，组与组之间的行�
     albumTracks('Mix', 40, 500),
   );
   await expect(group(A1)).toBeVisible();
-  await view.getByRole('columnheader', { name: '标题' }).click({ button: 'right' });
+  await view.locator('[data-playlist-view]').click();
   const before = host.callsTo('playlist.getTracks').length;
-  await page.getByRole('menuitem', { name: '全部折叠' }).click();
+  await page.locator('[data-action="collapse"]').click();
+  await page.keyboard.press('Escape');
   await expect(group('Album 12 | Artist 12')).toBeVisible();
   await expect(group('Album 12 | Artist 12').locator('[data-group-pending]')).toHaveCount(0);
   const starts = host

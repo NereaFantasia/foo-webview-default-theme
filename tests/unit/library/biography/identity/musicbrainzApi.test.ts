@@ -78,6 +78,14 @@ describe('MusicBrainz 请求', () => {
       [reply(200, '<html>'), { kind: 'failed', problem: 'invalid' }],
       [reply(502, ''), { kind: 'failed', problem: 'network' }],
       [hostFailure('OPERATION_FAILED'), { kind: 'failed', problem: 'network' }],
+      [
+        hostFailure('PERMISSION_DENIED', 'Target host resolves to a private/local network address'),
+        { kind: 'failed', problem: 'localRelay' },
+      ],
+      [
+        hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'),
+        { kind: 'failed', problem: 'dns', detail: 'Send failed: DNS name not resolved' },
+      ],
     ] as const;
     for (const [answer, expected] of cases) {
       const host = installFakeHost();

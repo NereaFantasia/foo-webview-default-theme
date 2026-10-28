@@ -13,7 +13,7 @@ import { reducedMotionAtom } from '../../../motion/reducedMotion.ts';
 import { rowHolding } from '../albumDropdown.ts';
 import { dropdownTracksAtom } from './albumDropdownTracks.ts';
 import type { GridItem } from '../albumGridLayout.ts';
-import { browserPrefsAtom } from '../../albums/browserPrefs.ts';
+import { browserPrefsAtom, wallSortAtom } from '../../albums/browserPrefs.ts';
 import { albumKeyOf } from '../../../host/libraryContract.ts';
 import type { FoldFrame } from './foldClock.ts';
 import type { AlbumWallLayout } from '../useAlbumWallLayout.ts';
@@ -80,7 +80,8 @@ export function useAlbumDropdown(options: AlbumDropdownOptions): AlbumDropdownMo
   const albums = useService(albumsKey);
   const store = useStore();
   const reduced = useAtomValueRawSync(reducedMotionAtom);
-  const { sort, dimension } = useAtomValueRawSync(browserPrefsAtom);
+  const { dimension } = useAtomValueRawSync(browserPrefsAtom);
+  const { sort, seed } = useAtomValueRawSync(wallSortAtom);
   const [, redraw] = useReducer((count: number) => count + 1, 0);
   const rows = useRef<HTMLDivElement>(null);
   const latest = useRef({ layout, reduced });
@@ -160,11 +161,17 @@ export function useAlbumDropdown(options: AlbumDropdownOptions): AlbumDropdownMo
     if (!settled || !current) return;
     if (!rowHolding(layout.items, albumKeyOf(current.album), current.sectionKey)) fold.dismiss();
   });
-  const order = useRef({ sort, dimension });
+  const order = useRef({ sort, seed, dimension });
   useLayoutEffect(() => {
-    if (order.current.sort !== sort || order.current.dimension !== dimension) fold.dismiss();
-    order.current = { sort, dimension };
-  }, [fold, sort, dimension]);
+    if (
+      order.current.sort.field !== sort.field ||
+      order.current.sort.descending !== sort.descending ||
+      order.current.seed !== seed ||
+      order.current.dimension !== dimension
+    )
+      fold.dismiss();
+    order.current = { sort, seed, dimension };
+  }, [fold, sort, seed, dimension]);
 
   useEffect(() => {
     const element = scroller.current;

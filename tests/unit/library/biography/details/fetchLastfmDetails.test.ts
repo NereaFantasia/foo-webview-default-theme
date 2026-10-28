@@ -9,6 +9,14 @@ const PARSE: typeof readLastfmDetails = (body) =>
     ? { kind: 'invalid' }
     : { kind: 'found', details: { tags: [body], counters: [], similar: [] } };
 
+const found = (status: number, headers: Record<string, string>, body: string) => ({
+  success: true as const,
+  status,
+  headers,
+  body,
+  responseType: 'text' as const,
+});
+
 describe('Last.fm 主页请求', () => {
   it.each([403, 429, 503])('HTTP %s 保留错误类型和 Retry-After', async (status) => {
     const host = installFakeHost();
@@ -34,6 +42,12 @@ describe('Last.fm 主页请求', () => {
       ok: false,
       problem: 'network',
     });
+    host.answer('http.get', hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'));
+    await expect(fetchLastfmDetails('Queen', 'en', host.fb, PARSE)).resolves.toMatchObject({
+      ok: false,
+      problem: 'dns',
+      detail: 'Send failed: DNS name not resolved',
+    });
     host.answer('http.get', { success: true, status: 200, body: 'invalid', headers: {} });
     await expect(fetchLastfmDetails('Queen', 'en', host.fb, PARSE)).resolves.toMatchObject({
       ok: false,
@@ -44,6 +58,33 @@ describe('Last.fm 主页请求', () => {
         throw new Error('parse');
       }),
     ).resolves.toMatchObject({ ok: false, problem: 'invalid' });
+  });
+
+  it('名字规范化跳转后解析校验用终跳名，归属名与链接保持请求名', async () => {
+    const host = installFakeHost();
+    host.answer('http.get', (params) =>
+      String(params['url']).includes('%E4%BC%A6')
+        ? found(301, { Location: '/zh/music/%E5%91%A8%E6%9D%B0%E5%80%AB' }, '')
+        : found(200, {}, '繁体资料'),
+    );
+    let seenPage = '';
+    const result = await fetchLastfmDetails(
+      '周杰伦',
+      'zh',
+      host.fb,
+      (body, artist, language, pageArtist) => {
+        seenPage = pageArtist ?? '';
+        return PARSE(body, artist, language);
+      },
+    );
+    expect(seenPage).toBe('周杰倫');
+    expect(result).toMatchObject({
+      ok: true,
+      details: {
+        artist: '周杰伦',
+        url: 'https://www.last.fm/zh/music/%E5%91%A8%E6%9D%B0%E4%BC%A6',
+      },
+    });
   });
 
   it('404 缓存空资料，Age 和 no-cache 决定附加资料自己的有效期', async () => {

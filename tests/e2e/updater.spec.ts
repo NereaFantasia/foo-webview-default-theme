@@ -7,6 +7,7 @@ import { zipEntries } from '../../scripts/release/zip.mjs';
 import { installPageHost } from '../fixtures/pageHost.ts';
 import { TEMPLATE_DIRECTORY, answerTemplateDisk } from '../fixtures/templateDisk.ts';
 import { ROOT_URL } from '../../src/update/contract.ts';
+import { CURRENT_VERSION, NEXT_VERSION } from '../fixtures/themeVersion.ts';
 
 const CHANGELOG = textLog();
 function textLog() {
@@ -14,7 +15,7 @@ function textLog() {
     format: 1,
     entries: [
       {
-        version: '0.2.0',
+        version: NEXT_VERSION,
         date: '2026-10-04',
         notes: {
           en: {
@@ -32,7 +33,7 @@ function textLog() {
         },
       },
       {
-        version: '0.1.0',
+        version: CURRENT_VERSION,
         notes: {
           'zh-CN': { title: '首个版本', summary: '本机自带的更新内容。' },
           en: { title: 'First version', summary: 'Bundled release notes.' },
@@ -52,10 +53,12 @@ for (const colorScheme of ['light', 'dark'] as const)
     await page.emulateMedia({ colorScheme });
     const host = await installPageHost(page);
     host.config.set('defaultTheme.update.mode', 'off');
-    host.config.set('defaultTheme.changelog.seen', '0.1.0');
+    host.config.set('defaultTheme.changelog.seen', CURRENT_VERSION);
     const disk = answerTemplateDisk(host, {
-      'fe/0.1.0/installed.json': JSON.stringify({ files: { 'backend.json': 'a'.repeat(64) } }),
-      'fe/0.1.0/backend.json': '{}',
+      [`fe/${CURRENT_VERSION}/installed.json`]: JSON.stringify({
+        files: { 'backend.json': 'a'.repeat(64) },
+      }),
+      [`fe/${CURRENT_VERSION}/backend.json`]: '{}',
     });
     await page.route('**/backend-ui-probe', (route) =>
       route.fulfill({
@@ -74,12 +77,12 @@ for (const colorScheme of ['light', 'dark'] as const)
     await expect(page.getByText('本地服务未就绪', { exact: true }).first()).toBeVisible();
     await page.getByText('诊断详情', { exact: true }).click();
     await expect(page.getByText('后端描述校验失败', { exact: true })).toBeVisible();
-    disk.write('fe/0.1.0/installed.json', JSON.stringify({ files: {} }));
+    disk.write(`fe/${CURRENT_VERSION}/installed.json`, JSON.stringify({ files: {} }));
     await page.getByRole('button', { name: '重试本地服务', exact: true }).click();
     await expect(page.getByText('本地服务未就绪', { exact: true })).toHaveCount(0);
   });
 
-const CURRENT = { v: '0.1.0', dir: '0.1.0' };
+const CURRENT = { v: CURRENT_VERSION, dir: CURRENT_VERSION };
 const STARTUP = {
   directory: TEMPLATE_DIRECTORY,
   installId: '11111111-1111-4111-8111-111111111111',
@@ -99,7 +102,7 @@ function frontendFiles() {
   const script = Array.from({ length: 6000 }, (_, index) => `export const v${index} = ${index};`);
   const binary = new Uint8Array(70_000).map((_, index) => (index * 7919) % 256);
   return [
-    { path: 'index.html', bytes: text('<!doctype html><title>主题 0.2.0</title>') },
+    { path: 'index.html', bytes: text('<!doctype html><title>主题 ${NEXT_VERSION}</title>') },
     { path: 'loader.html', bytes: text('<!doctype html>') },
     { path: 'assets/App.js', bytes: text(script.join('\n')) },
     { path: 'assets/cover.bin', bytes: binary },
@@ -112,7 +115,7 @@ async function publish(options: { tamper?: 'size' | 'hash'; der?: boolean } = {}
   const files = frontendFiles();
   const zip = zipEntries(files);
   const release = releaseManifest({
-    version: '0.2.0',
+    version: NEXT_VERSION,
     upgradeFrom: '>=0.1.0',
     plugin: '2.0.0',
     loader: 1,
@@ -121,10 +124,8 @@ async function publish(options: { tamper?: 'size' | 'hash'; der?: boolean } = {}
   });
   const releaseBytes = text(JSON.stringify(release));
   const changelog = text(CHANGELOG);
-  const changelogUrl = release.components.frontend.url.replace(
-    /fe-0\.2\.0\.zip$/,
-    'changelog.json',
-  );
+  const frontendZip = `fe-${NEXT_VERSION}.zip`;
+  const changelogUrl = release.components.frontend.url.replace(frontendZip, 'changelog.json');
   const payload = nextRootPayload(null, candidateOf(release, sha256(releaseBytes)), {
     url: changelogUrl,
     size: changelog.length,
@@ -142,7 +143,7 @@ async function publish(options: { tamper?: 'size' | 'hash'; der?: boolean } = {}
   if (options.tamper === 'hash') served[0] = (served[0] ?? 0) ^ 1;
   const routes = new Map<string, Uint8Array>([
     [ROOT_URL, text(manifest)],
-    [release.components.frontend.url.replace(/fe-0\.2\.0\.zip$/, 'release.json'), releaseBytes],
+    [release.components.frontend.url.replace(frontendZip, 'release.json'), releaseBytes],
     [release.components.frontend.url, served],
     [changelogUrl, changelog],
   ]);
@@ -153,7 +154,7 @@ async function run(
   page: Page,
   published: Awaited<ReturnType<typeof publish>>,
   action: 'check' | 'install' | 'view' = 'install',
-  seen = '0.1.0',
+  seen = CURRENT_VERSION,
   locale?: { host: string; selected: string },
 ) {
   page.on('pageerror', (error) => console.error(error.message));
@@ -171,12 +172,12 @@ async function run(
   }
   const disk = answerTemplateDisk(host, {
     'current.json': JSON.stringify({ schema: 1, frontend: { version: CURRENT } }),
-    'fe/0.1.0/installed.json': JSON.stringify({
+    [`fe/${CURRENT_VERSION}/installed.json`]: JSON.stringify({
       schema: 1,
-      version: '0.1.0',
+      version: CURRENT_VERSION,
       files: { 'index.html': 'f'.repeat(64) },
     }),
-    'fe/0.1.0/changelog.json': CHANGELOG,
+    [`fe/${CURRENT_VERSION}/changelog.json`]: CHANGELOG,
   });
   host.answer('http.get', (params) => {
     const body = published.routes.get(String(params['url']));
@@ -222,13 +223,14 @@ test('签名、解压与哈希在浏览器里通过，新版本装进新目录�
   const { status, disk } = await run(page, published);
   expect(status).toMatchObject({
     phase: 'ready',
-    version: '0.2.0',
+    version: NEXT_VERSION,
     notes: { 'zh-CN': '浏览器验证' },
   });
   const pointer = JSON.parse(disk.text('current.json') ?? '{}');
   expect(pointer.frontend.version).toEqual(CURRENT);
   const dir = pointer.frontend.pending.dir;
-  expect(dir).toMatch(/^0\.2\.0_[a-z0-9]{6}$/);
+  expect(dir).toMatch(/^[0-9.]+_[a-z0-9]{6}$/);
+  expect(dir.split('_')[0]).toBe(NEXT_VERSION);
   for (const file of published.files)
     expect(
       createHash('sha256')
@@ -248,7 +250,9 @@ for (const tamper of ['size', 'hash'] as const)
     const { status, disk } = await run(page, await publish({ tamper }));
     expect(status).toMatchObject({ phase: 'idle', failure: tamper });
     expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending).toBeUndefined();
-    expect([...disk.files.keys()].filter((path) => path.startsWith('fe/0.2.0'))).toEqual([]);
+    expect([...disk.files.keys()].filter((path) => path.startsWith(`fe/${NEXT_VERSION}`))).toEqual(
+      [],
+    );
   });
 
 test('Node 默认的 DER 格式签名在浏览器里验不过', async ({ page }) => {
@@ -260,7 +264,7 @@ test('Node 默认的 DER 格式签名在浏览器里验不过', async ({ page })
 test('仅通知检查不安装，主动下载后才提交 pending', async ({ page }) => {
   const published = await publish();
   const { status, disk, host } = await run(page, published, 'check');
-  expect(status).toMatchObject({ phase: 'available', version: '0.2.0' });
+  expect(status).toMatchObject({ phase: 'available', version: NEXT_VERSION });
   expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending).toBeUndefined();
   expect(
     host
@@ -277,8 +281,8 @@ test('仅通知检查不安装，主动下载后才提交 pending', async ({ pag
     },
     { keys: published.keys, startup: STARTUP },
   );
-  expect(installed).toMatchObject({ phase: 'ready', version: '0.2.0' });
-  expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending.v).toBe('0.2.0');
+  expect(installed).toMatchObject({ phase: 'ready', version: NEXT_VERSION });
+  expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending.v).toBe(NEXT_VERSION);
 });
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -300,7 +304,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await panel.evaluate((element) => {
       element.scrollTop = 200;
     });
-    await dialog.getByRole('tab', { name: '0.1.0', exact: true }).click();
+    await dialog.getByRole('tab', { name: CURRENT_VERSION, exact: true }).click();
     await expect(dialog.getByRole('heading', { name: '首个版本' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: '下载并安装' })).toHaveCount(0);
     expect(await panel.evaluate((element) => element.scrollTop)).toBe(0);
@@ -308,12 +312,17 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(after?.width).toBe(before?.width);
     expect(after?.height).toBe(before?.height);
     expect((await panel.boundingBox())?.height).toBe(contentBefore?.height);
-    await dialog.getByRole('tab', { name: /0.2.0/ }).click();
+    await dialog.getByRole('tab', { name: NEXT_VERSION }).click();
     await dialog.getByRole('button', { name: '下载并安装' }).click();
     await expect(dialog.getByRole('button', { name: '立即重启' })).toBeVisible();
-    expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending.v).toBe('0.2.0');
+    expect(JSON.parse(disk.text('current.json') ?? '{}').frontend.pending.v).toBe(NEXT_VERSION);
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
+    const trigger = page.locator('[data-info-center-trigger]');
+    await expect(trigger).toHaveAccessibleName(
+      new RegExp(`^主题 ${NEXT_VERSION} 已下载，重启 foobar2000 后生效`),
+    );
+    await expect(trigger.locator('[data-info-badge="accent"]')).toHaveCount(1);
     expect(host.config.get('defaultTheme.update.mode')).toBe('off');
   });
 }
@@ -340,7 +349,7 @@ test('升级首次展示只用本机日志，关闭后重开页面不再自动�
   const { host } = await run(page, await publish(), 'view', '0.0.9');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: '首个版本' })).toBeVisible();
-  await expect.poll(() => host.config.get('defaultTheme.changelog.seen')).toBe('0.1.0');
+  await expect.poll(() => host.config.get('defaultTheme.changelog.seen')).toBe(CURRENT_VERSION);
   expect(host.callsTo('http.get')).toEqual([]);
   await dialog.getByRole('button', { name: '关闭' }).click();
   await page.reload();
@@ -366,7 +375,10 @@ test('提醒档的信息中心展示日志标题，查看后关闭信息中心�
   await page.getByRole('option', { name: /仅提醒/ }).click();
   await expect.poll(() => host.config.get('defaultTheme.update.mode')).toBe('notify');
   await page.getByRole('button', { name: '检查更新 主题更新', exact: true }).click();
-  await page.locator('[data-info-center-trigger]').click();
+  const trigger = page.locator('[data-info-center-trigger]');
+  await expect(trigger).toHaveAccessibleName(new RegExp(`^主题有新版本：${NEXT_VERSION}`));
+  await expect(trigger.locator('[data-info-badge="accent"]')).toHaveCount(1);
+  await trigger.click();
   const notice = page.locator('[data-info-kind="updateAvailable"]');
   await expect(notice).toContainText('Updates, your way');
   await expect(notice.getByRole('button', { name: '下载并安装' })).toBeVisible();
@@ -387,10 +399,10 @@ for (const locale of [
   { host: 'zh-CN', selected: 'en', view: 'View', title: 'First version' },
 ]) {
   test(`宿主为 ${locale.host} 时日志跟随手动选择的 ${locale.selected}`, async ({ page }) => {
-    await run(page, await publish(), 'view', '0.1.0', locale);
+    await run(page, await publish(), 'view', CURRENT_VERSION, locale);
     await page.getByRole('button', { name: locale.view, exact: true }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('tab', { name: '0.1.0', exact: true }).click();
+    await dialog.getByRole('tab', { name: CURRENT_VERSION, exact: true }).click();
     await expect(dialog.getByRole('heading', { name: locale.title, exact: true })).toBeVisible();
     await expect(dialog.getByRole('tabpanel')).toHaveAttribute('lang', locale.selected);
   });

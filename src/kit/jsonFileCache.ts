@@ -23,22 +23,22 @@ export const EMPTY_JSON_FILE_CACHE: JsonFileCacheState = {
 };
 
 export interface JsonFileCacheOptions<T> {
-  /** profile 下的目录名，各业务一个，如 `webview-ui-artists`。 */
+  /** 存储于用户 profile 下的子目录名（按业务隔离，如 webview-ui-artists） */
   readonly directory: string;
-  /** 目录里的文件名，格式变了就换个带版本号的名字。 */
+  /** 缓存文件名；格式重大调整时应使用带版本号的新文件名 */
   readonly file: string;
   readonly limit: number;
-  /** 整个文件的字节上限；超出时从最久没用过的一项删起。 */
+  /** 缓存文件的最大字节预算；超出时按 LRU 顺序从最旧条目开始淘汰 */
   readonly bytes: number;
   readonly key: (entry: T) => string;
-  /** 按所属缓存的规则逐项校验，不可用答 null；是否保留过期条目由调用方决定。 */
+  /** 条目反序列化与校验函数；若数据损坏返回 null。过期条目的判定由调用方控制 */
   readonly read: (value: unknown, now: number) => T | null;
 }
 
 export interface JsonFileCache<T> {
   readonly ready: Promise<void>;
   get(key: string): T | undefined;
-  /** entry 为 null 时删掉这一项。 */
+  /** 写入或删除缓存条目；当 entry 为 null 时移除对应键 */
   save(key: string, entry: T | null): Promise<boolean>;
   clear(): Promise<boolean>;
   dispose(): void;
@@ -47,8 +47,10 @@ export interface JsonFileCache<T> {
 const EMPTY_TEXT = JSON.stringify({ version: 1, entries: [] });
 
 /**
- * 一份按键存取的 JSON 文件缓存。写入串行：较早发出的慢写不能盖掉较新的内容；清理前尚未发出的
- * 写入由代次挡住，已发出的写入之后再以空文件收尾。最近读过或写过的一项排到最后，超限时从头删。
+ * 基于本地 JSON 文件的 LRU 键值缓存
+ * 写入过程全局串行化，防止异步乱序导致新写入被旧写入覆盖；
+ * 清理操作通过代数标记拦截排队中的旧写入，并在已有写操作完成后统一重置为空文件；
+ * 命中读取或更新的条目移动至队列末尾，超出容量或字节上限时优先淘汰头部最旧项
  */
 export function createJsonFileCache<T>(
   options: JsonFileCacheOptions<T>,
@@ -100,7 +102,7 @@ export function createJsonFileCache<T>(
           if (entry) entries.set(options.key(entry), entry);
         }
       } catch {
-        // 文件损坏时当作空缓存，下一次写入会盖掉它。
+        // 文件损坏时当作空缓存，下一次写入会盖掉它
       }
     }
     publish({ loaded: true, count: entries.size, bytes: size(answer.content) });
@@ -158,7 +160,7 @@ export function createJsonFileCache<T>(
       entries.clear();
       publish({ clearing: true, failed: false });
       clearing = ready.then(async () => {
-        // 已发起的清空必须收尾；释放只取消普通排队写入与状态通知。
+        // 已发起的清空必须收尾；释放只取消普通排队写入与状态通知
         writing = writing.then(async () => {
           if (!path) return false;
           const filePath = path;

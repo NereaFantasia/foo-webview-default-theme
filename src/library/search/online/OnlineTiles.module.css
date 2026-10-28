@@ -1,0 +1,39 @@
+/* 专辑、歌单与艺人图块样式：外框填满网格单元格，悬停操作按钮与主按钮同级并覆盖于封面之上
+   封面框与文字样式见 cover-tile；艺人图块采用圆形头像与居中单行名称 */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  width: 100%;
+  min-width: 0;
+}
+
+/* 文字不在封面按钮里，点文字空白处同样打开 */
+.labels {
+  cursor: pointer;
+  min-width: 0;
+}
+
+.face {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+.tile[data-round] {
+  --tile-radius: var(--borderRadiusCircular);
+}
+.tile[data-round] .face,
+.tile[data-round] .labels {
+  text-align: center;
+}

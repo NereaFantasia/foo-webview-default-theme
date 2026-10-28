@@ -48,7 +48,7 @@ export function parseHomePins(raw: string | null): HomePin[] | null {
   }
 }
 
-/** 不用 `defineLocalPref`：读不了要报出来、也不让这次的改动盖掉读不了的存档，写不进也要报。 */
+/** 不用 `defineLocalPref`：读不了要报出来、也不让这次的改动盖掉读不了的存档，写不进也要报 */
 export function startHomePins(store: Store, storage: PrefStorage | null = browserStorage()) {
   const state = atom({
     items: [] as readonly HomePin[],

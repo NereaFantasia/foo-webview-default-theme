@@ -111,6 +111,7 @@ export class FakePlaylistContent {
               count: items.length,
               playlist: list.index,
               playlistGuid: list.guid,
+              contentVersion: this.lists.versionOf(list.guid),
             };
           }),
         getSelectedTracks: (params) =>
@@ -123,6 +124,7 @@ export class FakePlaylistContent {
               playlistGuid: list.guid,
               tracks,
               count: tracks.length,
+              contentVersion: this.lists.versionOf(list.guid),
             };
           }),
         setSelection: (params) =>
@@ -131,7 +133,7 @@ export class FakePlaylistContent {
             if (!rows) return hostFailure('INVALID_PARAMS');
             const keep = params['clearOthers'] === false ? this.selection(list.guid) : [];
             this.select(list, [...keep, ...rows]);
-            return { success: true };
+            return { success: true, contentVersion: this.lists.versionOf(list.guid) };
           }),
         selectAll: (params) =>
           this.read(params, (list) => {
@@ -161,7 +163,7 @@ export class FakePlaylistContent {
             if (items.length > 0) this.select(list, items);
             const count = this.lists.tracksOf(list).length;
             this.reorder(list, moveSelected(count, this.selectedSet(list.guid), delta));
-            return { success: true };
+            return { success: true, contentVersion: this.lists.versionOf(list.guid) };
           }),
         sort: (params) => this.write(params, (list) => this.sort(list, params)),
         shuffle: (params) =>
@@ -198,6 +200,7 @@ export class FakePlaylistContent {
               playlistGuid: list.guid,
               total: tracks.length,
               runs,
+              contentVersion: this.lists.versionOf(list.guid),
             };
           }),
         getLockInfo: (params) =>
@@ -245,7 +248,12 @@ export class FakePlaylistContent {
             if (rows.length === 0) return hostFailure('INVALID_INDEX');
             this.queued.push(...rows.map((row) => ({ guid: list.guid, row })));
             const queueCount = this.queued.length;
-            this.emit('playback:queueChanged', { origin: 'user_added', count: queueCount });
+            // 这里的队列只增不减，长度就是版本
+            this.emit('playback:queueChanged', {
+              origin: 'user_added',
+              count: queueCount,
+              contentVersion: String(queueCount),
+            });
             return { success: true, addedCount: rows.length, queueCount };
           }),
       },
@@ -305,15 +313,17 @@ export class FakePlaylistContent {
   private removeRows(list: PlaylistInfo, rows: ReadonlySet<number>) {
     const oldCount = this.lists.tracksOf(list).length;
     const kept = [...Array(oldCount).keys()].filter((row) => !rows.has(row));
-    if (kept.length === oldCount) return { success: true } as const;
-    this.rewrite(list, kept);
-    this.emit('playlist:itemsRemoved', {
-      playlist: list.index,
-      playlistGuid: list.guid,
-      oldCount,
-      newCount: kept.length,
-    });
-    return { success: true } as const;
+    if (kept.length !== oldCount) {
+      this.rewrite(list, kept);
+      this.emit('playlist:itemsRemoved', {
+        playlist: list.index,
+        playlistGuid: list.guid,
+        oldCount,
+        newCount: kept.length,
+        contentVersion: this.lists.versionOf(list.guid),
+      });
+    }
+    return { success: true, contentVersion: this.lists.versionOf(list.guid) } as const;
   }
 
   private insert(list: PlaylistInfo, params: HostParams) {
@@ -337,6 +347,7 @@ export class FakePlaylistContent {
       playlistGuid: list.guid,
       start: at,
       count: added.length,
+      contentVersion: this.lists.versionOf(list.guid),
     });
     return {
       success: true,
@@ -348,6 +359,7 @@ export class FakePlaylistContent {
       invalidCount: entries.length - added.length,
       countBefore,
       totalCount: countBefore + added.length,
+      contentVersion: this.lists.versionOf(list.guid),
     } as const;
   }
 
@@ -380,6 +392,7 @@ export class FakePlaylistContent {
       playlist: list.index,
       playlistGuid: list.guid,
       count: order.length,
+      contentVersion: this.lists.versionOf(list.guid),
     });
   }
 
@@ -422,17 +435,31 @@ export class FakePlaylistContent {
     }
     const playlist = list.index;
     const [oldCount, newCount] = [current.length, rows.length];
-    if (newCount < oldCount)
-      this.emit('playlist:itemsRemoved', { playlist, playlistGuid: list.guid, oldCount, newCount });
-    else if (newCount > oldCount) {
+    const contentVersion = this.lists.versionOf(list.guid);
+    if (newCount < oldCount) {
+      this.emit('playlist:itemsRemoved', {
+        playlist,
+        playlistGuid: list.guid,
+        oldCount,
+        newCount,
+        contentVersion,
+      });
+    } else if (newCount > oldCount) {
       this.emit('playlist:itemsAdded', {
         playlist,
         playlistGuid: list.guid,
         start: oldCount,
         count: newCount - oldCount,
+        contentVersion,
       });
-    } else
-      this.emit('playlist:itemsReordered', { playlist, playlistGuid: list.guid, count: newCount });
+    } else {
+      this.emit('playlist:itemsReordered', {
+        playlist,
+        playlistGuid: list.guid,
+        count: newCount,
+        contentVersion,
+      });
+    }
     return { success: true } as const;
   }
 

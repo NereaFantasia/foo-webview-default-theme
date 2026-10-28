@@ -3,9 +3,10 @@ import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { settle } from '../../host/hostCall.ts';
 import { historyAtom, type NavHistoryService } from '../../nav/navHistory.ts';
+import type { ObjectOpener } from '../../nav/objectOpener.ts';
 import type { Store } from '../../kit/store.ts';
 import { readAlbumFacts, type AlbumFacts, type AlbumFactsFace } from './albumDetailFacts.ts';
-import { startAlbumDetailOpen, type AlbumDetailOpen } from './albumDetailOpen.ts';
+import { albumKind, listedAlbum, type AlbumKind, type AlbumOpenOrigin } from './albumDetailOpen.ts';
 import { albumsAtom, type AlbumsState } from '../albums.ts';
 import { fetchAlbumTracks, type AlbumTracksFace } from '../albumTracks.ts';
 import {
@@ -16,29 +17,29 @@ import {
 } from '../../host/libraryContract.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
 
-/** 没有页面在看、还留着数据的专辑张数：后退、前进回到这几张时不必再等。 */
+/** 没有页面在看、还留着数据的专辑张数：后退、前进回到这几张时不必再等 */
 const KEEP = 4;
 
-/** loading：头一次取曲目；missing：这张已不在媒体库（清单里没有了，或宿主答了空）。 */
+/** loading：头一次取曲目；missing：这张已不在媒体库（清单里没有了，或宿主答了空） */
 export type AlbumDetailPhase = 'loading' | 'ready' | 'missing';
 
 export interface AlbumDetail {
-  /** 清单里的这一行；已不在清单里时留最后一次见到的。清单还没读回、之前也没见过时为 null。 */
+  /** 清单里的这一行；已不在清单里时留最后一次见到的。清单还没读回、之前也没见过时为 null */
   readonly album: Album | null;
   readonly phase: AlbumDetailPhase;
-  /** 曲目，按碟、曲、标题排；重取期间留着旧的。不在媒体库了为空。 */
+  /** 曲目，按碟、曲、标题排；重取期间留着旧的。不在媒体库了为空 */
   readonly tracks: readonly LibraryTrack[];
-  /** 取这批曲目的请求发出之前拿的评分戳。 */
+  /** 取这批曲目的请求发出之前拿的评分戳 */
   readonly stamp: number;
-  /** 最近一次取曲目失败；手上有旧曲目时照旧显示。 */
+  /** 最近一次取曲目失败；手上有旧曲目时照旧显示 */
   readonly failed: boolean;
-  /** 格式与各碟副标题；曲目到了才去取，取到之前为 null。 */
+  /** 格式与各碟副标题；曲目到了才去取，取到之前为 null */
   readonly facts: AlbumFacts | null;
 }
 
 const detailsAtom = atom<ReadonlyMap<string, AlbumDetail>>(new Map());
 
-/** 各张专辑的详情页数据，按专辑键（`album` 地点的主体）。 */
+/** 各张专辑的详情页数据，按专辑键（`album` 地点的主体） */
 export const albumDetailsAtom: Atom<ReadonlyMap<string, AlbumDetail>> = atom((get) =>
   get(detailsAtom),
 );
@@ -46,35 +47,31 @@ export const albumDetailsAtom: Atom<ReadonlyMap<string, AlbumDetail>> = atom((ge
 export interface AlbumDetailFace extends AlbumTracksFace, AlbumFactsFace {}
 
 export interface AlbumDetailDeps {
-  readonly history: Pick<NavHistoryService, 'navigate' | 'registerSubject' | 'subjectsChanged'>;
-  /** 评分服务的戳，见 `TrackRatingsService.stamp`：每次取曲目前拿一个。 */
+  readonly history: Pick<NavHistoryService, 'registerSubject' | 'subjectsChanged'>;
+  /** 评分服务的戳，见 `TrackRatingsService.stamp`：每次取曲目前拿一个 */
   readonly stamp: () => number;
-  /** 评分事件没报全时变一下，被看着的几张要重取。 */
+  /** 评分事件没报全时变一下，被看着的几张要重取 */
   readonly refetch: Atom<number>;
+  /** 进详情页经对象打开服务走：连点、转圈与提示和别的对象共用一套 */
+  readonly objects: Pick<ObjectOpener, 'open'>;
 }
 
-export interface AlbumDetailService extends Omit<AlbumDetailOpen, 'dispose'> {
+export interface AlbumDetailService {
   readonly catalog: Atom<AlbumsState>;
+  /** 对象打开服务里专辑这一种的打开器 */
+  readonly kind: AlbumKind;
   findAlbum(track: TrackAlbumFields): Album | null;
   isCurrent(album: Album): boolean;
+  /** 进这张专辑的详情页：先取曲目，取到了再进；取不到只挂提示 */
+  open(album: Album, origin?: AlbumOpenOrigin): void;
   /**
    * 页面挂上时要这张的数据，返回放手函数。手上没有就去取；几个页面同时要同一张（切换动画里的新旧两层）
-   * 共用一份。都放手后数据先留着，至多留 `KEEP` 张；库一变没人看的就丢掉。
+   * 共用一份。都放手后数据先留着，至多留 `KEEP` 张；库一变没人看的就丢掉
    */
   want(key: string): () => void;
-  /** 失败横幅上的重试。 */
+  /** 失败横幅上的重试 */
   retry(key: string): void;
   dispose(): void;
-}
-
-/**
- * 这张在清单里：答那一行；清单读回了而没有答 null；还说不准（没读回、读失败了）答 undefined。
- * 清单截断时排在截断之后的专辑也算不在：页头要的年份、封面都来自清单里的那一行。
- */
-function listed(state: AlbumsState, key: string): Album | null | undefined {
-  const album = state.albums.find((row) => albumKeyOf(row) === key);
-  if (album) return album;
-  return state.status === 'ready' ? null : undefined;
 }
 
 const LOADING: Omit<AlbumDetail, 'album'> = {
@@ -87,7 +84,7 @@ const LOADING: Omit<AlbumDetail, 'album'> = {
 
 /**
  * 专辑详情页的数据：按专辑键存曲目、格式与碟副标题，正在看的几张跟着库变更与评分重取信号重取，重取期间
- * 旧内容留着。这张移出了媒体库时标成 missing，页面留在原处。历史认得专辑主体：后退、前进越过已不在库里的。
+ * 旧内容留着。这张移出了媒体库时标成 missing，页面留在原处。历史认得专辑主体：后退、前进越过已不在库里的
  */
 export function startAlbumDetail(
   store: Store,
@@ -96,7 +93,7 @@ export function startAlbumDetail(
 ): AlbumDetailService {
   store.set(detailsAtom, new Map());
   let disposed = false;
-  /** 各张有几个页面在看、最近一次放手是第几次、在途请求的代次。 */
+  /** 各张有几个页面在看、最近一次放手是第几次、在途请求的代次 */
   const holders = new Map<string, { count: number; released: number; generation: number }>();
   let releases = 0;
 
@@ -113,7 +110,7 @@ export function startAlbumDetail(
     store.set(detailsAtom, next);
   }
 
-  /** 曲目到了：落下，再取格式与碟副标题。`mine` 是这次请求的代次，过期的不落。 */
+  /** 曲目到了：落下，再取格式与碟副标题。`mine` 是这次请求的代次，过期的不落 */
   async function land(key: string, album: Album, tracks: readonly LibraryTrack[], stamp: number) {
     const record = recordOf(key);
     const mine = record.generation;
@@ -139,7 +136,7 @@ export function startAlbumDetail(
     if (record?.count === 0) holders.delete(key);
     patch(key, null);
   }
-  /** 还留着的数据里挑没人看的，从最早放手的起丢，丢到只剩 `KEEP` 张。 */
+  /** 还留着的数据里挑没人看的，从最早放手的起丢，丢到只剩 `KEEP` 张 */
   function prune(): void {
     const idle = [...store.get(detailsAtom).keys()]
       .filter((key) => (holders.get(key)?.count ?? 0) === 0)
@@ -147,7 +144,7 @@ export function startAlbumDetail(
     for (const key of idle.slice(0, Math.max(0, idle.length - KEEP))) drop(key);
   }
 
-  /** 按此刻的清单重取被看着的几张；没人看的丢掉，下次要时重取。 */
+  /** 按此刻的清单重取被看着的几张；没人看的丢掉，下次要时重取 */
   function refresh(): void {
     const state = store.get(albumsAtom);
     for (const [key, detail] of store.get(detailsAtom)) {
@@ -155,7 +152,7 @@ export function startAlbumDetail(
         drop(key);
         continue;
       }
-      const album = listed(state, key);
+      const album = listedAlbum(state, key);
       if (album === null) {
         recordOf(key).generation += 1;
         patch(key, { phase: 'missing', tracks: [], failed: false });
@@ -166,10 +163,9 @@ export function startAlbumDetail(
     }
   }
 
-  const opener = startAlbumDetailOpen(
+  const kind = albumKind(
     store,
     {
-      history: deps.history,
       stamp: deps.stamp,
       seed(album, tracks, stamp) {
         const key = albumKeyOf(album);
@@ -183,7 +179,7 @@ export function startAlbumDetail(
     host,
   );
   const offSubject = deps.history.registerSubject('album', {
-    exists: (subject) => listed(store.get(albumsAtom), subject) !== null,
+    exists: (subject) => listedAlbum(store.get(albumsAtom), subject) !== null,
   });
   let list = store.get(albumsAtom);
   const offAlbums = store.sub(albumsAtom, () => {
@@ -198,21 +194,24 @@ export function startAlbumDetail(
 
   return {
     catalog: albumsAtom,
+    kind,
     findAlbum(track) {
       const key = trackAlbumKeyOf(track);
-      return store.get(albumsAtom).albums.find((album) => albumKeyOf(album) === key) ?? null;
+      return key === null ? null : (listedAlbum(store.get(albumsAtom), key) ?? null);
     },
     isCurrent(album) {
       const { place } = store.get(historyAtom);
       return place.id === 'album' && place.subject === albumKeyOf(album);
     },
-    open: (album, origin) => opener.open(album, origin),
-    dismissNotice: () => opener.dismissNotice(),
+    open(album, origin) {
+      kind.hand(album);
+      void deps.objects.open({ kind: 'album', key: albumKeyOf(album) }, { origin });
+    },
     want(key) {
       const record = recordOf(key);
       record.count += 1;
       if (!store.get(detailsAtom).has(key)) {
-        const album = listed(store.get(albumsAtom), key);
+        const album = listedAlbum(store.get(albumsAtom), key);
         if (album === null) patch(key, { phase: 'missing' });
         else {
           patch(key, { album: album ?? null });
@@ -235,7 +234,6 @@ export function startAlbumDetail(
     },
     dispose() {
       disposed = true;
-      opener.dispose();
       offRefetch();
       offAlbums();
       offSubject();

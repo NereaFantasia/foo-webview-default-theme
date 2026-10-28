@@ -9,15 +9,15 @@ import { PcmUnavailableError, type PcmTrack } from '../analysis/trackAnalysis.ts
 
 /**
  * 量表的两个整轨读数：DR（TT DR Meter）与 Integrated（BS.1770）。宿主连上、有曲目时，换曲后按段向宿主要
- * 原采样率、全部声道的 PCM，每段按 3 s 切片喂给两个累加器，片与片之间让出主线程，读完立刻释放共享缓冲。
- * 段长是 3 s 的整数倍（段界落在 DR 的块界上）、不超过 30 s，且一段的样本不超过 16 MiB。
+ * 原采样率、全部声道的 PCM，每段按 3 s 切片喂给两个累加器，片与片之间让出主线程，读完立刻释放共享缓冲
+ * 段长是 3 s 的整数倍（段界落在 DR 的块界上）、不超过 30 s，且一段的样本不超过 16 MiB
  *
- * 换曲或释放时中止在途的解码、丢掉算到一半的结果；按曲目记最近一份，来回切同一首不重算。
- * 来源报整个页面取不了 PCM（`PcmUnavailableError`）后本实例不再试；只是这一首取不了（网络流、解不了）给 `null`。
+ * 换曲或释放时中止在途的解码、丢掉算到一半的结果；按曲目记最近一份，来回切同一首不重算
+ * 来源报整个页面取不了 PCM（`PcmUnavailableError`）后本实例不再试；只是这一首取不了（网络流、解不了）给 `null`
  */
 export type DynamicsStatus = 'unavailable' | 'idle' | 'loading' | 'ready' | 'failed';
 
-/** 一段 PCM：每路一个平面（可能是共享缓冲上的视图），读完要 `release()`。 */
+/** 一段 PCM：每路一个平面（可能是共享缓冲上的视图），读完要 `release()` */
 export interface PcmPlanes {
   sampleRate: number;
   frames: number;
@@ -25,14 +25,14 @@ export interface PcmPlanes {
   release(): void;
 }
 
-/** 取一首歌 `range`（秒）这一段原采样率、全部声道的 PCM；这首取不了给 `null`。 */
+/** 取一首歌 `range`（秒）这一段原采样率、全部声道的 PCM；这首取不了给 `null` */
 export type PlanesSource = (
   track: PcmTrack,
   range: { start: number; end: number },
   signal: AbortSignal,
 ) => Promise<PcmPlanes | null>;
 
-/** 曲目的采样率与声道数只用来定段长；缺省按 48 kHz 立体声估。 */
+/** 曲目的采样率与声道数只用来定段长；缺省按 48 kHz 立体声估 */
 export interface DynamicsTrack extends PcmTrack {
   sampleRate?: number;
   channels?: number;
@@ -45,7 +45,7 @@ export interface TrackDynamics {
 
 export interface DynamicsModel {
   readonly status: DynamicsStatus;
-  /** 当前曲目的两个读数；还没算出、这首取不了时为 `null`。 */
+  /** 当前曲目的两个读数；还没算出、这首取不了时为 `null` */
   readonly result: TrackDynamics | null;
 }
 
@@ -58,7 +58,7 @@ export const MAX_SEGMENT_BYTES = 16 * 1024 * 1024;
 
 /**
  * 段长（秒）：3 s 的整数倍，不超过 30 s，样本（float32）不超过 16 MiB。采样率、声道数不大于 0（宿主报未知）
- * 时按 1 算，段长落在上限 30 s。
+ * 时按 1 算，段长落在上限 30 s
  */
 export function segmentSeconds(sampleRate = 48000, channels = 2): number {
   const perSecond = Math.max(1, sampleRate) * Math.max(1, channels) * 4;
@@ -68,7 +68,7 @@ export function segmentSeconds(sampleRate = 48000, channels = 2): number {
 
 const yieldToMain = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** 按段读完一首、喂两个累加器；中途 `isCurrent` 为假就停，给 `null`。 */
+/** 按段读完一首、喂两个累加器；中途 `isCurrent` 为假就停，给 `null` */
 export async function measureTrack(
   track: DynamicsTrack,
   source: PlanesSource,
@@ -98,7 +98,7 @@ export async function measureTrack(
       piece = null;
       previous?.release();
     };
-    // 让出主线程期间也可能进入休眠，不能等下一片调度才归还共享缓冲。
+    // 让出主线程期间也可能进入休眠，不能等下一片调度才归还共享缓冲
     const abort = () => {
       meters = null;
       release();
@@ -116,7 +116,7 @@ export async function measureTrack(
           loudness: createBlockMeter(piece.sampleRate, channels, (energy) => blocks.push(energy)),
         };
       }
-      // 段与段之间格式变了（不该发生）就不给值，免得两种采样率的块混在一起。
+      // 段与段之间格式变了（不该发生）就不给值，免得两种采样率的块混在一起
       if (meters.rate !== piece.sampleRate || meters.channels !== channels) return null;
       const slice = Math.max(1, Math.round(piece.sampleRate * DR_BLOCK_SECONDS));
       for (let at = 0; at < piece.frames; at += slice) {
@@ -139,7 +139,7 @@ const stateAtom = atom<DynamicsModel>({ status: 'unavailable', result: null });
 
 export const trackDynamicsAtom: Atom<DynamicsModel> = atom((get) => get(stateAtom));
 
-/** 跟着 `currentTrackAtom` 算读数；编辑标签不重算。`pause` 是片与片之间的让出，缺省等一个 `setTimeout(0)`。 */
+/** 跟着 `currentTrackAtom` 算读数；编辑标签不重算。`pause` 是片与片之间的让出，缺省等一个 `setTimeout(0)` */
 export function startTrackDynamics(
   store: Store,
   options: { source: PlanesSource | null; pause?: () => Promise<void>; active?: Atom<boolean> },
@@ -151,7 +151,7 @@ export function startTrackDynamics(
   let unavailable = source === null;
   let disposed = false;
   let last: { key: string; value: TrackDynamics | null } | null = null;
-  // 上一次看到的输入；还没看过时为 null。
+  // 上一次看到的输入；还没看过时为 null
   let input: { key: string; want: boolean } | null = null;
 
   function stop(): void {
@@ -203,7 +203,7 @@ export function startTrackDynamics(
     void load(track, key, token, source);
   }
 
-  // 先订阅再初读。
+  // 先订阅再初读
   const offs = [store.sub(currentTrackAtom, follow), store.sub(playbackConnectedAtom, follow)];
   if (options.active) offs.push(store.sub(options.active, follow));
   follow();

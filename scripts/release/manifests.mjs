@@ -1,5 +1,7 @@
-// 发行清单与根清单的生成。字段含义以客户端的 src/update/contract.ts 为准，发出去以后只能加字段、
-// 不能改含义；生成后都用客户端的解析代码读一遍，读不懂的不发布。
+// 发行清单与根清单构建逻辑
+//
+// 契约说明：数据规格严格遵循 src/update/contract.ts；
+// 生成后调用客户端解析器双向核验，确保向前兼容
 
 import { readRelease, readRootPayload } from '../../src/update/contract.ts';
 
@@ -43,7 +45,7 @@ export function releaseManifest(input) {
 }
 
 /**
- * 根清单里的候选：三项要求照抄发行清单，客户端会核对两边一致。
+ * 构造根清单候选版本项；同步依赖版本约束并经客户端规则反解校验
  * @param {ReturnType<typeof releaseManifest>} release
  * @param {string} releaseSha256
  * @param {boolean} [stone]
@@ -64,8 +66,9 @@ export function candidateOf(release, releaseSha256, stone = false) {
 }
 
 /**
- * 在上一份根清单的基础上加入新候选：序号加一，同版本的旧候选换掉，撤回表与公钥原样保留。
- * 更新日志附件每次都换成这一版的；不给时去掉，不沿用上一份指向的旧附件。没有上一份时从序号 1 开始。
+ * 生成递增序号的下一版根清单负载
+ *
+ * 替换同版本稳定通道候选，保留现有密钥与撤回列表，原子更新日志元数据
  * @param {string | null} previous 上一份根清单的 payload 文本
  * @param {Record<string, unknown>} candidate
  * @param {{ url: string, size: number, sha256: string } | null} [changelog]

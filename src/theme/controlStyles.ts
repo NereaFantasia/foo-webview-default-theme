@@ -1,12 +1,30 @@
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { roleVar } from './roles.ts';
 
-// Input 和 Dropdown 把禁用标记放在直接子槽；按钮把它放在根节点。
+// Input 和 Dropdown 把禁用标记放在直接子槽；按钮把它放在根节点
 const ENABLED_CONTROL = '&:not(:disabled, [aria-disabled="true"]):not(:has(> :disabled))';
 const CONTROL_STATES = {
   ':hover': { backgroundColor: roleVar('state-hover') },
   ':active': { backgroundColor: roleVar('state-pressed') },
   ':hover:active,:active:focus-visible': { backgroundColor: roleVar('state-pressed') },
+};
+// SpinButton 的增减键是根节点里的两个子按钮，Fluent 给它们的悬停、按下是不透明的 Subtle 底
+const SPIN_BUTTON_STATES = Object.fromEntries(
+  ['increment', 'decrement'].flatMap((name) => [
+    [`& .fui-SpinButton__${name}Button:enabled:hover`, { backgroundColor: roleVar('state-hover') }],
+    [
+      `& .fui-SpinButton__${name}Button:enabled:active`,
+      { backgroundColor: roleVar('state-pressed') },
+    ],
+  ]),
+);
+// 禁用态的 Fluent 缺省底（colorNeutralBackgroundDisabled）也是不透明灰；文字与描边仍用它的禁用色，只把底换成一层更淡的前景色
+const DISABLED_CONTROL = '&:is(:disabled, [aria-disabled="true"], :has(> :disabled))';
+const DISABLED_FILL = `color-mix(in srgb, ${tokens.colorNeutralForeground1} 4%, transparent)`;
+const DISABLED_STATES = {
+  backgroundColor: DISABLED_FILL,
+  ':hover': { backgroundColor: DISABLED_FILL },
+  ':hover:active,:active:focus-visible': { backgroundColor: DISABLED_FILL },
 };
 const FIELD_BORDER = {
   '&:not([aria-invalid="true"]):not(:has(> [aria-invalid="true"]))': {
@@ -15,8 +33,9 @@ const FIELD_BORDER = {
 };
 
 /**
- * 主视图输入框和文字按钮用 field，窗口背景上的输入框用 windowField，图标键和单选键用 icon，筛选标签用 tag。
- * 控件本身不复用阅读面的浓度；状态层只在控件范围内出现，不给工具栏整行铺底。
+ * 主视图输入框和文字按钮用 field，窗口背景上的输入框用 windowField，图标键和单选键用 icon，筛选标签用 tag
+ * 键自己没有选中语义、不该因 aria-pressed 叠选中底的（如静音键）用 plain
+ * 控件本身不复用阅读面的浓度；状态层只在控件范围内出现，不给工具栏整行铺底
  */
 export const useViewControlStyles = makeStyles({
   tag: {
@@ -35,7 +54,9 @@ export const useViewControlStyles = makeStyles({
         ...CONTROL_STATES,
         ...FIELD_BORDER,
       },
-      // 原生选项弹出列表独立于闭合控件，不能透出列表后面的正文。
+      [DISABLED_CONTROL]: DISABLED_STATES,
+      ...SPIN_BUTTON_STATES,
+      // 原生选项弹出列表独立于闭合控件，不能透出列表后面的正文
       '& option': {
         backgroundColor: tokens.colorNeutralBackground1,
         color: tokens.colorNeutralForeground1,
@@ -50,9 +71,17 @@ export const useViewControlStyles = makeStyles({
         ':hover': {
           backgroundImage: `linear-gradient(${roleVar('state-hover')}, ${roleVar('state-hover')})`,
         },
-        ':active, :hover:active, :active:focus-visible': {
+        ':active,:hover:active,:active:focus-visible': {
           backgroundImage: `linear-gradient(${roleVar('state-pressed')}, ${roleVar('state-pressed')})`,
         },
+      },
+    },
+  },
+  plain: {
+    '@media (forced-colors: none)': {
+      [ENABLED_CONTROL]: {
+        backgroundColor: 'transparent',
+        ...CONTROL_STATES,
       },
     },
   },
@@ -62,7 +91,7 @@ export const useViewControlStyles = makeStyles({
         backgroundColor: 'transparent',
         ...CONTROL_STATES,
         '&[aria-checked="true"], &[aria-pressed="true"]': {
-          // 选中底叠在状态底色上，悬停和按下时仍保留选中标记。
+          // 选中底叠在状态底色上，悬停和按下时仍保留选中标记
           backgroundImage: `linear-gradient(${roleVar('bg-selected')}, ${roleVar('bg-selected')})`,
         },
       },

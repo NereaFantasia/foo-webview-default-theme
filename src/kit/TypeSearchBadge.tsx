@@ -8,7 +8,7 @@ export interface TypeSearchBadgeProps {
   readonly search: TypeSearch;
 }
 
-/** 打字即跳正在累积的串，浮在网格右上角；没有以它开头的项时换成提示。串空了就不画。 */
+/** 打字即跳正在累积的串，浮在网格右上角；没有以它开头的项时换成提示。串空了就不画 */
 export function TypeSearchBadge({ search }: TypeSearchBadgeProps) {
   const t = useAtomValueRawSync(translateAtom);
   const state = useSyncExternalStore(search.subscribe, () => search.state);

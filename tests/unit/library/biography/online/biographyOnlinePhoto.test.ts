@@ -175,17 +175,85 @@ describe('在线主图生命周期', () => {
     const env = setup();
     await tick();
     const old = env.state().photo;
-    env.fetch.mockResolvedValueOnce({ ok: false, problem: 'network', retryAt: Date.now() + 30000 });
+    env.fetch.mockResolvedValueOnce({
+      ok: false,
+      problem: 'network',
+      retryAt: Date.now() + 30000,
+      detail: 'Receive failed: Connection timed out',
+    });
     env.store.set(env.ready, false);
     env.service.refresh();
     await tick();
     env.store.set(env.ready, true);
     await tick();
-    expect(env.state()).toMatchObject({ photo: old, problem: 'network', loading: false });
+    expect(env.state()).toMatchObject({
+      photo: old,
+      problem: 'network',
+      problemDetail: 'Receive failed: Connection timed out',
+      loading: false,
+    });
     env.service.refresh();
     await tick();
     expect(env.state().photo).not.toBe(old);
     expect(env.state().problem).toBeNull();
+  });
+
+  it('被拒访问后主动重试也立即重发，限流才等到期', async () => {
+    const env = setup();
+    await tick();
+    env.fetch.mockResolvedValueOnce({
+      ok: false,
+      problem: 'blocked',
+      retryAt: Date.now() + 900_000,
+    });
+    env.service.refresh();
+    await tick();
+    expect(env.state().problem).toBe('blocked');
+    env.service.refresh();
+    await tick();
+    expect(env.state().photo).not.toBeNull();
+    expect(env.state().problem).toBeNull();
+  });
+
+  it('相册被拒访问后主动重试也立即重发', async () => {
+    const store = createStore();
+    const cache = createBiographyPhotoCache();
+    const gallery = vi.fn(async (): Promise<LastfmGalleryResult> => ({
+      ok: true,
+      photos: [TAISHI_PHOTO],
+      store: true,
+      expiresAt: Date.now() + 60_000,
+    }));
+    const fetch = vi.fn<typeof fetchLastfmPhoto>().mockImplementation(async () => success());
+    const probe = vi.fn(async () => new Uint8ClampedArray([1, 2, 3, 255]));
+    const service = startBiographyOnlinePhoto(
+      store,
+      {
+        source: atom<LastfmPhoto | null>(null),
+        artist: atom<string | null>('Taishi'),
+        cache,
+        probe,
+        active: atom(true),
+        ready: atom(true),
+      },
+      fetch,
+      gallery,
+    );
+    onTestFinished(service.dispose);
+    await tick();
+    expect(store.get(service.state).photos?.length).toBeGreaterThan(0);
+    gallery.mockResolvedValueOnce({
+      ok: false,
+      problem: 'blocked',
+      retryAt: Date.now() + 900_000,
+    });
+    service.refresh();
+    await tick();
+    expect(store.get(service.state).problem).toBe('blocked');
+    service.refresh();
+    await tick();
+    expect(store.get(service.state).problem).toBeNull();
+    expect(gallery).toHaveBeenCalledTimes(3);
   });
 
   it('限流约束手动刷新和下一位艺人，缺图不会循环请求', async () => {

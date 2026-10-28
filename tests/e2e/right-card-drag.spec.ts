@@ -8,7 +8,11 @@ async function openQueue(page: Page, count = 80, upcoming = false) {
   const names = Array.from({ length: count }, (_, i) => `待播 ${i + 1}`);
   const queue = installFakeQueue(host, queueTracks(...names));
   await host.waitForListener('playback:queueChanged');
-  await host.emit('playback:queueChanged', { origin: 'user_added', count: names.length });
+  await host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: names.length,
+    contentVersion: '1',
+  });
   if (!upcoming) await page.locator('[data-right-card-key="queue"]').click();
   await expect(queuedRows(page)).toHaveCount(count);
   return { host, errors, queue, names };
@@ -108,7 +112,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await page.mouse.move(box.x + 42, box.y - 45, { steps: 4 });
     const preview = page.locator('[data-queue-drag-preview]');
     await expect(preview).toBeVisible();
-    await expect(preview).toContainText(['待播 3', 'Nujabes · Modal Soul', '2:55'].join(''));
+    await expect(preview).toContainText(['待播 3', 'Nujabes', 'Modal Soul', '2:55'].join(''));
     await expect(preview.locator('button, a, [tabindex], [data-queue-row]')).toHaveCount(0);
     const lifted = await preview.boundingBox();
     if (!lifted) throw new Error('拖动副本不可见');

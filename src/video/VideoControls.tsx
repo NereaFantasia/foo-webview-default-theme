@@ -1,13 +1,15 @@
+import { MenuSurface as MenuPopover, MenuBackgroundContext } from '../theme/MenuSurface.tsx';
+import { PanelBackgroundContext } from '../theme/PopoverSurface.tsx';
+import { Menu } from '../motion/Surfaces.tsx';
 import {
   Button,
-  Menu,
   MenuTrigger,
-  MenuPopover,
   MenuList,
   MenuItemRadio,
   MenuItem,
   MenuDivider,
   Tooltip,
+  tokens,
 } from '@fluentui/react-components';
 import {
   ArrowExpand20Regular,
@@ -83,146 +85,151 @@ export function VideoControls({
     </MenuItemRadio>
   ));
   return (
-    <div className={styles.root} data-video-controls>
-      <div className={styles.seek}>{bindings.seekBar}</div>
-      <div className={styles.row}>
-        <span className={styles.secondary}>
-          <Menu checkedValues={{ fit: [fit] }} surfaceMotion={MENU_SURFACE_MOTION}>
-            <MenuTrigger disableButtonEnhancement>
-              <Tooltip content={t('video.fit')} relationship="label">
-                <Button
-                  appearance="subtle"
-                  icon={<ResizeVideo20Regular />}
-                  aria-label={t('video.fit')}
-                  disabled={!available}
-                />
-              </Tooltip>
-            </MenuTrigger>
-            <MenuPopover>
-              <MenuList>{fitItems}</MenuList>
-            </MenuPopover>
-          </Menu>
-        </span>
-        <div className={styles.transport}>
-          <Key
-            className={styles.secondary}
-            label={t('player.previous')}
-            icon={<Previous20Regular />}
-            onClick={bindings.previous}
-            disabled={!playback.connected}
-          />
-          <Key
-            className={styles.secondary}
-            label={t('video.back')}
-            icon={<Rewind20Regular />}
-            onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
-            disabled={!playback.canSeek}
-          />
-          <Key
-            className={styles.play}
-            label={t(playback.playing ? 'player.pause' : 'player.play')}
-            icon={playback.playing ? <Pause20Filled /> : <Play20Filled />}
-            onClick={bindings.toggle}
-            disabled={!playback.connected}
-          />
-          <Key
-            className={styles.secondary}
-            label={t('video.forward')}
-            icon={<FastForward20Regular />}
-            onClick={() => bindings.seek(Math.min(playback.duration, playback.position + 5))}
-            disabled={!playback.canSeek}
-          />
-          <Key
-            className={styles.secondary}
-            label={t('player.next')}
-            icon={<Next20Regular />}
-            onClick={bindings.next}
-            disabled={!playback.connected}
-          />
-        </div>
-        <div className={styles.tools}>
-          <div className={styles.volume}>{bindings.volume}</div>
-          <Key
-            className={styles.window}
-            label={t(bindings.expanded ? 'video.collapse' : 'video.expand')}
-            icon={bindings.expanded ? <ArrowMinimize20Regular /> : <ArrowExpand20Regular />}
-            onClick={onExpand}
-            disabled={!available && !bindings.expanded}
-          />
-          <Key
-            className={styles.secondary}
-            label={t('video.fullscreen')}
-            icon={<FullScreenMaximize20Regular />}
-            onClick={onFullscreen}
-            disabled={!available}
-          />
-          <span className={styles.more}>
-            <Menu surfaceMotion={MENU_SURFACE_MOTION}>
-              <MenuTrigger disableButtonEnhancement>
-                <Tooltip content={t('video.more')} relationship="label">
-                  <Button
-                    appearance="subtle"
-                    icon={<MoreHorizontal20Regular />}
-                    aria-label={t('video.more')}
-                  />
-                </Tooltip>
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItem
-                    icon={<Previous20Regular />}
-                    onClick={bindings.previous}
-                    disabled={!playback.connected}
-                  >
-                    {t('player.previous')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={<Next20Regular />}
-                    onClick={bindings.next}
-                    disabled={!playback.connected}
-                  >
-                    {t('player.next')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={<Rewind20Regular />}
-                    onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
-                    disabled={!playback.canSeek}
-                  >
-                    {t('video.back')}
-                  </MenuItem>
-                  <MenuItem
-                    icon={<FastForward20Regular />}
-                    onClick={() =>
-                      bindings.seek(Math.min(playback.duration, playback.position + 5))
-                    }
-                    disabled={!playback.canSeek}
-                  >
-                    {t('video.forward')}
-                  </MenuItem>
-                  <MenuDivider />
-                  <Menu checkedValues={{ fit: [fit] }} surfaceMotion={MENU_SURFACE_MOTION}>
-                    <MenuTrigger disableButtonEnhancement>
-                      <MenuItem icon={<ResizeVideo20Regular />} disabled={!available}>
-                        {t('video.fit')}
+    // 视频页是深色局部；音量浮层挂在 Portal 里，背景要在它自己的深色令牌下取，不能沿用主视图传下来的底色
+    <MenuBackgroundContext value={undefined}>
+      <PanelBackgroundContext value={tokens.colorNeutralBackground1}>
+        <div className={styles.root} data-video-controls>
+          <div className={styles.seek}>{bindings.seekBar}</div>
+          <div className={styles.row}>
+            <span className={styles.secondary}>
+              <Menu checkedValues={{ fit: [fit] }} surfaceMotion={MENU_SURFACE_MOTION}>
+                <MenuTrigger disableButtonEnhancement>
+                  <Tooltip content={t('video.fit')} relationship="label">
+                    <Button
+                      appearance="subtle"
+                      icon={<ResizeVideo20Regular />}
+                      aria-label={t('video.fit')}
+                      disabled={!available}
+                    />
+                  </Tooltip>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>{fitItems}</MenuList>
+                </MenuPopover>
+              </Menu>
+            </span>
+            <div className={styles.transport}>
+              <Key
+                className={styles.secondary}
+                label={t('player.previous')}
+                icon={<Previous20Regular />}
+                onClick={bindings.previous}
+                disabled={!playback.connected}
+              />
+              <Key
+                className={styles.secondary}
+                label={t('video.back')}
+                icon={<Rewind20Regular />}
+                onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
+                disabled={!playback.canSeek}
+              />
+              <Key
+                className={styles.play}
+                label={t(playback.playing ? 'player.pause' : 'player.play')}
+                icon={playback.playing ? <Pause20Filled /> : <Play20Filled />}
+                onClick={bindings.toggle}
+                disabled={!playback.connected}
+              />
+              <Key
+                className={styles.secondary}
+                label={t('video.forward')}
+                icon={<FastForward20Regular />}
+                onClick={() => bindings.seek(Math.min(playback.duration, playback.position + 5))}
+                disabled={!playback.canSeek}
+              />
+              <Key
+                className={styles.secondary}
+                label={t('player.next')}
+                icon={<Next20Regular />}
+                onClick={bindings.next}
+                disabled={!playback.connected}
+              />
+            </div>
+            <div className={styles.tools}>
+              <div className={styles.volume}>{bindings.volume}</div>
+              <Key
+                className={styles.window}
+                label={t(bindings.expanded ? 'video.collapse' : 'video.expand')}
+                icon={bindings.expanded ? <ArrowMinimize20Regular /> : <ArrowExpand20Regular />}
+                onClick={onExpand}
+                disabled={!available && !bindings.expanded}
+              />
+              <Key
+                className={styles.secondary}
+                label={t('video.fullscreen')}
+                icon={<FullScreenMaximize20Regular />}
+                onClick={onFullscreen}
+                disabled={!available}
+              />
+              <span className={styles.more}>
+                <Menu surfaceMotion={MENU_SURFACE_MOTION}>
+                  <MenuTrigger disableButtonEnhancement>
+                    <Tooltip content={t('video.more')} relationship="label">
+                      <Button
+                        appearance="subtle"
+                        icon={<MoreHorizontal20Regular />}
+                        aria-label={t('video.more')}
+                      />
+                    </Tooltip>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      <MenuItem
+                        icon={<Previous20Regular />}
+                        onClick={bindings.previous}
+                        disabled={!playback.connected}
+                      >
+                        {t('player.previous')}
                       </MenuItem>
-                    </MenuTrigger>
-                    <MenuPopover>
-                      <MenuList>{fitItems}</MenuList>
-                    </MenuPopover>
-                  </Menu>
-                  <MenuItem
-                    icon={<FullScreenMaximize20Regular />}
-                    onClick={onFullscreen}
-                    disabled={!available}
-                  >
-                    {t('video.fullscreen')}
-                  </MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
-          </span>
+                      <MenuItem
+                        icon={<Next20Regular />}
+                        onClick={bindings.next}
+                        disabled={!playback.connected}
+                      >
+                        {t('player.next')}
+                      </MenuItem>
+                      <MenuItem
+                        icon={<Rewind20Regular />}
+                        onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
+                        disabled={!playback.canSeek}
+                      >
+                        {t('video.back')}
+                      </MenuItem>
+                      <MenuItem
+                        icon={<FastForward20Regular />}
+                        onClick={() =>
+                          bindings.seek(Math.min(playback.duration, playback.position + 5))
+                        }
+                        disabled={!playback.canSeek}
+                      >
+                        {t('video.forward')}
+                      </MenuItem>
+                      <MenuDivider />
+                      <Menu checkedValues={{ fit: [fit] }} surfaceMotion={MENU_SURFACE_MOTION}>
+                        <MenuTrigger disableButtonEnhancement>
+                          <MenuItem icon={<ResizeVideo20Regular />} disabled={!available}>
+                            {t('video.fit')}
+                          </MenuItem>
+                        </MenuTrigger>
+                        <MenuPopover>
+                          <MenuList>{fitItems}</MenuList>
+                        </MenuPopover>
+                      </Menu>
+                      <MenuItem
+                        icon={<FullScreenMaximize20Regular />}
+                        onClick={onFullscreen}
+                        disabled={!available}
+                      >
+                        {t('video.fullscreen')}
+                      </MenuItem>
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </PanelBackgroundContext>
+    </MenuBackgroundContext>
   );
 }

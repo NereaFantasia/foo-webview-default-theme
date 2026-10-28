@@ -17,7 +17,13 @@ test('播放列表多选按右键曲目转到专辑，而不是按选区第一�
     albumsAnswer([albumRow('First', 'Artist'), albumRow('Second', 'Artist')]),
   );
   host.answer('library.getAlbumTracks', albumTracksAnswer);
-  await host.emit('library:itemsModified', { count: 1, timestamp: 1 });
+  await host.emit('library:itemsModified', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: 1,
+  });
   await row('Mix 1').click();
   await row('Mix 2').click({ modifiers: ['Control'] });
   await row('Mix 2').click({ button: 'right' });
@@ -108,8 +114,10 @@ test('流派分组只操作筛选命中，专辑名菜单仍操作整张专辑',
 
 test('碟分组与艺人分组都有菜单，折叠后仍按原组范围操作', async ({ page }) => {
   const env = await openGenres(page);
-  await env.view.getByRole('combobox', { name: '分组依据' }).click();
+  await env.view.locator('[data-genres-view]').click();
+  await page.locator('[data-view-grouping]').click();
   await page.getByRole('option', { name: '专辑与碟号', exact: true }).click();
+  await page.keyboard.press('Escape');
   const disc = env.grid.locator('[data-genre-group="第 2 碟"]');
   await disc.getByText('2 首', { exact: true }).click({ button: 'right' });
   await page.locator('[data-track-menu] [data-action="toggle-group"]').click();
@@ -123,8 +131,10 @@ test('碟分组与艺人分组都有菜单，折叠后仍按原组范围操作',
     .toEqual(
       ['Time', 'Both'].map((title) => GENRES_TRACKS.find((track) => track.title === title)!.path),
     );
-  await env.view.getByRole('combobox', { name: '分组依据' }).click();
+  await env.view.locator('[data-genres-view]').click();
+  await page.locator('[data-view-grouping]').click();
   await page.getByRole('option', { name: '艺人', exact: true }).click();
+  await page.keyboard.press('Escape');
   const artist = env.grid.locator('[data-genre-group]').first();
   await artist.getByText('首', { exact: false }).click({ button: 'right' });
   await expect(page.locator('[data-track-menu] [data-action="play"]')).toContainText('播放本组');

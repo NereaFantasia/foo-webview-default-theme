@@ -18,10 +18,11 @@ import { useService } from '../../kit/useService.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
 import { playingAudibleAtom } from '../../playback/playingTrack.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { roleVar } from '../../theme/roles.ts';
 import styles from './MiniPlayer.module.css';
 
-// 播放区的键 32 见方、图标 20；播放键是主色圆底，紧凑态 36、封面态 40。窗口键 28 见方、图标 16。
+// 播放区的键 32 见方、图标 20；播放键是主色圆底，紧凑态 36、封面态 40。窗口键 28 见方、图标 16
 export const useKeyStyles = makeStyles({
   key: {
     minWidth: '32px',
@@ -31,21 +32,13 @@ export const useKeyStyles = makeStyles({
     color: roleVar('text-secondary'),
   },
   caption: { minWidth: '28px', width: '28px', height: '28px' },
+  // 选中底由 icon 配方按 aria-pressed 叠出，这里只管字色：Fluent 的 subtle 在悬停、按下时会改字色
   pinned: {
     '@media (forced-colors: none)': {
       '&:not(:disabled, [aria-disabled="true"])': {
-        backgroundColor: roleVar('bg-selected'),
         color: roleVar('accent'),
-        ':hover': {
-          backgroundColor: roleVar('bg-selected'),
-          color: roleVar('accent'),
-          backgroundImage: `linear-gradient(${roleVar('state-hover')}, ${roleVar('state-hover')})`,
-        },
-        ':active,:hover:active,:active:focus-visible': {
-          backgroundColor: roleVar('bg-selected'),
-          color: roleVar('accent'),
-          backgroundImage: `linear-gradient(${roleVar('state-pressed')}, ${roleVar('state-pressed')})`,
-        },
+        ':hover': { color: roleVar('accent') },
+        ':active,:hover:active,:active:focus-visible': { color: roleVar('accent') },
       },
     },
     '@media (forced-colors: active)': {
@@ -78,12 +71,13 @@ export function Key({
   readonly ref?: Ref<HTMLButtonElement>;
 }) {
   const classes = useKeyStyles();
+  const viewControls = useViewControlStyles();
   return (
     <Tooltip content={label} relationship="label">
       <Button
         ref={ref}
         appearance="subtle"
-        className={mergeClasses(classes.key, className || undefined)}
+        className={mergeClasses(classes.key, viewControls.icon, className || undefined)}
         icon={icon}
         disabled={disabled}
         aria-pressed={pressed}
@@ -128,7 +122,7 @@ export function Transport({ large }: { readonly large: boolean }) {
   );
 }
 
-/** 右上角的窗口键：置顶、最小化、关闭。平时透明，指针在播放器上或焦点进来时浮现。关闭即回到完整界面。 */
+/** 右上角的窗口键：置顶、最小化、关闭。平时透明，指针在播放器上或焦点进来时浮现。关闭即回到完整界面 */
 export function Captions() {
   const t = useAtomValueRawSync(translateAtom);
   const { pinned, busy } = useAtomValueRawSync(miniWindowAtom);

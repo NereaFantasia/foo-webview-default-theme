@@ -1,13 +1,15 @@
-// 把 build-release 生成的一个版本发布到 CNB。顺序固定：核对分发物 → 核对线上根清单 → 同步 README 与
-// LICENSE（仓库还空时必推，tag 要落在已有的提交上；之后有变化才推）→ 建发行版 → 上传附件 → 匿名下载核对哈希
-// → 最后才推根清单，再等线上根清单换成新的。任何一步不对就停下，已上传的附件不删也不覆盖。
-// CNB 仓库的 README 是同目录的 cnb-readme.md，写明这个仓库只用于分发。
+// 将本地构建的发行分发物发布至 CNB 分发仓库
+//
+// 契约说明：
+// 1. 发布管道：按顺序执行工件校验、线上根清单版本对比、基础文件同步、创建 Release、
+//    上传工件附件、匿名回读校验哈希，最后推送并轮询生效根清单
+// 2. 失败停机：任一阶段校验异常立即中止，保持已有远端状态不可变，不执行破坏性覆盖
 //
 // 用法：node scripts/release/publish-cnb.mjs --dir <输出目录>/v<版本> --checkout <CNB 仓库的本地克隆目录>
 //   [--dry-run] [--probe probe-<标识>] [--plugin]
-// --plugin 时 --dir 指向 build-plugin 生成的 plugin-<版本>-win-<架构> 目录，按插件发行核对后发布。
-// 令牌从环境变量 CNB_TOKEN 读，不写进命令行；--dry-run 只做核对与只读查询，不写入 CNB。
-// --probe 使用独立的预发布标签，匿名核对附件后结束，不推根清单，也不设为最新发行版。
+// --plugin 时 --dir 指向 build-plugin 生成的 plugin-<版本>-win-<架构> 目录，按插件发行核对后发布
+// 令牌从环境变量 CNB_TOKEN 读，不写进命令行；--dry-run 只做核对与只读查询，不写入 CNB
+// --probe 使用独立的预发布标签，匿名核对附件后结束，不推根清单，也不设为最新发行版
 
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,6 +20,7 @@ import { INITIAL_TRUST, acceptRoot } from '../../src/update/rootTrust.ts';
 import { sha256, verifyArtifacts } from './artifacts.mjs';
 import { cnbClient, confirmPublic, downloadPublic, planAssets } from './cnb.mjs';
 import { verifyPublishedRuntime } from './runtime-verify.mjs';
+import { verifyPublishedComponent } from './ncm-artifacts.mjs';
 import { verifyPluginArtifacts } from './plugin-artifacts.mjs';
 
 const REPO = 'foo-ui-webview2/default-theme';
@@ -77,6 +80,11 @@ async function publish() {
   if (verified.runtime) {
     await verifyPublishedRuntime(verified.runtime);
     step('公共运行时及全部附件匿名核对通过');
+  }
+  if ('components' in verified && verified.components) {
+    for (const component of Object.values(verified.components))
+      await verifyPublishedComponent(component);
+    step('网易云与 lxserver 组件附件匿名核对通过');
   }
 
   if (values.probe) {

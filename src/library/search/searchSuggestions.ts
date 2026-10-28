@@ -1,11 +1,23 @@
+import type { MusicTrack } from '../../server/musicObjects.ts';
 import type { SearchHit } from './searchQuery.ts';
 import { searchHitKey } from './searchQuery.ts';
 
 export interface SearchSuggestion {
   readonly key: string;
-  readonly group: 'recent' | 'best' | 'albums' | 'tracks';
+  readonly group: 'recent' | 'best' | 'albums' | 'tracks' | 'online';
   readonly text?: string;
   readonly hit?: SearchHit;
+  /** 在线音乐范围的一首曲目 */
+  readonly online?: MusicTrack;
+}
+
+/** 下拉在线音乐范围列几首曲目 */
+const ONLINE_ROWS = 5;
+
+export function onlineSuggestions(tracks: readonly MusicTrack[]): readonly SearchSuggestion[] {
+  return tracks
+    .slice(0, ONLINE_ROWS)
+    .map((track) => ({ key: `online:${track.ref.id}`, group: 'online', online: track }));
 }
 
 export function searchSuggestions(

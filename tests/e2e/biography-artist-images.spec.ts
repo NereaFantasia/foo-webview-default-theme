@@ -136,7 +136,13 @@ test('头像失效退回文字，刷新恢复，关闭在线后不继续读相�
   const reads = env.host
     .callsTo('artwork.getFb2kUrlByPath')
     .filter((call) => call['type'] === 'artist').length;
-  env.host.emit('library:itemsModified', { count: 1, timestamp: Date.now() });
+  env.host.emit('library:itemsModified', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: Date.now(),
+  });
   await page.waitForTimeout(1500);
   expect(
     env.host.callsTo('artwork.getFb2kUrlByPath').filter((call) => call['type'] === 'artist'),

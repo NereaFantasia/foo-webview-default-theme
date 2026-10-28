@@ -5,26 +5,26 @@ import type { TerrainPainter, TerrainPaintSettings, TerrainSurfaceKind } from '.
 
 /**
  * 山脊图 Worker 的主线程一端与消息约定：canvas 的控制权转给 Worker，重画循环与 `drawTerrain` 都在那边跑，
- * 主线程每来一帧至多发一条行消息（重画上限变了先另发一条），按刷新率重画的那部分开销不再占主线程。
+ * 主线程每来一帧至多发一条行消息（重画上限变了先另发一条），按刷新率重画的那部分开销不再占主线程
  *
  * 缓冲仍由主线程的整形链写，Worker 里存一份镜像：每来一帧，把镜像还没有的行按从旧到新发过去，
- * 那边逐行原样推进（主线程写入时已经混过帧间保留量，镜像不再混）。缓冲换了对象就整份重发。
- * 重画上限是各线程各自一份的模块状态，主线程的上限变了随下一条消息带过去。
- * 绘制计时由主线程开关（`meter`），开着时 Worker 每个统计窗回一条 `paintStats`，带上它画山脊图用的上下文种类。
+ * 那边逐行原样推进（主线程写入时已经混过帧间保留量，镜像不再混）。缓冲换了对象就整份重发
+ * 重画上限是各线程各自一份的模块状态，主线程的上限变了随下一条消息带过去
+ * 绘制计时由主线程开关（`meter`），开着时 Worker 每个统计窗回一条 `paintStats`，带上它画山脊图用的上下文种类
  */
 
-/** `Canvas` 是随 `init` 转移过去的对象；接 `terrainWorker.ts` 时必须是 `OffscreenCanvas`，泛型只为让端口能换实现。 */
+/** `Canvas` 是随 `init` 转移过去的对象；接 `terrainWorker.ts` 时必须是 `OffscreenCanvas`，泛型只为让端口能换实现 */
 export type TerrainWorkerMessage<Canvas = OffscreenCanvas> =
   | { type: 'init'; canvas: Canvas; settings: TerrainPaintSettings; gpu: boolean }
   | {
       type: 'rows';
       rows: number;
       bands: number;
-      /** 按从旧到新排的若干行，每行 `bands` 个值。 */
+      /** 按从旧到新排的若干行，每行 `bands` 个值 */
       data: Float32Array;
-      /** 镜像先按 `rows × bands` 重建再推。 */
+      /** 镜像先按 `rows × bands` 重建再推 */
       reset: boolean;
-      /** 这批里有新到的帧：从收到起算滑动进度。挂载时补发的存量行不算。 */
+      /** 这批里有新到的帧：从收到起算滑动进度。挂载时补发的存量行不算 */
       arrived: boolean;
     }
   | { type: 'update'; settings: Partial<TerrainPaintSettings> }
@@ -33,11 +33,11 @@ export type TerrainWorkerMessage<Canvas = OffscreenCanvas> =
 
 export type TerrainRowsMessage = Extract<TerrainWorkerMessage, { type: 'rows' }>;
 
-/** Worker 每个统计窗发回的绘制计时。 */
+/** Worker 每个统计窗发回的绘制计时 */
 interface TerrainWorkerStats {
   type: 'paintStats';
   stats: PaintStats;
-  /** Worker 里画山脊图的上下文是哪一种。 */
+  /** Worker 里画山脊图的上下文是哪一种 */
   surface: TerrainSurfaceKind;
 }
 
@@ -52,7 +52,7 @@ const MESSAGE_TYPES: ReadonlySet<unknown> = new Set([
   'meter',
 ]);
 
-/** Worker 收到的消息只来自本模块，只核对判别字段。 */
+/** Worker 收到的消息只来自本模块，只核对判别字段 */
 export function isTerrainWorkerMessage(value: unknown): value is TerrainWorkerMessage {
   return (
     typeof value === 'object' && value !== null && MESSAGE_TYPES.has(Reflect.get(value, 'type'))
@@ -61,7 +61,7 @@ export function isTerrainWorkerMessage(value: unknown): value is TerrainWorkerMe
 
 const SURFACE_KINDS: ReadonlySet<unknown> = new Set<TerrainSurfaceKind>(['webgl', '2d']);
 
-/** 主线程一端：Worker 发回的消息要核对到字段，统计会原样显示在性能小窗上。 */
+/** 主线程一端：Worker 发回的消息要核对到字段，统计会原样显示在性能小窗上 */
 export function isTerrainWorkerReply(value: unknown): value is TerrainWorkerReply {
   return (
     typeof value === 'object' &&
@@ -72,7 +72,7 @@ export function isTerrainWorkerReply(value: unknown): value is TerrainWorkerRepl
   );
 }
 
-/** Worker 一端：把一批行推进镜像。要重建时返回新缓冲，否则返回原缓冲。 */
+/** Worker 一端：把一批行推进镜像。要重建时返回新缓冲，否则返回原缓冲 */
 export function mirrorRows(mirror: SpectrumHistory, message: TerrainRowsMessage): SpectrumHistory {
   const rebuild = message.reset || mirror.rows !== message.rows || mirror.bands !== message.bands;
   const target = rebuild ? createSpectrumHistory(message.rows, message.bands) : mirror;
@@ -82,7 +82,7 @@ export function mirrorRows(mirror: SpectrumHistory, message: TerrainRowsMessage)
   return target;
 }
 
-/** `Worker` 用到的那一面。 */
+/** `Worker` 用到的那一面 */
 export interface TerrainWorkerPort<Canvas = OffscreenCanvas> {
   postMessage(message: TerrainWorkerMessage<Canvas>, transfer: Transferable[]): void;
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;

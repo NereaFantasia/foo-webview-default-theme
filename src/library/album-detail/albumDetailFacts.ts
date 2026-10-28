@@ -13,20 +13,20 @@ export interface AlbumFactsFace {
   titleformat: Pick<typeof fb.titleformat, 'evalBatch'>;
 }
 
-/** 曲目行里没有、详情页要另外求值的几项。 */
+/** 曲目行里没有、详情页要另外求值的几项 */
 export interface AlbumFacts {
-  /** 第一首的编码方式与位深；取不到为 null。 */
+  /** 第一首的编码方式与位深；取不到为 null */
   readonly format: FormatDetail | null;
-  /** 各碟的副标题（`%discsubtitle%`），按碟号；没有副标题的碟不在里面。 */
+  /** 各碟的副标题（`%discsubtitle%`），按碟号；没有副标题的碟不在里面 */
   readonly discTitles: ReadonlyMap<number, string>;
 }
 
 const NO_FACTS: AlbumFacts = { format: null, discTitles: new Map() };
 
-/** 格式在前、碟副标题在后：副标题里可能有 `|`，拆的时候前两段之后的全归它。 */
+/** 格式在前、碟副标题在后：副标题里可能有 `|`，拆的时候前两段之后的全归它 */
 const PATTERN = `${FORMAT_PATTERN}|%discsubtitle%`;
 
-/** 每张碟的第一首，按碟号的先后。 */
+/** 每张碟的第一首，按碟号的先后 */
 function discLeaders(tracks: readonly LibraryTrack[]): LibraryTrack[] {
   const leaders = new Map<number, LibraryTrack>();
   for (const track of tracks) {
@@ -37,7 +37,7 @@ function discLeaders(tracks: readonly LibraryTrack[]): LibraryTrack[] {
 
 /**
  * 一次求出第一首的编码方式与位深、各碟的副标题：对每张碟的第一首求值，副标题取那一首的。宿主答失败时
- * 答 `NO_FACTS`，页面只少写位深与副标题。
+ * 答 `NO_FACTS`，页面只少写位深与副标题
  */
 export async function readAlbumFacts(
   host: AlbumFactsFace,
@@ -60,7 +60,7 @@ export async function readAlbumFacts(
   return { format, discTitles };
 }
 
-/** 事实行里的格式要的几项；照专辑的第一首写，文案由页面按语言包拼。 */
+/** 事实行里的格式要的几项；照专辑的第一首写，文案由页面按语言包拼 */
 export type FormatFact =
   | {
       readonly kind: 'lossless';
@@ -74,7 +74,7 @@ export type FormatFact =
 
 /**
  * 第一首的格式：无损写位深与采样率，有损写比特率；编码方式或位深取不到时只写采样率，采样率也没有就只写
- * 编码。编码不知道时答 null，事实行不写这一项。
+ * 编码。编码不知道时答 null，事实行不写这一项
  */
 export function formatFactOf(
   track: Pick<LibraryTrack, 'codec' | 'sampleRate' | 'bitrate'> | undefined,

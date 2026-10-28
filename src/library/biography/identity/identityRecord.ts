@@ -6,7 +6,7 @@ import {
 } from '../details/biographyDetailsModel.ts';
 import { CANDIDATE_LIMIT, isMbid, type MusicbrainzCandidate } from './musicbrainzArtist.ts';
 
-/** 认定了的一位隔 60 天再核对；没认定的（同名待选、查无此人）7 天后再查，库里可能多了他的专辑。 */
+/** 认定了的一位隔 60 天再核对；没认定的（同名待选、查无此人）7 天后再查，库里可能多了他的专辑 */
 export const IDENTITY_RESOLVED_TTL = 60 * 24 * 60 * 60 * 1000;
 export const IDENTITY_OPEN_TTL = 7 * 24 * 60 * 60 * 1000;
 export const IDENTITY_CACHE_FILE = 'musicbrainz-v1.json';
@@ -14,7 +14,7 @@ export const IDENTITY_CACHE_LIMIT = 256;
 export const IDENTITY_CACHE_BYTES = 2 * 1024 * 1024;
 
 interface RecordTimes {
-  /** 本地艺人名，缓存按它存取。 */
+  /** 本地艺人名，缓存按它存取 */
   readonly artist: string;
   readonly fetchedAt: number;
   readonly expiresAt: number;
@@ -24,10 +24,10 @@ export type IdentityRecord =
   | (RecordTimes & {
       readonly status: 'resolved';
       readonly mbid: string;
-      /** 取简介时用的 Last.fm 艺人名。 */
+      /** 取简介时用的 Last.fm 艺人名 */
       readonly sourceArtist: string;
       readonly facts: readonly BiographyFact[];
-      /** 认定时的同名候选，「不是这位」时直接列出来，不必再查。 */
+      /** 认定时的同名候选，「不是这位」时直接列出来，不必再查 */
       readonly candidates: readonly MusicbrainzCandidate[];
     })
   | (RecordTimes & {
@@ -64,7 +64,7 @@ function readCandidates(value: unknown): readonly MusicbrainzCandidate[] {
   });
 }
 
-/** 读回缓存里的一项。过期、字段不全或有效期长得不合理的都答 null。 */
+/** 读回缓存里的一项。过期、字段不全或有效期长得不合理的都答 null */
 export function readIdentityRecord(value: unknown, now: number): IdentityRecord | null {
   if (!record(value)) return null;
   const { artist, fetchedAt, expiresAt, status } = value;
@@ -89,7 +89,7 @@ export function readIdentityRecord(value: unknown, now: number): IdentityRecord 
   };
 }
 
-/** 每种状态都带着它属于哪位本地艺人，换人时用方据此丢掉上一位的结果。 */
+/** 每种状态都带着它属于哪位本地艺人，换人时用方据此丢掉上一位的结果 */
 export type BiographyIdentityState = { readonly artist: string | null } & (
   | { readonly status: 'idle' }
   | { readonly status: 'resolving' }
@@ -107,7 +107,7 @@ export type BiographyIdentityState = { readonly artist: string | null } & (
 
 export const IDLE_IDENTITY: BiographyIdentityState = { artist: null, status: 'idle' };
 
-/** 缓存里的一项对应的状态；自动认定的都不是手选。 */
+/** 缓存里的一项对应的状态；自动认定的都不是手选 */
 export function identityStateOf(entry: IdentityRecord): BiographyIdentityState {
   const { artist } = entry;
   if (entry.status === 'none') return { artist, status: 'none' };

@@ -1,0 +1,17 @@
+/* 条件占一行，放不下的收进菜单；清除键保持可见 */
+.root {
+  display: flex;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  flex: 1;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalS);
+  padding-bottom: var(--spacingVerticalM);
+}

@@ -26,7 +26,7 @@ interface SurfacePresenceProps extends PresenceComponentProps {
 
 const NO_MOTION_CALLBACK: NonNullable<PresenceComponentProps['onMotionStart']> = () => {};
 
-/** 保留退场节点直到动画结束，关闭当帧移出指针、键盘和读屏的可访问范围。 */
+/** 保留退场节点直到动画结束，关闭当帧移出指针、键盘和读屏的可访问范围 */
 export function SurfacePresence({
   children,
   kind,
@@ -118,7 +118,7 @@ export function SurfacePresence({
       node.style.pointerEvents = inlineStyles.current.pointers;
       node.style.visibility = inlineStyles.current.visibility;
     } else {
-      // 新浮层已接走焦点时不再还焦点；旧浮层最终卸载也不另安排还焦点的回调。
+      // 新浮层已接走焦点时不再还焦点；旧浮层最终卸载也不另安排还焦点的回调
       if (node.contains(doc.activeElement)) {
         const target = opener.current;
         if (target?.isConnected && !target.closest('[inert]'))
@@ -135,7 +135,7 @@ export function SurfacePresence({
     previous.current = visible;
     busy.current = false;
     const mine = ++generation.current;
-    // appear 只管整个组件的首次显示，关闭后重新挂载的节点仍要播放入场。
+    // appear 只管整个组件的首次显示，关闭后重新挂载的节点仍要播放入场
     if (first && (!visible || (!appear && !toggled.current))) {
       motion.jump(visible);
       if (!visible) node.style.visibility = 'hidden';

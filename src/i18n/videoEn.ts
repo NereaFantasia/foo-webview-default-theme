@@ -3,6 +3,7 @@ export const videoEn = {
   'video.loading': 'Loading video',
   'video.buffering': 'Buffering',
   'video.none': 'This track has no video',
+  'video.container': 'Video in {format} files is not supported',
   'video.subsong': 'Video is unavailable for subsongs',
   'video.unsupported': 'This video format cannot be played',
   'video.failed': 'Video playback failed',
@@ -20,4 +21,7 @@ export const videoEn = {
   'video.collapse': 'Exit full window',
   'video.fullscreen': 'Full screen',
   'video.fullscreenFailed': 'Could not change full screen',
+  'video.browse': 'Browse videos',
+  'video.reveal': 'Open containing folder',
+  'video.revealFailed': 'Could not open the containing folder',
 } as const;

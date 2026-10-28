@@ -1,4 +1,4 @@
-/* 一行分类名，底下一条线；放不下时横向滚，不折行、不画滚动条。 */
+/* 一行分类名，底下一条线；放不下时横向滚，不折行、不画滚动条 */
 .strip {
   display: flex;
   flex: none;
@@ -32,7 +32,7 @@
   outline-offset: calc(var(--strokeWidthThick) * -1);
 }
 
-/* 亮着的那一项：字加重，底边一条 3px 的强调色。 */
+/* 亮着的那一项：字加重，底边一条 3px 的强调色 */
 .current {
   color: var(--text-primary);
   font-weight: var(--fontWeightSemibold);

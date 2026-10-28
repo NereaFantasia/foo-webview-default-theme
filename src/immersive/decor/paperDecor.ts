@@ -2,14 +2,14 @@ import { DIAL_CENTER, SHEET_HEIGHT, SHEET_WIDTH } from '../paper/paperLayout.ts'
 
 /**
  * 仪表图纸的生成式网格布局，做法照 catbot-3 网页版的面板背景：
- * 64 px 格子里一部分格打开（四条边都不画），零星的填色格与对角线，少量散点记号，三段带刻度的仪表弧。
- * 同一种子、同一尺寸、同一护区得到同一张图；作画在 `paperDecorDraw.ts`。
+ * 64 px 格子里一部分格打开（四条边都不画），零星的填色格与对角线，少量散点记号，三段带刻度的仪表弧
+ * 同一种子、同一尺寸、同一护区得到同一张图；作画在 `paperDecorDraw.ts`
  *
  * 坐标是 CSS 像素、以容器左上为原点；格线对齐版心原点 `origin`，容器比版心小时它是负数。护区按版心坐标给，
- * 护区里不打开格、不填色、不画对角线，记号也避开；格线照画。
+ * 护区里不打开格、不填色、不画对角线，记号也避开；格线照画
  *
  * 两个换算：`scale` 是版心坐标到容器像素的比（版心档 1，full 档是舞台的缩放），格子、护区与弧都乘它；
- * `unit` 是网页版一个像素在容器里多长，记号尺寸、净空、密度与弧上刻度的长短按它算（版心档是 `DECOR_SCALE`）。
+ * `unit` 是网页版一个像素在容器里多长，记号尺寸、净空、密度与弧上刻度的长短按它算（版心档是 `DECOR_SCALE`）
  */
 
 export interface Rect {
@@ -23,15 +23,15 @@ export const DECOR_CELL = 64;
 export const DECOR_OPEN_RATIO = 0.18;
 export const DECOR_FILL_RATIO = 0.025;
 export const DECOR_DIAGONAL_RATIO = 0.035;
-/** 版心与网页版页面的长度比（网页版按 1920 宽排）：记号尺寸、净空与密度都按它换算。 */
+/** 版心与网页版页面的长度比（网页版按 1920 宽排）：记号尺寸、净空与密度都按它换算 */
 export const DECOR_SCALE = SHEET_WIDTH / 1920;
-/** 网页版 1920 × 1080 的一屏放 10 个记号；按 `unit` 换算成容器像素后，容器更大就多放。 */
+/** 网页版 1920 × 1080 的一屏放 10 个记号；按 `unit` 换算成容器像素后，容器更大就多放 */
 const MARKS_PER_CANVAS = 10;
-/** 记号中心到护区的最小净空，网页版像素。 */
+/** 记号中心到护区的最小净空，网页版像素 */
 const MARK_CLEARANCE = 18;
-/** 随机落点试这么多次仍在护区里就不放这个记号。 */
+/** 随机落点试这么多次仍在护区里就不放这个记号 */
 const MARK_ATTEMPTS = 30;
-/** 点出现的机会是别的两倍，与网页版相同。 */
+/** 点出现的机会是别的两倍，与网页版相同 */
 const MARK_KINDS = ['dot', 'dot', 'square', 'plus', 'tick', 'chevron'] as const;
 export type MarkKind = (typeof MARK_KINDS)[number];
 
@@ -39,9 +39,9 @@ export interface DecorMark {
   kind: MarkKind;
   x: number;
   y: number;
-  /** 点是半径，方块是边长，加号是半臂长，刻线是全长。 */
+  /** 点是半径，方块是边长，加号是半臂长，刻线是全长 */
   size: number;
-  /** 刻线横着还是竖着。 */
+  /** 刻线横着还是竖着 */
   horizontal: boolean;
   text: '>>' | '<<';
 }
@@ -50,7 +50,7 @@ export interface DecorArc {
   cx: number;
   cy: number;
   r: number;
-  /** 起止角，弧度，从 x 轴顺时针量。 */
+  /** 起止角，弧度，从 x 轴顺时针量 */
   from: number;
   to: number;
   ticks: number;
@@ -60,17 +60,17 @@ export interface Decor {
   width: number;
   height: number;
   origin: { x: number; y: number };
-  /** 格子边长与网页版一个像素的长度，都是容器像素。 */
+  /** 格子边长与网页版一个像素的长度，都是容器像素 */
   cell: number;
   unit: number;
-  /** 版心中心，径向微光围着它。 */
+  /** 版心中心，径向微光围着它 */
   center: { x: number; y: number };
-  /** 铺满容器所需的列、行下标（相对版心原点，含两端）。 */
+  /** 铺满容器所需的列、行下标（相对版心原点，含两端） */
   columns: readonly [number, number];
   rows: readonly [number, number];
   open: ReadonlySet<string>;
   filled: ReadonlySet<string>;
-  /** 画对角线的格；值为真画「/」，为假画「\」。 */
+  /** 画对角线的格；值为真画「/」，为假画「\」 */
   diagonals: ReadonlyMap<string, boolean>;
   marks: readonly DecorMark[];
   arcs: readonly DecorArc[];
@@ -78,7 +78,7 @@ export interface Decor {
 
 /**
  * 1280 × 800 版心上的三段仪表弧（版心坐标）：绕罗盘、圆心在右栏右缘内侧、绕版心中心；起止角照网页版，
- * 半径按本版心另定。别的档位由 `paperTiers.ts` 按它挪位、缩放。
+ * 半径按本版心另定。别的档位由 `paperTiers.ts` 按它挪位、缩放
  */
 export const SHEET_ARCS: readonly DecorArc[] = [
   { cx: DIAL_CENTER.x, cy: DIAL_CENTER.y, r: 344, from: -2.95, to: 0.58, ticks: 11 },
@@ -88,7 +88,7 @@ export const SHEET_ARCS: readonly DecorArc[] = [
 
 export const cellKey = (column: number, row: number): string => `${column},${row}`;
 
-/** 带种子的伪随机数（mulberry32），取值 [0, 1)。 */
+/** 带种子的伪随机数（mulberry32），取值 [0, 1) */
 export function createRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -100,7 +100,7 @@ export function createRandom(seed: number): () => number {
   };
 }
 
-/** 曲目键折成种子（FNV-1a 32 位）；没有曲目时是空串，得 0。 */
+/** 曲目键折成种子（FNV-1a 32 位）；没有曲目时是空串，得 0 */
 export function seedFromKey(key: string): number {
   let hash = 0x811c9dc5;
   if (!key) return 0;
@@ -127,7 +127,7 @@ function shuffle<T>(items: T[], random: () => number): T[] {
   return items;
 }
 
-/** 抽出 `ratio` 比例的格，左右两半各占一半；一边不够时从剩下的里补齐。 */
+/** 抽出 `ratio` 比例的格，左右两半各占一半；一边不够时从剩下的里补齐 */
 function sampleBalanced(
   cells: readonly Cell[],
   ratio: number,
@@ -169,7 +169,7 @@ function markOf(x: number, y: number, unit: number, random: () => number): Decor
   };
 }
 
-/** 版心、原点与弧缺省时按 1280 × 800 版心居中算。 */
+/** 版心、原点与弧缺省时按 1280 × 800 版心居中算 */
 export function buildDecor(options: {
   width: number;
   height: number;

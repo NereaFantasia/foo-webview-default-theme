@@ -76,12 +76,28 @@ describe('startPlaylistRows', () => {
     rows.acquire(MAIN);
     await settle();
     vi.useFakeTimers();
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(1), playlist: 1, start: 0, count: 2 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(1),
+      playlist: 1,
+      start: 0,
+      count: 2,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect(requestsFor(host, MAIN)).toBe(3);
     fake.setTracks(MAIN, tracks('Sorted', 450));
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 450 });
-    host.emit('playlist:itemsReordered', { playlistGuid: guidOf(0), playlist: 0, count: 450 });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 450,
+      contentVersion: '1',
+    });
+    host.emit('playlist:itemsReordered', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      count: 450,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect(requestsFor(host, MAIN)).toBe(6);
     expect(rows.rowAt(MAIN, 0)?.title).toBe('Sorted 1');
@@ -96,10 +112,22 @@ describe('startPlaylistRows', () => {
     await host.fb.playlist.reorderPlaylists([1, 0]);
     await settle();
     vi.useFakeTimers();
-    host.emit('playlist:itemsAdded', { playlist: 0, playlistGuid: CHILL, start: 0, count: 2 });
+    host.emit('playlist:itemsAdded', {
+      playlist: 0,
+      playlistGuid: CHILL,
+      start: 0,
+      count: 2,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect(requestsFor(host, MAIN)).toBe(3);
-    host.emit('playlist:itemsAdded', { playlist: 1, playlistGuid: MAIN, start: 0, count: 2 });
+    host.emit('playlist:itemsAdded', {
+      playlist: 1,
+      playlistGuid: MAIN,
+      start: 0,
+      count: 2,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect(requestsFor(host, MAIN)).toBe(6);
   });
@@ -114,13 +142,25 @@ describe('startPlaylistRows', () => {
     vi.useFakeTimers();
     const reads = host.hold('playlist.getAll');
     host.emit('playlist:created', { guid: guidOf(2), index: 2, name: 'New' });
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(2), playlist: 2, start: 0, count: 2 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(2),
+      playlist: 2,
+      start: 0,
+      count: 2,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect([requestsFor(host, MAIN), requestsFor(host, CHILL)]).toEqual([6, 2]);
     // 读清单失败：版本没动，照旧不可信。
     reads.respond(0, hostFailure('INTERNAL_ERROR'));
     await vi.advanceTimersByTimeAsync(0);
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(2), playlist: 2, start: 0, count: 2 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(2),
+      playlist: 2,
+      start: 0,
+      count: 2,
+      contentVersion: '1',
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect([requestsFor(host, MAIN), requestsFor(host, CHILL)]).toEqual([9, 3]);
     reads.release();
@@ -136,8 +176,10 @@ describe('startPlaylistRows', () => {
     const { contentVersion } = state();
     const changed = (track: PlaylistTrack, count = 1) => ({
       tracks: [{ handle: track.handle, path: track.path, subsong: 0 }],
+      handles: [track.handle],
       count,
       fromHook: false,
+      truncated: false,
       timestamp: 1,
     });
     host.emit('metadb:changed', changed(makeRow('Elsewhere', 0)));
@@ -164,7 +206,14 @@ describe('startPlaylistRows', () => {
     await settle();
     vi.useFakeTimers();
     store.set(refetch, 1);
-    host.emit('metadb:changed', { tracks: [], count: 80, fromHook: false, timestamp: 1 });
+    host.emit('metadb:changed', {
+      tracks: [],
+      handles: [],
+      count: 80,
+      fromHook: false,
+      truncated: false,
+      timestamp: 1,
+    });
     await vi.advanceTimersByTimeAsync(ROWS_COALESCE_MS);
     expect(requestsFor(host, MAIN)).toBe(6);
   });
@@ -180,7 +229,14 @@ describe('startPlaylistRows', () => {
     await settle();
     expect(state(CHILL)).toMatchObject({ status: 'gone', total: 0 });
     // 别处的标签没报全：已删除的不跟着重取。
-    host.emit('metadb:changed', { tracks: [], count: 80, fromHook: false, timestamp: 1 });
+    host.emit('metadb:changed', {
+      tracks: [],
+      handles: [],
+      count: 80,
+      fromHook: false,
+      truncated: false,
+      timestamp: 1,
+    });
     await new Promise((resolve) => setTimeout(resolve, ROWS_COALESCE_MS + 10));
     expect(requestsFor(host, CHILL)).toBe(2);
     if (chill) fake.items = [...fake.items, { ...chill, index: 1 }];

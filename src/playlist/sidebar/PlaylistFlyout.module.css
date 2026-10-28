@@ -1,4 +1,4 @@
-/* 浮层是上层，取不透明的浮层底，同 Fluent 弹出层的底色、描边与阴影。位置与最大高度按图标算，写在行内。 */
+/* 浮层是上层，取不透明的浮层底，同 Fluent 弹出层的底色、描边与阴影。位置与最大高度按图标算，写在行内 */
 .flyout {
   position: fixed;
   z-index: 1;
@@ -10,7 +10,7 @@
   border-radius: var(--borderRadiusXLarge);
   background-color: var(--bg-panel-overlay);
   box-shadow: var(--shadow16);
-  /* 入场的位移方向：MenuMotion 读 Fluent 定位层写的方向变量，浮层在图标右边，从左往右滑出。 */
+  /* 入场的位移方向：FlyoutMotion 读 Fluent 定位层写的方向变量，浮层在图标右边，从左往右滑出 */
   --fui-positioning-slide-direction-x: -1px;
 }
 

@@ -1,0 +1,289 @@
+/*
+ * 桌面歌词弹窗。主题根固定深色档，深色的遮罩与底板上图标、状态层都是浅色
+ * 颜色经变量传入：--plate-color 底板色，--plate-alpha 底板浓度，--mask-alpha 悬停遮罩浓度，
+ * --sung、--unsung 已唱、未唱色，--glow 光晕色；没给的取中性 token
+ */
+.window {
+  --plate-color: var(--colorNeutralBackground3);
+  --glow: var(--colorNeutralBackground4);
+  --toolbar-height: 48px;
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
+  height: 100%;
+  border-radius: var(--borderRadius2XLarge);
+  /* 不穿透时全透明的像素收不到鼠标：留一点几乎看不见的底，悬停与拖动才在整个窗口上生效 */
+  background-color: color-mix(in srgb, var(--colorNeutralBackground1) 0.4%, transparent);
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.window[data-locked],
+.window[data-hidden] {
+  background-color: transparent;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.window[data-hidden] {
+  opacity: 0;
+}
+
+/*
+ * 底板与悬停遮罩是同一层。底板平时只铺歌词区；悬停时往上长到工具栏行，与歌词区成一整块，加细边，
+ * 看得出窗口的范围。长上去照已在场元素的移动，底色与细边淡变。透明背景时这一层只在悬停时铺 45% 的深色
+ */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: var(--strokeWidthThin) solid transparent;
+  border-radius: var(--borderRadius2XLarge);
+  clip-path: inset(0 round var(--borderRadius2XLarge));
+  pointer-events: none;
+  transition:
+    clip-path var(--motion-fast) var(--motion-curve-point-to-point),
+    background-color var(--motion-faster) var(--curveLinear),
+    border-color var(--motion-faster) var(--curveLinear);
+}
+
+.window[data-plate] .backdrop {
+  clip-path: inset(var(--toolbar-height) 0 0 round var(--borderRadius2XLarge));
+  background-color: color-mix(in srgb, var(--plate-color) var(--plate-alpha), transparent);
+}
+
+.window[data-mask] .backdrop {
+  clip-path: inset(0 round var(--borderRadius2XLarge));
+  border-color: color-mix(in srgb, var(--colorNeutralForeground1) 25%, transparent);
+  background-color: color-mix(in srgb, var(--colorNeutralBackground3) 45%, transparent);
+}
+
+.window[data-mask][data-plate] .backdrop {
+  background-color: color-mix(in srgb, var(--plate-color) var(--mask-alpha), transparent);
+}
+
+.toolbar-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 工具栏与解锁键常驻，只淡入淡出；藏起来时不可点，也不挡拖动 */
+.toolbar,
+.unlock {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    visibility 0s linear var(--motion-faster);
+}
+
+.window[data-mask] .toolbar,
+.unlock[data-shown] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * 按键一直标成不可拖，不随悬停切换：拖动区经 Chromium 异步报给宿主，悬停后才标的话，刚出现就点下去
+ * 可能还按可拖处理，这一下被宿主当成拖窗吃掉。藏起来的键挖出的几个小洞不影响拖窗：一悬停工具栏就出来了
+ */
+.toolbar button,
+.unlock {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.offset {
+  min-width: 44px;
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* 锁定后唯一能点的地方：工具栏行正中的圆形解锁键，不碰窗口边缘，免得被当成改尺寸的边 */
+.unlock {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--bg-menu);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.unlock:hover {
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
+}
+
+.unlock:active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+
+.unlock:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+.area {
+  position: relative;
+  min-height: 0;
+  /* 改尺寸时歌词保留旧宽高，缩小后的多余部分裁在歌词区内 */
+  overflow: hidden;
+}
+
+/* 光晕放在外层：AMLL 拖长音的强调动画会改字自己的 text-shadow */
+.lyrics {
+  position: absolute;
+  inset: var(--spacingVerticalXL) 0;
+  /* 歌词行移出容器后，继承的 drag 会覆盖工具栏的原生点击区域
+     恢复初始值，由固定外层负责拖窗；no-drag 会把歌词区也排除，导致这里不能拖窗。 */
+  -webkit-app-region: initial;
+  app-region: initial;
+}
+
+.window:not([data-plate]) .lyrics {
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--glow) 90%, transparent))
+    drop-shadow(0 2px 6px color-mix(in srgb, var(--glow) 55%, transparent));
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/*
+ * 两层叠在一起时不能相加发白，关掉 AMLL 的 plus-lighter；行的悬停底也不要
+ * 类名带构建时的哈希前缀，按片段匹配；`lyricLine` 要排除外层的 `lyricLineWrapper`
+ */
+.layer :global(.amll-lyric-player) {
+  --amll-lp-color: var(--unsung, var(--colorNeutralForeground1));
+  --amll-lp-hover-bg-color: transparent;
+  mix-blend-mode: normal;
+  /* 只有多行模式的下层歌词行接收点击；滚轮由外层同时交给两层 */
+  pointer-events: none;
+}
+
+.window[data-interactive]
+  .layer[data-layer='base']
+  :global([class*='lyricLine']:not([class*='Wrapper'])) {
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.window[data-interactive]
+  .layer[data-layer='base']
+  :global([class*='lyricLine']:not([class*='Wrapper']):hover) {
+  background-color: var(--state-hover);
+}
+
+.window[data-interactive]
+  .layer[data-layer='base']
+  :global([class*='lyricLine']:not([class*='Wrapper']):active) {
+  background-color: var(--state-pressed);
+}
+
+/* AMLL 悬停时取消模糊；两层要同时取消，避免清晰的未唱字与模糊的已唱字错叠 */
+.lyrics:hover .layer :global([class*='lyricLine']) {
+  filter: unset !important;
+}
+
+/*
+ * AMLL 给副行 0.3 的透明度，是配 plus-lighter 提亮用的；普通混合下太淡，桌面上看不清
+ * 主行的淡显在逐字遮罩里，不作用在副行上，副行按是不是当前行自己分两档
+ */
+.layer :global([class*='lyricSubLine']) {
+  opacity: 0.45;
+}
+
+.layer :global([class*='lyricLine'][class*='_active'] [class*='lyricSubLine']) {
+  opacity: 0.85;
+}
+
+/* 下层出未唱色：当前行整行不透明，其余行保留 AMLL 的淡显 */
+.window[data-two-tone]
+  .layer[data-layer='base']
+  :global([class*='lyricLine']:not([class*='Wrapper'])[class*='gradientMask']) {
+  --bright-mask-alpha: 1;
+  --dark-mask-alpha: 1;
+}
+
+/* 上层出已唱色：只露出唱过的部分；译文与音译只在下层显示 */
+.layer[data-layer='sung'] :global(.amll-lyric-player) {
+  --amll-lp-color: var(--sung);
+}
+
+.layer[data-layer='sung'] :global([class*='lyricLine']:not([class*='Wrapper'])) {
+  --dark-mask-alpha: 0;
+}
+
+.layer[data-layer='sung']
+  :global([class*='lyricLine']:not([class*='Wrapper']):not([class*='gradientMask'])) {
+  --bright-mask-alpha: 0;
+}
+
+.layer[data-layer='sung'] :global([class*='lyricSubLine']),
+.layer[data-layer='sung'] :global([class*='interludeDots']) {
+  visibility: hidden;
+}
+
+/*
+ * 单行：背景行与当前句同时亮起，窗高不为它留一行，不显示；行两侧的内边距收到 `--single-padding-x`，
+ * 让一句尽量放进一行（AMLL 超出行宽就把句子拆成长短接近的几行）
+ */
+.window[data-single] :global([class*='bgWrapper']) {
+  display: none;
+}
+
+.window[data-single] .layer :global(.amll-lyric-player) {
+  --lyric-line-padding-x: var(--single-padding-x);
+}
+
+/* 只放得下一句时只留当前句 */
+.window[data-single] :global([class*='lyricLine']:not([class*='Wrapper']):not([class*='_active'])) {
+  opacity: 0;
+}
+
+.title {
+  margin: 0;
+  padding: 0 var(--spacingHorizontalXXL);
+  position: absolute;
+  inset: 50% 0 auto;
+  translate: 0 -50%;
+  color: var(--unsung, var(--colorNeutralForeground1));
+  font-size: var(--title-size);
+  line-height: 1.3;
+  opacity: 0.7;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.window[data-align='left'] .title {
+  text-align: start;
+}
+
+.window[data-align='right'] .title {
+  text-align: end;
+}

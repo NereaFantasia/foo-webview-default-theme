@@ -21,7 +21,7 @@ export function contextMenuBounds(viewport: ContextMenuViewport, edge: number) {
   };
 }
 
-/** 按父层两侧真实可用宽度判断，不以固定窗口断点代替。 */
+/** 按父层两侧真实可用宽度判断，不以固定窗口断点代替 */
 export function contextMenuCascadeWidth(
   parent: Pick<DOMRect, 'left' | 'right'>,
   viewport: ContextMenuViewport,

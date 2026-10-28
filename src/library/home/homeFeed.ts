@@ -34,7 +34,7 @@ export const HOME_STATS_BATCH = 500;
 const MAX_RECOVERY_CALLS = 32;
 export type HomeFeedHost = Pick<typeof fb, 'config' | 'playcount' | 'on' | 'ready' | 'isAvailable'>;
 
-/** 已显示的统计只标记待刷新；用户显式刷新才换序，正在操作的条目不随播放事件移动。 */
+/** 已显示的统计只标记待刷新；用户显式刷新才换序，正在操作的条目不随播放事件移动 */
 export function startHomeFeed(
   store: ReturnType<typeof createStore>,
   tracks: Pick<LibraryTracksService, 'want' | 'retry'>,
@@ -153,7 +153,7 @@ export function startHomeFeed(
       if (!answer) return false;
       if (answer.success === false) {
         if (answer.code !== 'PERMISSION_DENIED') return false;
-        // 权限拒绝发生在整批校验阶段。拆批隔离坏路径，限制额外调用，避免整库被拒时逐首重试。
+        // 权限拒绝发生在整批校验阶段。拆批隔离坏路径，限制额外调用，避免整库被拒时逐首重试
         if (paths.length > 1 && recoveryCalls >= 2) {
           recoveryCalls -= 2;
           const middle = Math.floor(paths.length / 2);
@@ -237,7 +237,7 @@ export function startHomeFeed(
     const available = hasPlaycountComponent(installed.components);
     patch({ available, status: available ? 'loading' : 'ready', unreadCount: 0 });
     if (!available) return;
-    // 探测可能重跑（见 `probeGeneration`）；整库曲目只登记一次，到 dispose 才释放。
+    // 探测可能重跑（见 `probeGeneration`）；整库曲目只登记一次，到 dispose 才释放
     releaseTracks ??= tracks.want();
     if (store.get(libraryTracksAtom).status === 'failed') await tracks.retry();
     if (disposed || mine !== probeGeneration) return;

@@ -70,7 +70,7 @@ export function readBiographyPrefs(
   };
 }
 
-/** 写入经公共写入助手；没有传入 `writer` 时每次保存都按失败处理，不绕过写锁直接写宿主。 */
+/** 写入经公共写入助手；没有传入 `writer` 时每次保存都按失败处理，不绕过写锁直接写宿主 */
 export function startBiographyPrefs(
   store: ReturnType<typeof createStore>,
   host: BiographyPrefsHost = fb,

@@ -1,4 +1,5 @@
-import { createStore } from 'jotai/vanilla';
+import { atom, createStore } from 'jotai/vanilla';
+import type { MusicPlatform } from '../../../../src/server/musicObjects.ts';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { startNavHistory } from '../../../../src/nav/navHistory.ts';
 import { startSearchServices } from '../../../../src/library/search/searchServices.ts';
@@ -8,7 +9,10 @@ import { createMemoryConfigWriter } from '../../../fixtures/dataWriter.ts';
 import { albumRow, albumTrackRow } from '../../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 
-function setup() {
+type Music = Parameters<typeof startSearchServices>[1]['music'];
+
+function setup(music: Music = { search: () => Promise.reject(new Error('本组用例不搜在线')) }) {
+  const selected = atom<MusicPlatform>('wy');
   const host = installFakeHost();
   const store = createStore();
   const history = startNavHistory(store);
@@ -30,10 +34,13 @@ function setup() {
     catalog: { retry: async () => {} },
     actions: { playPaths },
     configWriter: createMemoryConfigWriter(host.fb),
+    music,
+    sources: { selected },
     findAlbum: () => album,
+    stamp: () => 0,
   });
   onTestFinished(() => search.dispose());
-  return { host, search, history, tracks, album, playPaths };
+  return { host, store, search, history, tracks, album, playPaths, selected };
 }
 
 describe('搜索起播', () => {
@@ -66,5 +73,47 @@ describe('搜索起播', () => {
     expect(playPaths.mock.calls).toEqual([]);
     search.dispose();
     expect(await search.play({ kind: 'album', album })).toBe(false);
+  });
+});
+
+describe('结果页的在线结果', () => {
+  it('同一查询词回到结果页时沿用已取到的结果，不再向平台要；只留最近四个查询词', async () => {
+    const searched = vi.fn();
+    const music: Music = {
+      async search(input) {
+        searched(input.query);
+        return { items: [], nextCursor: null, total: 0, discardedCount: 0 };
+      },
+    };
+    const { store, search } = setup(music);
+    const first = search.online('陈奕迅');
+    first.load(['track']);
+    await vi.waitFor(() => expect(store.get(first.kinds.track).status).toBe('ready'));
+    expect(search.online('陈奕迅')).toBe(first);
+    search.online('陈奕迅').load(['track']);
+    expect(searched).toHaveBeenCalledTimes(1);
+    for (const text of ['a', 'b', 'c', 'd']) search.online(text);
+    expect(search.online('陈奕迅')).not.toBe(first);
+  });
+
+  it('下拉里的在线预览与结果页读同一个所选来源，各自按它搜', async () => {
+    const asked: string[] = [];
+    const music: Music = {
+      async search(input) {
+        asked.push(`${input.platform}:${input.kind}`);
+        return { items: [], nextCursor: null, total: 0, discardedCount: 0 };
+      },
+    };
+    const { store, search, selected } = setup(music);
+    const page = search.online('陈奕迅');
+    expect(store.get(page.platform)).toBe('wy');
+    expect(store.get(search.onlinePreview.platform)).toBe('wy');
+    store.set(selected, 'kw');
+    expect(store.get(page.platform)).toBe('kw');
+    expect(store.get(search.onlinePreview.platform)).toBe('kw');
+    page.load(['track', 'album']);
+    search.onlinePreview.setText('陈奕迅');
+    search.onlinePreview.load(['track']);
+    await vi.waitFor(() => expect(asked).toEqual(['kw:track', 'kw:track']));
   });
 });

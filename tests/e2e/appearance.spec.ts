@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openBrowserPreview } from '../fixtures/browserPreview.ts';
 
 // 只断言算出来的样式值，不看画面：深浅、减弱动效与语义变量是否接到了主题根上。
 function themeRoot(page: Page): Locator {
@@ -13,7 +14,7 @@ function readVariable(root: Locator, name: string): Promise<string> {
 
 test('深浅跟随系统，切换即时生效', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.goto('/');
+  await openBrowserPreview(page);
   const root = themeRoot(page);
   await expect(root).toHaveCSS('color-scheme', 'light');
   const lightText = await readVariable(root, '--colorNeutralForeground1');
@@ -24,7 +25,7 @@ test('深浅跟随系统，切换即时生效', async ({ page }) => {
 });
 
 test('语义变量落到 Fluent token 上', async ({ page }) => {
-  await page.goto('/');
+  await openBrowserPreview(page);
   const root = themeRoot(page);
   const secondary = await readVariable(root, '--colorNeutralForeground3');
   expect(secondary).not.toBe('');
@@ -35,7 +36,7 @@ test('语义变量落到 Fluent token 上', async ({ page }) => {
 
 test('减弱动效时动效时长缩到 1 ms，关掉后恢复原值', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await openBrowserPreview(page);
   const root = themeRoot(page);
   await expect.poll(() => readVariable(root, '--motion-fast')).toBe('1ms');
 

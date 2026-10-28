@@ -9,7 +9,7 @@ import {
 } from '../../../host/configPref.ts';
 import { requestLastfmApi } from './lastfmApi.ts';
 
-/** 空串表示没填。Last.fm 发的 key 是 32 位十六进制，存成小写。 */
+/** 空串表示没填。Last.fm 发的 key 是 32 位十六进制，存成小写 */
 export function readLastfmKey(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
   const key = raw.trim().toLowerCase();
@@ -19,21 +19,23 @@ export function readLastfmKey(raw: unknown): string | undefined {
 export const LASTFM_KEY_PREF = defineConfigPref('defaultTheme.online.lastfmKey', '', readLastfmKey);
 
 /**
- * idle 是没校验过（刚读回的存档、或者 key 是空的）；unverified 是试过但连不上，key 照样留着。
- * malformed 只说明这一次填的不像 key，存着的那个没动。
+ * idle 是没校验过（刚读回的存档、或者 key 是空的）；unverified 是试过但连不上，key 照样留着
+ * malformed 只说明这一次填的不像 key，存着的那个没动
  */
 export type LastfmKeyCheck =
   'idle' | 'malformed' | 'checking' | 'valid' | 'invalid' | 'suspended' | 'unverified';
 
 export interface LastfmKeyService {
   readonly persistence: ConfigPersistence;
-  /** 存档读回（或补写）完时兑现，不会拒绝。 */
+  /** 存档读回（或补写）完时兑现，不会拒绝 */
   readonly ready: Promise<void>;
   readonly key: Atom<string>;
   readonly check: Atom<LastfmKeyCheck>;
-  /** 用户填完一次。`online` 关着时只存不校验：没开在线内容就不发请求。格式不对答 false。 */
+  /** check 为 unverified 时的宿主失败原文，其他时为 null */
+  readonly checkDetail: Atom<string | null>;
+  /** 用户填完一次。`online` 关着时只存不校验：没开在线内容就不发请求。格式不对答 false */
   commit(value: string, online: boolean): boolean;
-  /** 取数时 Last.fm 说 key 无效或停用了，改成对应状态。 */
+  /** 取数时 Last.fm 说 key 无效或停用了，改成对应状态 */
   report(problem: 'keyInvalid' | 'keySuspended'): void;
   dispose(): void;
 }
@@ -46,19 +48,24 @@ export function startLastfmKey(
 ): LastfmKeyService {
   const prefs = startConfigPrefs(store, [LASTFM_KEY_PREF], host, writer);
   const check = atom<LastfmKeyCheck>('idle');
+  const checkDetail = atom<string | null>(null);
   let generation = 0;
   let disposed = false;
 
   async function verify(key: string): Promise<void> {
     const mine = ++generation;
     store.set(check, 'checking');
-    // 用 Last.fm 文档里的示例艺人试一次；请求里只有这个名字和 key。
+    store.set(checkDetail, null);
+    // 用 Last.fm 文档里的示例艺人试一次；请求里只有这个名字和 key
     const result = await request('artist.getInfo', { artist: 'Cher', autocorrect: '0' }, key, host);
     if (disposed || mine !== generation) return;
     if (result.kind !== 'failed') store.set(check, 'valid');
     else if (result.problem === 'keyInvalid') store.set(check, 'invalid');
     else if (result.problem === 'keySuspended') store.set(check, 'suspended');
-    else store.set(check, 'unverified');
+    else {
+      store.set(check, 'unverified');
+      store.set(checkDetail, result.detail ?? null);
+    }
   }
 
   return {
@@ -66,6 +73,7 @@ export function startLastfmKey(
     persistence: prefs,
     key: LASTFM_KEY_PREF.atom,
     check: atom((get) => get(check)),
+    checkDetail: atom((get) => get(checkDetail)),
     commit(value, online) {
       if (disposed) return false;
       const key = readLastfmKey(value);
@@ -79,6 +87,7 @@ export function startLastfmKey(
       prefs.set(LASTFM_KEY_PREF, key);
       generation += 1;
       store.set(check, 'idle');
+      store.set(checkDetail, null);
       if (key && online) void verify(key);
       return true;
     },
@@ -86,6 +95,7 @@ export function startLastfmKey(
       if (disposed) return;
       generation += 1;
       store.set(check, problem === 'keyInvalid' ? 'invalid' : 'suspended');
+      store.set(checkDetail, null);
     },
     dispose() {
       disposed = true;

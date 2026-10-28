@@ -1,0 +1,329 @@
+/* 歌词栏顶部的工具条。位置与宽度跟歌词的文字区一致：左边距、右边距与行宽上限都读栏写进来的变量，
+   上沿距栏顶 `--lyrics-toolbar-top`（预设给，对齐封面上沿）。
+
+   外壳 `.bar` 管尺寸、圆角与 Acrylic 底（底在 `toolbarStyles.ts`），里面按状态叠几层，层都铺在外壳里、不撑它：
+   一行或两格高的按键层、收起后的单个图标层、搜索的输入层。外壳的宽高随状态过渡，层之间交叉淡变，
+   层里的内容宽度固定为条宽（`--toolbar-width`），外壳收窄时只是被裁，不会跟着重排。 */
+.toolbar {
+  position: absolute;
+  z-index: 1;
+  top: var(--lyrics-toolbar-top);
+  left: var(--lyrics-edge-start);
+  width: min(
+    calc(100% - var(--lyrics-edge-start) - var(--lyrics-edge-end)),
+    var(--lyrics-max-width)
+  );
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+/* 还没量到条宽时不知道排哪一档，先藏起，免得第一帧排错再跳 */
+.toolbar[data-pending] {
+  visibility: hidden;
+}
+
+/* 随控制层静止一起淡出：根上的 data-idle 就是控制层的显隐，淡出慢、回来快。搜索展开、面板开着、键盘焦点在条内时不淡；
+   鼠标点过的键留着焦点也照样淡，与控制层一样只认键盘焦点（`:focus-visible`） */
+:global([data-idle]) .toolbar:not(:has(:focus-visible)):not([data-open]) {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--motion-normal);
+}
+
+/* 尺寸的过渡：已在场元素的点到点，250 ms。窗口缩放时条宽、两格高与一行之间换档也走它；
+   宽度只在收起与展开时变值（缺省是 100%），拖窗口时条宽的变化不过渡 */
+.bar {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  overflow: hidden;
+  border-radius: var(--borderRadius2XLarge);
+  transition:
+    width var(--motion-normal) var(--motion-curve-point-to-point),
+    height var(--motion-normal) var(--motion-curve-point-to-point);
+}
+
+/* 两格高：高度要与 `lyricsToolbar.ts` 的 `TOOLBAR_HEIGHT` 一致 */
+.bar[data-state='open'][data-form='wide'] {
+  height: 72px;
+}
+
+.bar[data-state='collapsed'] {
+  width: 40px;
+}
+
+/* 层：铺在外壳里，宽度固定为条宽。隐藏的层先淡出（83 ms），要出现的层等它淡完再淡入（167 ms），不同时露出 */
+.layer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: var(--toolbar-width, 100%);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalSNudge);
+  transition: opacity var(--motion-fast) var(--curveLinear) var(--motion-faster);
+}
+
+.layer[data-hidden] {
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0ms;
+  transition-duration: var(--motion-faster);
+}
+
+/* 收起后的图标层：与外壳同大，不留内边距 */
+.layerMini {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+
+.keys {
+  display: flex;
+  flex: 1 1 0;
+  align-self: stretch;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 每一组出现时淡入：换档或歌词到了才有的组，等外壳尺寸动起来再露出 */
+.group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  animation: toolbar-fade-in var(--motion-fast) var(--curveLinear) var(--motion-faster) backwards;
+}
+
+/* 字号块所在的组：条放得下时保持内容宽度，放不下时收窄（滑块变短），不把右边的键挤出条外；校正块的步进要留够字，不收 */
+.tileGroup {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* 两格高时组拉满高度，块与整高图标键各占整高 */
+.bar[data-form='wide'] .group {
+  align-self: stretch;
+}
+
+.bar[data-form='wide'] .sep {
+  align-self: center;
+  height: 40px;
+}
+
+/* 译文与音译并排，隔一点间距 */
+.toggles {
+  gap: var(--spacingHorizontalXS);
+}
+
+.sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin-inline: var(--spacingHorizontalXS);
+  background: var(--line);
+}
+
+.fill {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 搜索展开：输入层 */
+.search {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalXS);
+}
+
+.searchIcon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-secondary);
+}
+
+.searchIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.query {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@keyframes toolbar-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 搜索结果面板：挂在条正下方，宽与条一致，高度不超过窗里剩下的地方（`--lyrics-toolbar-room`）。
+   进场从上面 6 px 处下落并淡入，等条的高度动起来之后；收起时只淡出。
+   候选卡原先带主窗的阅读面，这里换成面板里的半透明底 */
+.results {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + var(--spacingVerticalXS));
+  box-sizing: border-box;
+  max-height: var(--lyrics-toolbar-room);
+  padding-block: var(--spacingVerticalXS);
+  overflow-y: auto;
+  border-radius: var(--borderRadius2XLarge);
+  background-color: var(--bg-panel-overlay);
+  animation: results-in var(--motion-fast) var(--curveDecelerateMid) var(--motion-faster) backwards;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.results[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes results-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.resultsHost {
+  display: contents;
+}
+
+.results :global([data-reading-surface]) {
+  display: none;
+}
+
+.results :global([data-lyrics-candidate]),
+.results :global([data-lyrics-skeleton]) {
+  border-color: transparent;
+  border-radius: var(--borderRadiusXLarge);
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
+}
+
+.online {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+}
+
+.online p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+/* 小面板与更多面板里的行：左边标签，右边控件 */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  min-height: 32px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}
+
+/* 面板里的三个对齐键并排，键间隔一点 */
+.segment {
+  display: flex;
+  gap: var(--spacingHorizontalXS);
+}
+
+.rowValue {
+  flex: none;
+  min-width: 2ch;
+  color: var(--text-primary);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+}
+
+/* 宽档的块：两格高，上一格写名字与数值，下一格放控件。字号块与校正块各自随条宽伸缩，超出上限的宽度留给空白 */
+.tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 100%;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalS);
+}
+
+.tileFont {
+  flex: 1 1 128px;
+  max-width: 220px;
+}
+
+.tileTiming {
+  flex: 1 1 164px;
+  max-width: 240px;
+}
+
+.tileHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalXS);
+  min-height: 24px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.tile[data-disabled] .tileHead,
+.tile[data-disabled] .tileValue {
+  color: var(--colorNeutralForegroundDisabled);
+}
+
+.tileValue {
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  font-variant-numeric: tabular-nums;
+}
+
+.tileBody {
+  display: flex;
+  align-items: center;
+  height: 32px;
+}
+
+/* 校正面板：大号数值，下面四个步进等宽排开，再下面是恢复原时间 */
+.big {
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase500);
+  font-weight: var(--fontWeightMedium);
+  font-variant-numeric: tabular-nums;
+}
+
+.steps {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacingHorizontalXS);
+}
+
+.reset {
+  align-self: flex-start;
+}

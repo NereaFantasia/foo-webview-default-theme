@@ -3,8 +3,10 @@ import {
   ChevronDown16Regular,
   ChevronRight16Regular,
   Record48Regular,
+  RecordRegular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
-import type { MouseEvent } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import type { Translate } from '../../i18n/translate.ts';
 import type { PluralPick } from '../../i18n/plural.ts';
 import type { TableGroupState } from '../../table/TrackTable.tsx';
@@ -13,35 +15,44 @@ import type { AlbumCoversService } from '../albumCovers.ts';
 import styles from './AlbumListGroup.module.css';
 import type { AlbumListGroup as GroupData, ListAlbum, ListSection } from './albumListModel.ts';
 import { albumArtistOf, albumYearOf, type Album } from '../../host/libraryContract.ts';
+import { ObjectLink } from '../../nav/ObjectLink.tsx';
+import { albumArtistLink } from '../../track/trackLinks.ts';
 import { useCoverLoad } from '../../covers/useCoverLoad.ts';
+import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
 
-/** 分组头上的动作，整张表共用一份。 */
+/** 分组头上的动作，整张表共用一份 */
 export interface ListGroupHandlers {
-  /** 进这张专辑的详情页：单击封面或专辑名。 */
+  /** 进这张专辑的详情页：单击封面或专辑名 */
   open(album: Album): void;
-  /** 开合键上的单击；Ctrl 同一节的专辑都跟着。 */
+  /** 开合键上的单击；Ctrl 同一节的专辑都跟着 */
   toggleAlbum(entry: ListAlbum, siblings: boolean, state: TableGroupState): void;
 }
 
 export interface AlbumListGroupProps {
   readonly item: TableGroupItem<GroupData>;
   readonly state: TableGroupState;
-  /** 封面列此刻的宽，CSS 像素；0 是不画封面。 */
+  /** 封面列此刻的宽，CSS 像素；0 是不画封面 */
   readonly coverWidth: number;
   readonly covers: AlbumCoversService;
   readonly handlers: ListGroupHandlers;
-  /** 正在为进这张的详情页取曲目、等得有一阵了：专辑名后出小转圈。 */
+  /** 正在为进这张的详情页取曲目、等得有一阵了：专辑名后出小转圈 */
   readonly opening?: boolean;
   readonly t: Translate;
   readonly plural: PluralPick;
   readonly animateSection?: boolean;
 }
 
-function counts(t: Translate, plural: PluralPick, albums: number, tracks: number): string {
-  return [
-    t(plural(albums, 'album.countOne', 'album.count'), { count: albums }),
-    t(plural(tracks, 'album.menuTracksOne', 'album.menuTracks'), { count: tracks }),
-  ].join(' · ');
+function counts(t: Translate, plural: PluralPick, albums: number, tracks: number): ReactNode {
+  return (
+    <Metadata>
+      <MetadataItem icon={<RecordRegular />}>
+        {t(plural(albums, 'album.countOne', 'album.count'), { count: albums })}
+      </MetadataItem>
+      <MetadataItem icon={<TextNumberListLtr16Regular />}>
+        {t(plural(tracks, 'album.menuTracksOne', 'album.menuTracks'), { count: tracks })}
+      </MetadataItem>
+    </Metadata>
+  );
 }
 
 interface SectionHeadProps {
@@ -77,7 +88,7 @@ interface ListCoverProps {
   readonly label: string;
 }
 
-/** 封面：单击进详情页。拿封面服务的名额才挂图，与封面墙的图块同一套。 */
+/** 封面：单击进详情页。拿封面服务的名额才挂图，与封面墙的图块同一套 */
 function ListCover({ album, size, covers, onOpen, label }: ListCoverProps) {
   const cover = covers.coverOf(album, size);
   const ready = cover?.status === 'ready';
@@ -117,7 +128,7 @@ function ListCover({ album, size, covers, onOpen, label }: ListCoverProps) {
 
 /**
  * 列表形态的分组头：节头画节名与张数、首数；专辑分组头画开合键、专辑名、专辑艺术家、首数与年份，展开时在它
- * 下面挂封面。里面的按钮都不在 Tab 次序上，键盘从表格那一层走。
+ * 下面挂封面。里面的按钮都不在 Tab 次序上，键盘从表格那一层走
  */
 export function AlbumListGroup(props: AlbumListGroupProps) {
   const { item, state, t, plural, handlers } = props;
@@ -162,7 +173,13 @@ export function AlbumListGroup(props: AlbumListGroupProps) {
           {album.name}
         </button>
         {props.opening && <Spinner size="extra-tiny" data-list-opening />}
-        <span className={styles.artist}>{albumArtistOf(album)}</span>
+        <span className={styles.artist}>
+          {albumArtistOf(album) && (
+            <ObjectLink to={albumArtistLink(album)?.ref ?? null} tabIndex={-1}>
+              {albumArtistOf(album)}
+            </ObjectLink>
+          )}
+        </span>
         <span className={styles.spacer} />
         <span className={styles.count}>
           {t(plural(tracks, 'album.menuTracksOne', 'album.menuTracks'), { count: tracks })}

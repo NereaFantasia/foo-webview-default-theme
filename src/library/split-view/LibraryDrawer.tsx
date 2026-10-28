@@ -5,7 +5,7 @@ import { SidePanel } from '../../kit/SidePanel.tsx';
 import { useLightDismiss } from '../../nav/useLightDismiss.ts';
 import styles from './LibraryDrawer.module.css';
 
-/** 未包在抽屉里时为 undefined；挂载中的标题工具插槽暂为 null。 */
+/** 未包在抽屉里时为 undefined；挂载中的标题工具插槽暂为 null */
 export const LibraryDrawerToolsContext = createContext<HTMLElement | null | undefined>(undefined);
 
 interface LibraryDrawerProps {

@@ -1,16 +1,22 @@
-/* 列表名在左、过滤框在右；放不下时过滤框折到下一行，过滤框先收窄。 */
+/* 标题行在上：左边列表名、记号与副题，右边播放与 ⋯；下面是命令栏 */
 .root {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  padding-bottom: var(--spacingVerticalXS);
+}
+.titleRow {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacingVerticalS) var(--spacingHorizontalL);
-  padding-bottom: var(--spacingVerticalL);
+  gap: var(--spacingHorizontalL);
+  min-width: 0;
 }
 .titles {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--spacingHorizontalMNudge);
+  gap: var(--spacingVerticalXXS) var(--spacingHorizontalMNudge);
   min-width: 0;
 }
 .mark {
@@ -19,14 +25,13 @@
   color: var(--text-secondary);
 }
 .subtitle {
-  flex: none;
+  flex: 0 1 auto;
   color: var(--text-secondary);
   white-space: nowrap;
 }
-/* 过滤框与它右边的键排成一组，窄了一起折到下一行。 */
-.tools {
+.actions {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: var(--spacingHorizontalS);
-  min-width: 0;
+  gap: var(--spacingHorizontalXS);
 }

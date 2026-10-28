@@ -1,4 +1,14 @@
-import { Button, Select, Spinner, Tab, TabList, Tooltip } from '@fluentui/react-components';
+import {
+  Button,
+  Option,
+  Spinner,
+  Tab,
+  TabList,
+  Tooltip,
+  makeStyles,
+  mergeClasses,
+} from '@fluentui/react-components';
+import { ScrollDropdown } from '../../kit/ScrollDropdown.tsx';
 import { ArrowClockwise20Regular, ArrowShuffle20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -13,7 +23,9 @@ import { albumsAtom } from '../albums.ts';
 import { albumKeyOf, type Album } from '../../host/libraryContract.ts';
 import { libraryTracksAtom } from '../libraryTracks.ts';
 import { TrackMenu } from '../TrackMenu.tsx';
+import { CoverGrid, STANDARD_GRID_SHAPE } from '../cover-tile/CoverGrid.tsx';
 import { HomeAlbumCard } from './HomeAlbumCard.tsx';
+import { HomeCandidateCard } from './HomeCandidateCard.tsx';
 import { HomeChannels } from './HomeChannels.tsx';
 import { HomePins } from './HomePins.tsx';
 import { HOME_RECENT_LIMIT } from './homeRecent.ts';
@@ -50,6 +62,7 @@ interface HomeSnapshot {
   } | null;
 }
 const HOME_SLOT = createSnapshotSlot<HomeSnapshot>();
+const useStyles = makeStyles({ dropdown: { minWidth: 0 } });
 
 export function HomePage() {
   const home = useContext(HomeContext);
@@ -58,6 +71,7 @@ export function HomePage() {
 
 function HomeContent() {
   const viewControls = useViewControlStyles();
+  const classes = useStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const albums = useService(albumsKey);
@@ -148,15 +162,31 @@ function HomeContent() {
     void albums.menu.prepare([album]);
     setAlbumMenu({ at, owner });
   };
-  const albumGrid = (items: readonly Album[], compact = false) => (
-    <div className={compact ? styles.candidates : styles.grid}>
+  const albumCard = (album: Album) => (
+    <HomeAlbumCard
+      key={albumKeyOf(album)}
+      album={album}
+      onMenu={menu}
+      menuOwner={albumMenu?.owner}
+    />
+  );
+  // 方形图块照封面墙排；横排的候选卡带着曲数与时长，自己一列列排
+  const albumGrid = (items: readonly Album[]) => (
+    <CoverGrid
+      shape={STANDARD_GRID_SHAPE}
+      items={items}
+      keyOf={albumKeyOf}
+      render={(album) => albumCard(album)}
+    />
+  );
+  const candidateGrid = (items: readonly Album[]) => (
+    <div className={styles.candidates}>
       {items.map((album) => (
-        <HomeAlbumCard
+        <HomeCandidateCard
           key={albumKeyOf(album)}
           album={album}
           onMenu={menu}
           menuOwner={albumMenu?.owner}
-          compact={compact}
         />
       ))}
     </div>
@@ -331,13 +361,17 @@ function HomeContent() {
             </Tab>
           </TabList>
           {view.mode === 'albums' ? (
-            <Select
-              select={{ className: viewControls.field }}
+            <ScrollDropdown
+              className={mergeClasses(viewControls.field, classes.dropdown)}
               aria-label={t('home.duration')}
-              value={String(view.duration)}
-              onChange={(_, data) => {
+              value={
+                view.duration ? t('home.minutes', { count: view.duration }) : t('home.anyDuration')
+              }
+              selectedOptions={[String(view.duration)]}
+              onOptionSelect={(_, data) => {
+                if (!data.optionValue) return;
                 const duration: HomeDuration =
-                  data.value === '30' ? 30 : data.value === '60' ? 60 : 0;
+                  data.optionValue === '30' ? 30 : data.optionValue === '60' ? 60 : 0;
                 setView((old) => ({
                   ...old,
                   duration,
@@ -345,31 +379,33 @@ function HomeContent() {
                 }));
               }}
             >
-              <option value="0">{t('home.anyDuration')}</option>
-              <option value="30">{t('home.minutes', { count: 30 })}</option>
-              <option value="60">{t('home.minutes', { count: 60 })}</option>
-            </Select>
+              <Option value="0">{t('home.anyDuration')}</Option>
+              <Option value="30">{t('home.minutes', { count: 30 })}</Option>
+              <Option value="60">{t('home.minutes', { count: 60 })}</Option>
+            </ScrollDropdown>
           ) : (
-            <Select
-              select={{ className: viewControls.field }}
+            <ScrollDropdown
+              className={mergeClasses(viewControls.field, classes.dropdown)}
               aria-label={t('home.gemCondition')}
-              value={view.gem}
-              onChange={(_, data) =>
+              value={t(view.gem === 'unplayed' ? 'home.unplayed' : 'home.forgotten')}
+              selectedOptions={[view.gem]}
+              onOptionSelect={(_, data) => {
+                if (!data.optionValue) return;
                 setView((old) => ({
                   ...old,
-                  gem: data.value === 'unplayed' ? 'unplayed' : 'forgotten',
+                  gem: data.optionValue === 'unplayed' ? 'unplayed' : 'forgotten',
                   offset: 0,
-                }))
-              }
+                }));
+              }}
             >
-              <option value="forgotten">{t('home.forgotten')}</option>
-              <option value="unplayed">{t('home.unplayed')}</option>
-            </Select>
+              <Option value="forgotten">{t('home.forgotten')}</Option>
+              <Option value="unplayed">{t('home.unplayed')}</Option>
+            </ScrollDropdown>
           )}
         </div>
         {view.mode === 'albums' ? (
           <>
-            {albumGrid(view.albums, true)}
+            {candidateGrid(view.albums)}
             {catalog.status === 'ready' && !view.albums.length && <p>{t('home.noAlbums')}</p>}
           </>
         ) : (

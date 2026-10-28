@@ -99,3 +99,10 @@ button.photo {
 .status:empty {
   display: none;
 }
+
+.statusDetail {
+  flex-basis: 100%;
+  font-size: var(--fontSizeBase100);
+  color: var(--colorNeutralForeground3);
+  overflow-wrap: anywhere;
+}

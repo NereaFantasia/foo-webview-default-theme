@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Track } from 'foo-webview-sdk';
 import { openSongs, SONG_TRACKS } from '../fixtures/songsPage.ts';
 import { openPlaylist, albumTracks } from '../fixtures/playlistPage.ts';
@@ -36,6 +36,9 @@ function informationAnswers(host: PageHost, tracks: readonly Track[]) {
 async function showInfo(page: Page) {
   if (!(await page.locator('[data-right-card]').isVisible())) {
     await page.locator('[data-right-card-key="queue"]').click();
+    // 键上的悬停提示会盖在分页栏上，等它收了再点页签
+    await page.mouse.move(640, 700);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
   }
   await page.locator('[data-right-card-page="info"]').click();
   await expect(page.locator('[data-track-info]')).toBeVisible();
@@ -43,9 +46,24 @@ async function showInfo(page: Page) {
 
 const head = (page: Page) => page.locator('[data-track-info] > div').first();
 
+// 面板选项里没有关闭项：信息页上先按队列键换到队列页，再按一次合上；等卡退场完再往下做，退场中的卡还在 DOM 里
 async function closeInfo(page: Page) {
-  await page.getByRole('button', { name: '面板选项', exact: true }).click();
-  await page.getByRole('menuitem', { name: '关闭面板', exact: true }).click();
+  const key = page.locator('[data-right-card-key="queue"]');
+  await key.click();
+  await key.click();
+  await expect(page.locator('[data-right-card]')).toHaveCount(0);
+}
+
+/** 等元素不再动（入场位移播完）再取框，连着两次取到一样才算 */
+async function settledBox(locator: Locator) {
+  let last = await locator.boundingBox();
+  for (let at = 0; at < 20; at += 1) {
+    await locator.page().waitForTimeout(60);
+    const now = await locator.boundingBox();
+    if (JSON.stringify(now) === JSON.stringify(last)) return now;
+    last = now;
+  }
+  return last;
 }
 
 test('歌曲单击、键盘与跨页保留，关卡后选择在重新打开时生效；原队列仍跟随播放', async ({ page }) => {
@@ -100,12 +118,15 @@ test('歌曲单击、键盘与跨页保留，关卡后选择在重新打开时�
   const queueToolbar = await toolbar.boundingBox();
   const queueTabs = await tabs.boundingBox();
   const queueMore = await more.boundingBox();
+  const queueBorder = await toolbar.evaluate(
+    (element) => getComputedStyle(element).borderBottomWidth,
+  );
   await page.locator('[data-right-card-page="info"]').click();
   await expect(head(page)).toContainText('Feather');
   expect(await toolbar.boundingBox()).toEqual(queueToolbar);
   expect(await tabs.boundingBox()).toEqual(queueTabs);
   expect(await more.boundingBox()).toEqual(queueMore);
-  await expect(toolbar).toHaveCSS('border-bottom-width', '0px');
+  await expect(toolbar).toHaveCSS('border-bottom-width', queueBorder);
   await closeInfo(page);
   await expect(page.locator('[data-track-info]')).not.toBeVisible();
   const readCount = host.callsTo('metadata.read').length;
@@ -171,8 +192,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const header = head(page);
     const more = header.getByRole('button', { name: '曲目选项', exact: true });
     const toggle = header.locator('[data-info-cover-toggle]');
-    const arrowBounds = await toggle.boundingBox();
-    const moreBounds = await more.boundingBox();
+    const arrowBounds = await settledBox(toggle);
+    const moreBounds = await settledBox(more);
     expect(
       arrowBounds &&
         moreBounds &&

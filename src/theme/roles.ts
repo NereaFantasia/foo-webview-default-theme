@@ -1,25 +1,34 @@
 import { tokens } from '@fluentui/react-components';
 import type { ColorScheme } from './themes.ts';
 
+/** 分隔线与行间细线占前景色的百分比；调线的轻重只改这两个数 */
+export const LINE_PERCENT = 12;
+export const LINE_SUBTLE_PERCENT = 6;
+
+/** 从前景色混入透明：线随背后的底色与染色透出。Stroke2、Stroke3 是不透明灰，压在染色的底上会浮出来 */
+export function lineMix(foreground: string, percent: number): string {
+  return `color-mix(in srgb, ${foreground} ${percent}%, transparent)`;
+}
+
 /**
- * 语义变量：按界面上的用途命名（`--bg-pane` 是内容卡的底），取值落到 Fluent token。
- * 组件取色优先写语义变量：CSS Modules 里写 `var(--bg-pane)`，makeStyles 里用 `roleVar('bg-pane')`。
- * 变量由主题根挂在 FluentProvider 上，经 Portal 弹出的菜单、提示里同样取得到。
+ * 语义变量：按界面上的用途命名（`--bg-pane` 是内容卡的底），取值落到 Fluent token
+ * 组件取色优先写语义变量：CSS Modules 里写 `var(--bg-pane)`，makeStyles 里用 `roleVar('bg-pane')`
+ * 变量由主题根挂在 FluentProvider 上，经 Portal 弹出的菜单、提示里同样取得到
  */
 export const ROLE_VALUES = {
-  // 窗口底与内容卡是 Mica 的透出层，必须可透，不能取不透明的中性底。
+  // 窗口底与内容卡是 Mica 的透出层，必须可透，不能取不透明的中性底
   'bg-app': 'transparent',
   'bg-pane': tokens.colorNeutralBackgroundAlpha2,
-  // 直接坐在窗口背景上的控件使用固定浓度，不跟随主视图的内容浓度。
+  // 直接坐在窗口背景上的控件使用固定浓度，不跟随主视图的内容浓度
   'bg-window-control': `color-mix(in srgb, ${tokens.colorNeutralBackground1} 42%, transparent)`,
-  // 主视图里的工具控件只叠一层轻微中性底，不把阅读面的内容浓度再套一遍。
+  // 主视图里的工具控件只叠一层轻微中性底，不把阅读面的内容浓度再套一遍
   'bg-view-control': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 8%, transparent)`,
-  // 控件状态层用自适应前景色混出，深色档是浅色高亮，浅色档保持低对比度。
+  // 控件状态层用自适应前景色混出，深色档是浅色高亮，浅色档保持低对比度
   'state-hover': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 10%, transparent)`,
   'state-pressed': `color-mix(in srgb, ${tokens.colorNeutralForeground1} 14%, transparent)`,
-  // 播放栏直接坐在窗口背景上，未播放轨道固定使用浅白半透明，不随深浅档反色。
+  // 播放栏直接坐在窗口背景上，未播放轨道固定使用浅白半透明，不随深浅档反色
   'player-rail': `color-mix(in srgb, ${tokens.colorNeutralForegroundStaticInverted} 28%, transparent)`,
-  // 菜单与浮层使用不透明中性底；主窗标题栏直接露出窗口背景。
+  // 菜单与浮层使用不透明中性底；主窗标题栏直接露出窗口背景
   'bg-titlebar': tokens.colorNeutralBackground3Selected,
   'bg-surface': tokens.colorNeutralBackground2,
   'bg-elevated': tokens.colorNeutralBackground1,
@@ -27,10 +36,12 @@ export const ROLE_VALUES = {
   'bg-menu': tokens.colorNeutralBackground1,
   'bg-player-overlay': tokens.colorNeutralBackground1,
   'bg-hover': tokens.colorSubtleBackgroundSelected,
-  // 品牌着色的选中底。不用 colorBrandBackground2：青绿 ramp 下它落到 ramp 的两端档，选中态几乎看不出。
+  // 品牌着色的选中底。不用 colorBrandBackground2：青绿 ramp 下它落到 ramp 的两端档，选中态几乎看不出
   'bg-selected': `color-mix(in oklab, ${tokens.colorBrandStroke1} 18%, transparent)`,
-  // 分隔线取 Stroke2：Stroke3 在浅色档压在 Background2 上对比不足，看不见。
-  line: tokens.colorNeutralStroke2,
+  // 分隔线用前景色混出的半透明线，不取 Stroke2：浅色档 Stroke3 压在 Background2 上看不见，Stroke2 又是实色
+  line: lineMix(tokens.colorNeutralForeground1, LINE_PERCENT),
+  // 行与行之间的细线，比分隔线淡一档
+  'line-subtle': lineMix(tokens.colorNeutralForeground1, LINE_SUBTLE_PERCENT),
   'text-primary': tokens.colorNeutralForeground1,
   'text-secondary': tokens.colorNeutralForeground3,
   'text-muted': tokens.colorNeutralForeground4,
@@ -52,7 +63,7 @@ export function roleVar(name: RoleName): string {
   return `var(--${name})`;
 }
 
-/** 把一组角色取值写成 CSS 自定义属性，给 makeStyles 展开用。 */
+/** 把一组角色取值写成 CSS 自定义属性，给 makeStyles 展开用 */
 export function roleProperties(
   values: Readonly<Partial<Record<RoleName, string>>>,
 ): Record<`--${string}`, string> {
@@ -69,7 +80,7 @@ function acrylicTint(percent: number): string {
 
 /**
  * 宿主实际用的是 Acrylic 时，窗口底与内容卡改用不透明中性底按比例混入透明，两层各自定浓度，
- * 不受 Alpha token 固定档位的限制。内容卡比窗口底更不透明，材质主要从窗口底透出；深色档两层都更透一些。
+ * 不受 Alpha token 固定档位的限制。内容卡比窗口底更不透明，材质主要从窗口底透出；深色档两层都更透一些
  */
 export const ACRYLIC_ROLES: Readonly<Record<ColorScheme, Partial<Record<RoleName, string>>>> = {
   light: { 'bg-app': acrylicTint(80), 'bg-pane': acrylicTint(90) },

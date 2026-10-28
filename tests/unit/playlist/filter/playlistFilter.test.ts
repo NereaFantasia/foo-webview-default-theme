@@ -1,14 +1,13 @@
 import { createMemoryConfigWriter } from '../../../fixtures/dataWriter.ts';
 import type { PlaylistTrack } from 'foo-webview-sdk';
 import { atom, createStore } from 'jotai/vanilla';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   FILTER_DEBOUNCE_MS,
   MATCH_LIMIT,
   SCAN_PAGE,
   startPlaylistFilter,
 } from '../../../../src/playlist/filter/playlistFilter.ts';
-import { ROW_FIELDS } from '../../../../src/playlist/playlistRow.ts';
 import { startPlaylistRows } from '../../../../src/playlist/playlistRows.ts';
 import { startPlaylists } from '../../../../src/playback/playlists.ts';
 import { FakePlaylists, guidOf, makePlaylist, makeRow } from '../../../fixtures/fakePlaylists.ts';
@@ -74,7 +73,7 @@ describe('startPlaylistFilter', () => {
     expect(titles()).toStrictEqual(['Blue Moon', 'Red', 'Moonlight']);
     expect(state().hits.map((hit) => hit.index)).toStrictEqual([0, 1, 3]);
     expect(state()).toMatchObject({ term: 'mOOn', scanning: false, truncated: false, stamp: 1 });
-    expect(scans(host)[0]?.['fields']).toStrictEqual([...ROW_FIELDS]);
+    expect(scans(host)[0]?.['fields']).toBeUndefined();
   });
 
   it('连着键入只扫最后那个词；flush 不等静默期', async () => {
@@ -177,7 +176,13 @@ describe('startPlaylistFilter', () => {
     const current = fake.items[0];
     if (!current) throw new Error('清单里没有 Main');
     fake.setTracks(MAIN, [...fake.tracksOf(current), makeRow('Main', 9, { title: 'New Moon' })]);
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(0), playlist: 0, start: 3, count: 1 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      start: 3,
+      count: 1,
+      contentVersion: '1',
+    });
     await wait(200);
     expect(state().term).toBe('moon');
     await wait(200);
@@ -276,4 +281,91 @@ describe('startPlaylistFilter', () => {
     expect(scans(host).at(-1)?.['formats']).toBeUndefined();
     expect(titles()).toStrictEqual([]);
   });
+});
+
+it('标签与播放统计更新会刷新过滤快照', async () => {
+  const host = installFakeHost();
+  const track = makeRow('Main', 0, {
+    title: 'Blue',
+    playCount: 1,
+    lastPlayed: '2024-01-01 00:00:00',
+  });
+  const fake = lists(host, [track]);
+  const { filter, state } = await start(host);
+  filter.setQuery(MAIN, 'Blue');
+  filter.flush(MAIN);
+  await vi.waitFor(() => expect(state().hits[0]?.row.playCount).toBe(1));
+  fake.setTracks(MAIN, [{ ...track, playCount: 2, lastPlayed: '2024-02-01 00:00:00' }]);
+  host.emit('metadb:changed', {
+    count: 1,
+    fromHook: false,
+    handles: [track.handle],
+    truncated: false,
+    timestamp: Date.now(),
+    tracks: [{ handle: track.handle, path: track.path, subsong: track.subsong }],
+  });
+  await vi.waitFor(() => expect(state().hits[0]?.row.playCount).toBe(2));
+  expect(state().hits[0]?.row.lastPlayed).toBe('2024-02-01 00:00:00');
+});
+
+const longList = () =>
+  Array.from({ length: 900 }, (_, row) =>
+    makeRow('Main', row, row === 850 ? { title: 'Target', playCount: 1 } : {}),
+  );
+const changed = (...tracks: readonly PlaylistTrack[]) => ({
+  count: tracks.length,
+  fromHook: false,
+  handles: tracks.map((track) => track.handle),
+  truncated: false,
+  timestamp: Date.now(),
+  tracks: tracks.map(({ handle, path, subsong }) => ({ handle, path, subsong })),
+});
+/** 行服务只缓存列表开头几页，取到第 800 行的只有过滤的整表扫描。 */
+const fullScans = (host: UnitHost) =>
+  host.callsTo('playlist.getTracks').filter((call) => call['start'] === 800).length;
+
+it('行缓存之外的命中也随标签与统计更新，原来没命中的改完变成命中', async () => {
+  const host = installFakeHost();
+  const tracks = longList();
+  const fake = lists(host, tracks);
+  const { filter, state, titles } = await start(host);
+  filter.setQuery(MAIN, 'Target');
+  filter.flush(MAIN);
+  await vi.waitFor(() => expect(state().hits.map((hit) => hit.index)).toStrictEqual([850]));
+  const [target, other] = [tracks[850]!, tracks[860]!];
+  fake.setTracks(
+    MAIN,
+    tracks.map((track) =>
+      track === target
+        ? { ...track, playCount: 2 }
+        : track === other
+          ? { ...track, title: 'Target 2' }
+          : track,
+    ),
+  );
+  host.emit('metadb:changed', changed(target, other));
+  await vi.waitFor(() => expect(titles()).toStrictEqual(['Target', 'Target 2']));
+  expect(state().hits[0]?.row.playCount).toBe(2);
+});
+
+it('标签更新只重扫一轮：列表外的曲目不扫，缓存里的不与行服务各扫一遍，重扫期间旧命中留着', async () => {
+  const host = installFakeHost();
+  const tracks = longList();
+  lists(host, tracks);
+  const { filter, state, titles } = await start(host);
+  filter.setQuery(MAIN, 'Target');
+  filter.flush(MAIN);
+  await vi.waitFor(() => expect(titles()).toStrictEqual(['Target']));
+  const before = fullScans(host);
+  host.emit('metadb:changed', changed(makeRow('Elsewhere', 0)));
+  await wait(400);
+  expect(fullScans(host)).toBe(before);
+  const held = host.hold('playlist.getTracks');
+  host.emit('metadb:changed', changed(tracks[1]!));
+  await vi.waitFor(() => expect(state().scanning).toBe(true));
+  expect(titles()).toStrictEqual(['Target']);
+  held.release();
+  await vi.waitFor(() => expect(fullScans(host)).toBe(before + 1));
+  await wait(400);
+  expect(fullScans(host)).toBe(before + 1);
 });

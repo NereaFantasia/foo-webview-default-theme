@@ -7,8 +7,8 @@ import { serviceKey } from '../kit/serviceKey.ts';
 
 /**
  * 播放队列里有几首：侧边栏图标态在队列图标上点小圆点用。先订 `playback:queueChanged` 再初读
- * `queue.getCount`，事件自带变化之后的长度，直接用；初读的应答晚于任何一次事件到时丢掉，它已经过期。
- * 读失败、没连上宿主都当 0，只是不点圆点。
+ * `queue.getCount`，事件自带变化之后的长度，直接用；初读的应答晚于任何一次事件到时丢掉，它已经过期
+ * 读失败、没连上宿主都当 0，只是不点圆点
  */
 export interface QueueCountFace extends HostReadyFace {
   on: typeof fb.on;
@@ -27,7 +27,7 @@ export interface QueueCountService {
 export function startQueueCount(store: Store, host: QueueCountFace = fb): QueueCountService {
   store.set(countAtom, 0);
   let disposed = false;
-  // 收到过事件之后，初读的应答一律作废。
+  // 收到过事件之后，初读的应答一律作废
   let heard = false;
   let off: (() => void) | undefined;
   const waiter = waitForHost(host);

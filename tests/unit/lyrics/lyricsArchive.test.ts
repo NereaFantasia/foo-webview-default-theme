@@ -164,6 +164,48 @@ describe('曲目歌词存档', () => {
     });
   });
 
+  describe('条目淘汰', () => {
+    const keyOf = (name: string) => `defaultTheme.lyrics.track.${name}`;
+    const walk = (env: ReturnType<typeof setup>, count: number) => {
+      for (let at = 0; at < count; at += 1) env.store.set(env.target, track(`t${at}`));
+    };
+    const live = (env: ReturnType<typeof setup>) => env.store.get(env.service.persistence.state);
+
+    it('只留最近用过的存档，丢掉的回到那首时从宿主重读', async () => {
+      const env = setup();
+      await env.service.select('a', lyrics);
+      walk(env, 40);
+      expect(live(env).has(keyOf('a'))).toBe(false);
+      expect(live(env).has(keyOf('t39'))).toBe(true);
+      expect(live(env).size).toBeLessThan(40);
+      env.store.set(env.target, track('a'));
+      await expect.poll(() => env.store.get(env.service.selected)).toEqual(lyrics);
+    });
+
+    it('写入失败的存档不被淘汰，重试成功后才可淘汰', async () => {
+      const env = setup();
+      env.host.answer('config.set', hostFailure('OPERATION_FAILED'));
+      expect(await env.service.select('a', lyrics)).toBe(false);
+      walk(env, 40);
+      expect(live(env).get(keyOf('a'))?.status).toBe('failed');
+      env.host.answer('config.set', (params) => ({ success: true, key: String(params['key']) }));
+      expect(await env.service.persistence.retry(keyOf('a'))).toBe(true);
+      env.store.set(env.target, track('t40'));
+      expect(live(env).has(keyOf('a'))).toBe(false);
+    });
+
+    it('写入还在等初读时不被淘汰', async () => {
+      const env = setup();
+      const held = env.host.hold('config.get');
+      const saving = env.service.select('a', lyrics);
+      walk(env, 40);
+      expect(live(env).has(keyOf('a'))).toBe(true);
+      held.release();
+      expect(await saving).toBe(true);
+      expect(env.host.config.get(keyOf('a'))).toMatchObject({ selected: JSON.stringify(lyrics) });
+    });
+  });
+
   it('网络流同一路径的新节目不沿用默认词或校正', async () => {
     const env = setup();
     env.store.set(env.target, track('radio', false));

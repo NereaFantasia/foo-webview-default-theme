@@ -1,12 +1,13 @@
 import { useCallback, useLayoutEffect, useRef, type RefCallback } from 'react';
 
 /**
- * 量元素的内容宽（不含内边距），像素：返回的 ref 挂到元素上，挂上后报一次，之后每次变宽变窄都报。
- * 宽高都是 0 的元素（没渲染出来）挂上时不报，等它有了尺寸才报第一次。
- * `report` 取最近一次渲染传进来的，调用方不必记忆化；要什么状态由调用方自己存。
+ * 监听并获取 DOM 元素内容区宽度（不含内边距，单位为像素）的 Ref 回调 Hook
+ * 元素初次挂载就绪后派发初次测量值，后续尺寸变动时持续上报
+ * 针对初次挂载尺寸为 0 的未就绪元素，延迟至首次获得有效尺寸后派发
+ * 回调引用自动保持最新，调用方无需使用 `useCallback` 包裹 `report`
  *
- * 用 ResizeObserver 而不用容器查询：`container-type` 自带布局包含，元素里 fixed 定位的浮层
- * （菜单、提示）的包含块会变成这个元素，浮层就飘到别处去了。
+ * 注：采用 ResizeObserver 代替 CSS 容器查询，避免 `container-type` 引入的包含块格式化上下文
+ * 导致内部 fixed 定位的浮层（如 Tooltip、菜单等）偏离预设视口锚点
  */
 export function useElementWidth<E extends Element>(
   report: (width: number) => void,

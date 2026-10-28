@@ -1,4 +1,4 @@
-/* 铺满舞台的定位层；可点的只有下面罗盘的传输键，这一层不接指针。 */
+/* 铺满舞台的定位层；可点的只有下面罗盘的传输键，这一层不接指针 */
 .meter {
   position: absolute;
   inset: 0;
@@ -6,7 +6,7 @@
   font-family: var(--fontFamilyMonospace);
 }
 
-/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线。 */
+/* 按基线落位：字盒底边裁到字母基线，`top` 写的就是基线 */
 .base,
 .duration-cell > span,
 .remain > span {
@@ -31,7 +31,7 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* 声场格右缘约 1092：小标加实时值与 W / B 附行是这一格里最宽的两行。 */
+/* 声场格右缘约 1092：小标加实时值与 W / B 附行是这一格里最宽的两行 */
 .stereo-cell {
   position: absolute;
   left: 760px;
@@ -52,7 +52,7 @@
   left: 1110px;
 }
 
-/* 摆锤条右端（1276）再隔 30。 */
+/* 摆锤条右端（1276）再隔 30 */
 .divider.second {
   left: 1306px;
 }

@@ -1,0 +1,62 @@
+.root {
+  display: grid;
+  gap: var(--spacingVerticalXL);
+}
+
+.section {
+  min-width: 0;
+}
+
+.heading {
+  display: flex;
+  margin: 0 0 var(--spacingVerticalM);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase500);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase500);
+}
+
+/* 标题就是按钮：悬停与按下只在标题范围出状态层；左边的内边距用负外边距抵掉，文字仍与网格左缘对齐 */
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  margin: 0 0 0 calc(-1 * var(--spacingHorizontalS));
+  padding: 0 var(--spacingHorizontalXS) 0 var(--spacingHorizontalS);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.open:hover {
+  background: var(--state-hover);
+}
+
+.open:active {
+  background: var(--state-pressed);
+}
+
+.open:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+.arrow {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* 读取中只有一个转圈，不画骨架、不写字 */
+.spinner {
+  padding: var(--spacingVerticalXXXL) 0;
+}
+
+/* 查找或筛选没有匹配时的一句 */
+.empty {
+  margin: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalS);
+  color: var(--text-secondary);
+}

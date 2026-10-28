@@ -17,7 +17,7 @@ const pref = defineLocalPref<number>({
 
 export interface WindowZoomState {
   readonly status: 'connecting' | 'ready' | 'failed' | 'unavailable';
-  /** 0 表示使用本次宿主启动时的默认缩放，其余是百分比。 */
+  /** 缩放选项百分比数值；0 表示跟随本次启动时宿主默认缩放比例 */
   readonly choice: number;
   readonly pending: boolean;
   readonly failed: boolean;
@@ -37,8 +37,9 @@ function validZoom(value: unknown): value is number {
 }
 
 /**
- * 页面重载后 getZoom 已是主题设过的值，不能再当作宿主默认值。初始值按窗口保存在宿主进程的内存里，
- * 随进程退出失效；用户选择则单独存浏览器偏好。设置请求串行执行，只保存最后一次选择。
+ * 启动窗口缩放管理服务
+ * 宿主默认基准比例按窗口 ID 缓存于宿主共享内存中（随进程退出失效），避免重载后读取到已被主题修改的值；
+ * 用户显式设置的比例持久化至本地偏好中。更新请求全局串行处理，仅最后一次生效
  */
 export function startWindowZoom(
   store: Store,

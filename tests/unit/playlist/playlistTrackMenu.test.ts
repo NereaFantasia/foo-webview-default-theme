@@ -63,7 +63,7 @@ async function setup(settled: () => Promise<boolean> = async () => true) {
   );
   lists.setTracks(OTHER, [makeRow('Other', 0)]);
   host.answer('menu.getContextMenu', answer(TREE));
-  host.answer('menu.runContextCommandById', { success: true });
+  host.answer('menu.runContextCommandById', { success: true, completion: 'unknown' });
   const store = createStore();
   const playlists = startPlaylists(store, host.fb);
   const rows = startPlaylistRows(store, { stamp: () => 0, refetch: atom(0) }, host.fb);

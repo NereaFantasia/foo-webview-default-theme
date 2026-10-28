@@ -64,7 +64,9 @@ for (const scenario of [
       await page.setViewportSize({ width, height: 700 });
       const hasCapsule =
         scenario.style === 'capsule' || (scenario.style === 'titlebar' && width < 1008);
+      // 滚动尾部 = 页面底边距 16 + 胶囊占的 80
       const inset = hasCapsule ? 80 : 0;
+      const tail = 16 + inset;
       await expect(capsule).toHaveCount(hasCapsule ? 1 : 0);
       await expect
         .poll(() =>
@@ -72,15 +74,15 @@ for (const scenario of [
             Number.parseFloat(getComputedStyle(element).paddingBottom),
           ),
         )
-        .toBe(inset);
+        .toBe(tail);
       await songs.grid.press('Home');
       await expect(songs.row('Track 0001')).toHaveAttribute('data-row-focus', 'true');
       await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
 
-      // 视口伸到页面常规内边距处，末尾预留不从它的可见高度扣掉。
+      // 滚动区一直伸到页面底边（差的 1 是卡的边线），页面底边距在它的内边距里，末尾预留不从可见高度扣掉。
       await expect
         .poll(async () => Math.round((await bottom(songs.view)) - (await bottom(scroller))))
-        .toBe(16);
+        .toBe(1);
       await expect
         .poll(async () => Math.round((await bottom(viewport)) - (await bottom(scroller))))
         .toBe(0);
@@ -102,7 +104,7 @@ for (const scenario of [
 
       const pageRows = await scroller.evaluate(
         (element, covered) => Math.floor((element.clientHeight - covered) / 40),
-        inset,
+        tail,
       );
       await songs.grid.press('PageDown');
       const next = `Track ${String(pageRows + 1).padStart(4, '0')}`;
@@ -112,7 +114,7 @@ for (const scenario of [
       await expect(last).toHaveAttribute('data-row-focus', 'true');
       await expect
         .poll(async () => Math.round((await bottom(scroller)) - (await bottom(last))))
-        .toBe(inset);
+        .toBe(tail);
       if (hasCapsule) {
         const cover = await capsule.boundingBox();
         expect(await bottom(last)).toBeLessThanOrEqual(cover?.y ?? 0);

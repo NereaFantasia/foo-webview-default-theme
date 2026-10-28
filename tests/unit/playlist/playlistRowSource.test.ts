@@ -1,7 +1,6 @@
 import type { PlaylistTrack } from 'foo-webview-sdk';
 import { atom, createStore } from 'jotai/vanilla';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ROW_FIELDS } from '../../../src/playlist/playlistRow.ts';
 import {
   IDLE_ROWS,
   MAX_IN_FLIGHT,
@@ -48,7 +47,7 @@ function setup(count: number, guid = MAIN) {
 const starts = (host: UnitHost) => host.callsTo('playlist.getTracks').map((call) => call['start']);
 
 describe('PlaylistRowSource', () => {
-  it('取视口那一页并往下预取，按 GUID 取、只投影要的字段；每页带着它请求之前拿的戳', async () => {
+  it('取视口那一页并往下预取，按 GUID 取、完整页包含显示所需字段；每页带着它请求之前拿的戳', async () => {
     const { host, source, state } = setup(450);
     source.start(450, true);
     expect(state()).toMatchObject({ status: 'loading', total: 450 });
@@ -58,7 +57,6 @@ describe('PlaylistRowSource', () => {
         playlistGuid: MAIN,
         start,
         count: PAGE_SIZE,
-        fields: [...ROW_FIELDS],
       })),
     );
     expect(state()).toMatchObject({ status: 'ready', total: 450, readFailed: false });

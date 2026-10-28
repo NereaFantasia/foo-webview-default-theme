@@ -32,10 +32,11 @@ import {
 import { foldersTreeAtom } from './foldersTree.ts';
 import { useFoldersKeys } from './useFoldersKeys.ts';
 import { useFoldersTreeMotion } from './useFoldersTreeMotion.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import styles from './FoldersTree.module.css';
 import { useService } from '../../../kit/useService.ts';
 
-/** 每行的高，像素，与样式里 `.row` 的高一致。 */
+/** 每行的高，像素，与样式里 `.row` 的高一致 */
 const ROW_HEIGHT = 40;
 
 export interface FoldersTreeProps {
@@ -51,6 +52,7 @@ export interface FoldersTreeHandle {
 }
 export function FoldersTree({ scroll, handle, onMenu, onPlay, active }: FoldersTreeProps) {
   const folders = useService(foldersKey);
+  const viewControls = useViewControlStyles();
   const state = useAtomValueRawSync(foldersTreeAtom);
   const filter = useAtomValueRawSync(foldersFilterAtom);
   const selectedFocus = useAtomValueRawSync(foldersFocusAtom);
@@ -250,6 +252,7 @@ export function FoldersTree({ scroll, handle, onMenu, onPlay, active }: FoldersT
               <span className={styles.count}>{node.count.toLocaleString()}</span>
               {failed && (
                 <Button
+                  className={viewControls.field}
                   size="small"
                   onClick={(event) => {
                     event.stopPropagation();

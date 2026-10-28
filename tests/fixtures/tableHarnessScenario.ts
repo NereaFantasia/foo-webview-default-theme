@@ -22,8 +22,6 @@ export interface HarnessScenario {
   readonly range: boolean;
   /** 评分戳按行给：每这么多行一页、各拿一个戳；0 是整张表一个戳。 */
   readonly pageStamps: number;
-  /** 列头菜单带上排序与分组两段，见 `useHarnessMenu`。 */
-  readonly menu: boolean;
   /** 列存档的键。 */
   readonly key: string;
   readonly width: number;
@@ -53,7 +51,6 @@ export function scenarioFrom(search: string): HarnessScenario {
     loading: flag('loading'),
     range: flag('range'),
     pageStamps: count('pageStamps', 0),
-    menu: flag('menu'),
     key,
     width: count('width', 900),
     height: count('height', 480),

@@ -1,4 +1,4 @@
-/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给。
+/* `--scope-corner-font` 是声场图角标 L / R 的字号，由放声场图的格子按档给
    小标下 5 的空没有等值的 spacing token，写成本件的几何变量。 */
 .stereo {
   --scope-corner-font: 9px;
@@ -20,7 +20,7 @@
   gap: var(--spacingHorizontalL);
 }
 
-/* 读数区是一张 112 × 96 的小图：各件的位置照图纸，都相对读数区左上角。 */
+/* 读数区是一张 112 × 96 的小图：各件的位置照图纸，都相对读数区左上角 */
 .readouts {
   position: relative;
   flex: none;
@@ -42,7 +42,7 @@
   left: 0;
 }
 
-/* 刻度轨高 14：中间一条 2 px 的轨线，零点一根 10 px 的短刻，游标竖贯整条。 */
+/* 刻度轨高 14：中间一条 2 px 的轨线，零点一根 10 px 的短刻，游标竖贯整条 */
 .scale {
   top: 16px;
   left: 0;

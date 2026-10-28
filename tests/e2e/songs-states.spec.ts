@@ -65,17 +65,18 @@ test('去详情页再后退，过滤词、条件与焦点恢复，前进仍到�
   const songs = await openSongs(page);
   await songs.box.fill('massive');
   await expect(songs.subtitle).toHaveText(/^2 首/);
-  await songs.view.locator('[data-songs-facets-toggle]').click();
+  await songs.view.locator('[data-filter-toggle]').click();
   await songs.view
-    .locator('[data-songs-facet="genre"]')
+    .locator('[data-facet-column="genre"]')
     .getByRole('checkbox', { name: 'Trip-Hop' })
     .check();
+  await page.keyboard.press('Escape');
   await songs.row('Teardrop').click();
   await songs.row('Teardrop').getByRole('button', { name: 'Mezzanine' }).click();
   await expect(page.locator('[data-page="album"]')).toBeVisible();
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(songs.box).toHaveValue('massive');
-  await expect(songs.view.locator('[data-songs-condition="genre:Trip-Hop"]')).toBeVisible();
+  await expect(songs.view.locator('[data-query-condition="genre:Trip-Hop"]')).toBeVisible();
   await expect(songs.row('Teardrop')).toHaveAttribute('data-row-focus', 'true');
   await expect(songs.subtitle).toHaveText(/^2 首/);
   await page.keyboard.press('Alt+ArrowRight');
@@ -97,7 +98,8 @@ test('曲目菜单命令失败在歌曲页可见并能关闭', async ({ page }) 
 
 test('查询有误时保留上次结果，页头播放与整批操作等待有效查询', async ({ page }) => {
   const songs = await openSongs(page);
-  await songs.view.locator('[data-query-mode-toggle]').click();
+  await songs.view.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="advanced"]').click();
   await songs.box.fill('%bitrate GREATER 900 AND');
   await expect(songs.view.locator('[data-songs-invalid]')).toBeVisible();
   await expect(songs.view.locator('[data-songs-play]')).toBeDisabled();
@@ -117,7 +119,7 @@ test('查询有误时保留上次结果，页头播放与整批操作等待有�
 });
 
 for (const colorScheme of ['dark', 'light'] as const) {
-  test(`${colorScheme} 档的 1280、900、390 窗口：表格收列，条件溢出可从菜单去掉`, async ({
+  test(`${colorScheme} 档的 1280、900、390 窗口：表格保留列，条件溢出可从菜单去掉`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -126,37 +128,49 @@ for (const colorScheme of ['dark', 'light'] as const) {
     for (const width of [1280, 900, 390]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(songs.grid.getByRole('columnheader', { name: '年份', exact: true })).toHaveCount(
-        width === 1280 ? 1 : 0,
+        1,
       );
       await expect(songs.grid.getByRole('columnheader', { name: '艺人', exact: true })).toHaveCount(
-        width > 390 ? 1 : 0,
+        1,
       );
+      // 播放在标题行右端，与标题同一行；窄档搜索框收成命令栏里的搜索键。
       const heading = await songs.view.getByRole('heading', { name: '歌曲' }).boundingBox();
       const play = await songs.view.locator('[data-songs-play]').boundingBox();
-      expect(heading && play && heading.x + heading.width <= play.x).toBeTruthy();
-      const filter = await songs.box.boundingBox();
       expect(
-        filter && filter.x >= 0 && filter.x + filter.width <= width,
-        JSON.stringify({ width, filter }),
+        heading &&
+          play &&
+          play.x >= heading.x + heading.width &&
+          play.y < heading.y + heading.height,
+        JSON.stringify({ width, heading, play }),
       ).toBeTruthy();
-      await expect(songs.subtitle).toHaveText(width === 390 ? '8 首' : /^8 首 · \d+ 分钟$/);
+      if (width === 390) {
+        await expect(songs.view.locator('[data-command-search-open]')).toBeVisible();
+        await expect(songs.box).toHaveCount(0);
+      } else {
+        const filter = await songs.box.boundingBox();
+        expect(
+          filter && filter.x >= 0 && filter.x + filter.width <= width,
+          JSON.stringify({ width, filter }),
+        ).toBeTruthy();
+      }
+      await expect(songs.subtitle).toHaveText(width === 390 ? '8 首' : /^8 首\d+ 分钟$/);
       await expect(songs.subtitle).toHaveAttribute('title', /^8 首 · \d+ 分钟$/);
     }
-    await songs.view.locator('[data-query-funnel]').click();
-    const menu = page.locator('[data-query-menu]');
+    await songs.view.locator('[data-filter-toggle]').click();
+    const chips = page.locator('[data-preset-chips]');
     for (const preset of ['highRated', 'lossless', 'hiRes', 'long', 'missingTags']) {
-      await menu.locator(`[data-query-option="${preset}"]`).click();
+      await chips.locator(`[data-preset="${preset}"]`).click();
     }
-    await songs.box.press('Escape');
-    const more = songs.view.locator('[data-songs-condition-overflow]');
+    await page.keyboard.press('Escape');
+    const more = songs.view.locator('[data-query-condition-overflow]');
     await expect(more).toBeVisible();
     await expect
-      .poll(() => songs.view.locator('[data-songs-condition]:visible').count())
+      .poll(() => songs.view.locator('[data-query-condition]:visible').count())
       .toBeLessThanOrEqual(3);
     await more.click();
     await page.getByRole('menuitem', { name: '移除「缺少标签」' }).click();
     await songs.view.getByRole('button', { name: '清除条件', exact: true }).click();
-    await expect(songs.view.locator('[data-songs-conditions]')).toHaveCount(0);
+    await expect(songs.view.locator('[data-query-conditions]')).toHaveCount(0);
     expect(songs.errors).toEqual([]);
   });
 }

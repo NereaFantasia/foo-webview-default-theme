@@ -2,7 +2,11 @@ import type { AlbumsState } from '../albums.ts';
 import type { BiographyPhotosState } from './biographyPhotos.ts';
 import { createBiographyRequestPool } from './biographyRequestPool.ts';
 import { fetchLastfmGallery, type LastfmGalleryResult } from './online/lastfmGallery.ts';
-import { fetchLastfmPhoto, type LastfmPhotoResult } from './online/fetchLastfmPhoto.ts';
+import {
+  fetchLastfmPhoto,
+  type BiographyPhotoProblem,
+  type LastfmPhotoResult,
+} from './online/fetchLastfmPhoto.ts';
 import type { LastfmPhoto } from './online/lastfmPhoto.ts';
 
 interface CachedLocalPhotos {
@@ -14,8 +18,15 @@ export type DecodedBiographyPhoto =
   | Extract<LastfmPhotoResult, { ok: false }>;
 
 const PHOTO_CACHE_BYTES = 64 * 1024 * 1024;
+/** 主动刷新可以放行的失败：网络环境或出口可能刚改过，不让他等退避。限流照样等到期 */
+const FRESH_RETRYABLE: ReadonlySet<BiographyPhotoProblem> = new Set([
+  'network',
+  'dns',
+  'localRelay',
+  'blocked',
+]);
 
-/** 缓存二进制与采样像素；显示地址由各视图持有，淘汰缓存不会破坏另一视图的图片。 */
+/** 缓存二进制与采样像素；显示地址由各视图持有，淘汰缓存不会破坏另一视图的图片 */
 export function createBiographyPhotoCache() {
   const local = new Map<string, CachedLocalPhotos>();
   const localRequests = createBiographyRequestPool<BiographyPhotosState, object>();
@@ -72,14 +83,18 @@ export function createBiographyPhotoCache() {
     },
     gallery(artistUrl: string, fresh: boolean, fetch = fetchLastfmGallery) {
       const failure = galleryFailures.get(artistUrl);
-      if (failure && failure.retryAt > Date.now() && !(fresh && failure.problem === 'network'))
+      if (
+        failure &&
+        failure.retryAt > Date.now() &&
+        !(fresh && FRESH_RETRYABLE.has(failure.problem))
+      )
         return Promise.resolve(failure);
       const known = galleries.get(artistUrl);
       if (
         known &&
         (known.ok
           ? !fresh && known.expiresAt > Date.now()
-          : known.retryAt > Date.now() && !(fresh && known.problem === 'network'))
+          : known.retryAt > Date.now() && !(fresh && FRESH_RETRYABLE.has(known.problem)))
       )
         return Promise.resolve(known);
       return galleryRequests.run(artistUrl, async () => {
@@ -112,14 +127,18 @@ export function createBiographyPhotoCache() {
       alive = () => true,
     ) {
       const failure = imageFailures.get(source.url);
-      if (failure && failure.retryAt > Date.now() && !(fresh && failure.problem === 'network'))
+      if (
+        failure &&
+        failure.retryAt > Date.now() &&
+        !(fresh && FRESH_RETRYABLE.has(failure.problem))
+      )
         return Promise.resolve(failure);
       const known = binaries.get(source.url);
       if (
         known &&
         (known.ok
           ? !fresh && known.expiresAt > Date.now()
-          : known.retryAt > Date.now() && !(fresh && known.problem === 'network'))
+          : known.retryAt > Date.now() && !(fresh && FRESH_RETRYABLE.has(known.problem)))
       ) {
         binaries.delete(source.url);
         binaries.set(source.url, known);
@@ -138,13 +157,14 @@ export function createBiographyPhotoCache() {
           }
           return result;
         }
-        if (mine !== revision || !alive()) return { ok: false, problem: 'network', retryAt: 0 };
+        if (mine !== revision || !alive())
+          return { ok: false, problem: 'network', retryAt: 0, detail: null };
         const url = URL.createObjectURL(result.blob);
         const pixels = await probe(url).catch(() => null);
         URL.revokeObjectURL(url);
         const decoded: DecodedBiographyPhoto = pixels?.length
           ? { ...result, pixels }
-          : { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000 };
+          : { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000, detail: null };
         if (mine === revision) {
           imageFailures.delete(source.url);
           binaries.delete(source.url);

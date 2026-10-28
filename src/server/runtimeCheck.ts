@@ -14,7 +14,7 @@ export interface RuntimeCheckTarget {
   readonly sha256: string;
 }
 
-// 文件完整性由调用方在执行前校验；这段只验证 Node 能启动、版本和运行环境符合要求。
+// 文件完整性由调用方在执行前校验；这段只验证 Node 能启动、版本和运行环境符合要求
 const CHECK_SCRIPT = `
 const fs = require('node:fs');
 const crypto = require('node:crypto');

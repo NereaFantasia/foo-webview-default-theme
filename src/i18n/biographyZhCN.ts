@@ -39,6 +39,9 @@ export const biographyZhCN: Record<keyof typeof biographyEn, string> = {
   'biography.loading': '正在读取简介',
   'biography.missing': '未找到可用简介',
   'biography.network': '无法连接数据源',
+  'biography.dns': '无法解析数据源的域名，检查 DNS、hosts 或代理设置',
+  'biography.localRelay':
+    '域名被解析到了本机或内网地址，安全设置拦截了本次请求；把域名指向 127.0.0.1 的 hosts 或加速器方式不适用',
   'biography.blocked': '数据源拒绝了本次请求',
   'biography.rateLimited': '请求过于频繁，请稍后重试',
   'biography.invalid': '无法解析此来源页面',

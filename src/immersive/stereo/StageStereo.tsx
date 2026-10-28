@@ -5,12 +5,12 @@ import styles from './StageStereo.module.css';
 import { StereoScope } from './StereoScope.tsx';
 import { useStereoReadouts } from './useStereoReadouts.ts';
 
-/** 声场图的边长（舞台像素），与仪表第一行的高同为 155。 */
+/** 声场图的边长（舞台像素），与仪表第一行的高同为 155 */
 const SCOPE_SIZE = 155;
 
-/** 相关条上三根刻度的位置（相对条的左缘）。 */
+/** 相关条上三根刻度的位置（相对条的左缘） */
 const BAR_TICKS: readonly number[] = [0, 68, 135];
-/** 刻度字居中写在三根刻度下面，位置相对格左上。 */
+/** 刻度字居中写在三根刻度下面，位置相对格左上 */
 const SCALE_LABELS = [
   { label: '-1', x: 180 },
   { label: '0', x: 248 },
@@ -19,11 +19,11 @@ const SCALE_LABELS = [
 
 /**
  * full 档舞台仪表第一行的声场格：左上是 155 × 155 的声场图，右边一列左缘在格内 172（舞台 x 932），自上而下是
- * 小标 Correlation 与跟在后面的实时值、相关条（136 × 20）、条下居中的 −1 / 0 / +1、附行 W 与 B。
+ * 小标 Correlation 与跟在后面的实时值、相关条（136 × 20）、条下居中的 −1 / 0 / +1、附行 W 与 B
  * 铺满 `StageMeterRow` 给的格子，坐标相对格左上角（舞台 (760, 296)），字按基线落位：字盒底边裁到字母基线，
- * `top` 写的就是基线。宿主不提供左右两路时三个值写 `—`，说明写在空着的声场图中间。
+ * `top` 写的就是基线。宿主不提供左右两路时三个值写 `—`，说明写在空着的声场图中间
  *
- * 读数随声场取数每窗一换（最多 60 次每秒），整格跟着重画；相关为负时值与游标取红色。
+ * 读数随声场取数每窗一换（最多 60 次每秒），整格跟着重画；相关为负时值与游标取红色
  */
 export function StageStereo() {
   const t = useAtomValueRawSync(translateAtom);

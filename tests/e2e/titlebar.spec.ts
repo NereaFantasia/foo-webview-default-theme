@@ -48,6 +48,10 @@ const TREE: MenuTreeNode[] = ROOTS.map(([label, display]) =>
   ),
 );
 
+/** ⋯ 的浮层先是本主题自己的两项，宿主的根在后一组里；按有「文件」这一项认出宿主那一组 */
+const hostRoots = (page: Page) =>
+  page.getByRole('menu').filter({ has: page.getByRole('menuitem', { name: '文件', exact: true }) });
+
 function answerTree(host: PageHost): void {
   host.answer('menu.getMainMenu', {
     success: true,
@@ -219,7 +223,7 @@ test('播放栏在标题栏时宽窗 64 高、窄窗 48 高，高度都交给宿
   await choosePlayerBar(page, 'titlebar');
   await open(page);
   expect(await boxOf(page, 'header')).toMatchObject({ height: 64 });
-  expect(await boxOf(page, '[data-menu="main"]')).toMatchObject({ x: 8, width: 28, height: 36 });
+  expect(await boxOf(page, '[data-menu="main"]')).toMatchObject({ x: 8, width: 40, height: 32 });
   expect(await boxOf(page, '[data-caption="maximize"]')).toEqual({
     x: 1280 - 92,
     y: 0,
@@ -303,7 +307,7 @@ test('⋯ 首读还没回来时占位项写「正在读取」，读到了才换�
   await expect(placeholder).toHaveAttribute('aria-disabled', 'true');
 
   held.release();
-  const roots = page.getByRole('menu').first().getByRole('menuitem');
+  const roots = hostRoots(page).getByRole('menuitem');
   await expect(roots).toHaveText(ROOTS.map(([, display]) => display));
   expect(errors).toEqual([]);
 });
@@ -330,7 +334,9 @@ test('⋯ 读到空树时给一条置灰的占位项；之前读失败过，读�
   await trigger.click();
   const placeholder = page.getByRole('menuitem', { name: '没有可用的菜单项' });
   await expect(placeholder).toHaveAttribute('aria-disabled', 'true');
-  await expect(page.getByRole('menu').first().getByRole('menuitem')).toHaveCount(1);
+  await expect(
+    page.getByRole('menu').filter({ has: placeholder }).getByRole('menuitem'),
+  ).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -338,11 +344,11 @@ test('⋯ 弹出 fb2k 的六个根，打开时重读；点命令按 GUID 执行'
   await open(page);
   const reads = host.callsTo('menu.getMainMenu').length;
   await page.getByRole('button', { name: '主菜单' }).click();
-  const roots = page.getByRole('menu').first().getByRole('menuitem');
+  const roots = hostRoots(page).getByRole('menuitem');
   await expect(roots).toHaveText(ROOTS.map(([, display]) => display));
   expect(host.callsTo('menu.getMainMenu').length).toBeGreaterThan(reads);
 
-  await page.getByRole('menuitem', { name: '播放' }).click();
+  await page.getByRole('menuitem', { name: '播放', exact: true }).click();
   await expect(page.getByRole('menuitemcheckbox', { name: '播完当前停止' })).toHaveAttribute(
     'aria-checked',
     'true',

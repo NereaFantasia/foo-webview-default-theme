@@ -11,7 +11,7 @@ const useStyles = makeStyles({
   },
 });
 
-/** 进不了主界面时的几种说明；等待中的步骤由页面里的等待层显示。 */
+/** 进不了主界面时的几种说明；等待中的步骤由页面里的等待层显示 */
 export type StartupNoticeState = 'panel' | 'failed' | 'startFailed' | 'panelUnconfirmed';
 
 export interface StartupNoticeProps {
@@ -20,7 +20,7 @@ export interface StartupNoticeProps {
   readonly onCommitted?: () => void;
 }
 
-/** 业务服务启动前的提示只使用系统深浅与浏览器语言，不为说明页读取或写入偏好。 */
+/** 业务服务启动前的提示只使用系统深浅与浏览器语言，不为说明页读取或写入偏好 */
 export function StartupNotice({ state, onRetry, onCommitted }: StartupNoticeProps) {
   useEffect(() => {
     onCommitted?.();

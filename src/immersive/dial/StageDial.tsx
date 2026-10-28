@@ -17,7 +17,7 @@ import { PaperOrbit } from './PaperOrbit.tsx';
 import { PaperTransport } from './PaperTransport.tsx';
 import styles from './StageDial.module.css';
 
-/** 括号线宽；拐点压在封面四角，线落在封面外侧，所以括号框比封面各边外扩一个线宽。 */
+/** 括号线宽；拐点压在封面四角，线落在封面外侧，所以括号框比封面各边外扩一个线宽 */
 const BRACKET_STROKE = 2;
 const BRACKET_BOX = {
   left: STAGE_COVER.x - BRACKET_STROKE,
@@ -50,7 +50,7 @@ const CELL_KEY_CLASS = `${styles.base} ${styles['cell-key']}`;
 const CELL_VALUE_CLASS = `${styles.base} ${styles['cell-value']}`;
 const MISSING_VALUE_CLASS = `${CELL_VALUE_CLASS} ${styles.missing}`;
 
-/** 以环心为圆心、直径是两倍半径的方框；样式里再用 `translate` 拉回中心。 */
+/** 以环心为圆心、直径是两倍半径的方框；样式里再用 `translate` 拉回中心 */
 function ringBox(radius: number): CSSProperties {
   return { left: STAGE_DIAL.x, top: STAGE_DIAL.y, width: radius * 2, height: radius * 2 };
 }
@@ -59,10 +59,10 @@ function ringBox(radius: number): CSSProperties {
  * full 档舞台的左区：三圈实线环、转动层（`PaperOrbit`，压在实线环之上、刻度字与封面之下）、刻度字、
  * 封面上方的专辑名、封面与四角括号、封面下三格
  * （Date · Track · Label）与传输三键。本身是舞台原点上的零尺寸定位锚，各件按舞台坐标绝对定位；
- * 字按基线落位（字盒底边裁到字母基线，`top` 写基线）。
+ * 字按基线落位（字盒底边裁到字母基线，`top` 写基线）
  *
  * 封面（`DialCover`）与背景的封面底色共用同一份状态。封面、封面下三格与传输键标了
- * `data-decor-guard`，生成式网格不在它们周围放装饰；传输键压在歌词卡之上。
+ * `data-decor-guard`，生成式网格不在它们周围放装饰；传输键压在歌词卡之上
  */
 export function StageDial() {
   const track = useAtomValueRawSync(currentTrackAtom);

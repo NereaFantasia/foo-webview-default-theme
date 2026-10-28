@@ -1,4 +1,4 @@
-/* 纵向自上而下：时间轴字与短刻、波形带（底线压在带的下沿）、贯穿两者的播放头竖线，胶囊挂在竖线顶端。
+/* 纵向自上而下：时间轴字与短刻、波形带（底线压在带的下沿）、贯穿两者的播放头竖线，胶囊挂在竖线顶端
    位置与字号都是 CSS 变量，由放波形的外框按档给全；舞台上时间轴字按基线落位（`--wave-trim` 把字盒底边
    裁到字母基线），胶囊居中顶在竖线上。 */
 .waveform {
@@ -45,7 +45,7 @@
   left: var(--wave-mark-first-left);
 }
 
-/* 最后一个刻度右对齐到带的右端，不伸出外框。 */
+/* 最后一个刻度右对齐到带的右端，不伸出外框 */
 .tick.last {
   translate: var(--wave-tick-last-shift);
 }
@@ -82,7 +82,7 @@
   inset: var(--wave-message-inset);
 }
 
-/* 分道名挂在带左侧的垫纸边距里，与频谱纵轴刻度同一种挂法；一直挂着，分道画出来时淡入、换走时淡出。
+/* 分道名挂在带左侧的垫纸边距里，与频谱纵轴刻度同一种挂法；一直挂着，分道画出来时淡入、换走时淡出
    不接指针：落在它上面的按下不该当成 seek。 */
 .lane-name {
   position: absolute;
@@ -100,7 +100,7 @@
   opacity: 1;
 }
 
-/* `left` 由帧回调逐帧写。 */
+/* `left` 由帧回调逐帧写 */
 .playhead {
   position: absolute;
   top: var(--wave-playhead-top);
@@ -110,7 +110,7 @@
   pointer-events: none;
 }
 
-/* 胶囊两侧各留 3 px，没有等值的 spacing token，写成本件的几何变量。 */
+/* 胶囊两侧各留 3 px，没有等值的 spacing token，写成本件的几何变量 */
 .clock {
   --clock-pad: 3px;
   position: absolute;
@@ -128,7 +128,7 @@
   color: var(--paper-tint);
 }
 
-/* 靠近波形右端、右侧放不下时挂到竖线左侧。 */
+/* 靠近波形右端、右侧放不下时挂到竖线左侧 */
 .clock[data-flipped] {
   left: var(--wave-clock-flip-left);
   right: var(--wave-clock-flip-right);

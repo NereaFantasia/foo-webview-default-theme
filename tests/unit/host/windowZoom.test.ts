@@ -15,7 +15,7 @@ function setup(saved = '0') {
     },
   };
   let zoom = 1.1;
-  host.answer('window.getZoom', () => ({ success: true, zoom }));
+  host.answer('window.getZoom', () => ({ success: true, zoom, textScaleFactor: 1 }));
   host.answer('window.setZoom', (params) => {
     if (typeof params['zoom'] !== 'number') throw new Error('缩放倍数应为数字');
     zoom = params['zoom'];

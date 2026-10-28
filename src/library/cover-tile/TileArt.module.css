@@ -1,0 +1,58 @@
+.art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  overflow: hidden;
+  border-radius: var(--tile-radius, var(--radius-control));
+  background: var(--bg-hover);
+}
+
+/* 封面叠加在占位层上方；未加载完成前透明，加载后快速线性淡入，淡入完成后移除底层占位。已标记 instant 时直接显示而不触发过渡 */
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.image[data-loaded] {
+  opacity: 1;
+}
+
+.image[data-instant] {
+  transition: none;
+}
+
+.placeholder {
+  width: 40%;
+  height: 40%;
+  color: var(--text-muted);
+}
+
+.art[data-selected] {
+  outline: var(--strokeWidthThick) solid var(--accent);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+/* 仅在键盘交互时绘制焦点环：所在网格匹配 :focus-visible，或图块按钮自身获得焦点时呈现 */
+[role='grid']:focus-visible .art[data-focused] {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+[data-tile-face]:focus-visible .art {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+@media (forced-colors: active) {
+  [data-tile-face]:focus-visible .art {
+    outline-color: Highlight;
+  }
+}

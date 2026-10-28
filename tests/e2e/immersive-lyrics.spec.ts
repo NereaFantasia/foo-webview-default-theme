@@ -72,8 +72,12 @@ for (const scheme of ['light', 'dark'] as const) {
     await panel(page).getByRole('switch', { name: '在线歌词' }).check();
     await panel(page).getByRole('button', { name: '搜索歌词', exact: true }).click();
     const search = panel(page).locator('[data-lyrics-search]');
-    await search.getByRole('radio').check();
-    await search.getByRole('button', { name: '使用歌词' }).click();
+    await search
+      .locator('[data-lyrics-candidate]')
+      .first()
+      .getByRole('button', { name: '歌词预览', exact: true })
+      .click();
+    await panel(page).getByRole('button', { name: '使用歌词', exact: true }).click();
     await expect(panel(page).locator('[data-lyrics-source]')).toHaveText('LRCLIB');
     const reads = env.host.callsTo('lyrics.get').length;
     const requests = env.host.callsTo('http.get').length;
@@ -204,9 +208,12 @@ test('进入沉浸视图取消候选搜索；恢复预览后可继续查找', as
   await entry(page).click();
   await expect(view(page).locator('[data-field="lyric-main"]')).toHaveText('本地句');
   held.release();
-  await expect(panel(page).getByRole('radio')).toHaveCount(0);
+  await expect(panel(page).locator('[data-lyrics-candidate]')).toHaveCount(0);
+  // 指针还停在刚点的入口上，它的悬停提示会先吃掉第一下 Esc；挪开等提示收了再按
+  await page.mouse.move(640, 700);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(view(page)).toHaveCount(0);
-  await expect(panel(page).getByRole('radio')).toHaveCount(1);
+  await expect(panel(page).locator('[data-lyrics-candidate]')).toHaveCount(1);
   expect(env.errors).toEqual([]);
 });

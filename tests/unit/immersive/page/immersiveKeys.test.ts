@@ -166,6 +166,19 @@ describe('焦点', () => {
     expect(view.actions).toStrictEqual(['leave']);
   });
 
+  test('listbox 自己吃方向键与空格；打了放行标记的 listbox（Coverflow）里空格与 ↑ ↓ 照常交给全局', async () => {
+    const view = await setup();
+    const plain = view.root.append('[role="listbox"]');
+    plain.focus();
+    expect(view.press(' ')).toBe(false);
+    expect(view.press('ArrowUp')).toBe(false);
+    const passing = view.root.append('[role="listbox"]', '[data-key-pass]');
+    passing.focus();
+    expect(view.press(' ')).toBe(true);
+    expect(view.press('ArrowUp')).toBe(true);
+    expect(view.actions).toStrictEqual(['playOrPause', 'volume up']);
+  });
+
   test('键盘聚焦的按钮只让出空格；鼠标点过、焦点留在按钮上时空格照样播放 / 暂停', async () => {
     const view = await setup();
     const button = view.root.append('button');

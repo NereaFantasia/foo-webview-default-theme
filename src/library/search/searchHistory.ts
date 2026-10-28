@@ -36,7 +36,7 @@ function readItems(value: unknown): string[] {
   );
 }
 
-/** 写入经公共写入助手；没有传入 `writer` 时每次保存都按失败处理。 */
+/** 写入经公共写入助手；没有传入 `writer` 时每次保存都按失败处理 */
 export function startSearchHistory(
   store: Store,
   host: SearchHistoryFace = fb,
@@ -109,7 +109,7 @@ export function startSearchHistory(
       store.set(state, { ...store.get(state), failed: true });
       return;
     }
-    // 初读期间的增加、删除与清空按顺序重放：增加保留旧词，删除和清空不会被旧存档撤销。
+    // 初读期间的增加、删除与清空按顺序重放：增加保留旧词，删除和清空不会被旧存档撤销
     let items: readonly string[] = answer.found ? readItems(answer.value) : [];
     for (const change of pending) items = change(items);
     pending.length = 0;

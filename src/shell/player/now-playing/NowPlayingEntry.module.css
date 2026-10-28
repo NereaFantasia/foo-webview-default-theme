@@ -1,4 +1,4 @@
-/* 按钮只是封面外面的一层：不加内边距与底色，圆角随封面的形状，悬停层裁在里面。焦点环画在封面内侧。 */
+/* 按钮只是封面外面的一层：不加内边距与底色，圆角随封面的形状，悬停层裁在里面。焦点环画在封面内侧 */
 .entry {
   position: relative;
   display: grid;
@@ -29,7 +29,7 @@
   outline-offset: calc(-1 * var(--strokeWidthThick));
 }
 
-/* 压暗的一层与展开图标，悬停与键盘聚焦时淡入，83 ms。 */
+/* 压暗的一层与展开图标，悬停与键盘聚焦时淡入，83 ms */
 .hint {
   position: absolute;
   inset: 0;

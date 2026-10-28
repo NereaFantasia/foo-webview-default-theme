@@ -1,0 +1,7 @@
+/* 跟随系统：深色那一扇只露右半，切缝在正中 */
+.rightHalf {
+  position: absolute;
+  inset: 0;
+  display: block;
+  clip-path: inset(0 0 0 50%);
+}

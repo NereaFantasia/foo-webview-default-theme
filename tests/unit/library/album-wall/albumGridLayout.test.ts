@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGridItems,
-  GRID_METRICS,
   gridIndexOf,
-  gridRowHeight,
-  layoutRow,
   placeVisible,
   readingPositionOf,
   stepTileSize,
-  tilesPerRow,
 } from '../../../../src/library/album-wall/albumGridLayout.ts';
 import type { AlbumSection } from '../../../../src/library/albumSections.ts';
 import { albumKeyOf } from '../../../../src/host/libraryContract.ts';
@@ -20,44 +16,6 @@ const b = albumRow('B', 'X');
 const c = albumRow('C', 'X');
 const d = albumRow('D', 'X');
 const e = albumRow('E', 'X');
-
-describe('列数', () => {
-  it('只按内容卡的内宽算：间距只在块与块之间', () => {
-    expect(tilesPerRow(160 * 3 + 12 * 2, 160, 12)).toBe(3);
-    expect(tilesPerRow(160 * 3 + 12 * 2 - 1, 160, 12)).toBe(2);
-    expect(tilesPerRow(100, 160, 12)).toBe(1);
-  });
-
-  it('还没量出宽度时按一块', () => {
-    expect(tilesPerRow(0, 160, 12)).toBe(1);
-    expect(layoutRow(0, 160, GRID_METRICS.grid, BOUNDS)).toEqual({
-      perRow: 1,
-      tileSize: 160,
-      spacing: 12,
-      offset: 0,
-    });
-  });
-
-  it('余量先补间距到上限，剩下的两侧均分；不拉伸的档余量全去两侧', () => {
-    const wide = layoutRow(1000, 160, GRID_METRICS.grid, BOUNDS);
-    expect(wide.perRow).toBe(5);
-    expect(wide.spacing).toBe(24);
-    expect(wide.offset).toBe((1000 - (5 * 160 + 4 * 24)) / 2);
-    const compact = layoutRow(1000, 160, GRID_METRICS.compact, BOUNDS);
-    expect(compact.perRow).toBe(6);
-    expect(compact.spacing).toBe(6);
-  });
-
-  it('边长夹在区间内', () => {
-    expect(layoutRow(1000, 999, GRID_METRICS.grid, BOUNDS).tileSize).toBe(256);
-    expect(layoutRow(1000, 3, GRID_METRICS.grid, BOUNDS).tileSize).toBe(128);
-  });
-
-  it('行高是边长加行间距，有字档再加两行字', () => {
-    expect(gridRowHeight(160, GRID_METRICS.grid)).toBe(160 + 36 + 12);
-    expect(gridRowHeight(160, GRID_METRICS.gridNoText)).toBe(160 + 12);
-  });
-});
 
 describe('stepTileSize', () => {
   it('一格一步、夹在区间内；到头或零格不动', () => {

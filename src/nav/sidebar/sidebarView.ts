@@ -10,40 +10,46 @@ import { serviceKey } from '../../kit/serviceKey.ts';
  * 侧边栏此刻怎么呈现，按窗口宽度分三档：
  *
  * - `wide`（≥ 1008）：照用户存的形态（`sidebarPrefs`），能拖、能切图标态；标题栏的键把它整个藏起来或
- *   摆回来。
- * - `tight`（641–1007）：恒为图标态，不出握柄，用户藏没藏都照画；标题栏的键以浮层展开整张侧边栏。
- * - `hidden`（≤ 640）：不显示；标题栏的键同样以浮层展开。
+ *   摆回来
+ * - `tight`（641–1007）：恒为图标态，不出握柄，用户藏没藏都照画；标题栏的键以浮层展开整张侧边栏
+ * - `hidden`（≤ 640）：不显示；标题栏的键同样以浮层展开
  *
  * 窄的两档只改呈现，不写存档，窗口变宽回来照存的摆。宽窄按视口的媒体查询认，跨档那一刻才通知，
- * 首帧之前就定下，不等量元素。
+ * 首帧之前就定下，不等量元素
  */
 export type SidebarTier = 'wide' | 'tight' | 'hidden';
 
-/** 两档的下界，CSS 像素。 */
+/** 两档的下界，CSS 像素 */
 export const SIDEBAR_TIER_MIN = { wide: 1008, tight: 641 } as const;
 
 const WIDE_QUERY = `(min-width: ${SIDEBAR_TIER_MIN.wide}px)`;
 const TIGHT_QUERY = `(min-width: ${SIDEBAR_TIER_MIN.tight}px)`;
 
-/** 侧边栏换形态之后内容区挪位要多久，毫秒：换形态的动画最长 200 ms，再留一点让最后一帧落定。 */
+/** 侧边栏换形态之后内容区挪位要多久，毫秒：换形态的动画最长 200 ms，再留一点让最后一帧落定 */
 export const SIDEBAR_SHIFT_MS = 250;
 
 export interface SidebarViewState {
   readonly tier: SidebarTier;
-  /** 以浮层展开着；只在 `tight` 与 `hidden` 两档里有，跨到 `wide` 立刻关。 */
+  /** 以浮层展开着；宽档仅在侧栏完全隐藏时允许悬停预览 */
   readonly overlay: boolean;
+  readonly peeking: boolean;
   /**
    * 侧边栏刚换了形态（展开、图标态、不显示之间），内容区的宽度是被它挤变的：这段时间里内容区别为自己
-   * 宽度的变化播动画（比如封面墙换列时图块滑到新位置），直接到位。拖宽拖窄不算。
+   * 宽度的变化播动画（比如封面墙换列时图块滑到新位置），直接到位。拖宽拖窄不算
    */
   readonly shifting: boolean;
 }
 
-const stateAtom = atom<SidebarViewState>({ tier: 'wide', overlay: false, shifting: false });
+const stateAtom = atom<SidebarViewState>({
+  tier: 'wide',
+  overlay: false,
+  peeking: false,
+  shifting: false,
+});
 
 export const sidebarViewAtom: Atom<SidebarViewState> = atom((get) => get(stateAtom));
 
-/** 侧边栏此刻呈现成哪样：宽档照存档，641–1007 恒为图标态，≤ 640 不显示。 */
+/** 侧边栏此刻呈现成哪样：宽档照存档，641–1007 恒为图标态，≤ 640 不显示 */
 export type SidebarForm = 'expanded' | 'rail' | 'none';
 
 export function sidebarFormOf(
@@ -57,8 +63,10 @@ export function sidebarFormOf(
 }
 
 export interface SidebarViewService {
-  /** 标题栏的键在窄的两档里用：开着就关，关着就开。宽档里什么都不做。 */
+  /** 窄窗点击切换浮层；悬停预览转为保持打开。宽档里什么都不做 */
   toggleOverlay(): void;
+  /** 完全收起时临时展开，不改存档或转移焦点 */
+  peekOverlay(): void;
   closeOverlay(): void;
   dispose(): void;
 }
@@ -69,8 +77,8 @@ function tierOf(wide: boolean, tight: boolean): SidebarTier {
 }
 
 /**
- * 跟随窗口宽度定档，并记下侧边栏换形态的时机。去了别的地点（点了浮层里的一项）浮层就关。
- * `media` 为 null（node）时恒为宽档。
+ * 跟随窗口宽度定档，并记下侧边栏换形态的时机。去了别的地点（点了浮层里的一项）浮层就关
+ * `media` 为 null（node）时恒为宽档
  */
 export function startSidebarView(store: Store, media: MatchMedia | null): SidebarViewService {
   const wide = media?.(WIDE_QUERY) ?? null;
@@ -91,19 +99,24 @@ export function startSidebarView(store: Store, media: MatchMedia | null): Sideba
     }, SIDEBAR_SHIFT_MS);
   }
 
-  store.set(stateAtom, { tier: currentTier(), overlay: false, shifting: false });
+  const closeOverlay = () => {
+    if (store.get(stateAtom).overlay) update({ overlay: false, peeking: false });
+  };
+  store.set(stateAtom, { tier: currentTier(), overlay: false, peeking: false, shifting: false });
   let lastForm = form();
-  // 形态一变就先亮起 `shifting`，再让界面按新形态排：订阅是同步的，内容区量到新宽度时它已经亮着。
+  // 形态一变就先亮起 `shifting`，再让界面按新形态排：订阅是同步的，内容区量到新宽度时它已经亮着
   const followForm = () => {
     const next = form();
     if (next === lastForm) return;
     lastForm = next;
+    if (store.get(stateAtom).peeking) closeOverlay();
     shift();
   };
   const onTier = () => {
     const tier = currentTier();
     if (tier === store.get(stateAtom).tier) return;
-    update({ tier, overlay: tier === 'wide' ? false : store.get(stateAtom).overlay });
+    if (tier === 'wide' || store.get(stateAtom).peeking) closeOverlay();
+    update({ tier });
     followForm();
   };
   wide?.addEventListener('change', onTier);
@@ -114,17 +127,20 @@ export function startSidebarView(store: Store, media: MatchMedia | null): Sideba
     const next = store.get(historyAtom).place;
     if (samePlace(next, place)) return;
     place = next;
-    if (store.get(stateAtom).overlay) update({ overlay: false });
+    closeOverlay();
   });
 
   return {
     toggleOverlay() {
       const state = store.get(stateAtom);
-      if (state.tier !== 'wide') update({ overlay: !state.overlay });
+      if (state.tier !== 'wide')
+        update({ overlay: state.peeking || !state.overlay, peeking: false });
     },
-    closeOverlay() {
-      if (store.get(stateAtom).overlay) update({ overlay: false });
+    peekOverlay() {
+      if (form() === 'none' && !store.get(stateAtom).overlay)
+        update({ overlay: true, peeking: true });
     },
+    closeOverlay,
     dispose() {
       if (timer !== undefined) clearTimeout(timer);
       wide?.removeEventListener('change', onTier);

@@ -1,0 +1,35 @@
+.name,
+.artist {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--tile-line);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  color: var(--text-secondary);
+}
+
+.row {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+  width: 100%;
+  min-width: 0;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--tile-line);
+}
+
+.row .artist {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.aside {
+  flex: none;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}

@@ -1,4 +1,4 @@
-/* 工具条、分页栏与播放历史按内容高；当前曲目与队列共用余下的滚动区。 */
+/* 工具条、分页栏与播放历史按内容高；当前曲目与队列共用余下的滚动区 */
 .root {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -6,7 +6,7 @@
   min-height: 0;
 }
 
-/* 工具条包含顶部 12 的留白，分页栏和内容区不随菜单开合移动。 */
+/* 工具条包含顶部 12 的留白，分页栏和内容区不随菜单开合移动 */
 .toolbar {
   display: flex;
   align-items: center;
@@ -37,7 +37,7 @@
   gap: var(--spacingHorizontalS);
 }
 
-/* 分页栏左右与头对齐，下面一道细线把它和内容区分开。 */
+/* 分页栏左右与头对齐，下面一道细线把它和内容区分开 */
 .tabs {
   display: flex;
   align-items: center;
@@ -46,7 +46,7 @@
   border-bottom: var(--strokeWidthThin) solid var(--line);
 }
 
-/* 播放历史的插槽：左右与队列页的内容对齐。 */
+/* 播放历史的插槽：左右与队列页的内容对齐 */
 .history {
   min-width: 0;
   padding: 0 var(--spacingHorizontalS);
@@ -65,8 +65,17 @@
   scrollbar-gutter: auto;
 }
 
+.root[data-lyrics-preview] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .root[data-lyrics-preview] > * {
   grid-column: 1;
+}
+
+/* 停靠的歌词页伸到了窗口右缘，分页栏退回原来的右缘 */
+.root[data-lyrics-preview] > .tabs {
+  margin-right: var(--edge-bleed, 0px);
 }
 
 .root > .toolbar {
@@ -101,4 +110,24 @@
 .root[data-lyrics-preview][data-controls-visible] > .tabs {
   opacity: 1;
   pointer-events: auto;
+}
+
+/*
+ * 歌词页里的滚动条平时只留位置不画手柄，指针活动或滚动后显示，闲置一点五秒收回
+ * 悬停和按住手柄时照常显示；强制颜色模式下不隐藏
+ */
+@media not (forced-colors: active) {
+  .root[data-lyrics-preview] *::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    transition: background-color var(--motion-faster) var(--curveLinear);
+  }
+
+  .root[data-lyrics-preview][data-scrollbars-visible] *::-webkit-scrollbar-thumb {
+    background-color: var(--colorScrollbarOverlay);
+  }
+
+  .root[data-lyrics-preview] *::-webkit-scrollbar-thumb:hover,
+  .root[data-lyrics-preview] *::-webkit-scrollbar-thumb:active {
+    background-color: var(--colorNeutralStrokeAccessible);
+  }
 }

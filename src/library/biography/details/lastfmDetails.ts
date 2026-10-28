@@ -47,16 +47,21 @@ export function readLastfmFacts(root: ParentNode): readonly BiographyFact[] {
 
 function counterValue(value: string): number | null {
   const trimmed = value.trim();
-  // 只接受完整整数及三位分组，不把 1.2M 这类缩写伪装成精确计数。
+  // 只接受完整整数及三位分组，不把 1.2M 这类缩写伪装成精确计数
   if (!/^(?:\d+|\d{1,3}(?:[,. \u00a0\u202f]\d{3})+)$/.test(trimmed)) return null;
   const number = Number(trimmed.replace(/[,. \u00a0\u202f]/g, ''));
   return Number.isSafeInteger(number) ? number : null;
 }
 
+/**
+ * 解析 Last.fm 艺人主页的资料。`pageArtist` 是取到的那一页的艺人名（名字规范化跳转
+ * 后是规范名），与页面内容比对都用它；归属名保持 `artist`（请求名）
+ */
 export function readLastfmDetails(
   html: string,
   artist: string,
   language: BiographyLanguage,
+  pageArtist: string = artist,
 ): LastfmDetailsResult {
   if (html.length > 2_000_000) return { kind: 'invalid' };
   const template = document.createElement('template');
@@ -67,8 +72,8 @@ export function readLastfmDetails(
   const title = root.querySelector('.header-new-title, .header-title');
   if (
     !canonical ||
-    lastfmArtistFromUrl(canonical)?.toLowerCase() !== artist.toLowerCase() ||
-    textOf(title).toLowerCase() !== artist.toLowerCase()
+    lastfmArtistFromUrl(canonical)?.toLowerCase() !== pageArtist.toLowerCase() ||
+    textOf(title).toLowerCase() !== pageArtist.toLowerCase()
   )
     return { kind: 'invalid' };
   const tags: string[] = [];
@@ -82,7 +87,7 @@ export function readLastfmDetails(
       target.origin !== new URL(url).origin ||
       !/^\/(?:[a-z]{2}\/)?tag\/[^/]+\/?$/.test(target.pathname) ||
       !biographyField(tag, 80) ||
-      tag.toLowerCase() === artist.toLowerCase() ||
+      tag.toLowerCase() === pageArtist.toLowerCase() ||
       /^(?:@|user[: _-]|https?:)|[\\/@]/i.test(tag) ||
       tags.some((previous) => previous.toLowerCase() === tag.toLowerCase())
     )
@@ -111,7 +116,7 @@ export function readLastfmDetails(
     if (
       !name ||
       textOf(link).toLowerCase() !== name.toLowerCase() ||
-      name.toLowerCase() === artist.toLowerCase() ||
+      name.toLowerCase() === pageArtist.toLowerCase() ||
       similar.some((item) => item.artist.toLowerCase() === name.toLowerCase())
     )
       continue;
@@ -120,6 +125,11 @@ export function readLastfmDetails(
   }
   return {
     kind: 'found',
-    details: { tags, counters, similar, photo: readLastfmPhoto(root, artist, language) },
+    details: {
+      tags,
+      counters,
+      similar,
+      photo: readLastfmPhoto(root, artist, language, pageArtist),
+    },
   };
 }

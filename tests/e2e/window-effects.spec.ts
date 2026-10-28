@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
-import { enterSettings, openSettings } from '../fixtures/settingsPage.ts';
+import {
+  enterSettings,
+  openSettings,
+  expectBackground,
+  backgroundSources,
+} from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
 for (const scheme of ['light', 'dark'] as const) {
@@ -20,19 +25,23 @@ for (const scheme of ['light', 'dark'] as const) {
       const settings = await openSettings(page);
       await expect(page.locator('[data-window-background="solid"]')).toBeVisible();
       await expect(settings.card('窗口背景')).toContainText('Windows 10 使用主题色背景');
-      await expect(settings.select('窗口背景')).toHaveText('主题色背景');
-      await settings.select('窗口背景').click();
-      for (const name of ['Mica', 'Mica Alt', 'Acrylic', '跟随 foobar2000 首选项'])
-        await expect(page.getByRole('option', { name, exact: true })).toBeDisabled();
-      await expect(page.getByRole('option', { name: '主题色背景', exact: true })).toBeEnabled();
-      await page.keyboard.press('Escape');
+      await expectBackground(page, '主题色背景');
+      await expect(
+        backgroundSources(page).getByRole('radio', { name: '系统材质', exact: true }),
+      ).toBeDisabled();
+      await expect(
+        backgroundSources(page).getByRole('radio', { name: '主题色背景', exact: true }),
+      ).toBeEnabled();
       await expect
         .poll(() => settings.host.callsTo('window.setBackdropPolicy').at(-1)?.['backdropPolicy'])
         .toMatchObject({ activeEffect: 'none' });
       expect(await page.evaluate(() => localStorage.getItem('default-theme.backdrop.v1'))).toBe(
         choice,
       );
-      await page.locator('[data-info-center-trigger]').click();
+      const trigger = page.locator('[data-info-center-trigger]');
+      await expect(trigger).toHaveAccessibleName('未安装播放统计组件，另有 1 条消息');
+      await expect(trigger.locator('[data-info-badge]')).toHaveCount(0);
+      await trigger.click();
       const message = page.locator('[data-info-kind="windowEffectsLimited"]');
       await expect(message).toContainText('Mica、Mica Alt');
       await expect(message).toContainText('原生窗口保留直角');
@@ -117,8 +126,7 @@ for (const scheme of ['light', 'dark'] as const) {
         });
       }, version);
       const settings = await openSettings(page);
-      await expect(settings.select('窗口背景')).toHaveText('主题色背景');
-      await settings.expand('窗口背景');
+      await expectBackground(page, '主题色背景');
       await expect(page.getByRole('combobox', { name: '背景取色', exact: true })).toHaveCount(0);
       const background = page.locator('[data-window-background="solid"]');
       const pane = page.locator('main [data-reading-fill]').first();

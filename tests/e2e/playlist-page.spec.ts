@@ -13,8 +13,11 @@ test('点侧边栏的列表进它的页：页头写列表名、首数与总时�
   await entry('Road Trip').click();
   const view = page.locator('[data-page="playlist"]');
   await expect(view.getByRole('heading', { level: 1, name: 'Road Trip' })).toBeVisible();
-  // 副题：首数，再接宿主报的总时长。
-  await expect(view.locator('[data-playlist-subtitle]')).toHaveText(/^48 首 · \d+:\d{2}(:\d{2})?$/);
+  // 副题：首数，再接宿主报的总时长，各是一项。
+  await expect(view.locator('[data-playlist-subtitle] > span')).toHaveText([
+    '48 首',
+    /^\d+:\d{2}(:\d{2})?$/,
+  ]);
   const grid = view.getByRole('treegrid', { name: '曲目' });
   await expect(grid).toBeVisible();
   // 缺省按专辑分组：组头在第 1 层，曲目行在第 2 层。
@@ -52,27 +55,27 @@ test('曲目菜单与 Delete：移除选中的曲目；锁着的列表 Delete �
   expect(errors).toEqual([]);
 });
 
-test('页内过滤：键入后只列命中的行，副题接命中数；列头菜单里有排序与分组两段', async ({ page }) => {
+test('页内过滤：键入后只列命中的行，副题接命中数；「⋯」里有列表排序', async ({ page }) => {
   const { host, entry, errors } = await openSidebar(page);
   await entry('Road Trip').click();
   const view = page.locator('[data-page="playlist"]');
-  await view.getByRole('textbox', { name: '筛选此播放列表' }).fill('zzz-no-such-track');
+  await view.getByRole('searchbox', { name: '在此播放列表中搜索' }).fill('zzz-no-such-track');
   await expect(view.locator('[data-playlist-empty="noMatch"]')).toBeVisible();
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 0 首');
   await page.keyboard.press('Escape');
   await expect(view.locator('[data-playlist-empty]')).toHaveCount(0);
 
-  await view.getByRole('columnheader', { name: '标题' }).click({ button: 'right' });
-  await expect(page.getByRole('menuitem', { name: '排序' })).toBeVisible();
-  await page.getByRole('menuitem', { name: '排序' }).click();
-  await page.getByRole('menuitem', { name: '艺人', exact: true }).click();
+  await view.locator('[data-playlist-more]').click();
+  await page.locator('[data-playlist-sort]').click();
+  await page.locator('[data-sort-choice="artist"]').click();
+  await page.getByRole('menuitem', { name: '升序', exact: true }).click();
   await expect.poll(() => host.callsTo('playlist.sort').length).toBe(1);
   expect(errors).toEqual([]);
 });
 
 test('滚到表尾：页头、过滤框与列头还在原处，过滤框照常能用', async ({ page }) => {
   const { view, grid, row, errors } = await openPlaylist(page, 'Mix', albumTracks('Mix', 30, 10));
-  const filter = view.getByRole('textbox', { name: '筛选此播放列表' });
+  const filter = view.getByRole('searchbox', { name: '在此播放列表中搜索' });
   // 点得着行时换页的动效已经走完，这时量的才是页头的落脚处。
   await row('Mix 2').click();
   const top = await filter.boundingBox();
@@ -111,6 +114,7 @@ test('单击列头排序后记号在；撤销、别处增删行之后记号收�
     playlist: 1,
     oldCount: 12,
     newCount: 11,
+    contentVersion: '1',
   });
   await expect(title).not.toHaveAttribute('aria-sort', /ascending|descending/);
   expect(host.callsTo('playlist.sort').map((call) => call['descending'])).toEqual([

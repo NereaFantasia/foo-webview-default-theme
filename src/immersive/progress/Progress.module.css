@@ -1,0 +1,66 @@
+/* 已播的一段取主色、未播的轨道取主色的淡一档，都跟着外框的 `--text-primary`；线下是左右两端的时间，
+   与线隔 6，字 12、`--text-muted`。命中区只有线上下各 8（内边距由 `SeekBar` 给），时间行悬在命中区下面、
+   不接指针，高度由 `min-height` 留出：命中区上 8 + 线 6 + 与线隔 6 + 时间行 16 + 下沿 8。 */
+.progress {
+  --accent: var(--text-primary);
+  --player-rail: color-mix(in srgb, var(--text-primary) 24%, transparent);
+
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+/* 竖标比线高出上下各 4，取主色，不接指针；位置由元素按预览的比例写进 `left` */
+.rail {
+  position: relative;
+}
+
+.marker {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 14px;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  translate: -50% -50%;
+}
+
+.marker[data-visible] {
+  opacity: 1;
+}
+
+.times {
+  display: flex;
+  justify-content: space-between;
+  min-height: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+/* 有曲目时的时间行：以 `.progress` 为准悬在线下方 6 处（命中区 8 + 线 6 + 隔 6），指针穿过它 */
+.hanging {
+  position: absolute;
+  inset-inline: 0;
+  top: 20px;
+  pointer-events: none;
+}
+
+/* 没有曲目：空轨与空的时间行，占的高度与有曲目时一样（命中区上下各 8） */
+.rest {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--spacingVerticalSNudge);
+  padding: var(--spacingVerticalS) 0;
+}
+
+.empty {
+  height: 6px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--player-rail);
+}

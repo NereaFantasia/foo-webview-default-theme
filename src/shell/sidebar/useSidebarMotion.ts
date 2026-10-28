@@ -7,26 +7,26 @@ import type { SidebarForm, SidebarTier } from '../../nav/sidebar/sidebarView.ts'
 
 /**
  * 换形态的时长，毫秒：展开、图标态与摆回来用 WinUI SplitView 的 `SplitViewPaneAnimationOpenDuration`，
- * 整个藏起来用 `SplitViewPaneAnimationCloseDuration`。
+ * 整个藏起来用 `SplitViewPaneAnimationCloseDuration`
  */
 export const PANE_MS = 200;
 export const PANE_CLOSE_MS = 100;
 
 export interface SidebarMotionOptions {
-  /** 窗格里画侧边栏的那一层：裁剪与平移加在它身上。 */
+  /** 窗格里画侧边栏的那一层：裁剪与平移加在它身上 */
   readonly pane: RefObject<HTMLElement | null>;
-  /** 内容区：位移加在它身上。 */
+  /** 内容区：位移加在它身上 */
   readonly content: RefObject<HTMLElement | null>;
   readonly form: SidebarForm;
   readonly tier: SidebarTier;
-  /** 展开宽度。 */
+  /** 展开宽度 */
   readonly width: number;
   readonly reduced: boolean;
 }
 
 /**
  * 窗格此刻的样子：内容从左边起露出 `reveal` 宽，其余裁掉，整体再往左挪 `shift`（≤ 0）。露出部分的右缘
- * `shift + reveal` 就是内容区左缘跟着走的那条线。
+ * `shift + reveal` 就是内容区左缘跟着走的那条线
  */
 interface PaneFrame {
   readonly shift: number;
@@ -34,7 +34,7 @@ interface PaneFrame {
 }
 
 interface Running {
-  /** 第一个是窗格的，按它的进度算此刻的样子。 */
+  /** 第一个是窗格的，按它的进度算此刻的样子 */
   readonly animations: readonly Animation[];
   readonly duration: number;
   readonly from: PaneFrame;
@@ -44,11 +44,11 @@ interface Running {
 interface Move {
   readonly from: SidebarForm;
   readonly to: SidebarForm;
-  /** 窗格这一刻刚换上目标形态的内容：只在一种形态里有的部分从透明起步，不读此刻的透明度。 */
+  /** 窗格这一刻刚换上目标形态的内容：只在一种形态里有的部分从透明起步，不读此刻的透明度 */
   readonly fresh: boolean;
 }
 
-/** 这一形态占的列宽，也是它停稳时窗格露出的宽度。 */
+/** 这一形态占的列宽，也是它停稳时窗格露出的宽度 */
 function formWidth(form: SidebarForm, width: number): number {
   if (form === 'none') return 0;
   return form === 'expanded' ? width : RAIL_WIDTH;
@@ -56,7 +56,7 @@ function formWidth(form: SidebarForm, width: number): number {
 
 const edgeOf = (frame: PaneFrame) => frame.shift + frame.reveal;
 
-/** 一段还在播的动画此刻播到哪；没在播答 null。 */
+/** 一段还在播的动画此刻播到哪；没在播答 null */
 function frameNow(running: Running | null): PaneFrame | null {
   const time = running?.animations[0]?.currentTime;
   if (!running || typeof time !== 'number') return null;
@@ -70,15 +70,15 @@ function frameNow(running: Running | null): PaneFrame | null {
 
 /**
  * 侧边栏换形态的动画，照 WinUI SplitView 并排窗格的做法：布局在第 0 帧就到终值，不逐帧改宽；内容区从旧
- * 位置位移到新位置，窗格与它同一条曲线。
+ * 位置位移到新位置，窗格与它同一条曲线
  *
  * - 展开 ↔ 图标态（200 ms）：窗格用裁剪露出或收起。展开时当场换成展开态；收起时展开态的内容留着、随裁剪
  *   收窄，走完才换成图标态。两种形态都有的导航项摆在同一个位置，不跟着跳；只在一种形态里有的部分
- *   （`paneFades.ts`）收起时先淡出、换上图标态再淡入，展开时稍等再淡入。
- * - 藏起来（100 ms）与摆回来（200 ms）：窗格整张往左滑出或从左边滑入，藏起来时滑出窗口才卸掉。
+ *   （`paneFades.ts`）收起时先淡出、换上图标态再淡入，展开时稍等再淡入
+ * - 藏起来（100 ms）与摆回来（200 ms）：窗格整张往左滑出或从左边滑入，藏起来时滑出窗口才卸掉
  *
- * 动画中又换了形态，从此刻的样子起步，不跳回头。跨档（窗口缩放跨过 1008）、减弱动效时直接到位。
- * 返回窗格此刻该画哪一种内容，`none` 是不画。
+ * 动画中又换了形态，从此刻的样子起步，不跳回头。跨档（窗口缩放跨过 1008）、减弱动效时直接到位
+ * 返回窗格此刻该画哪一种内容，`none` 是不画
  */
 export function useSidebarMotion(options: SidebarMotionOptions): SidebarForm {
   const { pane, content, form, tier, width, reduced } = options;
@@ -87,20 +87,20 @@ export function useSidebarMotion(options: SidebarMotionOptions): SidebarForm {
   const [move, setMove] = useState<Move | null>(null);
   const running = useRef<Running | null>(null);
   const fades = useRef<Animation[]>([]);
-  // 拖动中宽度一直在变，动画按起步那一刻的宽度算，不因宽度变了重来。
+  // 拖动中宽度一直在变，动画按起步那一刻的宽度算，不因宽度变了重来
   const widthNow = useRef(width);
   widthNow.current = width;
   const shownNow = useRef(shown);
   shownNow.current = shown;
   // 上一次提交时的展开宽度，也就是换形态之前窗格露出的宽度：拖动中吸成图标态时存档的宽度已经换回拖动
-  // 之前的值，按它起步窗格会先跳宽一截。
+  // 之前的值，按它起步窗格会先跳宽一截
   const committedWidth = useRef(width);
 
   if (last.form !== form || last.tier !== tier) {
     const animated = !reduced && last.tier === tier && tier === 'wide';
     setLast({ form, tier });
     if (animated) {
-      // 要露出的形态当场换上；收起到图标态等裁剪走完，藏起来等滑出去。
+      // 要露出的形态当场换上；收起到图标态等裁剪走完，藏起来等滑出去
       const swap = form === 'expanded' || (form === 'rail' && shown === 'none');
       setMove({ from: last.form, to: form, fresh: swap && shown !== form });
       if (swap) setShown(form);
@@ -131,7 +131,7 @@ export function useSidebarMotion(options: SidebarMotionOptions): SidebarForm {
         ? { shift: -paneWidth, reveal: paneWidth }
         : { shift: 0, reveal: formWidth(move.from, committedWidth.current) };
     const from = frameNow(running.current) ?? settled;
-    // 藏起来时裁剪停在此刻的位置，整张往左挪出它露出的那一截。
+    // 藏起来时裁剪停在此刻的位置，整张往左挪出它露出的那一截
     const to: PaneFrame =
       move.to === 'none'
         ? { shift: -from.reveal, reveal: from.reveal }
@@ -163,7 +163,7 @@ export function useSidebarMotion(options: SidebarMotionOptions): SidebarForm {
     paneMotion.onfinish = () => {
       if (running.current !== mine) return;
       running.current = null;
-      // 收起与藏起来：同一帧里换内容再撤掉裁剪与平移，中间不露出没裁的展开态。
+      // 收起与藏起来：同一帧里换内容再撤掉裁剪与平移，中间不露出没裁的展开态
       flushSync(() => {
         if (move.to !== 'expanded') setShown(move.to);
         setMove(null);
@@ -173,7 +173,7 @@ export function useSidebarMotion(options: SidebarMotionOptions): SidebarForm {
     };
   }, [move, pane, content]);
 
-  // 排在上面那个 effect 之后：它读到的还是上一次提交的宽度。
+  // 排在上面那个 effect 之后：它读到的还是上一次提交的宽度
   useLayoutEffect(() => {
     committedWidth.current = width;
   });

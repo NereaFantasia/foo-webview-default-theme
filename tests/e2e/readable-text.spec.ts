@@ -3,6 +3,7 @@ import { openSongs } from '../fixtures/songsPage.ts';
 import { answerTrackInfo, INFO_TAGS } from '../fixtures/trackInfoAnswers.ts';
 import { stringParam } from '../fixtures/hostAnswers.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
+import { openBiographyLink } from '../fixtures/biographyActions.ts';
 import { biographyHtml, biographyOverviewHtml } from '../fixtures/biographySamples.ts';
 
 const DISPLAY =
@@ -80,6 +81,7 @@ test('简介正文复用可读链接，已有命名链接不被改写', async ({
   }));
   await page.goto('/tests/fixtures/readableTextHarness.html');
   await page.getByRole('switch', { name: '在线艺人简介' }).check();
+  await openBiographyLink(page);
   await page.getByRole('button', { name: '确认艺人', exact: true }).click();
   const panel = page.locator('[data-biography]');
   await expect(panel.getByRole('link', { name: DISPLAY, exact: true })).toHaveAttribute(

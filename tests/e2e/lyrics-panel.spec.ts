@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openBrowserPreview } from '../fixtures/browserPreview.ts';
 import { openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
+import { chooseOption, expectOption } from '../fixtures/settingsPage.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -175,7 +177,7 @@ test('读取失败可重试，纯文本可滚动，换曲后旧应答不串词',
 });
 
 test('未连接宿主时保留重试入口，不显示永久加载状态', async ({ page }) => {
-  await page.goto('/');
+  await openBrowserPreview(page);
   await key(page).click();
   await expect(panel(page)).toContainText('未连接 foobar2000');
   await expect(panel(page).getByRole('switch', { name: '在线歌词' })).toBeDisabled();
@@ -330,7 +332,8 @@ test('设置键进入歌词栏目，两档动效与自定义即时生效，字�
       .getByRole('navigation', { name: '设置分类' })
       .getByRole('button', { name: '歌词', exact: true }),
   ).toBeVisible();
-  const preset = settings.getByRole('combobox', { name: '动效预设' });
+  // 歌词栏目里桌面歌词那一块也有同名的「动效预设」，这里只管歌词播放器自己的，它排在前面
+  const preset = settings.getByRole('combobox', { name: '动效预设' }).first();
   const choosePreset = async (name: string) => {
     await preset.click();
     await page.getByRole('option', { name, exact: true }).click();
@@ -358,7 +361,7 @@ test('设置键进入歌词栏目，两档动效与自定义即时生效，字�
   await font.fill('28');
   await font.press('Enter');
   await expect(lyricsPlayer(page)).toHaveCSS('font-size', '28px');
-  await settings.getByRole('button', { name: '动效预设', exact: true }).click();
+  await settings.getByRole('button', { name: '动效预设', exact: true }).first().click();
   await settings.getByRole('switch', { name: '远处歌词模糊' }).check();
   await expect(preset).toHaveText('自定义');
   await choosePreset('AMLL');
@@ -395,14 +398,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const settings = page.locator('[data-lyrics-settings]');
     const font = settings.getByRole('spinbutton', { name: '字号 (px)' });
     await expect(font).toBeVisible();
-    for (const name of ['动效预设', '当前行位置', '缩放弹簧', '非弹簧过渡', '歌词整理', '渲染']) {
+    for (const name of ['动效预设', '缩放弹簧', '非弹簧过渡', '歌词整理', '渲染']) {
       await expect(settings.getByRole('button', { name, exact: true })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
     }
     await settings.getByRole('button', { name: '动效预设', exact: true }).click();
-    await settings.getByRole('button', { name: '当前行位置', exact: true }).click();
     const control = settings.getByRole('switch', { name: '远处歌词模糊', exact: true });
     const label = settings.getByText('远处歌词模糊', { exact: true });
     for (const width of [1280, 900, 390]) {
@@ -511,6 +513,39 @@ test('搜索入口打开候选选择器，选择在线歌词覆盖当前本地�
   expect(env.errors).toEqual([]);
 });
 
+test('搜索结果按格式筛选：筛掉的候选不显示，条数跟着变，再选一次取消', async ({ page }) => {
+  const env = await openLyrics(page);
+  onlineReplies(env);
+  await panel(page).hover();
+  await panel(page).getByRole('switch', { name: '在线歌词' }).check();
+  await panel(page).getByRole('button', { name: '搜索歌词', exact: true }).click();
+  const search = panel(page).locator('[data-lyrics-search]');
+  const candidates = search.locator('[data-lyrics-candidate]');
+  await expect(candidates).toHaveCount(1);
+  const bar = search.locator('[data-lyrics-filter]');
+  await expect(bar).toContainText('1 / 1 条');
+  const trigger = bar.locator('[data-lyrics-filter-menu="format"]');
+  await expect(trigger).toHaveText('歌词格式');
+  await trigger.click();
+  const word = page.getByRole('menuitemcheckbox', { name: '逐字', exact: true });
+  await expect(word).toHaveAttribute('aria-checked', 'false');
+  await word.click();
+  await expect(word).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await expect(trigger).toHaveText('歌词格式：1');
+  // 候选的正文读到之前内容类筛选先留着它，读到是逐行就筛掉
+  await expect(candidates).toHaveCount(0);
+  await expect(bar).toContainText('0 / 1 条');
+  await expect(search).toContainText('没有符合筛选条件的结果');
+  await trigger.click();
+  await word.click();
+  await expect(word).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
+  await expect(candidates).toHaveCount(1);
+  await expect(bar).toContainText('1 / 1 条');
+  expect(env.errors).toEqual([]);
+});
+
 test('单框搜索处理中文组词、清空和失败，窄窗返回保留预览外壳', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
   const env = await openLyrics(page, LOCAL, 720);
@@ -572,6 +607,8 @@ test('右卡历史独立、页签位置固定，候选预览与使用分开', as
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(search).toBeVisible();
   await expect(search.getByRole('textbox')).not.toHaveValue('');
+  // 前进键只认焦点在右侧卡里；后退换页后焦点落回页面，先放回卡里
+  await search.getByRole('textbox').focus();
   await page.keyboard.press('Alt+ArrowRight');
   await expect(panel(page).locator('[data-lyrics-candidate-preview]')).toBeVisible();
   await panel(page).getByRole('checkbox', { name: '设为本曲目的默认歌词' }).check();
@@ -599,7 +636,8 @@ test('显示面板与设置同步，校正应用于句首跳转且返回不重�
   await expect(settings.getByRole('spinbutton', { name: '字号 (px)', exact: true })).toHaveValue(
     '30',
   );
-  await page.keyboard.press('Escape');
+  // 点「歌词设置」时显示浮层自己收起，不留在歌词栏上
+  await expect(surface).toHaveCount(0);
   await panel(page).hover();
   await panel(page).getByRole('button', { name: '更多歌词操作' }).click();
   await page.getByRole('menuitem', { name: '时间校正', exact: true }).click();
@@ -780,5 +818,125 @@ test('含空格字体名与字号保存，预览按比例跟随', async ({ page 
     'font-family',
     /Noto Sans/,
   );
+  expect(env.errors).toEqual([]);
+});
+
+test('文字对齐：居中与居右即时生效并单独保存，预览页签不跟随', async ({ page }) => {
+  const env = await openLyrics(page);
+  await openLyricsSettings(page);
+  // 歌词设置收在窄的栏目里时，对齐是单选，宽时是页签：按实际控件点与断言
+  const choose = (name: string) => chooseOption(page, '文字对齐', name);
+  const selected = (name: string) => expectOption(page, '文字对齐', name);
+  const root = lyricsPlayer(page).locator('..');
+  const mainLine = lyricsPlayer(page).locator('[class*="lyricMainLine"]').first();
+  const duet = lyricsPlayer(page).locator('[class*="lyricDuetLine"]');
+  const plain = lyricsPlayer(page).locator(
+    '[class*="_lyricLine"]:not([class*="Wrapper"], [class*="bottomLine"], [class*="lyricDuetLine"])',
+  );
+  await selected('居左');
+  await expect(root).toHaveAttribute('data-lyrics-align', 'left');
+  await expect(duet).toHaveCount(0);
+  await choose('居中');
+  await expect(root).toHaveAttribute('data-lyrics-align', 'center');
+  await expect(mainLine).toHaveCSS('text-align', 'center');
+  await expect(duet).toHaveCount(0);
+  await choose('居右');
+  await expect(root).toHaveAttribute('data-lyrics-align', 'right');
+  await expect(plain).toHaveCount(0);
+  await expect(duet.first()).toBeAttached();
+  await expect(mainLine).toHaveCSS('text-align', 'right');
+  await expect.poll(() => env.host.config.get('defaultTheme.lyrics.align')).toBe('right');
+  await panel(page).hover();
+  await panel(page).getByRole('tab', { name: '预览', exact: true }).click();
+  await expect(
+    panel(page)
+      .locator('[data-lyrics-transcript]')
+      .getByRole('button', { name: '第一句 第一句译文' }),
+  ).toHaveCSS('text-align', 'left');
+  await panel(page).hover();
+  await panel(page).getByRole('tab', { name: '歌词', exact: true }).click();
+  await expect(root).toHaveAttribute('data-lyrics-align', 'right');
+  expect(env.errors).toEqual([]);
+});
+
+const LONG_TEXT = Array.from(
+  { length: 60 },
+  (_, index) => `[00:${String(index).padStart(2, '0')}]第${index}行歌词`,
+).join('\n');
+
+test('主副标题超长时被裁切，页面不被撑宽；停靠的歌词页滚动区贴着窗口右缘', async ({ page }) => {
+  const env = await openLyrics(page, LONG_TEXT);
+  env.state.track = makeTrack({
+    title: '超长的曲目标题'.repeat(12),
+    artist: 'AnExtremelyLongArtistNameWithoutSpaces'.repeat(3),
+    album: '专辑名也非常非常长'.repeat(8),
+  });
+  await env.host.emit('playback:trackChanged', env.state.track);
+  await expect(panel(page).getByText('超长的曲目标题', { exact: false }).first()).toBeAttached();
+  await panel(page).hover();
+  const refresh = panel(page).getByRole('button', { name: '重新读取歌词' });
+  await expect(refresh).toBeEnabled();
+  const layout = await panel(page).evaluate((root) => {
+    const title = root.querySelector('strong');
+    const artist = [...root.querySelectorAll('span')].find(
+      (span) => !span.querySelector('span') && span.textContent?.startsWith('AnExtremelyLong'),
+    );
+    const button = root.querySelector('button[aria-label="重新读取歌词"]');
+    if (!title || !artist || !button) throw new Error('页头缺少标题、艺人或刷新键');
+    return {
+      overflowX: root.scrollWidth - root.clientWidth,
+      titleClipped: title.scrollWidth > title.clientWidth,
+      artistClipped: artist.scrollWidth > artist.clientWidth,
+      titleRight: title.getBoundingClientRect().right,
+      artistRight: artist.getBoundingClientRect().right,
+      buttonLeft: button.getBoundingClientRect().left,
+      buttonRight: button.getBoundingClientRect().right,
+      headRight: (title.closest('[data-lyrics-preview-controls]') ?? title).getBoundingClientRect()
+        .right,
+    };
+  });
+  expect(layout.overflowX).toBeLessThanOrEqual(0);
+  expect(layout.titleClipped).toBe(true);
+  expect(layout.artistClipped).toBe(true);
+  expect(layout.titleRight).toBeLessThanOrEqual(layout.buttonLeft);
+  expect(layout.artistRight).toBeLessThanOrEqual(layout.buttonLeft);
+  expect(layout.buttonRight).toBeLessThanOrEqual(layout.headRight);
+
+  await panel(page).getByRole('tab', { name: '预览', exact: true }).click();
+  const edges = await panel(page).evaluate((root) => {
+    const transcript = root.querySelector('[data-lyrics-transcript]');
+    if (!transcript) throw new Error('没有找到预览文本');
+    const scroller = transcript.closest<HTMLElement>('[class*="root"]') ?? transcript;
+    const head = root.querySelector('[data-lyrics-preview-controls]');
+    return {
+      scrollerRight: scroller.getBoundingClientRect().right,
+      headRight: head?.getBoundingClientRect().right ?? 0,
+      windowRight: window.innerWidth,
+    };
+  });
+  expect(edges.scrollerRight).toBe(edges.windowRight);
+  expect(edges.headRight).toBeLessThan(edges.windowRight);
+  expect(env.errors).toEqual([]);
+});
+
+test('歌词页的滚动条闲置一点五秒隐藏，指针活动或滚动时显示，滚动不唤出控件', async ({ page }) => {
+  const env = await openLyrics(page, LONG_TEXT);
+  await panel(page).hover();
+  await panel(page).getByRole('tab', { name: '预览', exact: true }).click();
+  const card = page.locator('[data-right-card]');
+  const bounds = await card.boundingBox();
+  if (!bounds) throw new Error('预览区域不可见');
+  await page.mouse.move(bounds.x + 20, bounds.y + 200);
+  await expect(card).toHaveAttribute('data-scrollbars-visible', 'true');
+  await expect(card).not.toHaveAttribute('data-scrollbars-visible', 'true', { timeout: 4000 });
+  await expect(card).not.toHaveAttribute('data-controls-visible', 'true');
+  await panel(page).evaluate((root) => {
+    const scroller = root.querySelector('[data-lyrics-transcript]')?.closest('[class*="root"]');
+    if (!scroller) throw new Error('没有找到滚动区');
+    scroller.scrollTop = 120;
+  });
+  await expect(card).toHaveAttribute('data-scrollbars-visible', 'true');
+  await expect(card).not.toHaveAttribute('data-controls-visible', 'true');
+  await expect(card).not.toHaveAttribute('data-scrollbars-visible', 'true', { timeout: 4000 });
   expect(env.errors).toEqual([]);
 });

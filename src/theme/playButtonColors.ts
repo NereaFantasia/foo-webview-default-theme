@@ -44,7 +44,7 @@ function readable(preferred: number, background: number): number {
   return contrast(BLACK, background) >= contrast(WHITE, background) ? BLACK : WHITE;
 }
 
-/** 原色按钮只改变交互态明度；字色确定后，底色朝对比度更高的一端移动。 */
+/** 原色按钮只改变交互态明度；字色确定后，底色朝对比度更高的一端移动 */
 export function playButtonColors(
   accent: CoverTone,
   scheme: ColorScheme,

@@ -7,9 +7,9 @@ import {
 } from '@material/material-color-utilities';
 
 export interface CoverSeed {
-  /** HCT 色相角，度。 */
+  /** HCT 色相角，度 */
   hue: number;
-  /** HCT 彩度，不是 OKLCH 彩度。 */
+  /** HCT 彩度，不是 OKLCH 彩度 */
   chroma: number;
 }
 
@@ -29,9 +29,9 @@ export interface CoverProfile {
   readonly secondary: readonly CoverTone[];
   readonly gray: boolean;
   readonly pixelCount: number;
-  /** 有效原像素的 HCT tone，范围 0 到 100；透明图没有统计。 */
+  /** 有效原像素的 HCT tone，范围 0 到 100；透明图没有统计 */
   readonly lightness: { readonly min: number; readonly max: number; readonly mean: number } | null;
-  /** 按面积降序保留的颜色；旧版存档没有这一项。 */
+  /** 按面积降序保留的颜色；旧版存档没有这一项 */
   readonly palette?: readonly CoverSwatch[];
 }
 
@@ -136,13 +136,13 @@ function eligible(color: number): boolean {
   return hct.chroma >= 8 && hct.tone >= 5;
 }
 
-/** RGBA 中 alpha 小于 128 的像素不计入面积；没有可靠强调色时答 null。 */
+/** RGBA 中 alpha 小于 128 的像素不计入面积；没有可靠强调色时答 null */
 export function seedFromPixels(data: Uint8ClampedArray): CoverSeed | null {
   const accent = profileFromPixels(data).accent;
   return accent ? { hue: accent.hue, chroma: accent.chroma } : null;
 }
 
-/** 无强调色仍保留主色与明度；读取失败由调用方处理，不能表示成灰图。 */
+/** 无强调色仍保留主色与明度；读取失败由调用方处理，不能表示成灰图 */
 export function profileFromPixels(data: Uint8ClampedArray): CoverProfile {
   const pixels: number[] = [];
   const histogram = new Map<number, number>();
@@ -192,7 +192,7 @@ export function profileFromPixels(data: Uint8ClampedArray): CoverProfile {
       largest = count;
     }
   }
-  // 保留完整面积分布供 Score 排序，不能先过滤直方图再打分。
+  // 保留完整面积分布供 Score 排序，不能先过滤直方图再打分
   const candidates = Score.score(colors, { desired: 4, filter: true, fallbackColorARGB: 0 });
   const accents =
     qualified >= pixels.length * 0.05

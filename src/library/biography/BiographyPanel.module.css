@@ -82,6 +82,13 @@
   display: none;
 }
 
+.statusDetail {
+  font-size: var(--fontSizeBase100);
+  line-height: var(--lineHeightBase100);
+  color: var(--colorNeutralForeground3);
+  overflow-wrap: anywhere;
+}
+
 .root > .status:not(:empty) {
   margin-top: var(--spacingVerticalM);
 }

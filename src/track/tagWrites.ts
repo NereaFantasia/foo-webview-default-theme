@@ -1,19 +1,19 @@
 import type { MetadataWriteCompletePayload } from 'foo-webview-sdk';
 import { normalizeHostPath } from '../host/hostPath.ts';
 
-// 完成事件向所有窗口广播且不带请求身份，只用于触发补读；不能凭同一路径的事件确认某次写入。
+// 完成事件向所有窗口广播且不带请求身份，只用于触发补读校验；不能仅凭相同路径的事件直接确认某次写入
 
 export interface TagWait {
-  /** 补读与目标值一致答 true；到时限仍不一致答 false，读失败或取消答 null。 */
+  /** 校验值与目标值一致时返回 true；超时仍不一致时返回 false，读取失败或取消时返回 null */
   readonly done: Promise<boolean | null>;
-  /** 不等了（请求本身失败、或宿主没走写标签）：`done` 答 null。 */
+  /** 中止等待（请求失败或宿主未触发标签写入），`done` 兑现为 null */
   cancel(): void;
 }
 
 export interface TagWrites {
-  /** 发请求前登记；verify 补读目标字段，读失败答 null。`file` 按 `fileKeyOf` 的口径。 */
+  /** 下发写请求前登记期待项。`verify` 用于补读校验目标字段，失败返回 null；`file` 采用 `fileKeyOf` 归一化路径 */
   expect(file: string, subsong: number, verify: () => Promise<boolean | null>): TagWait;
-  /** 同一曲目的每次等待都补读自己的目标值，不依赖不同写入的完成顺序。 */
+  /** 同一曲目的并发等待各自校验专属目标值，避免依赖写入事件的先后到达顺序 */
   deliver(payload: MetadataWriteCompletePayload): void;
   dispose(): void;
 }
@@ -24,7 +24,7 @@ interface Waiter {
   check(): void;
 }
 
-/** `timeoutMs` 是等这个事件的时限，毫秒。 */
+/** 创建标签写入等待器，`timeoutMs` 为等待事件与校验的超时时限（毫秒） */
 export function createTagWrites(timeoutMs: number): TagWrites {
   const waiting = new Map<string, Waiter[]>();
   const keyOf = (file: string, subsong: number) => `${file}|${subsong}`;
@@ -72,7 +72,7 @@ export function createTagWrites(timeoutMs: number): TagWrites {
             .then((written) => {
               checking = false;
               if (!active) return;
-              // 补读途中又有写入完成，旧快照不能用于确认或判失败。
+              // 补读校验期间再次触发写入完成事件，当前快照作废并重新发起校验
               if (again) {
                 again = false;
                 waiter.check();

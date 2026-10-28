@@ -1,0 +1,33 @@
+/* 尺寸都按缩略图宽的百分比，宽卡与窄卡一个比例 */
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  container-type: inline-size;
+  background-color: var(--colorNeutralBackground4);
+}
+
+.row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: 9cqw;
+}
+
+.side {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12cqw;
+}
+
+.button {
+  display: grid;
+  flex: none;
+  width: 28cqw;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: var(--borderRadiusCircular);
+  font-size: 14cqw;
+}

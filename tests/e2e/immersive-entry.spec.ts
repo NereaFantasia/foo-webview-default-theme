@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openBrowserPreview } from '../fixtures/browserPreview.ts';
 import { choosePlayerBar, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 
 // 进沉浸视图的入口：三种播放栏的封面，底部通栏宽窗最右的沉浸键。没连上宿主时置灰，停止时照样能进。
@@ -13,6 +14,9 @@ async function enterAndLeave(page: Page, entry: Locator): Promise<void> {
   await entry.click();
   await expect(view(page)).toBeVisible();
   await expect(view(page).locator('[data-field="title"]')).toHaveText(PLAYING_TRACK.title);
+  // 指针还停在刚点的入口上，它的悬停提示会先吃掉第一下 Esc；挪开等提示收了再按
+  await page.mouse.move(640, 700);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(view(page)).toHaveCount(0);
   await expect(entry).toBeFocused();
@@ -62,12 +66,11 @@ test('视图开着时停止：视图留着，图纸上的字段写「—」', as
   expect(errors).toEqual([]);
 });
 
-test('没连上宿主时封面与沉浸键置灰，点了不进', async ({ page }) => {
-  await page.goto('/');
-  const cover = playerKey(page, '[data-player-bar]', 'cover');
-  await expect(cover).toBeDisabled();
-  await expect(playerKey(page, '[data-player-bar]', 'immersive')).toBeDisabled();
-  await cover.click({ force: true });
+test('没连上宿主时不出播放栏，也进不了沉浸视图', async ({ page }) => {
+  await openBrowserPreview(page);
+  // 没有当前曲目时播放栏整条收掉，封面与沉浸键都不在
+  await expect(page.locator('[data-player-bar]')).toHaveCount(0);
+  await expect(page.locator('[data-player-key="cover"]')).toHaveCount(0);
   await expect(view(page)).toHaveCount(0);
 });
 

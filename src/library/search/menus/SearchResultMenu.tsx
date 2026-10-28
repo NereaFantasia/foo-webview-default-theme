@@ -15,7 +15,7 @@ import type { SearchMenuService } from './searchMenu.ts';
 import { useService } from '../../../kit/useService.ts';
 import { LIBRARY_SOURCE } from '../../../playback/playbackSource.ts';
 import { pathHandlers, trackActionsKey } from '../../../track/trackActions.ts';
-import { albumDetailKey } from '../../album-detail/albumDetail.ts';
+import { placeOf } from '../../../nav/objectRef.ts';
 import { ratingsKey } from '../../../track/trackRatings.ts';
 
 interface SearchResultMenuProps {
@@ -29,7 +29,6 @@ export function SearchResultMenu({ menu, at, text, onClose }: SearchResultMenuPr
   const plural = useAtomValueRawSync(pluralAtom);
   const session = useSearchSession();
   const trackActions = useService(trackActionsKey);
-  const albumDetail = useService(albumDetailKey);
   const ratings = useService(ratingsKey);
   const state = useAtomValueRawSync(menu.state);
   const { hit, hits, tracks, paths, targets, tree } = state;
@@ -52,7 +51,6 @@ export function SearchResultMenu({ menu, at, text, onClose }: SearchResultMenuPr
       ? t('album.menuAlbums', { count: hits.length })
       : t(plural(hits.length, 'album.menuTracksOne', 'album.menuTracks'), { count: hits.length });
   const usable = !state.loading && !state.failed && !state.limited && !!paths.length;
-  const album = hit?.kind === 'track' ? albumDetail.findAlbum(hit.track) : null;
   const items: TrackMenuItem[] = [
     ...(single?.kind === 'album'
       ? [
@@ -86,6 +84,7 @@ export function SearchResultMenu({ menu, at, text, onClose }: SearchResultMenuPr
         ? [
             divider('navigation-divider'),
             'go-to-album' as const,
+            'go-to-artist' as const,
             divider('rating-divider'),
             'rating' as const,
           ]
@@ -132,7 +131,11 @@ export function SearchResultMenu({ menu, at, text, onClose }: SearchResultMenuPr
         ...pathHandlers(trackActions, paths, title, LIBRARY_SOURCE),
         ...(single ? { play: () => session.activate(single, text, true) } : {}),
       }}
-      album={{ open: hit && album ? () => session.activate(hit, text) : null, here: false }}
+      anchor={hit?.kind === 'track' ? hit.track : null}
+      beforeGoTo={(ref) => {
+        const place = placeOf(ref);
+        if (place) session.leaving(place, text);
+      }}
       rating={rating}
       tree={tree}
       runCommand={(node) => void trackActions.runCommandIn(tree, node)}

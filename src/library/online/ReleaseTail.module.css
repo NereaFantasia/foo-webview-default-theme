@@ -1,0 +1,26 @@
+/* 末尾的状态：空着时只留一个像素给哨兵，有内容时上下留白 */
+.tail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1px;
+}
+
+.tail:not(:empty) {
+  padding: var(--spacingVerticalL) 0;
+}
+
+.note {
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+}
+
+/* 联网搜索的等待、失败与加载更多 */
+.search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}

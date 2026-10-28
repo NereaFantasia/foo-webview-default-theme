@@ -1,0 +1,71 @@
+/* 尺寸都按缩略图宽的百分比；方框是 16:10，高是宽的 62.5% */
+.root {
+  --line: 9cqw;
+  --height: 62.5cqw;
+
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  container-type: inline-size;
+  background-color: var(--colorNeutralBackground4);
+}
+
+/* 当前句在第 7 行：列整体上移，让它的中线落在方框的 10%、50%、90% 处 */
+.column {
+  position: absolute;
+  inset: 0 6cqw auto 12cqw;
+  display: block;
+  transform: translateY(calc(var(--at) * var(--height) - 6.5 * var(--line)));
+}
+
+.root[data-anchor='top'] {
+  --at: 0.1;
+}
+
+.root[data-anchor='center'] {
+  --at: 0.5;
+}
+
+.root[data-anchor='bottom'] {
+  --at: 0.9;
+}
+
+.line {
+  display: block;
+  height: var(--line);
+  overflow: hidden;
+  color: var(--colorNeutralForeground2);
+  font-size: 5.6cqw;
+  line-height: var(--line);
+  white-space: nowrap;
+  opacity: 0.15;
+  filter: blur(0.9cqw);
+}
+
+.line[data-distance='0'] {
+  color: var(--colorNeutralForeground1);
+  font-weight: var(--fontWeightSemibold);
+  opacity: 1;
+  filter: none;
+}
+
+.line[data-distance='1'] {
+  opacity: 0.62;
+  filter: none;
+}
+
+.line[data-distance='2'] {
+  opacity: 0.42;
+  filter: blur(0.25cqw);
+}
+
+.line[data-distance='3'] {
+  opacity: 0.3;
+  filter: blur(0.5cqw);
+}
+
+.line[data-distance='4'] {
+  opacity: 0.22;
+  filter: blur(0.7cqw);
+}

@@ -45,7 +45,7 @@ test('F2：正在播放的那一行被过滤挡住，先清过滤再落上去', 
   const view = await openPlaylist(page, 'Mix');
   const { row, errors } = view;
   await playRow(view, 5);
-  const filter = view.view.getByRole('textbox', { name: '筛选此播放列表' });
+  const filter = view.view.getByRole('searchbox', { name: '在此播放列表中搜索' });
   await filter.fill('Mix 1');
   await expect(view.view.locator('[data-playlist-subtitle]')).toContainText('匹配');
   await row('Mix 10').click();

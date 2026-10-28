@@ -1,5 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { libraryAnswers, manyAlbums, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
+import {
+  albumTracksAnswer,
+  libraryAnswers,
+  manyAlbums,
+  SAMPLE_ALBUMS,
+} from '../fixtures/albumLibrary.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
 // 封面墙的下拉：单击开合、同一行换一张、换行、自动滚动、减弱动效、键盘与收起的几种情形。
@@ -97,7 +102,8 @@ test('单击封面在这一行下面展开下拉：先露出一截，逐帧长�
   await expect(panel(page)).toContainText('Blue Train');
   await expect(panel(page)).toContainText('John Coltrane');
   await expect(tracks(page)).toHaveCount(2);
-  await expect(panel(page)).toContainText('1957 · Jazz');
+  await expect(panel(page).getByText('1957', { exact: true })).toBeVisible();
+  await expect(panel(page).getByText('Jazz', { exact: true })).toBeVisible();
   const after = (await below.boundingBox())?.y ?? 0;
   expect(after - before).toBeCloseTo(height + 12, 0);
 });
@@ -229,14 +235,20 @@ test('这张被过滤掉、换了排序就收起；切到列表形态再切回�
   await tile(page, 'Moanin').click();
   await expect(slots(page)).toHaveCount(1);
   await page.locator('[data-album-tool="sort"]').click();
-  await page.getByRole('menuitemradio', { name: '年份降序' }).click();
+  await page.locator('[data-sort-field="year"]').click();
+  await page.locator('[data-album-tool="sort"]').click();
+  await page.getByRole('menuitemradio', { name: '降序', exact: true }).click();
   await expect(slots(page)).toHaveCount(0);
 
   await tile(page, 'Moanin').click();
   await expect(tracks(page)).toHaveCount(2);
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('treegrid', { name: '专辑列表' })).toBeVisible();
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(panel(page)).toHaveAttribute('data-album-dropdown', /^Moanin/);
   expect(await visibleOf(slots(page))).toBe(await panelOf(slots(page)));
 });
@@ -253,4 +265,26 @@ test('离开专辑页再从历史回来：下拉开着的那张直接到位，�
   const values = await sample(page, '[data-fold-slot]', 'visible');
   const height = await panelOf(slots(page));
   expect(values.every((value) => value === height)).toBe(true);
+});
+
+test('单曲的艺人署名很长：标题后面照样露出署名的开头，不是只剩一个省略号', async ({ page }) => {
+  const host = await start(page);
+  const artists = Array.from({ length: 8 }, (_, at) => `鸣潮先约电台/jixwang/艺人${at}`);
+  host.answer('library.getAlbumTracks', (params) => {
+    const answer = albumTracksAnswer(params);
+    if (answer.success === false) return answer;
+    const rows = answer.tracks.map((track) => ({ ...track, artist: artists.join(', '), artists }));
+    return { ...answer, tracks: rows, items: rows };
+  });
+  await tile(page, 'The Wall').click();
+  const credit = tracks(page).first().getByRole('button');
+  await expect(credit).toHaveCount(1);
+  // 署名起点那一点落在署名上；署名被整个省略掉时，那一点是标题行本身
+  const onCredit = await credit.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + 4, box.top + box.height / 2);
+    return hit?.closest('[role="button"]') === element;
+  });
+  expect(onCredit).toBe(true);
+  expect(errors).toEqual([]);
 });

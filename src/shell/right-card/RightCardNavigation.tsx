@@ -19,7 +19,7 @@ export function RightCardNavigation({ scope }: { readonly scope: RefObject<HTMLE
     form !== 'none' &&
     (scope.current?.matches(':hover') === true ||
       document.querySelector('[data-right-card-surface]:hover') !== null);
-  // 边界处仍接住输入，不能把右侧卡的后退交给主视图或浏览器。
+  // 边界处仍接住输入，不能把右侧卡的后退交给主视图或浏览器
   useCommand({
     id: 'rightCard.back',
     layer: 'widget',

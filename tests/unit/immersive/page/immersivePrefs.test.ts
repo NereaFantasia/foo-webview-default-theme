@@ -248,7 +248,7 @@ describe('整轨波形画法', () => {
 });
 
 describe('场景存档', () => {
-  test('只有图纸一档，同值不重写；读的是同一个键，旧存档的 terrain、坏值、无存档与坏存储都回缺省', () => {
+  test('图纸与预设两档，同值不重写；读的是同一个键，旧存档的 terrain、坏值、无存档与坏存储都回缺省', () => {
     const empty = fakeStorage();
     const store = createStore();
     loadImmersivePrefs(store, empty.storage);
@@ -275,5 +275,21 @@ describe('场景存档', () => {
     loadImmersivePrefs(muted, broken);
     expect(muted.get(immersiveSceneAtom)).toBe(DEFAULT_SCENE);
     expect(() => chooseImmersiveScene(muted, 'paper', broken)).not.toThrow();
+  });
+
+  test('预设一档写进同一个键，下次读回；切回图纸再写一次', () => {
+    const storage = fakeStorage();
+    const store = createStore();
+    loadImmersivePrefs(store, storage.storage);
+    chooseImmersiveScene(store, 'presets', storage.storage);
+    expect(store.get(immersiveSceneAtom)).toBe('presets');
+    expect(storage.writes()).toBe(1);
+    expect(readImmersiveScene(storage.storage)).toBe('presets');
+    const again = createStore();
+    loadImmersivePrefs(again, storage.storage);
+    expect(again.get(immersiveSceneAtom)).toBe('presets');
+    chooseImmersiveScene(again, 'paper', storage.storage);
+    expect(readImmersiveScene(storage.storage)).toBe('paper');
+    expect(storage.writes()).toBe(2);
   });
 });

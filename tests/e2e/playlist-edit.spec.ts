@@ -32,7 +32,8 @@ test('全选时、过滤时、锁着的列表上，裁剪置灰', async ({ page 
   );
   await page.keyboard.press('Escape');
 
-  await view.getByRole('textbox', { name: '筛选此播放列表' }).fill('Mix 1');
+  await view.locator('[data-selection-clear]').click();
+  await view.getByRole('searchbox', { name: '在此播放列表中搜索' }).fill('Mix 1');
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配');
   await row('Mix 10').click({ button: 'right' });
   await expect(menuOf(page).locator('[data-action="crop"]')).toHaveAttribute(
@@ -81,7 +82,7 @@ test('Ctrl+Z 撤销、Ctrl+Y 与 Ctrl+Shift+Z 重做，只在焦点在表格上�
   await page.keyboard.press('Control+Shift+Z');
   await expect.poll(() => host.callsTo('playlist.redo').length).toBe(2);
 
-  await view.getByRole('textbox', { name: '筛选此播放列表' }).focus();
+  await view.getByRole('searchbox', { name: '在此播放列表中搜索' }).focus();
   await page.keyboard.press('Control+Z');
   expect(host.callsTo('playlist.undo')).toHaveLength(2);
   expect(errors).toEqual([]);

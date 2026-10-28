@@ -8,8 +8,8 @@ import { PLAYER_KEY_ATTR } from '../playerFocus.ts';
 import { useOpenNowPlaying } from './useOpenNowPlaying.ts';
 
 /**
- * 播放栏里的封面，按下进沉浸视图。三种播放栏各档宽度都有它，窄窗收掉别的键时入口还在。
- * 悬停与键盘聚焦时封面压暗一层、正中出展开图标；没连上宿主时置灰，不出悬停层。
+ * 播放栏里的封面，按下进沉浸视图。三种播放栏各档宽度都有它，窄窗收掉别的键时入口还在
+ * 悬停与键盘聚焦时封面压暗一层、正中出展开图标；没连上宿主时置灰，不出悬停层
  */
 export function NowPlayingEntry({ size, shape }: NowPlayingCoverProps) {
   const t = useAtomValueRawSync(translateAtom);

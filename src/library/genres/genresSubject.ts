@@ -1,8 +1,9 @@
 import type { Translate } from '../../i18n/translate.ts';
 import { albumKeyOf, trackAlbumKeyOf } from '../../host/libraryContract.ts';
-import { EMPTY_GENRE, type GenreEntry } from './genresModel.ts';
+import { EMPTY_GENRE } from '../../nav/places.ts';
+import type { GenreEntry } from './genresModel.ts';
 
-/** 单选沿用标签名，多选把名称列表编码进保留前缀，来源返回时仍能看到整批曲目。 */
+/** 单选沿用标签名，多选把名称列表编码进保留前缀，来源返回时仍能看到整批曲目 */
 export function genresSubject(keys: readonly string[]): string {
   const unique = [...new Set(keys)];
   return unique.length === 1 ? (unique[0] ?? EMPTY_GENRE) : `\0${JSON.stringify(unique)}`;
@@ -22,7 +23,7 @@ export function genreKeys(subject: string): readonly string[] {
       return [...new Set(value.filter((name): name is string => typeof name === 'string'))];
     }
   } catch {
-    /* 旧来源或损坏的存档没有对应流派，按主体失效处理。 */
+    /* 旧来源或损坏的存档没有对应流派，按主体失效处理 */
   }
   return [subject];
 }

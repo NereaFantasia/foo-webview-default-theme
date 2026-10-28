@@ -1,4 +1,4 @@
-/* 段首横线下留 6、表头下 3、行间 4：前两个量没有同时适用的 spacing token，写成本件的几何变量。 */
+/* 段首横线下留 6、表头下 3、行间 4：前两个量没有同时适用的 spacing token，写成本件的几何变量 */
 .lyric-log {
   --head-lead: 6px;
   --rows-lead: 3px;
@@ -35,7 +35,7 @@
   color: var(--colorNeutralForeground3);
 }
 
-/* 行距与字号照图纸：邻行 17 高、当前行 20 高；方块 6、时间码 60 宽，正文从左边 86 起。 */
+/* 行距与字号照图纸：邻行 17 高、当前行 20 高；方块 6、时间码 60 宽，正文从左边 86 起 */
 .rows {
   margin: var(--rows-lead) 0 0;
   padding: 0;

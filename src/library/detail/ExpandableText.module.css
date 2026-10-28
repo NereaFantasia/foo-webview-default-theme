@@ -1,0 +1,34 @@
+.row {
+  display: flex;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+}
+
+.text {
+  display: -webkit-box;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 下拉里写完整介绍：照原样分段，长了在框里滚 */
+.surface {
+  width: min(440px, 90vw);
+  max-height: 280px;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  overflow-y: auto;
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase400);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

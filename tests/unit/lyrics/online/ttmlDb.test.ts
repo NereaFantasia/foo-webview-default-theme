@@ -48,6 +48,23 @@ describe('AMLL TTML DB 来源', () => {
     expect(found).toHaveLength(1);
     expect(await source.search({ ...query, keywords: '不存在的词' })).toEqual([]);
   });
+  it('网易云在线曲目先按 ID 找，候选写查询的曲名；库里没标这个 ID 时照旧按名字匹配', async () => {
+    const { source } = setup();
+    const byId = await source.search({ ...query, title: 'Idol (Live)', neteaseId: '2048982668' });
+    expect(byId).toEqual([
+      {
+        source: 'ttmlDb',
+        ref: '1689318244000-1-new.ttml',
+        title: 'Idol (Live)',
+        artists: ['YOASOBI'],
+        album: 'アイドル',
+        durationMs: 213_000,
+      },
+    ]);
+    const unknown = await source.search({ ...query, neteaseId: '1' });
+    expect(unknown === 'failed' ? unknown : unknown[0]?.ref).toBe('1689318244000-1-new.ttml');
+  });
+
   it('同一首的多次提交只留最新的一份，按匹配分排；按别名也能对上，曲名取对得最好的那个', async () => {
     const { source } = setup();
     const found = await source.search(query);

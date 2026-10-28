@@ -1,0 +1,37 @@
+:where(.root) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalM);
+  vertical-align: middle;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--spacingHorizontalXS);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 图标随字走的地方（沉浸视图的大字）设 `--metadata-icon-size` */
+.icon {
+  display: inline-flex;
+  flex: none;
+  font-size: var(--metadata-icon-size, var(--fontSizeBase300));
+}
+
+.icon > svg {
+  width: 1em;
+  height: 1em;
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

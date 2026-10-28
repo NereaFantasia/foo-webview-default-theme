@@ -8,7 +8,7 @@ import { createTtmlDbSource } from './ttmlDb.ts';
 import { searchOnline } from './lyricsSearch.ts';
 import type { LyricsQuery, LyricsSource } from './lyricsSource.ts';
 
-/** 同一实例复用 TTML 索引；创建本身不联网。 */
+/** 同一实例复用 TTML 索引；创建本身不联网 */
 export function createLyricsSources(host: LyricsHttpHost): LyricsSource[] {
   return [
     createLrclibSource(host),

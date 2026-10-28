@@ -6,7 +6,7 @@ import {
   widthOf,
   type ColumnId,
 } from '../../../../src/table/columns/columns.ts';
-import { resizePartner } from '../../../../src/table/columns/columnsLayout.ts';
+import { canResizeColumn } from '../../../../src/table/columns/columnsLayout.ts';
 import {
   createColumnsModel,
   type ColumnsOptions,
@@ -44,9 +44,7 @@ describe('画哪些列', () => {
     model.setContainerWidth(1200);
     expect(layout().header).toEqual(['cover', 'number', 'title', 'artist', 'rating', 'duration']);
     expect(layout().cells).toEqual(['number', 'title', 'artist', 'rating', 'duration']);
-    expect(layout().rowTemplate).toBe(
-      `52px minmax(${MIN_WIDTH}px, 2fr) minmax(${MIN_WIDTH}px, 1fr) 88px 60px`,
-    );
+    expect(layout().rowTemplate).toBe('52px 280px 160px 88px 60px');
     expect(layout().headerTemplate).toBe(`120px ${layout().rowTemplate}`);
   });
 
@@ -57,7 +55,7 @@ describe('画哪些列', () => {
     model.setContainerWidth(600);
     expect(layout().coverWidth).toBe(120);
     model.setContainerWidth(330);
-    expect(layout().coverWidth).toBe(0);
+    expect(layout().coverWidth).toBe(110);
   });
 
   it('存的封面宽超过容器宽的三分之一时按三分之一画', () => {
@@ -72,13 +70,13 @@ describe('画哪些列', () => {
     expect(store.get(model.layout).coverWidth).toBe(200);
   });
 
-  it('容器不宽于 520 时只留序号、标题与时长', () => {
-    const { model, layout } = setup();
+  it('窗口变窄仍保留勾选的列和普通列宽', () => {
+    const { model, layout, widths } = setup();
     model.setContainerWidth(520);
-    expect(layout().narrow).toBe(true);
-    expect(layout().header).toEqual(['number', 'title', 'duration']);
+    const before = widths();
+    expect(layout().header).toEqual(['cover', 'number', 'title', 'artist', 'rating', 'duration']);
     model.setContainerWidth(521);
-    expect(layout().narrow).toBe(false);
+    expect(widths()).toEqual(before);
   });
 
   it('量到的宽度不是有限非负数时不收', () => {
@@ -161,14 +159,14 @@ describe('换列', () => {
     model.setContainerWidth(400);
     model.moveAdjacent('title', 1);
     model.setContainerWidth(1200);
-    expect(layout().cells).toEqual(['number', 'artist', 'rating', 'duration', 'title']);
+    expect(layout().cells).toEqual(['number', 'artist', 'title', 'rating', 'duration']);
   });
 
-  it('窄档里键盘换列只在留下的三列之间换', () => {
+  it('窄窗键盘换列仍在全部可见列之间进行', () => {
     const { model, layout } = setup();
     model.setContainerWidth(400);
     expect(model.moveAdjacent('title', 1)).toBe(true);
-    expect(layout().cells).toEqual(['number', 'duration', 'title']);
+    expect(layout().cells).toEqual(['number', 'artist', 'title', 'rating', 'duration']);
   });
 });
 
@@ -182,24 +180,24 @@ describe('拖分隔条', () => {
     ['duration', 60],
   ]);
 
-  it('另一侧是右边第一个不定宽的列；定宽列与最后一列没有分隔条', () => {
+  it('普通列包括最后一列都能独立调整，控件列保持固定宽度', () => {
     const { model, layout } = setup();
     model.setContainerWidth(1200);
-    expect(resizePartner(layout(), 'title')).toBe('artist');
-    expect(resizePartner(layout(), 'artist')).toBe('duration');
-    expect(resizePartner(layout(), 'rating')).toBeNull();
-    expect(resizePartner(layout(), 'duration')).toBeNull();
-    expect(resizePartner(layout(), 'cover')).toBe('self');
+    expect(canResizeColumn(layout(), 'title')).toBe(true);
+    expect(canResizeColumn(layout(), 'artist')).toBe(true);
+    expect(canResizeColumn(layout(), 'rating')).toBe(false);
+    expect(canResizeColumn(layout(), 'duration')).toBe(true);
+    expect(canResizeColumn(layout(), 'cover')).toBe(true);
     expect(model.beginResize('rating', measured)).toBeNull();
   });
 
-  it('fr 列换成实测像素，位移只改两侧，松手才落盘', () => {
+  it('位移只改当前列，松手才落盘', () => {
     const { model, widths, storage } = setup();
     model.setContainerWidth(1200);
     const drag = model.beginResize('title', measured);
     drag?.update(50);
     expect(widthOf(widths(), 'title')).toBe(450);
-    expect(widthOf(widths(), 'artist')).toBe(150);
+    expect(widthOf(widths(), 'artist')).toBe(160);
     expect(widthOf(widths(), 'duration')).toBe(60);
     drag?.update(-20);
     expect(widthOf(widths(), 'title')).toBe(380);
@@ -208,23 +206,18 @@ describe('拖分隔条', () => {
     expect(JSON.parse(storage.saved.get(KEY) ?? '{}').widths[3]).toBe(380);
   });
 
-  it('看不见的 fr 列按同一比例换算，勾回来时比例不变', () => {
-    const { model, widths } = setup();
-    model.setContainerWidth(1200);
-    model.beginResize('title', measured)?.update(0);
-    // 标题与艺术家的权重 2 + 1 量出来是 600 px，一份权重 200 px；藏着的专辑列原是 1 份。
-    expect(widthOf(widths(), 'album')).toBe(200);
-  });
-
-  it('越过定宽列时它原宽不动', () => {
+  it('拖动一列不受右侧列最小宽度限制', () => {
     const { model, widths } = setup();
     model.setContainerWidth(1200);
     const drag = model.beginResize('artist', measured);
     drag?.update(20);
     expect(widthOf(widths(), 'artist')).toBe(220);
     expect(widthOf(widths(), 'rating')).toBe(88);
-    expect(widthOf(widths(), 'duration')).toBe(40);
+    expect(widthOf(widths(), 'duration')).toBe(60);
     drag?.update(500);
+    expect(widthOf(widths(), 'artist')).toBe(700);
+    expect(widthOf(widths(), 'duration')).toBe(60);
+    model.beginResize('duration', measured)?.update(-500);
     expect(widthOf(widths(), 'duration')).toBe(MIN_WIDTH);
   });
 
@@ -273,29 +266,28 @@ describe('同一个存档键', () => {
     const narrow = createColumnsModel(store, options);
     wide.setContainerWidth(1200);
     narrow.setContainerWidth(400);
-    expect(store.get(wide.layout).narrow).toBe(false);
-    expect(store.get(narrow.layout).narrow).toBe(true);
+    expect(store.get(wide.state).containerWidth).toBe(1200);
+    expect(store.get(narrow.state).containerWidth).toBe(400);
   });
 });
 
-describe('收列档与恢复缺省', () => {
+describe('窄窗与恢复缺省', () => {
   const SONGS: ColumnId[] = ['title', 'artist', 'album', 'year', 'genre', 'rating', 'duration'];
 
-  it('容器不宽于收列档时先收起它那几列，窄档再照全局的收', () => {
+  it('各档宽度保留相同的字段', () => {
     const store = createStore();
     const model = createColumnsModel(store, {
       key: 'default-theme.songs-columns.v1',
       offered: SONGS,
-      compact: { width: 860, columns: ['year', 'genre'] },
       storage: memory(),
     });
     const cells = () => store.get(model.layout).cells;
     model.setContainerWidth(1000);
     expect(cells()).toEqual(['title', 'artist', 'album', 'year', 'genre', 'rating', 'duration']);
     model.setContainerWidth(860);
-    expect(cells()).toEqual(['title', 'artist', 'album', 'rating', 'duration']);
+    expect(cells()).toEqual(SONGS);
     model.setContainerWidth(400);
-    expect(cells()).toEqual(['title', 'duration']);
+    expect(cells()).toEqual(SONGS);
   });
 
   it('恢复缺省：列宽、显隐与列序回到建模型时的样子，并落盘', () => {

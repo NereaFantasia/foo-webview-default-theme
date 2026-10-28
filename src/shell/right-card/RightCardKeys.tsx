@@ -1,6 +1,7 @@
 import { ToggleButton, Tooltip, mergeClasses, type ButtonProps } from '@fluentui/react-components';
 import { CommentText16Regular, MusicNote2Play20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
+import { useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { RIGHT_CARD_KEY_ATTR } from './rightCardContext.ts';
 import { useService } from '../../kit/useService.ts';
@@ -9,25 +10,31 @@ import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export interface RightCardKeyProps {
   readonly className?: string;
-  /** 队列只有 20 的线框图标，放进 16 的键组时缩到 16。 */
+  /** 队列只有 20 的线框图标，放进 16 的键组时缩到 16 */
   readonly glyphClassName?: string;
   readonly shape?: ButtonProps['shape'];
-  /** 键上另挂的标识，如导航行的 `data-nav`。 */
+  /** 键上另挂的标识，如导航行的 `data-nav` */
   readonly marks?: Readonly<Record<`data-${string}`, string>>;
 }
 
 /**
  * 右侧卡队列页的开合键：点了开到队列页，卡开着又停在队列页时收起；这时键亮着。按在它上面不算右侧卡浮层的
- * 「外面」，免得窄窗里按下时关掉、松开的单击又打开。导航行、标题栏各放一枚，看播放栏是哪种形态。
+ * 「外面」，免得窄窗里按下时关掉、松开的单击又打开。导航行、标题栏各放一枚，看播放栏是哪种形态
  */
 export function QueueKey({ className, glyphClassName, shape, marks }: RightCardKeyProps) {
   const t = useAtomValueRawSync(translateAtom);
   const rightCard = useService(rightCardKey);
   const { form, prefs } = useAtomValueRawSync(rightCard.card.view);
+  const [tip, setTip] = useState(false);
   const lit = form !== 'none' && prefs.page === 'queue';
   const controls = useViewControlStyles();
   return (
-    <Tooltip content={t('nav.queue')} relationship="label">
+    <Tooltip
+      content={t('nav.queue')}
+      relationship="label"
+      visible={tip && form !== 'overlay'}
+      onVisibleChange={(_, data) => setTip(data.visible)}
+    >
       <ToggleButton
         appearance="subtle"
         shape={shape}
@@ -42,14 +49,20 @@ export function QueueKey({ className, glyphClassName, shape, marks }: RightCardK
   );
 }
 
-/** 与队列键使用同一个右侧卡；浮层外部点击识别同一份入口标记。 */
+/** 与队列键使用同一个右侧卡；浮层外部点击识别同一份入口标记 */
 export function LyricsKey({ className, shape, marks }: RightCardKeyProps) {
   const t = useAtomValueRawSync(translateAtom);
   const rightCard = useService(rightCardKey);
   const { form, prefs } = useAtomValueRawSync(rightCard.card.view);
+  const [tip, setTip] = useState(false);
   const controls = useViewControlStyles();
   return (
-    <Tooltip content={t('nav.lyrics')} relationship="label">
+    <Tooltip
+      content={t('nav.lyrics')}
+      relationship="label"
+      visible={tip && form !== 'overlay'}
+      onVisibleChange={(_, data) => setTip(data.visible)}
+    >
       <ToggleButton
         appearance="subtle"
         shape={shape}

@@ -26,6 +26,44 @@ describe('fetchAlbumTracks', () => {
     ]);
   });
 
+  it('异常专辑把 albumId 传给宿主，显示名称只作回显', async () => {
+    const host = installFakeHost();
+    const album = { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' };
+    await fetchAlbumTracks(host.fb, album);
+    expect(host.callsTo('library.getAlbumTracks')).toEqual([
+      { album: '\uFFFD', albumArtist: 'X', albumId: album.albumId },
+    ]);
+  });
+
+  it('按 albumId 过滤返回曲目，不混入同显示名称的其他异常专辑与正常专辑', async () => {
+    const host = installFakeHost();
+    const album = { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' };
+    const rows = [
+      { ...albumTrackRow('\uFFFD', 'X', 'own'), albumId: album.albumId },
+      { ...albumTrackRow('\uFFFD', 'X', 'other'), albumId: 'album1:ba0058' },
+      albumTrackRow('\uFFFD', 'X', 'valid'),
+    ];
+    host.answer('library.getAlbumTracks', tracksAnswer('\uFFFD', 'X', rows));
+    const tracks = await fetchAlbumTracks(host.fb, album);
+    expect(tracks.map((track) => track.title)).toEqual(['own']);
+  });
+
+  it('同显示名称的不同 albumId 分开发请求，同一 albumId 仍合并并发请求', async () => {
+    const host = installFakeHost();
+    const held = host.hold('library.getAlbumTracks');
+    const album = { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' };
+    const first = fetchAlbumTracks(host.fb, album);
+    const joined = fetchAlbumTracks(host.fb, album);
+    const second = fetchAlbumTracks(host.fb, { ...album, albumId: 'album1:ba0058' });
+    await Promise.resolve();
+    const pending = held.pending.length;
+    held.release();
+    await Promise.all([first, joined, second]);
+    expect(pending).toBe(2);
+    expect(joined).toBe(first);
+    expect(second).not.toBe(first);
+  });
+
   it('专辑键第二段为空：宿主答的同名专辑里，只留同样折不出艺术家的曲目', async () => {
     const host = installFakeHost();
     const rows = [
@@ -125,6 +163,12 @@ describe('fetchAlbumTracks', () => {
 });
 
 describe('albumAutoplaylistQuery', () => {
+  it('异常专辑不能按显示名称创建自动播放列表，混选时也拒绝', () => {
+    const album = { ...albumRow('\uFFFD', 'X'), albumId: 'album1:b90058' };
+    expect(albumAutoplaylistQuery([album])).toBeNull();
+    expect(albumAutoplaylistQuery([albumRow('Blue', 'Joni'), album])).toBeNull();
+  });
+
   it('与取曲目同一口径：专辑名相同，album artist 或 artist 等于专辑艺术家', () => {
     expect(albumAutoplaylistQuery([albumRow('Blue', 'Joni')])).toBe(
       'album IS "Blue" AND ("album artist" IS "Joni" OR artist IS "Joni")',

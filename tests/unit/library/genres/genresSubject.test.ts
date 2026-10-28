@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { buildGenres, EMPTY_GENRE } from '../../../../src/library/genres/genresModel.ts';
+import { buildGenres } from '../../../../src/library/genres/genresModel.ts';
+import { EMPTY_GENRE } from '../../../../src/nav/places.ts';
 import {
   genreEntryOf,
   genreKeys,

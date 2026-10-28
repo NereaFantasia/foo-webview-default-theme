@@ -28,17 +28,6 @@
   padding-top: 0;
   padding-bottom: 0;
 }
-.tools {
-  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacingVerticalS);
-}
-.filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacingHorizontalS);
-}
 .scroll {
   flex: 1;
   min-height: 0;
@@ -122,6 +111,7 @@
   flex-shrink: 0;
 }
 .count {
+  flex-wrap: nowrap;
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase100);
 }

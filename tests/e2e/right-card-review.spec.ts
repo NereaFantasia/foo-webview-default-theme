@@ -83,8 +83,14 @@ test('历史入口仅图标和数量，固定视口向上看更早记录，键�
     movedCount: 0,
     invalidCount: 0,
     queueCount: 1,
+    contentVersion: '1',
   });
-  player.host.answer('queue.playNow', { success: true, playedIndex: 0, queueCount: 0 });
+  player.host.answer('queue.playNow', {
+    success: true,
+    playedIndex: 0,
+    queueCount: 0,
+    contentVersion: '1',
+  });
   await page.keyboard.press('Enter');
   await expect
     .poll(() => player.host.callsTo('queue.insertNext').at(-1)?.paths)
@@ -135,30 +141,26 @@ test('快速反向展开与收起接续动画，减弱动效直接落位，大�
   expect(player.errors).toEqual([]);
 });
 
-test('下一轮独立折叠且键盘不进入隐藏行，实际回绕后历史保留', async ({ page }) => {
+test('循环时「接下来」只列这一轮还剩的曲目，到末尾就停，最后一首在播时这一段不出', async ({
+  page,
+}) => {
   const player = await openLargeQueue(page, 12);
   await advance(player, 9);
   player.state.order = 1;
   await player.host.emit('playback:orderChanged', { order: 1, orderIndex: 1 });
-  const nextRound = page.locator('[data-queue-next-round]');
-  await expect(nextRound).toHaveAttribute('aria-expanded', 'false');
-  const upcoming = page.locator('[data-queue-section="upnext"] [data-queue-row]');
+  const section = page.locator('[data-queue-section="upnext"]');
+  const upcoming = section.locator('[data-queue-row]');
   await expect(upcoming).toHaveCount(3);
+  await expect(section.locator('[data-lead]')).toContainText('3 首');
   await upcoming.first().click();
   await page.keyboard.press('End');
   await expect(upcoming.last()).toBeFocused();
   await expect(upcoming.last()).toContainText('曲目 12');
-  await nextRound.click();
-  await expect(upcoming).toHaveCount(13);
-  await upcoming.first().click();
-  await page.keyboard.press('End');
-  await expect(upcoming.last()).toBeFocused();
-  await expect(upcoming.last()).toContainText('曲目 9');
-  await expect(upcoming.last()).toContainText('10曲目 9');
-  await expect(upcoming.filter({ hasText: /^1曲目 0/ })).toHaveCount(1);
+  await expect(upcoming.filter({ hasText: /^1曲目 0/ })).toHaveCount(0);
   await advance(player, 0);
   await expect(toggle(page)).toHaveText('2');
-  await expect(nextRound).toHaveAttribute('aria-expanded', 'false');
+  await advance(player, 12);
+  await expect(section).toHaveCount(0);
   expect(player.errors).toEqual([]);
 });
 
@@ -176,7 +178,11 @@ test('播放来源第 N 首后显示 N+1，手动插播不改来源序号，多�
     queueTrack(500),
     queueTrack(501),
   ]);
-  await player.host.emit('playback:queueChanged', { origin: 'user_added', count: 2 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: 2,
+    contentVersion: '1',
+  });
   await expect(page.locator('[data-kind="queued"]').first()).toContainText('1手动一');
   await expect(upcoming.first()).toContainText('501曲目 500');
   await upcoming.first().click();
@@ -201,15 +207,15 @@ test('面板选项在深浅两档都能开合封面，展开资料与评分跟�
       current(page).getByRole('button', { name: '收起封面', exact: true }),
     ).toBeVisible();
     await expect(current(page).locator('[data-queue-rating]')).toHaveCount(1);
-    await expect(current(page)).toContainText('FLAC · 44.1 kHz · 900 kbps');
+    await expect(current(page)).toContainText(['FLAC', '44.1 kHz', '900 kbps'].join(''));
     await options.click();
     await page.getByRole('menuitem', { name: '收起封面', exact: true }).click();
     await expect(
       current(page).getByRole('button', { name: '展开封面', exact: true }).first(),
     ).toBeVisible();
   }
-  await options.click();
-  await page.getByRole('menuitem', { name: '关闭面板', exact: true }).click();
+  // 面板选项里没有关闭项，合上靠标题栏的队列键
+  await page.locator('[data-right-card-key="queue"]').click();
   await expect(page.locator('[data-right-card]')).toHaveCount(0);
   expect(player.errors).toEqual([]);
 });
@@ -294,7 +300,11 @@ test('跳播只记实际播放，清空队列不增加历史，列表编辑保�
   await expect(reviewRows(page).last()).toContainText('曲目 0');
   const before = await toggle(page).textContent();
   const queue = installFakeQueue(player.host, queueTracks('手动一', '手动二'));
-  await player.host.emit('playback:queueChanged', { origin: 'user_added', count: 2 });
+  await player.host.emit('playback:queueChanged', {
+    origin: 'user_added',
+    count: 2,
+    contentVersion: '1',
+  });
   await page.getByRole('button', { name: '清空', exact: true }).click();
   await expect.poll(() => queue.titles()).toEqual([]);
   expect(await toggle(page).textContent()).toBe(before);
@@ -303,57 +313,9 @@ test('跳播只记实际播放，清空队列不增加历史，列表编辑保�
     playlist: 0,
     start: 0,
     count: 1,
+    contentVersion: '1',
   });
   await expect(toggle(page)).toHaveText(before ?? '');
-  expect(player.errors).toEqual([]);
-});
-
-test('收起下一轮后丢弃尚未读完的多选菜单，重新打开只作用于本轮', async ({ page }) => {
-  const player = await openLargeQueue(page, 1600);
-  await advance(player, 1599);
-  player.state.order = 1;
-  await player.host.emit('playback:orderChanged', { order: 1, orderIndex: 1 });
-  const nextRound = page.locator('[data-queue-next-round]');
-  await nextRound.click();
-  const first = page.locator('[data-kind="upnext"]').filter({ hasText: /^1601曲目 1600/ });
-  await first.click();
-  await page.keyboard.press('Shift+End');
-  await expect(
-    page.locator('[data-kind="upnext"]').filter({ hasText: /^1600曲目 1599/ }),
-  ).toBeFocused();
-  const held = player.host.hold('playlist.getTracks');
-  const readsBefore = player.host.callsTo('playlist.getTracks').length;
-  await page.keyboard.press('ContextMenu');
-  await expect.poll(() => held.pending.length).toBeGreaterThan(0);
-  await queueScroller(page).evaluate((box) => {
-    box.scrollTop = 0;
-  });
-  await nextRound.click();
-  await expect(nextRound).toHaveAttribute('aria-expanded', 'false');
-  held.release();
-  let lastCount = readsBefore;
-  let lastRead = Date.now();
-  // 多选读取会补齐被回收的缓存页；等请求结束后再核对菜单，避免只检查到尚未返回的那一帧。
-  await expect
-    .poll(() => {
-      const count = player.host.callsTo('playlist.getTracks').length;
-      if (count !== lastCount) {
-        lastCount = count;
-        lastRead = Date.now();
-      }
-      return Date.now() - lastRead;
-    })
-    .toBeGreaterThan(200);
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  await expect(page.locator('[data-queue-menu]')).toHaveCount(0);
-  await first.click({ button: 'right' });
-  await expect(page.locator('[data-queue-menu]')).toContainText('曲目 1600');
-  await expect(page.locator('[data-queue-menu]')).not.toContainText('已选');
   expect(player.errors).toEqual([]);
 });
 

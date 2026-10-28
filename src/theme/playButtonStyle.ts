@@ -4,7 +4,7 @@ import type { Store } from '../kit/store.ts';
 import { PLAY_BUTTON_STYLES, type PlayButtonStyle } from './playButtonColors.ts';
 
 export const PLAY_BUTTON_STYLE_KEY = 'default-theme.play-button-style.v1';
-/** 缺省柔和；存储不可用时照样切换，只是下次启动回到柔和。 */
+/** 缺省柔和；存储不可用时照样切换，只是下次启动回到柔和 */
 const stylePref = defineLocalPref<PlayButtonStyle>({
   key: PLAY_BUTTON_STYLE_KEY,
   fallback: 'soft',

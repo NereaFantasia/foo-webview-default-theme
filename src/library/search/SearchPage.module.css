@@ -1,36 +1,13 @@
 .root {
+  --search-inset: var(--spacingHorizontalXXL);
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL) 0;
-}
-.header {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacingHorizontalM);
-  padding-bottom: var(--spacingVerticalM);
-}
-.title {
-  min-width: 0;
-}
-.title h1 {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fontSizeBase600);
-  line-height: var(--lineHeightBase600);
-  font-weight: var(--fontWeightSemibold);
-}
-.count {
-  color: var(--colorNeutralForeground3);
-  font-size: var(--fontSizeBase200);
-  margin-top: var(--spacingVerticalXS);
+  padding-top: var(--spacingVerticalL);
 }
 .scroller {
+  padding-inline: var(--search-inset);
   position: relative;
   flex: 1;
   min-height: 0;
@@ -40,11 +17,21 @@
   padding-bottom: calc(var(--player-inset, 0px) + var(--spacingVerticalXXL));
 }
 .controls {
+  padding-inline: var(--search-inset);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: var(--spacingHorizontalS);
+}
+/* 分类页签兼作命令栏：页签之后隔一条竖线是命令栏，命令栏占满余下的宽 */
+.controls > :last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.divider {
+  flex: none;
+  width: var(--strokeWidthThin);
+  height: 20px;
+  background: var(--line);
 }
 .overview {
   display: flex;
@@ -75,10 +62,6 @@
 }
 @media (max-width: 640px) {
   .root {
-    padding-inline: var(--spacingHorizontalM);
-  }
-  .title h1 {
-    font-size: var(--fontSizeBase500);
-    line-height: var(--lineHeightBase500);
+    --search-inset: var(--spacingHorizontalM);
   }
 }

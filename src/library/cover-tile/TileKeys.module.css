@@ -1,0 +1,32 @@
+/* 外框与封面同尺寸对齐，仅作为内部操作按钮的定位基准，自身不响应指针事件
+   采用 83ms 线性淡入淡出；淡出过渡完成后切换 display: none 以免影响容器滚动溢出测量；使用 @starting-style 实现初次挂载时的透明度渐显 */
+.root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 1;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    display var(--motion-faster) allow-discrete;
+}
+
+.root[data-hidden] {
+  opacity: 0;
+  display: none;
+}
+
+/* 支持 Tab 导航的按钮在隐藏时仅设置透明并禁用指针交互，不设置 display: none，以保证菜单关闭后能够正确恢复焦点 */
+.root[data-hidden][data-tabbable] {
+  display: block;
+}
+
+.root[data-hidden][data-tabbable] > * {
+  pointer-events: none;
+}
+
+@starting-style {
+  .root {
+    opacity: 0;
+  }
+}

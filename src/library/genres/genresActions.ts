@@ -14,13 +14,15 @@ import { exclusive } from '../../playback/libraryView.ts';
 import { genresCatalogAtom } from './genresCatalog.ts';
 import { GENRES_SORT } from './genresGroups.ts';
 import { genresQuery } from './genresModel.ts';
+import { genresRowsAtom } from './genresRows.ts';
+import { genresSubject } from './genresSubject.ts';
 
 export type GenresActionNotice = 'failed' | 'busy' | 'unsupported' | 'gone' | null;
 const noticeAtom = atom<GenresActionNotice>(null);
 export const genresActionNoticeAtom: Atom<GenresActionNotice> = atom((get) => get(noticeAtom));
 export interface GenresActionsDeps {
   record(keys: readonly string[], name: string): void;
-  openSongs(keys: readonly string[]): void;
+  openSongs(keys: readonly string[], fill?: QueryFill): void;
 }
 export interface GenresActionsFace extends QueryFillFace {
   library: QueryFillFace['library'] & Pick<typeof fb.library, 'query'>;
@@ -34,8 +36,13 @@ export interface GenresActionsService {
     start?: QueryPlayStart,
     fill?: QueryFill,
   ): Promise<boolean>;
-  send(keys: readonly string[], name: string, autoplaylist: boolean): Promise<boolean>;
-  openSongs(keys: readonly string[]): void;
+  send(
+    keys: readonly string[],
+    name: string,
+    autoplaylist: boolean,
+    fill?: QueryFill,
+  ): Promise<boolean>;
+  openSongs(keys: readonly string[], fill?: QueryFill): void;
   copy(text: string): Promise<boolean>;
   dismiss(): void;
   dispose(): void;
@@ -50,7 +57,7 @@ export function startGenresActions(
   let disposed = false;
   let sending = false;
   const current = () => !disposed && host.isAvailable();
-  function prepare(keys: readonly string[]): QueryFill | null {
+  function prepare(keys: readonly string[], shown?: QueryFill): QueryFill | null {
     if (disposed || !host.isAvailable()) return null;
     const catalog = store.get(genresCatalogAtom);
     if (
@@ -67,6 +74,14 @@ export function startGenresActions(
       return null;
     }
     store.set(noticeAtom, null);
+    if (shown) {
+      const rows = store.get(genresRowsAtom);
+      if (rows.status !== 'ready' || rows.key !== genresSubject(keys) || rows.fill !== shown) {
+        store.set(noticeAtom, 'gone');
+        return null;
+      }
+      return shown;
+    }
     return { query, sort: GENRES_SORT.album, descending: false };
   }
   function finish(ok: boolean): boolean {
@@ -75,14 +90,14 @@ export function startGenresActions(
   }
   return {
     async play(keys, name, start, shown) {
-      const wanted = prepare(keys);
-      if (!wanted) return false;
-      const fill = shown ?? wanted;
-      if (shown && shown.query !== wanted.query) return finish(false);
+      const fill = prepare(keys, shown);
+      if (!fill) return false;
+      // 显示中的结果已核对是当前那一份，表格第一行就是它的第一行；降序时宿主升序的第一首在末尾，不能再去查
+      const first = shown && store.get(genresRowsAtom).tracks[0]?.handle;
       const outcome = await exclusive(store, async () => {
-        let beginning = start;
+        let beginning = start ?? (first ? { row: 0, handle: first } : undefined);
         if (beginning === undefined) {
-          // 页头播放从查询结果的第一行开始；让查询填表后的核对走同一个入口。
+          // 页头播放从查询结果的第一行开始；让查询填表后的核对走同一个入口
           if (disposed) return false;
           const answer = await settle(() =>
             host.library.query(fill.query, fill.sort, 1, ['handle']),
@@ -102,12 +117,12 @@ export function startGenresActions(
       if (outcome) deps.record(keys, name);
       return finish(outcome);
     },
-    async send(keys, name, autoplaylist) {
+    async send(keys, name, autoplaylist, shown) {
       if (sending) {
         if (!disposed) store.set(noticeAtom, 'busy');
         return false;
       }
-      const fill = prepare(keys);
+      const fill = prepare(keys, shown);
       if (!fill) return false;
       sending = true;
       try {
@@ -120,8 +135,10 @@ export function startGenresActions(
         sending = false;
       }
     },
-    openSongs(keys) {
-      if (prepare(keys)) deps.openSongs(keys);
+    openSongs(keys, shown) {
+      if (!prepare(keys, shown)) return;
+      if (shown) deps.openSongs(keys, shown);
+      else deps.openSongs(keys);
     },
     async copy(text) {
       return !disposed && finish(await hostCommand(() => host.clipboard.write(text)));

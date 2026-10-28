@@ -1,6 +1,9 @@
 import type { LibraryTrack } from 'foo-webview-sdk';
 import type { TableItem } from '../../table/tableItems.ts';
+import type { TableSort } from '../../table/TrackTableHeader.tsx';
 import { albumKeyOf, trackAlbumKeyOf, type Album } from '../../host/libraryContract.ts';
+import { arrangeRuns } from '../../track/runOrder.ts';
+import { TRACK_COMPARE } from '../../track/trackSort.ts';
 import type { GenreGrouping } from './genresPrefs.ts';
 
 export const GENRE_ROW_HEIGHT = 40;
@@ -31,7 +34,28 @@ function groupValue(track: LibraryTrack, mode: GenreGrouping): string {
   return trackAlbumKeyOf(track) ?? '';
 }
 
-/** 只把相邻的同组行合在一起，不重排宿主返回的行号。折叠改变显示位置，不改变起播位置。 */
+/**
+ * 把宿主按「分组键、所选列」升序给出的结果整理成表格的次序：组序反过来时整组倒位，降序只倒主键不同的段，
+ * 同值与「专辑与碟号」的碟序不跟着倒。不分组时没有组序
+ */
+export function arrangeGenreTracks(
+  tracks: readonly LibraryTrack[],
+  mode: GenreGrouping,
+  sort: TableSort | null,
+  groupDescending: boolean,
+): LibraryTrack[] {
+  const compare = sort ? TRACK_COMPARE[sort.column] : undefined;
+  const grouped = mode !== 'none';
+  return arrangeRuns(tracks, {
+    groupOf: grouped ? (track) => groupValue(track, mode) : undefined,
+    groupDescending: grouped && groupDescending,
+    cellOf: mode === 'albumDisc' ? (track) => String(track.discNumber) : undefined,
+    same: compare ? (a, b) => compare(a, b) === 0 : undefined,
+    descending: compare !== undefined && sort?.descending === true,
+  });
+}
+
+/** 只把相邻的同组行合在一起，不重排宿主返回的行号。折叠改变显示位置，不改变起播位置 */
 export function buildGenreGroups(
   tracks: readonly LibraryTrack[],
   mode: GenreGrouping,

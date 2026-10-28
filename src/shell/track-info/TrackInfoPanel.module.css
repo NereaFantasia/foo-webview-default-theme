@@ -13,8 +13,7 @@
 .fold {
   overflow: clip;
   flex-shrink: 0;
-  border-bottom: var(--strokeWidthThin) solid
-    color-mix(in srgb, var(--colorNeutralStroke2) 35%, transparent);
+  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
 }
 
 .identity {
@@ -191,7 +190,7 @@
 
 .tag-row {
   grid-template-columns: 80px minmax(0, 1fr) 28px;
-  border-bottom: 1px solid var(--colorNeutralStroke3);
+  border-bottom: 1px solid var(--line-subtle);
 }
 
 .tag-name {
@@ -208,7 +207,7 @@
 
 .return {
   flex-shrink: 0;
-  border-top: 1px solid var(--colorNeutralStroke2);
+  border-top: 1px solid var(--line);
   padding: var(--spacingVerticalS) var(--spacingHorizontalS);
 }
 

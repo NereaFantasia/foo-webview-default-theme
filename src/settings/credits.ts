@@ -8,6 +8,7 @@ export type CreditId =
   | 'fluentIcons'
   | 'jotai'
   | 'tanstackVirtual'
+  | 'neteaseApi'
   | 'materialColors'
   | 'amll'
   | 'foobox'
@@ -16,15 +17,15 @@ export type CreditId =
 
 export interface Credit {
   readonly id: CreditId;
-  /** 项目的名字与作者照原文写，不翻译。 */
+  /** 项目的名字与作者照原文写，不翻译 */
   readonly name: string;
   readonly author: string;
-  /** 它在这个主题里起什么作用。 */
+  /** 它在这个主题里起什么作用 */
   readonly role: MessageKey;
-  /** 许可的 SPDX 标识；不是以开源许可分发的不写。 */
+  /** 许可的 SPDX 标识；不是以开源许可分发的不写 */
   readonly license?: string;
   readonly url: string;
-  /** 对应 package.json 里的哪几个依赖；不是 npm 依赖的为空。依赖增减时靠它发现这张表没跟上。 */
+  /** 对应 package.json 里的哪几个依赖；不是 npm 依赖的为空。依赖增减时靠它发现这张表没跟上 */
   readonly packages: readonly string[];
 }
 
@@ -33,7 +34,7 @@ export interface CreditSection {
   readonly credits: readonly Credit[];
 }
 
-/** 致谢的内容：先是播放器与运行环境，再是打进产物的开源组件，最后是代码有出处的地方。 */
+/** 致谢的内容：先是播放器与运行环境，再是打进产物的开源组件，最后是代码有出处的地方 */
 export const CREDIT_SECTIONS: readonly CreditSection[] = [
   {
     title: 'settings.creditsRuntime',
@@ -121,6 +122,15 @@ export const CREDIT_SECTIONS: readonly CreditSection[] = [
         license: 'MIT',
         url: 'https://tanstack.com/virtual',
         packages: ['@tanstack/react-virtual'],
+      },
+      {
+        id: 'neteaseApi',
+        name: 'NeteaseCloudMusicApi Enhanced',
+        author: 'MoeFurina',
+        role: 'settings.creditRoleOnlineMusic',
+        license: 'MIT',
+        url: 'https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced',
+        packages: ['@neteasecloudmusicapienhanced/api'],
       },
     ],
   },

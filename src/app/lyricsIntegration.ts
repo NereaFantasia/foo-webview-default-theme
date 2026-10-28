@@ -1,7 +1,7 @@
 import { fb, PlaybackClock } from 'foo-webview-sdk/bridge';
 import { atom } from 'jotai/vanilla';
 import { serviceKey } from '../kit/serviceKey.ts';
-import { isLocalMedia } from '../immersive/analysis/localMedia.ts';
+import { trackAbilities } from '../host/trackOrigin.ts';
 import { startLyricLog } from '../immersive/lyrics/lyricLog.ts';
 import { historyAtom } from '../nav/navHistory.ts';
 import { startLocalLyrics } from '../lyrics/lyricsLocal.ts';
@@ -10,10 +10,14 @@ import { startLyricsArchive } from '../lyrics/lyricsArchive.ts';
 import { startLyricsDisplay } from '../lyrics/lyricsDisplay.ts';
 import { startLyricsPrefs } from '../lyrics/lyricsPrefs.ts';
 import { startLyrics, type LyricsTarget } from '../lyrics/lyricsService.ts';
+import { desktopLyricsPrefAtom } from '../lyrics/desktop/desktopLyricsPrefs.ts';
 import { currentTrackAtom } from '../playback/playback.ts';
+import { onlineSourceOf } from '../playback/onlineTracks.ts';
 import { trackKeyOf } from '../playback/playbackContract.ts';
 import { playbackCanSeekAtom, playbackConnectedAtom } from '../playback/playerAtoms.ts';
 import type { AppServices } from './services.ts';
+
+const NO_UNBLOCKED: ReadonlySet<string> = new Set();
 
 const artistNames = (values: readonly string[] | undefined, fallback: string) =>
   (values?.length ? values : [fallback])
@@ -40,16 +44,19 @@ export function startLyricsIntegration(
   const track = atom<LyricsTarget | null>((get) => {
     const current = get(currentTrackAtom);
     if (!current) return null;
+    // 只要平台与 ID，补全与否不相干
+    const online = onlineSourceOf(current.path, NO_UNBLOCKED)?.ref;
     return {
       key: trackKeyOf(current),
       handle: current.handle,
-      local: isLocalMedia(current.path),
+      local: trackAbilities(current.path).opensLocally,
       query: {
         title: current.title,
         artists: artistNames(current.artists, current.artist),
         album: current.album,
         albumArtists: artistNames(current.albumArtists, current.albumArtist),
         durationMs: Math.max(0, current.duration * 1000),
+        ...(online?.platform === 'wy' ? { neteaseId: online.id } : {}),
       },
     };
   });
@@ -64,8 +71,12 @@ export function startLyricsIntegration(
     );
   });
   const immersiveActive = atom((get) => get(visible) && get(historyAtom).place.id === 'nowPlaying');
-  // 取词需求包含沉浸视图，但被它遮住的预览播放器仍使用自己的可见状态。
-  const wanted = atom((get) => get(active) || (get(immersiveActive) && get(playbackConnectedAtom)));
+  // 取词需求包含沉浸视图与开着的桌面歌词，但被沉浸视图遮住的预览播放器仍使用自己的可见状态
+  const wanted = atom(
+    (get) =>
+      get(active) ||
+      ((get(immersiveActive) || get(desktopLyricsPrefAtom).open) && get(playbackConnectedAtom)),
+  );
   const prefs = startLyricsPrefs(store, host, configWriter);
   const motion = startLyricsMotion(store, host, configWriter);
   const display = startLyricsDisplay(store, host, configWriter);
@@ -104,9 +115,12 @@ export function startLyricsIntegration(
     history.subjectsChanged();
   });
   const clock = new PlaybackClock();
-  const stopActive = store.sub(active, () => {
-    if (store.get(active)) void clock.resync();
-  });
+  // 进入沉浸视图时同样重新对准：它看不见的这段时间里时钟没人校准
+  const stopActive = [active, immersiveActive].map((viewActive) =>
+    store.sub(viewActive, () => {
+      if (store.get(viewActive)) void clock.resync();
+    }),
+  );
   return {
     service,
     prefs,
@@ -115,6 +129,7 @@ export function startLyricsIntegration(
     archive,
     clock,
     active,
+    immersiveActive,
     track,
     async seek(key: string, seconds: number) {
       if (
@@ -130,7 +145,7 @@ export function startLyricsIntegration(
     dispose() {
       disposed = true;
       document.removeEventListener('visibilitychange', updateVisibility);
-      stopActive();
+      stopActive.forEach((stop) => stop());
       stopSubject();
       stopSubjects.forEach((stop) => stop());
       immersive.dispose();

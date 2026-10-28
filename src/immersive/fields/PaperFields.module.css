@@ -125,7 +125,7 @@
   white-space: nowrap;
 }
 
-/* 场景给每个元素都把字距清零，写在 .from 上传不到里面的字。 */
+/* 场景给每个元素都把字距清零，写在 .from 上传不到里面的字 */
 .from > span {
   letter-spacing: 1px;
 }
@@ -149,7 +149,7 @@
   background: var(--paper-hot);
 }
 
-/* 48 是起始字号，放不下时 `useTitleScroll` 在行内样式上改写；行高定在 58，降字号不改版式。 */
+/* 48 是起始字号，放不下时 `useTitleScroll` 在行内样式上改写；行高定在 58，降字号不改版式 */
 .title {
   margin: 0;
   height: 58px;
@@ -168,7 +168,7 @@
   text-overflow: clip;
 }
 
-/* 行内元素上 transform 不生效，滚动期间换成 inline-block；平时保持行内，省略号才截在字符上。 */
+/* 行内元素上 transform 不生效，滚动期间换成 inline-block；平时保持行内，省略号才截在字符上 */
 .title[data-rolling] .title-text {
   display: inline-block;
 }
@@ -227,7 +227,7 @@
   grid-template-columns: 312px 1fr;
 }
 
-/* 框高 8、行高 10：字底压到下面歌词段的上沿线上，与图纸一致。 */
+/* 框高 8、行高 10：字底压到下面歌词段的上沿线上，与图纸一致 */
 .footnote {
   margin: 0;
   height: 8px;

@@ -1,4 +1,4 @@
-/** 本地后端只为同一安装、本次页面启动和同一主题版本提供服务。 */
+/** 本地后端只为同一安装、本次页面启动和同一主题版本提供服务 */
 export const BACKEND_PROTOCOL = 1;
 export const BACKEND_ORIGIN = 'https://foo-ui-webview2.local';
 

@@ -94,6 +94,7 @@ export function AlbumMenu({ at, onClose }: AlbumMenuProps) {
       ? [
           divider('navigation-divider'),
           'go-to-album' as const,
+          'go-to-artist' as const,
           divider('rating-divider'),
           'rating' as const,
         ]
@@ -140,7 +141,7 @@ export function AlbumMenu({ at, onClose }: AlbumMenuProps) {
           ),
           sendToNew: () => void albums.actions.sendToNew(),
         }}
-        album={{ open: single ? () => albumDetail.open(single) : null, here: !!here }}
+        anchor={track ?? null}
         rating={track ? rating : undefined}
         tree={menu.tree}
         runCommand={(node) => void trackActions.runCommandIn(menu.tree, node)}

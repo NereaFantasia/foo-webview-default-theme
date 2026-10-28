@@ -91,7 +91,7 @@ function line(raw: unknown): LyricLine | null {
   };
 }
 
-/** 存档保留逐字、译文、音译、注音与人声角色，不经过文本格式转换。 */
+/** 存档保留逐字、译文、音译、注音与人声角色，不经过文本格式转换 */
 export function readSavedLyrics(text: string): LyricsReady | null {
   try {
     const raw: unknown = JSON.parse(text);
@@ -127,7 +127,7 @@ export function readSavedLyrics(text: string): LyricsReady | null {
   }
 }
 
-/** 内容本身参与版本身份；来源返回同一编号的新正文不会继承旧校正。 */
+/** 内容本身参与版本身份；来源返回同一编号的新正文不会继承旧校正 */
 export function lyricsVersion(lyrics: LyricsReady): string {
   const { content } = lyrics;
   return JSON.stringify([
@@ -154,6 +154,7 @@ export function lyricsVersion(lyrics: LyricsReady): string {
   ]);
 }
 
+const ENTRY_LIMIT = 16;
 const EMPTY = { selected: '', offsets: {} as Record<string, number> };
 function parseRecord(raw: unknown) {
   const selected = field(raw, 'selected');
@@ -173,7 +174,7 @@ function parseRecord(raw: unknown) {
   return { selected, offsets };
 }
 
-/** 每首曲目独立存档，晚到的初读和写入不影响其他曲目的选择。 */
+/** 每首曲目独立存档，晚到的初读和写入不影响其他曲目的选择 */
 export function startLyricsArchive(
   store: Store,
   track: Atom<LyricsTarget | null>,
@@ -230,21 +231,35 @@ export function startLyricsArchive(
       return retrying;
     }
     const unregister = registerConfigPersistence(store, { state: blocked, retry });
+    const state = atom((get) => new Map([...get(persistence.state), ...get(blocked)]));
+    /** 进行中的 `save` 数。写入等初读期间条目状态仍是 idle，淘汰只能靠它判断条目在忙 */
+    let saving = 0;
     return {
       pref,
       persistence,
       value,
-      state: atom((get) => new Map([...get(persistence.state), ...get(blocked)])),
+      state,
       retry,
+      idle() {
+        if (saving > 0) return false;
+        for (const item of store.get(state).values())
+          if (item.status === 'pending' || item.status === 'failed') return false;
+        return true;
+      },
       async save(change: (value: typeof EMPTY) => typeof EMPTY) {
-        await persistence.ready;
-        if (disposed) return false;
-        if (!readable) {
-          changes.push(change);
-          store.set(draft, change(store.get(value)));
-          return false;
+        saving += 1;
+        try {
+          await persistence.ready;
+          if (disposed) return false;
+          if (!readable) {
+            changes.push(change);
+            store.set(draft, change(store.get(value)));
+            return false;
+          }
+          return await persistence.set(pref, change(store.get(value)));
+        } finally {
+          saving -= 1;
         }
-        return persistence.set(pref, change(store.get(value)));
       },
       dispose() {
         unregister();
@@ -252,10 +267,23 @@ export function startLyricsArchive(
       },
     };
   }
+  /** 按最近使用的先后排列。淘汰只丢内存里的条目，存档仍在宿主 config，回到那首时重读 */
   const entries = new Map<string, ReturnType<typeof create>>();
   const all = atom<readonly ReturnType<typeof create>[]>([]);
   const current = atom<ReturnType<typeof create> | null>(null);
   let disposed = false;
+  /** 淘汰最久没用的条目。条目写入未完成或失败待重试时不淘汰，失败提示和重试入口都在条目上 */
+  function evict(keep: ReturnType<typeof create>): boolean {
+    let evicted = false;
+    for (const [key, entry] of entries) {
+      if (entries.size <= ENTRY_LIMIT) break;
+      if (entry === keep || !entry.idle()) continue;
+      entries.delete(key);
+      entry.dispose();
+      evicted = true;
+    }
+    return evicted;
+  }
   function follow() {
     const target = store.get(track);
     const key = target
@@ -267,13 +295,12 @@ export function startLyricsArchive(
       store.set(current, null);
       return;
     }
-    let entry = entries.get(key);
-    if (!entry) {
-      entry = create(key);
-      entries.set(key, entry);
-      store.set(all, [...entries.values()]);
-    }
+    const known = entries.get(key);
+    const entry = known ?? create(key);
+    entries.delete(key);
+    entries.set(key, entry);
     store.set(current, entry);
+    if (evict(entry) || !known) store.set(all, [...entries.values()]);
   }
   const off = store.sub(track, follow);
   follow();

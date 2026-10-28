@@ -1,6 +1,6 @@
 import type { playlistEn } from './playlistEn.ts';
 
-/** 播放列表（侧边栏的播放列表节与播放列表页）的简体中文文案，并进中文包。 */
+/** 播放列表简体中文文案，供主中文包合入。包含侧边栏列表项与播放列表页面 */
 export const playlistZhCN: Record<keyof typeof playlistEn, string> = {
   'playlist.playing': '正在播放',
   'playlist.locked': '已锁定',
@@ -35,8 +35,10 @@ export const playlistZhCN: Record<keyof typeof playlistEn, string> = {
   'playlistPage.autoplaylist': '自动播放列表',
   'playlistPage.matchCount': '匹配 {count} 首',
   'playlistPage.matchCountOne': '匹配 {count} 首',
-  'playlistPage.filter': '筛选此播放列表',
-  'playlistPage.filterPlaceholder': '筛选曲目',
+  'playlistPage.filter': '在此播放列表中搜索',
+  'playlistPage.filterPlaceholder': '搜索曲目',
+  'playlistPage.listSort': '列表排序',
+  'playlistPage.play': '播放',
   'playlistPage.scope': '搜索范围',
   'playlistPage.scopeAll': '全部字段',
   'playlistPage.scopeArtist': '艺人',
@@ -57,7 +59,8 @@ export const playlistZhCN: Record<keyof typeof playlistEn, string> = {
   'playlistPage.filterAlbum': '同一专辑',
   'playlistPage.filterGenre': '同一流派',
   'playlistPage.filterYear': '同一年份',
-  'playlistPage.hitsMenu': '结果操作',
+  'playlistPage.more': '更多',
+  'playlistPage.changeList': '改动列表（可撤销）',
   'playlistPage.selectHits': '全选筛选结果',
   'playlistPage.sendHits': '将筛选结果发送到新播放列表',
   'playlistPage.hitsListName': '{name} · {filter}',

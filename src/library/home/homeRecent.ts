@@ -23,7 +23,7 @@ interface HomeRecentState {
   readonly limited: boolean;
 }
 
-/** 宿主已按添加时间倒序；同一专辑只保留首次出现的位置，不接收缺少添加时间的行。 */
+/** 宿主已按添加时间倒序；同一专辑只保留首次出现的位置，不接收缺少添加时间的行 */
 export function homeRecentAlbums(
   tracks: readonly RecentLibraryTrack[],
   albums: readonly Album[],

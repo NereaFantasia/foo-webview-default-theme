@@ -8,14 +8,18 @@ test('多值分别归类，逗号单值保持完整；筛选、排序与整理�
   await expect(env.genre('Trip-Hop')).toContainText('3 首');
   await expect(env.genre('Rock, Soul')).toContainText('1 首');
   await expect(env.genre('未填写流派')).toBeVisible();
-  const sort = env.view.getByRole('combobox', { name: '流派排序' });
+  const sort = env.view.locator('aside [data-sort-menu]');
   await sort.click();
-  await page.getByRole('option', { name: '曲目数', exact: true }).click();
+  await page.locator('[data-sort-field="tracks"]').click();
   await expect(sort).toHaveText('曲目数');
-  await expect(env.list.getByRole('row').nth(2)).toContainText('Hip-Hop');
+  // 换到曲目数时从多的起，不沿用名称的升序
+  await expect(env.list.getByRole('row').nth(0)).toContainText('Hip-Hop');
+  await expect(env.list.getByRole('row').nth(1)).toContainText('Trip-Hop');
+  await expect(env.list.getByRole('row').nth(2)).toContainText('Rock, Soul');
   await sort.click();
-  await page.getByRole('option', { name: '名称', exact: true }).click();
-  await env.view.getByRole('button', { name: '降序' }).click();
+  await page.locator('[data-sort-field="name"]').click();
+  await sort.click();
+  await page.getByRole('menuitemradio', { name: '降序', exact: true }).click();
   await expect(env.list.getByRole('row').last()).toContainText('未填写流派');
   await env.view.getByRole('textbox', { name: '筛选流派' }).fill('trip');
   await expect(env.list.getByRole('row')).toHaveCount(1);
@@ -28,8 +32,10 @@ test('多值分别归类，逗号单值保持完整；筛选、排序与整理�
 
 test('两层分组折叠以后按原查询行号起播，封面右键是专辑菜单', async ({ page }) => {
   const env = await openGenres(page);
-  await env.view.getByRole('combobox', { name: '分组依据' }).click();
+  await env.view.locator('[data-genres-view]').click();
+  await page.locator('[data-view-grouping]').click();
   await page.getByRole('option', { name: '专辑与碟号', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(env.grid.locator('[data-genre-group="第 1 碟"]')).toBeVisible();
   await env.grid.locator('[data-genre-group="第 1 碟"]').getByRole('button').click();
   await expect(
@@ -87,10 +93,13 @@ test('在歌曲页打开清掉旧筛选，后退恢复流派主体与分组折�
     .click();
   await env.genre('Trip-Hop').click();
   await expect(env.view.getByRole('heading', { level: 2 })).toHaveText('Trip-Hop');
-  await env.view.getByRole('button', { name: '全部折叠' }).click();
-  await env.view.getByRole('button', { name: '在歌曲页打开', exact: true }).click();
+  await env.view.locator('[data-genres-view]').click();
+  await page.locator('[data-action="collapse"]').click();
+  await page.keyboard.press('Escape');
+  await env.view.locator('header:has(h2)').getByRole('button', { name: '流派选项' }).click();
+  await page.getByRole('menuitem', { name: '在歌曲页打开' }).click();
   await expect(songs.locator('input[data-query-input]')).toHaveValue('');
-  await expect(songs.locator('[data-songs-condition="genre:Trip-Hop"]')).toBeVisible();
+  await expect(songs.locator('[data-query-condition="genre:Trip-Hop"]')).toBeVisible();
   await expect(songs.locator('[data-songs-subtitle]')).toContainText('3 首');
   await expect(page.locator('[data-page="genres"]')).toHaveCount(0);
   await page.keyboard.press('Alt+ArrowLeft');
@@ -102,7 +111,8 @@ test('在歌曲页打开清掉旧筛选，后退恢复流派主体与分组折�
 test('未填写流派进入歌曲页是缺值查询，不能变成全库', async ({ page }) => {
   const env = await openGenres(page);
   await env.genre('未填写流派').click();
-  await env.view.getByRole('button', { name: '在歌曲页打开', exact: true }).click();
+  await env.view.locator('header:has(h2)').getByRole('button', { name: '流派选项' }).click();
+  await page.getByRole('menuitem', { name: '在歌曲页打开' }).click();
   await expect(page.locator('[data-songs-subtitle]')).toContainText('1 首');
   expect(env.host.callsTo('library.query').at(-1)?.['query']).toBe('NOT genre PRESENT');
   expect(env.errors).toEqual([]);
@@ -150,10 +160,27 @@ test('窄窗保留详情，拉宽再缩到 390 后往返仍能操作', async ({ 
   await env.genre('Trip-Hop').click();
   await page.setViewportSize({ width: 390, height: 800 });
   await expect(env.view.getByRole('heading', { level: 2 })).toHaveText('Trip-Hop');
-  await env.view.getByRole('button', { name: '在歌曲页打开', exact: true }).click();
+  await env.view.locator('header:has(h2)').getByRole('button', { name: '流派选项' }).click();
+  await page.getByRole('menuitem', { name: '在歌曲页打开' }).click();
   await expect(page.locator('[data-songs-subtitle]')).toContainText('3 首');
   await expect(page.locator('[data-page="genres"]')).toHaveCount(0);
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(env.view.getByRole('heading', { level: 2 })).toHaveText('Trip-Hop');
+  expect(env.errors).toEqual([]);
+});
+
+test('流派曲目筛选并进查询：在歌曲页打开带上条件，后退恢复筛选', async ({ page }) => {
+  const env = await openGenres(page);
+  const box = env.view.getByRole('searchbox', { name: '搜索当前流派的曲目' });
+  const titles = env.grid.locator('[data-column-id="title"][role="gridcell"]');
+  await box.fill('feather');
+  await expect(titles).toHaveText(['Feather']);
+  await env.view.locator('header:has(h2)').getByRole('button', { name: '流派选项' }).click();
+  await page.getByRole('menuitem', { name: '在歌曲页打开' }).click();
+  await expect(page.locator('[data-songs-subtitle]')).toContainText('1 首');
+  expect(env.host.callsTo('library.query').at(-1)?.['query']).toContain('(genre IS "Hip-Hop") AND');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(box).toHaveValue('feather');
+  await expect(titles).toHaveText(['Feather']);
   expect(env.errors).toEqual([]);
 });

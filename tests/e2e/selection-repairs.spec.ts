@@ -68,7 +68,13 @@ test('下拉曲序刷新保留曲目身份，移除焦点曲目后不留下失�
     return { ...answer, tracks, items: tracks };
   });
   await host.waitForListener('library:itemsModified');
-  await host.emit('library:itemsModified', { count: 2, timestamp: 1 });
+  await host.emit('library:itemsModified', {
+    count: 2,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: 1,
+  });
   await expect(rows.first()).toContainText('Blue Train 2');
   await expect(selected).toContainText('Blue Train 1');
   host.answer('library.getAlbumTracks', (params) => {
@@ -77,7 +83,12 @@ test('下拉曲序刷新保留曲目身份，移除焦点曲目后不留下失�
     const tracks = answer.tracks.slice(1);
     return { ...answer, tracks, items: tracks, total: 1 };
   });
-  await host.emit('library:itemsRemoved', { count: 1, timestamp: 2 });
+  await host.emit('library:itemsRemoved', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    timestamp: 2,
+  });
   await expect(rows).toHaveCount(1);
   await expect(selected).toHaveCount(0);
   await expect(list).not.toHaveAttribute('aria-activedescendant');
@@ -110,7 +121,7 @@ test('队列 Ctrl+A 选中当前段全部曲目，Delete 移除后可撤销', as
   const { host, errors } = await openPlayer(page);
   const queue = installFakeQueue(host, queueTracks('First', 'Second', 'Third'));
   await host.waitForListener('playback:queueChanged');
-  await host.emit('playback:queueChanged', { origin: 'user_added', count: 3 });
+  await host.emit('playback:queueChanged', { origin: 'user_added', count: 3, contentVersion: '1' });
   await page.locator('[data-right-card-key="queue"]').click();
   const rows = page.locator('[data-queue-section="queued"] [data-queue-row]');
   await expect(rows).toHaveCount(3);
@@ -127,7 +138,7 @@ test('队列 Ctrl+A 选中当前段全部曲目，Delete 移除后可撤销', as
 test('接下来全选包含离屏未加载曲目，不带上手动队列', async ({ page }) => {
   const { host, errors } = await openLargeQueue(page, 120);
   installFakeQueue(host, queueTracks('Queued'));
-  await host.emit('playback:queueChanged', { origin: 'user_added', count: 1 });
+  await host.emit('playback:queueChanged', { origin: 'user_added', count: 1, contentVersion: '1' });
   const queued = page.locator('[data-queue-section="queued"] [data-queue-row]');
   await expect(queued).toHaveCount(1);
   await queued.click();

@@ -21,11 +21,16 @@ import { foldersSubjects } from './tree/foldersModel.ts';
 import type { FoldersTreeHandle } from './tree/FoldersTree.tsx';
 import { FoldersNavigator } from './tree/FoldersNavigator.tsx';
 import { FoldersHeader } from './FoldersHeader.tsx';
-import { FoldersToolbar } from './detail/FoldersToolbar.tsx';
+import { useFilterSurface } from '../../track/FilterSurface.tsx';
+import { filterConditions } from '../../track/filterLabels.ts';
+import { COMMAND_BAR_TIERS, type CommandBarTier } from '../../kit/CommandBar.tsx';
+import { useWidthTier } from '../../kit/useWidthTier.ts';
+import { foldersFilterDockedAtom, foldersPrefsAtom } from './foldersPrefs.ts';
 import { useFoldersSnapshot } from './useFoldersSnapshot.ts';
 import { useLibrarySplit } from '../split-view/useLibrarySplit.ts';
 import { LibrarySplitHandle } from '../split-view/LibrarySplitHandle.tsx';
 import { LibraryDrawer } from '../split-view/LibraryDrawer.tsx';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './FoldersPage.module.css';
 import { useService } from '../../kit/useService.ts';
 import { AddFoldersAction } from '../AddFoldersAction.tsx';
@@ -38,6 +43,7 @@ interface OpenMenu {
 }
 export function FoldersPage({ place }: PageProps) {
   const folders = useService(foldersKey);
+  const viewControls = useViewControlStyles();
   const store = useStore();
   const entry = useContext(PageEntryContext);
   const history = useAtomValueRawSync(historyAtom);
@@ -55,6 +61,16 @@ export function FoldersPage({ place }: PageProps) {
   const split = useLibrarySplit('folders', 252);
   const model = useFoldersView(sort);
   useAtomValueRawSync(model.selection.state);
+  const [measure, tier] = useWidthTier<CommandBarTier, HTMLElement>(COMMAND_BAR_TIERS);
+  const prefs = useAtomValueRawSync(foldersPrefsAtom);
+  const surface = useFilterSurface({
+    docked: useAtomValueRawSync(foldersFilterDockedAtom),
+    expanded: prefs.facetsOpen,
+    narrow: tier === 'narrow',
+    onDock: folders.prefs.setFilterDocked,
+    onExpand: (facetsOpen) => folders.prefs.change({ facetsOpen }),
+  });
+  const conditionCount = filterConditions(model.conditions, t).length;
   function showMenu(target: FoldersTarget, point: TablePoint, inDrawer = false) {
     const generation = store.get(foldersTreeAtom).generation;
     const subject = store.get(foldersFocusAtom);
@@ -94,7 +110,7 @@ export function FoldersPage({ place }: PageProps) {
     active,
     model,
   );
-  // 离场层保留使用权到卸载，目录之间交接时不清空共享树和预览。
+  // 离场层保留使用权到卸载，目录之间交接时不清空共享树和预览
   useEffect(() => folders.want(), [folders]);
   useEffect(() => {
     if (!active || !place.subject || hasSnapshot) return;
@@ -128,17 +144,27 @@ export function FoldersPage({ place }: PageProps) {
     />
   );
   return (
-    <section className={styles.root} aria-label={t('folders.title')} data-page="folders">
-      <FoldersHeader model={model} onMenu={showMenu} />
-      <FoldersToolbar
+    <section
+      ref={measure}
+      className={styles.root}
+      aria-label={t('folders.title')}
+      data-page="folders"
+    >
+      <FoldersHeader
         model={model}
+        tier={tier}
         compact={split.compact}
+        surface={surface}
+        conditions={conditionCount}
+        sort={sort}
+        onSort={setSort}
         onDirectory={() => setDirectoryOpen(true)}
+        onMenu={showMenu}
       />
       {notice && (
         <div role="alert" className={styles.notice}>
           {t(`folders.${notice}`)}
-          <Button size="small" onClick={folders.actions.dismiss}>
+          <Button className={viewControls.field} size="small" onClick={folders.actions.dismiss}>
             {t('folders.dismiss')}
           </Button>
         </div>
@@ -146,7 +172,9 @@ export function FoldersPage({ place }: PageProps) {
       {catalog.status === 'failed' && (
         <div role="alert" className={styles.notice}>
           {t('folders.failed')}
-          <Button onClick={() => void folders.tree.retry()}>{t('folders.retry')}</Button>
+          <Button className={viewControls.field} onClick={() => void folders.tree.retry()}>
+            {t('folders.retry')}
+          </Button>
         </div>
       )}
       {catalog.status === 'ready' && !catalog.enabled && (
@@ -172,6 +200,8 @@ export function FoldersPage({ place }: PageProps) {
           handle={table}
           scroll={content}
           sort={sort}
+          surface={surface}
+          conditions={conditionCount}
           onSort={setSort}
           onMenu={showMenu}
         />

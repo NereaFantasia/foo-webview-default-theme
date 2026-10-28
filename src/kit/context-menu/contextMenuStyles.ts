@@ -1,4 +1,5 @@
 import { makeStyles, tokens } from '@fluentui/react-components';
+import { SCROLLBAR_STYLES } from '../../theme/scrollbarStyles.ts';
 
 export const useContextMenuStyles = makeStyles({
   surface: {
@@ -9,16 +10,20 @@ export const useContextMenuStyles = makeStyles({
     overflow: 'hidden',
     padding: tokens.spacingVerticalXS,
     backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: tokens.borderRadiusMedium,
+    borderRadius: tokens.borderRadiusXLarge,
   },
   list: {
+    marginRight: `calc(-1 * ${tokens.spacingHorizontalXS})`,
+    paddingRight: tokens.spacingHorizontalXS,
     minWidth: 0,
     minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
     overscrollBehavior: 'contain',
-    scrollbarGutter: 'stable',
+    scrollbarGutter: 'auto',
     flex: '1 1 auto',
+    // 局部主题的Portal不带外层Provider类，滚动区直接应用共用样式
+    ...SCROLLBAR_STYLES,
   },
   item: {
     maxWidth: 'none',
@@ -38,6 +43,9 @@ export const useContextMenuStyles = makeStyles({
     minWidth: 0,
     whiteSpace: 'normal',
     overflowWrap: 'anywhere',
+  },
+  badge: {
+    marginLeft: tokens.spacingHorizontalS,
   },
   secondary: {
     flexShrink: 0,

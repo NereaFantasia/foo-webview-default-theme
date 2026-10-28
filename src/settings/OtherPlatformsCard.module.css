@@ -1,0 +1,26 @@
+.status {
+  color: var(--colorNeutralForeground2);
+}
+
+.failure {
+  display: block;
+  color: var(--colorStatusDangerForeground1);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+/* 「全部检测」在「导入脚本…」左边；窄时换到标题下面，两个按钮各占一半 */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalS);
+}
+
+.stacked {
+  justify-content: stretch;
+}
+
+.stacked > * {
+  flex: 1 1 0;
+}

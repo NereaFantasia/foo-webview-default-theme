@@ -1,0 +1,92 @@
+/* 舞台铺满外框，每张卡是封面边长的方块，叠在同一个位置，位置、缩放、倾角与不透明度由引擎逐帧写进
+   transform 与 opacity。外框给的变量：--cf-cover 当前封面边长、--cf-top 封面上沿；引擎写 --shade（远边暗层）
+   与 --center（离选中项越近越接近 1，只用来加深投影）。色值取 Fluent token，场景固定深色，
+   Background5 在深色里是黑，投影取外框的 --scene-shadow。 */
+.root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  outline: none;
+}
+
+.card {
+  position: absolute;
+  top: var(--cf-top);
+  left: calc(50% - var(--cf-cover) / 2);
+  display: grid;
+  place-items: center;
+  width: var(--cf-cover);
+  height: var(--cf-cover);
+  overflow: hidden;
+  border-radius: calc(var(--cf-cover) * 0.0375);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  box-shadow: 0 calc(13px + 7px * var(--center, 0)) calc(14px + 34px * var(--center, 0))
+    var(--scene-shadow, var(--colorNeutralShadowKeyDarker));
+  cursor: pointer;
+  will-change: transform, opacity;
+  transition: scale var(--motion-faster) var(--curveLinear);
+}
+
+/* 选中的那张被左键或右键按住时略微缩小：scale 属性叠在引擎逐帧写的 transform 之外，两者互不覆盖 */
+.card[data-pressed] {
+  scale: 0.98;
+}
+
+/* 键盘焦点在舞台里时，焦点环画在选中的那一张上，不围整个舞台 */
+.root:focus-visible .card[aria-selected='true'] {
+  outline: 2px solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.image[data-ready] {
+  opacity: 1;
+}
+
+.placeholder {
+  width: 30%;
+  height: 30%;
+}
+
+/* 远边的暗层：从近边（几乎透明）到远边线性加深，加深多少由 --shade 定；左边的卡近边在左，右边的在右 */
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--shade, 0);
+  background: linear-gradient(to right, transparent, var(--colorNeutralBackground5));
+}
+
+.card[data-side='right'] .shade {
+  background: linear-gradient(to left, transparent, var(--colorNeutralBackground5));
+}
+
+/* 选中的那张悬停时正中出一个大播放键，不压暗封面；点它起播或切换播放／暂停，侧封面点的是选中，所以只给选中的那张。
+   淡入淡出同队列行封面上的播放键（83 ms 线性），颜色不随主题反色；封面不压暗，浅色封面上白图标靠一圈投影托出来；
+   盖层不接指针，点击落在卡上 */
+.play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--colorNeutralForegroundStaticInverted);
+  font-size: max(40px, calc(var(--cf-cover) * 0.16));
+  filter: drop-shadow(0 2px 8px var(--scene-shadow, var(--colorNeutralShadowKeyDarker)));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.card[aria-selected='true']:hover .play {
+  opacity: 1;
+}

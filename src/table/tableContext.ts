@@ -11,7 +11,7 @@ export interface TableServices {
   readonly PlayingMark: ComponentType<{ readonly active: boolean; readonly label: string }>;
 }
 
-/** 表格依赖由装配层提供，不读取页面或窗口的服务容器。 */
+/** 表格依赖由装配层提供，不读取页面或窗口的服务容器 */
 export const TableContext = createContext<TableServices | null>(null);
 
 export function useTableServices(): TableServices {
@@ -21,6 +21,6 @@ export function useTableServices(): TableServices {
 }
 
 /**
- * 曲目信息卡的预览，由装配层提供，没有时不上报。只上报用户主动落到的曲目；恢复焦点和播放定位不切换预览。
+ * 曲目信息卡的预览，由装配层提供，没有时不上报。只上报用户主动落到的曲目；恢复焦点和播放定位不切换预览
  */
 export const TablePreviewContext = createContext<((track: TableTrack) => void) | null>(null);

@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openBrowserPreview } from '../fixtures/browserPreview.ts';
 import { choosePlayerBar, openPlayer } from '../fixtures/playerPage.ts';
+
+test.use({ screenshot: 'off' });
 
 // 播放顺序菜单：单击与右键都能开，七项带图标、当前项打勾；选中只发命令，勾与键上的图标等宿主报了新顺序
 // 才动。宽窗的标题栏与胶囊共用同一份；底部通栏的顺序键开菜单、发命令另在 player-bottom-bar.spec.ts。
@@ -32,7 +35,8 @@ test('单击弹出七选一，各带图标，当前项打勾', async ({ page }) 
   await orderKey(page).click();
   const items = menu(page).getByRole('menuitemradio');
   await expect(items).toHaveText(NAMES);
-  for (const item of await items.all()) await expect(item.locator('svg').first()).toBeVisible();
+  for (const item of await items.all())
+    await expect(item.locator('.fui-MenuItem__icon svg').first()).toBeVisible();
   expect(await checkedItems(page)).toEqual(['重复（列表）']);
   await page.keyboard.press('Escape');
   await expect(menu(page)).toHaveCount(0);
@@ -91,7 +95,7 @@ test('胶囊里的顺序键开同一份菜单', async ({ page }) => {
 });
 
 test('还没连上宿主时顺序键置灰、点不开', async ({ page }) => {
-  await page.goto('/');
+  await openBrowserPreview(page);
   const key = orderKey(page);
   await expect(key).toBeDisabled();
   await key.click({ force: true });

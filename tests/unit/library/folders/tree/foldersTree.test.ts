@@ -123,8 +123,13 @@ it('一秒内库事件合并重读，释放摘掉订阅', async () => {
   env.service.want();
   await vi.advanceTimersByTimeAsync(0);
   const before = env.state().generation;
-  env.host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
-  env.host.emit('library:itemsRemoved', { count: 1, timestamp: 2 });
+  env.host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
+  env.host.emit('library:itemsRemoved', {
+    count: 1,
+    handles: [],
+    truncated: false,
+    timestamp: 2,
+  });
   await vi.advanceTimersByTimeAsync(999);
   expect(env.state().generation).toBe(before);
   await vi.advanceTimersByTimeAsync(1);

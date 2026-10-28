@@ -9,6 +9,9 @@ import {
   runContextCommand,
   type ContextTree,
 } from '../../../src/host/contextMenu.ts';
+import { contextExtensionEntries } from '../../../src/host/contextMenuEntries.ts';
+import { createTranslate } from '../../../src/i18n/translate.ts';
+import { zhCN } from '../../../src/i18n/zhCN.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
@@ -74,6 +77,32 @@ describe('readContextTree', () => {
     expect(tree.roots).toHaveLength(5);
   });
 
+  it('宿主报了 targetKey 就记在树上，没报（播放列表模式）就不留这个键', async () => {
+    const host = installFakeHost();
+    host.answer('menu.getContextMenu', { ...menuAnswer([]), targetKey: 'k1' });
+    expect(await readContextTree(host.fb, { mode: 'selection' })).toEqual({
+      roots: [],
+      target: { mode: 'selection' },
+      targetKey: 'k1',
+    });
+    host.answer('menu.getContextMenu', menuAnswer([]));
+    expect(await readContextTree(host.fb, { mode: 'selection' })).not.toHaveProperty('targetKey');
+  });
+
+  it('作用对象里有在线曲目时不建树、不问宿主，属性与更多命令随之不出', async () => {
+    const host = installFakeHost();
+    host.answer('menu.getContextMenu', menuAnswer(TREE.roots.slice()));
+    const online = 'http://127.0.0.1:51234/music/stream/wy/12.flac?q=flac';
+    const tree = await readContextTree(host.fb, {
+      mode: 'handles',
+      handles: ['file://E:/a.flac', online],
+    });
+    expect(tree).toEqual({ ...EMPTY_CONTEXT_TREE, loading: false });
+    expect(host.callsTo('menu.getContextMenu')).toEqual([]);
+    // 空树已读完：「更多命令」没有内容，子菜单整项不出，而不是停在读取状态
+    expect(contextExtensionEntries(createTranslate(zhCN, {}), tree, () => {})).toEqual([]);
+  });
+
   it('读取失败与正常空树分开', async () => {
     const host = installFakeHost();
     host.answer('menu.getContextMenu', hostFailure('NO_ACTIVE_ITEM'));
@@ -95,6 +124,36 @@ describe('runContextCommand', () => {
     expect(await runContextCommand(host.fb, TREE, PROPERTIES)).toBe(true);
     expect(host.callsTo('menu.runContextCommandById')).toEqual([
       { id: PROPERTIES.commandId, mode: 'handles', handles: ['file://E:\\a.flac'] },
+    ]);
+  });
+
+  it('树带 targetKey 时成对回传节点的 path 与指纹，让宿主核对后再执行', async () => {
+    const host = installFakeHost();
+    const keyed: ContextTree = { ...TREE, targetKey: 'k1' };
+    expect(await runContextCommand(host.fb, keyed, PROPERTIES)).toBe(true);
+    expect(host.callsTo('menu.runContextCommandById')).toEqual([
+      {
+        id: PROPERTIES.commandId,
+        mode: 'handles',
+        handles: ['file://E:\\a.flac'],
+        expectPath: PROPERTIES.path,
+        expectTarget: 'k1',
+      },
+    ]);
+  });
+
+  it('宿主核对不符而拒绝时答 false，不当作执行过', async () => {
+    const host = installFakeHost();
+    host.answer('menu.runContextCommandById', hostFailure('NOT_FOUND', 'targetChanged'));
+    expect(await runContextCommand(host.fb, { ...TREE, targetKey: 'k1' }, PROPERTIES)).toBe(false);
+  });
+
+  it('节点没有 path 时不单传指纹，两项都不给', async () => {
+    const host = installFakeHost();
+    const bare = command('Bare', { path: '' });
+    expect(await runContextCommand(host.fb, { ...TREE, targetKey: 'k1' }, bare)).toBe(true);
+    expect(host.callsTo('menu.runContextCommandById')).toEqual([
+      { id: bare.commandId, mode: 'handles', handles: ['file://E:\\a.flac'] },
     ]);
   });
 

@@ -14,15 +14,22 @@ describe('简介请求退避', () => {
     expect(backoff.blocking('a')).toBeNull();
   });
 
-  it('主动刷新只放行断网与 key 出错，限流和拒绝访问照样等', () => {
+  it('主动刷新放行网络环境问题、被拒访问与 key 出错，限流照样等', () => {
     const backoff = createBiographyBackoff();
     const later = Date.now() + 60_000;
-    for (const problem of ['network', 'keyInvalid', 'keySuspended'] as const) {
+    for (const problem of [
+      'network',
+      'dns',
+      'localRelay',
+      'blocked',
+      'keyInvalid',
+      'keySuspended',
+    ] as const) {
       backoff.record({ ok: false, problem, retryAt: later }, 'a');
       backoff.release();
       expect(backoff.blocking('a')).toBeNull();
     }
-    for (const problem of ['rateLimited', 'blocked', 'invalid'] as const) {
+    for (const problem of ['rateLimited', 'invalid'] as const) {
       backoff.record({ ok: false, problem, retryAt: later }, 'a');
       backoff.release();
       expect(backoff.blocking('a')).toMatchObject({ problem });

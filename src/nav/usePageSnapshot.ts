@@ -3,13 +3,13 @@ import type { HistoryEntry, SnapshotHooks, SnapshotSlot, NavHistoryService } fro
 import { useService } from '../kit/useService.ts';
 import { historyKey } from './navHistory.ts';
 
-/** 页面所在的历史记录，由中央区域给每一层提供；页面里的部件按它登记快照。 */
+/** 页面所在的历史记录，由中央区域给每一层提供；页面里的部件按它登记快照 */
 export const PageEntryContext = createContext<HistoryEntry | null>(null);
 
 /**
  * 为所在页面的这条历史记录登记快照钩子。`ready` 为真（页面要的数据到齐）才登记：回到这条记录时，
- * 快照在登记那一刻交还，滚动与焦点于是落在已经取回的数据上。登记在布局阶段，交还发生在绘制之前。
- * 钩子取最近一次渲染传进来的，调用方不必记忆化；槽要在模块顶层建，换了槽会重新登记。
+ * 快照在登记那一刻交还，滚动与焦点于是落在已经取回的数据上。登记在布局阶段，交还发生在绘制之前
+ * 钩子取最近一次渲染传进来的，调用方不必记忆化；槽要在模块顶层建，换了槽会重新登记
  */
 export function usePageSnapshot<S extends object>(
   slot: SnapshotSlot<S>,
@@ -21,7 +21,7 @@ export function usePageSnapshot<S extends object>(
   useHistorySnapshot(history, entry, slot, hooks, ready);
 }
 
-/** 快照只绑定所属历史实例；主视图与右侧卡可以共享恢复时序。 */
+/** 快照只绑定所属历史实例；主视图与右侧卡可以共享恢复时序 */
 export function useHistorySnapshot<S extends object>(
   history: Pick<NavHistoryService, 'registerSnapshot'>,
   entry: HistoryEntry | null,

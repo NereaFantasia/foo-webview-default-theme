@@ -2,32 +2,32 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { edgeStep, passedThreshold, slotAt, type RowEdges } from './playlistReorder.ts';
 
-/** 拖动中：拖的是哪一张（GUID）、此刻的插入位（0…n）。 */
+/** 拖动中：拖的是哪一张（GUID）、此刻的插入位（0…n） */
 export interface PlaylistDrag {
   readonly guid: string;
   readonly slot: number;
 }
 
 export interface PlaylistReorderOptions {
-  /** 清单所在的滚动区；各行按 `[data-playlist-entry]` 找，文档顺序就是插入位的顺序。 */
+  /** 清单所在的滚动区；各行按 `[data-playlist-entry]` 找，文档顺序就是插入位的顺序 */
   readonly scroller: RefObject<HTMLElement | null>;
-  /** 此刻能不能起拖：过滤时看不见全部列表、改名时行在输入态，都不行。 */
+  /** 此刻能不能起拖：过滤时看不见全部列表、改名时行在输入态，都不行 */
   readonly enabled: boolean;
-  /** 清单的签名：拖动途中变了（别处新建、删除、重排）就取消，按旧清单算的插入位已经对不上。 */
+  /** 清单的签名：拖动途中变了（别处新建、删除、重排）就取消，按旧清单算的插入位已经对不上 */
   readonly signature: string;
-  /** 松手时交出去；落在原位与否由接的一方判断。 */
+  /** 松手时交出去；落在原位与否由接的一方判断 */
   drop(guid: string, slot: number): void;
 }
 
 export interface PlaylistReorder {
   readonly drag: PlaylistDrag | null;
-  /** 行上按下指针时调。 */
+  /** 行上按下指针时调 */
   press(event: ReactPointerEvent, guid: string): void;
-  /** 取消进行中的拖动；拖动层的 Esc 调它。 */
+  /** 取消进行中的拖动；拖动层的 Esc 调它 */
   cancel(): void;
 }
 
-/** 拖到边缘时每隔这么久滚一行，毫秒。 */
+/** 拖到边缘时每隔这么久滚一行，毫秒 */
 const EDGE_STEP_MS = 100;
 const ROW = '[data-playlist-entry]';
 
@@ -44,15 +44,15 @@ function inside(list: HTMLElement, x: number, y: number): boolean {
 }
 
 /**
- * 拖动重排的手势：只认鼠标左键、不带修饰键；按下后移出阈值才算拖，没过线就松手照常是单击。
+ * 拖动重排的手势：只认鼠标左键、不带修饰键；按下后移出阈值才算拖，没过线就松手照常是单击
  *
  * 过线之前不抢指针：捕获会把松手那一下改投给捕获元素，单击就坏了。过线之后把指针捕获到 `document.body`，
- * 松手在窗口外也收得到，而 `click` 落在按下与松开两处的公共祖先上，不会再触发行的单击。
+ * 松手在窗口外也收得到，而 `click` 落在按下与松开两处的公共祖先上，不会再触发行的单击
  * 指针停在滚动区上下沿附近或越出时按定时器一行一行滚，插入位跟着重算。窗口失焦、`pointercancel`、
- * 丢了捕获、清单签名变了都算取消；松手在滚动区外同样不交出去。
+ * 丢了捕获、清单签名变了都算取消；松手在滚动区外同样不交出去
  *
  * 过线之后的取消（Esc、失焦、清单变了）只收起拖动的样子，捕获留到松手：松手那一下仍落在 body 上，
- * 按下与松开在同一行时也不会合成一次单击、打开那张列表。
+ * 按下与松开在同一行时也不会合成一次单击、打开那张列表
  */
 export function usePlaylistReorder(options: PlaylistReorderOptions): PlaylistReorder {
   const [drag, setDrag] = useState<PlaylistDrag | null>(null);

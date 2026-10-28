@@ -118,7 +118,13 @@ describe('startPlaylists', () => {
     await start(host);
     vi.useFakeTimers();
     const reads = host.callsTo('playlist.getAll').length;
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(0), playlist: 0, start: 0, count: 3 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      start: 0,
+      count: 3,
+      contentVersion: '1',
+    });
     host.emit('playback:stopped', { reason: 'starting_another' });
     host.emit('playback:trackChanged', makeTrack());
     await vi.advanceTimersByTimeAsync(COALESCE_MS - 1);
@@ -315,7 +321,13 @@ describe('startPlaylists', () => {
     lists(host);
     const { service } = await start(host);
     vi.useFakeTimers();
-    host.emit('playlist:itemsAdded', { playlistGuid: guidOf(0), playlist: 0, start: 0, count: 1 });
+    host.emit('playlist:itemsAdded', {
+      playlistGuid: guidOf(0),
+      playlist: 0,
+      start: 0,
+      count: 1,
+      contentVersion: '1',
+    });
     const reads = host.callsTo('playlist.getAll').length;
     service.dispose();
     await vi.advanceTimersByTimeAsync(COALESCE_MS);

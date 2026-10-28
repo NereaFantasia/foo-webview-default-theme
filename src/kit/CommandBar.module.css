@@ -1,0 +1,41 @@
+/* 一行 40 高：左边搜索框与查找键，右边视图键；不换行，下面不画线 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+  min-height: 40px;
+}
+/* 宽档搜索框 320，挤的时候缩到 200；中档占满左侧余量 */
+.search {
+  display: flex;
+  flex: 0 1 320px;
+  min-width: 200px;
+}
+.bar[data-tier='medium'] .search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.search > *,
+.expanded > * {
+  flex: 1;
+  min-width: 0;
+}
+.tools {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bar[data-tier='medium']:not([data-command-bar='selection']) .tools {
+  flex: none;
+}
+.bar[data-command-bar='selection'] .spacer {
+  flex: none;
+}
+.spacer {
+  flex: 1;
+}
+.expanded {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}

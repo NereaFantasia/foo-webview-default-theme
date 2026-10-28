@@ -3,23 +3,23 @@ import { atom, type Atom, type PrimitiveAtom } from 'jotai/vanilla';
 /**
  * 按 GUID 记哪几张列表有页面在要，服务据此只为这几张订阅、取数。同一张同时被几处要（切换动画里离场与
  * 入场的两层）时共用一份；都放手后晚一个微任务再关：页面在同一次提交里卸下又挂上（StrictMode 的二次
- * effect）时那一份留着，不重开。
+ * effect）时那一份留着，不重开
  */
 export interface Holds<T> {
-  /** 要这张列表：没人要时现开一份；返回的函数放手，调几次都只算一次。 */
+  /** 要这张列表：没人要时现开一份；返回的函数放手，调几次都只算一次 */
   acquire(guid: string): () => void;
   get(guid: string): T | undefined;
-  /** 此刻有人要的几张，按开的先后。 */
+  /** 此刻有人要的几张，按开的先后 */
   entries(): [string, T][];
-  /** 全部关掉，之后的 acquire 不再开新的。 */
+  /** 全部关掉，之后的 acquire 不再开新的 */
   dispose(): void;
 }
 
-/** 每张列表一格状态：服务按 GUID 写，页面按 GUID 读；同一 GUID 总是同一对原子，没人要时停在初值。 */
+/** 每张列表一格状态：服务按 GUID 写，页面按 GUID 读；同一 GUID 总是同一对原子，没人要时停在初值 */
 export interface Slots<S> {
-  /** 可写的那一格，只在服务里用。 */
+  /** 可写的那一格，只在服务里用 */
   own(guid: string): PrimitiveAtom<S>;
-  /** 对外的只读那一面。 */
+  /** 对外的只读那一面 */
   view(guid: string): Atom<S>;
 }
 

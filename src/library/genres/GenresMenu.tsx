@@ -1,47 +1,64 @@
-import { MenuItem, MenuList, MenuPopover, MenuTrigger, Button } from '@fluentui/react-components';
-import { Menu } from '../../motion/Surfaces.tsx';
+import { MenuItem, MenuList, MenuTrigger, Button } from '@fluentui/react-components';
+import {
+  ScrollMenu as Menu,
+  ScrollMenuPopover as MenuPopover,
+} from '../../kit/ScrollMenuPopover.tsx';
+import type { QueryFill } from '../libraryQueryFill.ts';
 import { MoreHorizontal20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
-import { EMPTY_GENRE, genresQuery } from './genresModel.ts';
+import { EMPTY_GENRE } from '../../nav/places.ts';
+import { genresQuery } from './genresModel.ts';
 import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 export interface GenresMenuProps {
   readonly keys: readonly string[];
   readonly at?: { readonly x: number; readonly y: number } | null;
   readonly onClose?: () => void;
+  readonly fill?: QueryFill | null;
 }
 
-export function GenresMenu({ keys, at, onClose }: GenresMenuProps) {
+export function GenresMenu({ keys, at, onClose, fill }: GenresMenuProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const genres = useService(genresKey);
   const names = keys.map((key) => (key === EMPTY_GENRE ? t('genres.unknown') : key));
   const name =
     names.length === 1 ? (names[0] ?? '') : t('genres.multiple', { count: names.length });
-  const unsupported = genresQuery(keys) === null;
+  const unsupported = genresQuery(keys) === null || fill === null;
   const menu = (
     <MenuPopover>
       <MenuList>
-        <MenuItem disabled={unsupported} onClick={() => void genres.actions.play(keys, name)}>
+        <MenuItem
+          disabled={unsupported}
+          onClick={() => void genres.actions.play(keys, name, undefined, fill ?? undefined)}
+        >
           {t('genres.play')}
         </MenuItem>
         <MenuItem
           disabled={unsupported}
-          onClick={() => void genres.actions.play(keys, name, 'shuffle')}
+          onClick={() => void genres.actions.play(keys, name, 'shuffle', fill ?? undefined)}
         >
           {t('genres.shuffle')}
         </MenuItem>
         <MenuItem
           disabled={unsupported}
-          onClick={() => void genres.actions.send(keys, name, false)}
+          onClick={() => void genres.actions.send(keys, name, false, fill ?? undefined)}
         >
           {t('genres.send')}
         </MenuItem>
-        <MenuItem disabled={unsupported} onClick={() => void genres.actions.send(keys, name, true)}>
+        <MenuItem
+          disabled={unsupported}
+          onClick={() => void genres.actions.send(keys, name, true, fill ?? undefined)}
+        >
           {t('genres.autoplaylist')}
         </MenuItem>
-        <MenuItem disabled={unsupported} onClick={() => genres.actions.openSongs(keys)}>
+        <MenuItem
+          disabled={unsupported}
+          onClick={() => genres.actions.openSongs(keys, fill ?? undefined)}
+        >
           {t('genres.openSongs')}
         </MenuItem>
         <MenuItem onClick={() => void genres.actions.copy(names.join('\n'))}>
@@ -68,6 +85,7 @@ export function GenresMenu({ keys, at, onClose }: GenresMenuProps) {
     <Menu>
       <MenuTrigger disableButtonEnhancement>
         <Button
+          className={viewControls.icon}
           appearance="subtle"
           icon={<MoreHorizontal20Regular />}
           aria-label={t('genres.more')}

@@ -67,7 +67,9 @@ test('左右键开合与进出、回车与空格切换、* 展开同级，双击
   ]);
 });
 
-test('调用方画的开合键：单击、双击都不算点分组头，点完键盘照样接得上', async ({ page }) => {
+test('调用方画的开合键：单击、双击都不算点分组头，点完焦点落在该分组头，↓ 从它往下走', async ({
+  page,
+}) => {
   await openTableHarness(page, { albums: 3, rows: 4 });
   const toggle = group(page, 'Album 1').getByRole('button');
   await toggle.dblclick();
@@ -77,8 +79,9 @@ test('调用方画的开合键：单击、双击都不算点分组头，点完�
   await row(page, 'Track 0002').click();
   await toggle.click();
   await expect(group(page, 'Album 1')).toHaveAttribute('aria-expanded', 'false');
+  await expect(group(page, 'Album 1')).toHaveAttribute('data-row-focus', 'true');
   await page.keyboard.press('ArrowDown');
-  await expect(row(page, 'Track 0003')).toHaveAttribute('data-row-focus', 'true');
+  await expect(row(page, 'Track 0009')).toHaveAttribute('data-row-focus', 'true');
 });
 
 test('焦点那一行被收起后，焦点退到它的分组头上，下一次 ↓ 从那里接着走', async ({ page }) => {

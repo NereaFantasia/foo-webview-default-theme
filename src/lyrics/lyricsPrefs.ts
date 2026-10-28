@@ -30,7 +30,7 @@ export const LYRICS_PRIORITY_KEY = PRIORITY_PREF.key;
 export interface LyricsPrefs {
   readonly order?: readonly LyricsPriority[];
   readonly enabled: boolean;
-  /** null 表示尚未选择首次预设；空数组表示不使用任何来源。 */
+  /** null 表示尚未选择首次预设；空数组表示不使用任何来源 */
   readonly sources: readonly LyricsSourceId[] | null;
 }
 

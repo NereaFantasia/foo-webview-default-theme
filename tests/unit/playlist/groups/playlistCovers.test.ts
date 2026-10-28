@@ -12,6 +12,7 @@ import { startPlaylistRows } from '../../../../src/playlist/playlistRows.ts';
 import { startPlaylists } from '../../../../src/playback/playlists.ts';
 import { FakePlaylists, guidOf, makePlaylist, makeRow } from '../../../fixtures/fakePlaylists.ts';
 import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
+import { hostArtwork } from '../../../fixtures/trackArtwork.ts';
 
 const MAIN = guidOf(0);
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +57,7 @@ async function setup(host: UnitHost, groups: readonly (readonly string[])[]) {
   const grouping = startPlaylistGroups(store, { rows, storage: null }, host.fb);
   const covers = startPlaylistCovers(
     store,
-    { rows, groups: grouping, pixelRatio: () => 1 },
+    { rows, groups: grouping, pixelRatio: () => 1, artwork: hostArtwork(store, host.fb) },
     host.fb,
   );
   rows.acquire(MAIN);
@@ -103,7 +104,12 @@ describe('startPlaylistCovers：行号对不上的旧行', () => {
     const state = atom<PlaylistGroupsState>({ ...NO_GROUPS, runs, total: 2 });
     const covers = startPlaylistCovers(
       store,
-      { rows, groups: { stateOf: () => state }, pixelRatio: () => 1 },
+      {
+        rows,
+        groups: { stateOf: () => state },
+        pixelRatio: () => 1,
+        artwork: hostArtwork(store, host.fb),
+      },
       host.fb,
     );
     covers.coverOf(MAIN, 0, 120);
@@ -137,7 +143,12 @@ describe('startPlaylistCovers：游程在重取', () => {
     const state = atom<PlaylistGroupsState>({ ...NO_GROUPS, runs, total: 2, loading: true });
     const covers = startPlaylistCovers(
       store,
-      { rows, groups: { stateOf: () => state }, pixelRatio: () => 1 },
+      {
+        rows,
+        groups: { stateOf: () => state },
+        pixelRatio: () => 1,
+        artwork: hostArtwork(store, host.fb),
+      },
       host.fb,
     );
     expect(covers.coverOf(MAIN, 0, 120)).toBeUndefined();

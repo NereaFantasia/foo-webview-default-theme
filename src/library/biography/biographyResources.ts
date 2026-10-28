@@ -16,7 +16,7 @@ import type { LastfmDetailsFetchResult } from './details/fetchLastfmDetails.ts';
 import { createBiographyPhotoCache } from './biographyPhotoCache.ts';
 import { createLastfmSource } from './lastfm-api/lastfmApiSource.ts';
 
-/** 由装配持有，所有简介消费者共用；消费者释放时不能释放这些资源。 */
+/** 由装配持有，所有简介消费者共用；消费者释放时不能释放这些资源 */
 export function startBiographyResources(
   store: ReturnType<typeof createStore>,
   host: Pick<typeof fb, 'file' | 'misc' | 'http'> = fb,

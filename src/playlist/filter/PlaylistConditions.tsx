@@ -1,4 +1,4 @@
-import { Button, Tag, TagGroup, makeStyles } from '@fluentui/react-components';
+import { Button, Tag, TagGroup, makeStyles, mergeClasses } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { MessageKey } from '../../i18n/en.ts';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -6,9 +6,10 @@ import type { Translate } from '../../i18n/translate.ts';
 import styles from './PlaylistConditions.module.css';
 import type { ConditionField, PlaylistCondition } from './playlistMatch.ts';
 import { useService } from '../../kit/useService.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { playlistPageKey } from '../playlistPageServices.ts';
 
-/** 条件行与行菜单「筛选」共用的字段名。 */
+/** 条件行与行菜单「筛选」共用的字段名 */
 export const CONDITION_LABELS: Readonly<Record<ConditionField, MessageKey>> = {
   artist: 'playlistPage.scopeArtist',
   album: 'playlistPage.scopeAlbum',
@@ -16,7 +17,7 @@ export const CONDITION_LABELS: Readonly<Record<ConditionField, MessageKey>> = {
   year: 'playlistPage.conditionYear',
 };
 
-const useStyles = makeStyles({ tags: { flexWrap: 'wrap' } });
+const useStyles = makeStyles({ tags: { flexWrap: 'wrap' }, clear: { marginLeft: 'auto' } });
 
 const keyOf = (condition: PlaylistCondition) =>
   `${condition.field}:${condition.value.toLowerCase()}`;
@@ -29,13 +30,14 @@ export interface PlaylistConditionsProps {
 }
 
 /**
- * 页头下面的条件行：只在有条件时出，逐个列出生效的条件，✕ 去掉一个，末尾「清除条件」只清条件、不动过滤词。
- * 条件从行菜单的「筛选」加。
+ * 页头下面的条件行：只在有条件时出，逐个列出生效的条件，✕ 去掉一个，末尾「清除条件」只清条件、不动过滤词
+ * 条件从行菜单的「筛选」加
  */
 export function PlaylistConditions({ guid, conditions }: PlaylistConditionsProps) {
   const t = useAtomValueRawSync(translateAtom);
   const playlistPage = useService(playlistPageKey);
   const classes = useStyles();
+  const controls = useViewControlStyles();
   if (conditions.length === 0) return null;
   return (
     <div className={styles.root} data-playlist-conditions>
@@ -59,6 +61,8 @@ export function PlaylistConditions({ guid, conditions }: PlaylistConditionsProps
               }),
             }}
             data-playlist-condition={keyOf(condition)}
+            size="small"
+            appearance="outline"
           >
             {labelOf(t, condition)}
           </Tag>
@@ -67,6 +71,7 @@ export function PlaylistConditions({ guid, conditions }: PlaylistConditionsProps
       <Button
         size="small"
         appearance="subtle"
+        className={mergeClasses(controls.icon, classes.clear)}
         onClick={() => playlistPage.filter.clearConditions(guid)}
       >
         {t('playlistPage.conditionsClear')}

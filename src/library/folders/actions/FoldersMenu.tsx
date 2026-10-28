@@ -1,18 +1,19 @@
+import { VideoClip20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../../i18n/locale.ts';
-import { historyAtom } from '../../../nav/navHistory.ts';
+import { isVideoPath } from '../../../track/mediaKind.ts';
 import type { TablePoint } from '../../../table/tableItems.ts';
 import { TrackContextMenu } from '../../../track/TrackContextMenu.tsx';
 import { divider, type TrackMenuItem } from '../../../track/trackMenuEntries.ts';
 import { trackDisplayTitle } from '../../../track/trackDisplayTitle.ts';
 import { useTrackMenuRating } from '../../../track/useTrackMenuRating.ts';
-import { albumKeyOf } from '../../../host/libraryContract.ts';
 import type { FoldersTarget } from './foldersActions.ts';
 import { useFoldersMenu } from './useFoldersMenu.ts';
 import { useService } from '../../../kit/useService.ts';
 import { foldersKey } from '../foldersServices.ts';
+import { foldersPrefsAtom } from '../foldersPrefs.ts';
+import { foldersTreeAtom } from '../tree/foldersTree.ts';
 import { ratingsKey } from '../../../track/trackRatings.ts';
-import { albumDetailKey } from '../../album-detail/albumDetail.ts';
 
 export interface FoldersMenuProps {
   readonly target: FoldersTarget;
@@ -25,25 +26,38 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
   const t = useAtomValueRawSync(translateAtom);
   const folders = useService(foldersKey);
   const ratings = useService(ratingsKey);
-  const albumDetail = useService(albumDetailKey);
-  useAtomValueRawSync(albumDetail.catalog);
-  const { place } = useAtomValueRawSync(historyAtom);
+  const { pins } = useAtomValueRawSync(foldersPrefsAtom);
+  const catalog = useAtomValueRawSync(foldersTreeAtom);
   const menu = useFoldersMenu(target);
   const rating = useTrackMenuRating(t, ratings, menu.tracks ?? [], menu.ratingStamp, true);
   const single = target.trackMenu && target.tracks?.length === 1 ? target.tracks[0] : undefined;
   const anchor = target.anchor ?? single;
-  const album = anchor ? albumDetail.findAlbum(anchor) : null;
   const ready = { nodes: target.nodes, tracks: menu.tracks ?? undefined };
   const node = target.nodes.length === 1 ? target.nodes[0] : undefined;
   const queueLimited = (menu.tracks?.length ?? 0) > 256;
   const limitedReason = t('context.selectionLimited');
   const items: TrackMenuItem[] = [
+    // 只有右键单个视频文件时出；执行与「播放」同一条路，起播成功后才进视频页
+    ...(single && isVideoPath(single.path)
+      ? [
+          {
+            kind: 'command' as const,
+            id: 'play-watch',
+            label: t('folders.playWatch'),
+            icon: <VideoClip20Regular />,
+            disabled: menu.loading || !menu.tracks?.length,
+            onSelect: () => void folders.playAndWatch(ready),
+          },
+        ]
+      : []),
     'play',
     queueLimited ? { action: 'play-next', disabled: true, reason: limitedReason } : 'play-next',
     queueLimited ? { action: 'enqueue', disabled: true, reason: limitedReason } : 'enqueue',
     divider('send-divider'),
     'send-to',
-    ...(target.trackMenu ? [divider('navigation-divider'), 'go-to-album' as const] : []),
+    ...(target.trackMenu
+      ? [divider('navigation-divider'), 'go-to-album' as const, 'go-to-artist' as const]
+      : []),
     divider('properties-divider'),
     'rating',
     'properties',
@@ -113,6 +127,25 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
       onSelect: () => folders.trash.prepare(tracks),
     });
   }
+  if (target.header) {
+    items.push(divider('header-divider'));
+    if (node) {
+      const pinned = pins.some((pin) => pin.key === node.key);
+      items.push({
+        kind: 'command',
+        id: 'pin',
+        label: t(pinned ? 'folders.unpin' : 'folders.pin'),
+        onSelect: () => folders.prefs.pin(node),
+      });
+    }
+    items.push({
+      kind: 'command',
+      id: 'refresh',
+      label: t('folders.refresh'),
+      disabled: catalog.status === 'loading',
+      onSelect: () => void folders.tree.retry(),
+    });
+  }
   return (
     <TrackContextMenu
       at={point}
@@ -149,10 +182,8 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
         sendToNew: () => void folders.actions.run(ready, 'new'),
         sendTo: ({ guid }) => void folders.actions.run(ready, { guid }),
       }}
-      album={{
-        open: album ? () => albumDetail.open(album) : null,
-        here: !!album && place.id === 'album' && place.subject === albumKeyOf(album),
-      }}
+      anchor={anchor ?? null}
+
       rating={rating}
       tree={menu.tree}
       runCommand={(command) => void folders.actions.native(menu.tree, command)}

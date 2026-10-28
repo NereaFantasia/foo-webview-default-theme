@@ -26,9 +26,9 @@ void main() {
   vec4 pixel = texture(source, point);
   vec3 c = (pixel.rgb - 0.5) * 1.3 + 0.5;
   float mean = (c.r + c.g + c.b) / 3.0;
-  // 超过固定阈值后按亮度逐渐减色，大片近白区域可降至黑色，避免抬高背景亮度。
+  // 超过固定阈值后按亮度逐渐减色，大片近白区域可降至黑色，避免抬高背景亮度
   if (mean > 0.5) c *= 2.0 - mean / 0.5;
-  // 在有效色域内收敛彩度，避免暖色通道裁切后仍呈现高饱和的纯色块。
+  // 在有效色域内收敛彩度，避免暖色通道裁切后仍呈现高饱和的纯色块
   c = clamp(c, 0.0, 1.0);
   float gray = dot(c, vec3(0.299, 0.587, 0.114));
   outputColor = vec4(mix(vec3(gray), c, 0.75), pixel.a);
@@ -88,7 +88,7 @@ vec3 lightField(vec3 c) {
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
   float span = max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b);
   float presence = smoothstep(0.015, 0.18, span);
-  // 明度与色差分别约束；无彩区域接近白色，彩色区域保留流动边界而不带入暗灰。
+  // 明度与色差分别约束；无彩区域接近白色，彩色区域保留流动边界而不带入暗灰
   float tone = 0.975 - 0.065 * presence - 0.01 * smoothstep(0.0, 0.6, luma);
   vec3 tint = (c - vec3(luma)) * min(1.0, 0.20 / max(span, 0.00001));
   float peak = max(max(tint.r, tint.g), tint.b);

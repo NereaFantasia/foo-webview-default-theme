@@ -22,8 +22,8 @@ function CommittedRoot({
 }
 
 /**
- * 先确认运行方式，再加载业务和偏好；面板不会创建写入助手或播放等业务服务。
- * 等待期间由页面里的等待层显示当前步骤，界面挂上或进入说明页时收起。
+ * 先确认运行方式，再加载业务和偏好；面板不会创建写入助手或播放等业务服务
+ * 等待期间由页面里的等待层显示当前步骤，界面挂上或进入说明页时收起
  */
 export function startFrontend(container: HTMLElement) {
   const store = createStore();
@@ -44,7 +44,7 @@ export function startFrontend(container: HTMLElement) {
       const { clearPanelStartup } = await import('../update/loaderConfirmation.ts');
       if (disposed || (await clearPanelStartup())) return;
     } catch {
-      /* 说明页仍保留，失败时提供重新加载。 */
+      /* 说明页仍保留，失败时提供重新加载 */
     }
     if (!disposed) {
       panelFailed = true;

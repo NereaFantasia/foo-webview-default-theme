@@ -18,7 +18,7 @@ const useStyles = makeStyles({
         color: 'var(--play-button-hover-fg)',
         '& .fui-Button__icon': { color: 'var(--play-button-hover-icon)' },
       },
-      ':active, :hover:active, :active:focus-visible': {
+      ':active,:hover:active,:active:focus-visible': {
         backgroundColor: 'var(--play-button-pressed-bg)',
         color: 'var(--play-button-pressed-fg)',
         '& .fui-Button__icon': { color: 'var(--play-button-pressed-icon)' },

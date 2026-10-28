@@ -29,6 +29,8 @@ export interface FoldersTarget {
   readonly trackMenu?: boolean;
   readonly anchor?: LibraryTrack;
   readonly ratingStamp?: number;
+  /** 从页头的 ⋯ 打开：末尾另带固定目录与重新读取目录 */
+  readonly header?: boolean;
 }
 export interface FoldersActionsDeps {
   record(subject: string, name: string): void;
@@ -41,7 +43,8 @@ export type FoldersActionsFace = Pick<
 >;
 export interface FoldersActionsService {
   collect(target: FoldersTarget): Promise<readonly LibraryTrack[] | null>;
-  run(target: FoldersTarget, action: FoldersWrite, index?: number): Promise<void>;
+  /** 答宿主是否执行成功：取消、忙与失败都是 false，提示另走 `foldersNoticeAtom` */
+  run(target: FoldersTarget, action: FoldersWrite, index?: number): Promise<boolean>;
   native(tree: ContextTree, command: MenuCommand): Promise<boolean>;
   explore(node: FolderNode): Promise<void>;
   autoplaylist(target: FoldersTarget): Promise<void>;
@@ -84,10 +87,10 @@ export function startFoldersActions(
   return {
     collect,
     async run(target, action, index = 0) {
-      if (disposed) return;
+      if (disposed) return false;
       if (busy) {
         notice('busy');
-        return;
+        return false;
       }
       busy = true;
       notice(null);
@@ -119,6 +122,7 @@ export function startFoldersActions(
         });
         if (current() && result !== true && store.get(noticeAtom) === null)
           notice(result === 'busy' ? 'busy' : 'failed');
+        return current() && result === true;
       } finally {
         busy = false;
       }

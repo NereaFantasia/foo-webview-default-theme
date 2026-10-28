@@ -104,7 +104,7 @@ describe('库根随媒体库变更重取', () => {
     await service.ready;
     paths = ['E:\\Music', 'F:\\Hi-Res'];
     for (let i = 0; i < 4; i += 1) {
-      host.emit('library:itemsAdded', { count: 1, timestamp: i });
+      host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: i });
       await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS / 2);
     }
     expect(host.callsTo('library.getRoots')).toHaveLength(1);
@@ -122,11 +122,11 @@ describe('库根随媒体库变更重取', () => {
     const service = startLibraryRoots(store, host.fb);
     await service.ready;
     host.answer('library.getRoots', hostFailure('OPERATION_FAILED'));
-    host.emit('library:itemsRemoved', { count: 1, timestamp: 1 });
+    host.emit('library:itemsRemoved', { count: 1, handles: [], truncated: false, timestamp: 1 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
     expect(store.get(libraryRootsAtom).roots).toEqual(['E:\\Music']);
     service.dispose();
-    host.emit('library:itemsAdded', { count: 1, timestamp: 2 });
+    host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 2 });
     await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS * 2);
     expect(host.callsTo('library.getRoots')).toHaveLength(2);
   });

@@ -1,3 +1,5 @@
+import { genresFilterAtom } from './genresTools.ts';
+import { sameTrackFilter, type TrackFilter } from '../../track/trackFilter.ts';
 import {
   Button,
   Spinner,
@@ -26,12 +28,14 @@ import { filterGenres } from './genresModel.ts';
 import { genresPrefsAtom } from './genresPrefs.ts';
 import { genresRowsAtom } from './genresRows.ts';
 import { genreEntryOf } from './genresSubject.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './GenresPage.module.css';
 import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
 import { AddFoldersAction } from '../AddFoldersAction.tsx';
 
 interface GenresSnapshot {
+  readonly filter: TrackFilter;
   readonly text: string;
   readonly tidy: boolean;
   readonly listTop: number;
@@ -45,10 +49,12 @@ const useStyles = makeStyles({ notice: { color: tokens.colorPaletteRedForeground
 
 export function GenresPage({ place }: PageProps) {
   const genres = useService(genresKey);
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const locale = useAtomValueRawSync(localeAtom);
   const catalog = useAtomValueRawSync(genresCatalogAtom);
   const prefs = useAtomValueRawSync(genresPrefsAtom);
+  const filter = useAtomValueRawSync(genresFilterAtom);
   const rows = useAtomValueRawSync(genresRowsAtom);
   const actionNotice = useAtomValueRawSync(genresActionNoticeAtom);
   const library = useAtomValueRawSync(albumsAtom);
@@ -93,6 +99,7 @@ export function GenresPage({ place }: PageProps) {
       capture: () =>
         restore.current ?? {
           text,
+          filter,
           tidy,
           listTop: listTop.current,
           detailTop: detail.current?.scrollTop ?? 0,
@@ -102,6 +109,7 @@ export function GenresPage({ place }: PageProps) {
         },
       restore: (saved) => {
         restore.current = saved;
+        genres.tools.filter.restore(saved.filter);
         setText(saved.text);
         setTidy(saved.tidy);
         setListFocus(saved.listFocus);
@@ -113,13 +121,20 @@ export function GenresPage({ place }: PageProps) {
   );
   useLayoutEffect(() => {
     const saved = restore.current;
-    if (!saved || catalog.status !== 'ready' || text !== saved.text || tidy !== saved.tidy) return;
+    if (
+      !saved ||
+      catalog.status !== 'ready' ||
+      text !== saved.text ||
+      tidy !== saved.tidy ||
+      !sameTrackFilter(filter, saved.filter)
+    )
+      return;
     if (list.current) list.current.scrollTop = saved.listTop;
     if (selected !== null && (rows.key !== selected || rows.status !== 'ready')) return;
     if (detail.current) detail.current.scrollTop = saved.detailTop;
     handle.current?.setFocusKey(saved.focus);
     restore.current = null;
-  }, [catalog.status, selected, rows, text, tidy, closed]);
+  }, [catalog.status, selected, rows, text, tidy, closed, filter]);
   const notice =
     actionNotice === 'busy'
       ? 'genres.busy'
@@ -156,6 +171,7 @@ export function GenresPage({ place }: PageProps) {
         {split.compact && (
           <Button
             {...drawerTrigger}
+            className={viewControls.icon}
             appearance="subtle"
             icon={<PanelLeft20Regular />}
             aria-expanded={directoryOpen}
@@ -170,7 +186,7 @@ export function GenresPage({ place }: PageProps) {
       {actionNotice && (
         <div role="alert" className={styles.notice}>
           <span className={classes.notice}>{t(notice)}</span>
-          <Button size="small" onClick={genres.actions.dismiss}>
+          <Button className={viewControls.field} size="small" onClick={genres.actions.dismiss}>
             {t('genres.dismiss')}
           </Button>
         </div>
@@ -178,7 +194,11 @@ export function GenresPage({ place }: PageProps) {
       {catalog.status === 'failed' && (
         <div role="alert" className={styles.notice}>
           {t('genres.failed')}
-          <Button size="small" onClick={() => void genres.catalog.retry()}>
+          <Button
+            className={viewControls.field}
+            size="small"
+            onClick={() => void genres.catalog.retry()}
+          >
             {t('genres.retry')}
           </Button>
         </div>

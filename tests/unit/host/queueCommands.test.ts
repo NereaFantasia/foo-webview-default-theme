@@ -28,6 +28,7 @@ describe('enqueuePaths', () => {
         movedCount: 0,
         invalidCount: 0,
         queueCount: QUEUE_BATCH,
+        contentVersion: '1',
       };
     });
     expect(
@@ -49,6 +50,7 @@ describe('enqueuePaths', () => {
       movedCount: 0,
       invalidCount: 1,
       queueCount: 255,
+      contentVersion: '1',
     });
     expect(
       await enqueuePaths(
@@ -98,7 +100,12 @@ describe('playKeepingQueue', () => {
       count: 1,
       playlists: [makePlaylist(0, 'Target', { guid: GUID, trackCount: 2 })],
     });
-    host.answer('queue.insertNext', { success: true, ...counts, queueCount: 1 });
+    host.answer('queue.insertNext', {
+      success: true,
+      ...counts,
+      queueCount: 1,
+      contentVersion: '1',
+    });
     expect(await playKeepingQueue(host.fb, GUID, 1)).toBe(false);
     expect(host.callsTo('queue.insertNext')).toHaveLength(1);
     expect(host.callsTo('queue.playNow')).toEqual([]);

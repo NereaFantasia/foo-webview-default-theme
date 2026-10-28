@@ -95,4 +95,26 @@ describe('艺人地点与历史', () => {
     expect(env.store.get(historyAtom).place.subject).toBe('');
     env.places.dispose();
   });
+  it('从曲目署名深入客串艺人：按专辑艺人偏好进临时态，按署名偏好不进，主体都保留', () => {
+    const env = setup();
+    env.history.navigate({ id: 'artists', subject: 'Guest' }, 'drill');
+    expect(env.store.get(env.places.temporary)).toBe(true);
+    expect(env.store.get(historyAtom).place.subject).toBe('Guest');
+    env.prefs.update({ basis: 'credited' });
+    env.history.navigate({ id: 'albums' });
+    env.history.navigate({ id: 'artists', subject: 'Guest' }, 'drill');
+    expect(env.store.get(env.places.temporary)).toBe(false);
+    expect(env.store.get(env.places.selected)).toBe('Guest');
+    expect(env.store.get(historyAtom).place.subject).toBe('Guest');
+    env.places.dispose();
+  });
+  it('署名里的名字哪个清单都没有：乐观放行后主体不被换掉，库再变也留着', () => {
+    const env = setup();
+    env.history.navigate({ id: 'artists', subject: 'Nobody' }, 'drill');
+    expect(env.store.get(env.places.selected)).toBe('Nobody');
+    env.store.set(env.all, [row('A')]);
+    expect(env.store.get(historyAtom).place.subject).toBe('Nobody');
+    expect(env.store.get(env.places.selected)).toBe('Nobody');
+    env.places.dispose();
+  });
 });

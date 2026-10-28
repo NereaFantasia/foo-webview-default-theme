@@ -1,0 +1,43 @@
+/* 正在播放指示器覆盖于封面上，使用品牌背景色衬底以保证各色封面上的对比度；尺寸通过字体大小缩放 */
+.playing {
+  position: absolute;
+  right: var(--spacingHorizontalXS);
+  bottom: var(--spacingVerticalXS);
+  display: flex;
+  padding: var(--spacingVerticalXS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--playing-fill);
+  font-size: var(--fontSizeBase200);
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+/* 指针悬停该图块时与悬停按钮同步淡出，将右下角让位于操作按钮 */
+.playing[data-covered] {
+  opacity: 0;
+}
+
+/* 组合类选择器提高特异性，覆盖指示器组件内部默认取色规则 */
+.playing .playing-mark {
+  color: var(--text-on-accent);
+}
+
+.check {
+  position: absolute;
+  top: var(--spacingVerticalS);
+  left: var(--spacingHorizontalS);
+  display: flex;
+  padding: var(--spacingVerticalXS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorBrandBackground);
+  color: var(--text-on-accent);
+}
+
+/* 进入详情页加载中动画居中置于封面之上，使用菜单底色以保证背景可读性 */
+.opening {
+  position: absolute;
+  display: flex;
+  padding: var(--spacingVerticalS);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-menu);
+  box-shadow: var(--shadow4);
+}

@@ -1,4 +1,4 @@
-/* 最高 384，超出在列表里滚动；放进高度有限的浮层时跟着缩。 */
+/* 最高 384，超出在列表里滚动；放进高度有限的浮层时跟着缩 */
 .root {
   display: flex;
   flex: 1 1 auto;
@@ -8,7 +8,7 @@
   overflow-y: auto;
 }
 
-/* 组名：11 / 600、淡色，上 8 下 4、左右 12。 */
+/* 组名：11 / 600、淡色，上 8 下 4、左右 12 */
 .group {
   padding: var(--spacingVerticalS) var(--spacingHorizontalM) var(--spacingVerticalXS);
   color: var(--text-muted);
@@ -17,7 +17,7 @@
   line-height: 16px;
 }
 
-/* 一行 32 高、左右 12：勾 14、隔 10、名字 13。当前设备铺选中底、勾取主色，别的行勾不显示但占着位子。 */
+/* 一行 32 高、左右 12：勾 14、隔 10、名字 13。当前设备铺选中底、勾取主色，别的行勾不显示但占着位子 */
 .device {
   display: flex;
   flex: none;
@@ -36,12 +36,18 @@
   cursor: pointer;
 }
 
-.device:hover {
-  background: var(--colorSubtleBackgroundHover);
-}
+@media (forced-colors: none) {
+  .device:hover {
+    background-color: var(--state-hover);
+  }
 
-.device[aria-current] {
-  background: var(--bg-hover);
+  .device:active {
+    background-color: var(--state-pressed);
+  }
+
+  .device[aria-current] {
+    background-image: linear-gradient(var(--bg-selected), var(--bg-selected));
+  }
 }
 
 .device:focus-visible {

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { openSettings, enterSettings } from '../fixtures/settingsPage.ts';
 import { installPageHost } from '../fixtures/pageHost.ts';
 import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
-import { hostFailure } from '../fixtures/hostAnswers.ts';
+import { HOST_VERSION, hostFailure } from '../fixtures/hostAnswers.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -55,7 +55,9 @@ for (const scheme of ['light', 'dark'] as const) {
     await settings.choose('颜色模式', chosen);
     const card = settings.card('颜色模式');
     await expect(card).toContainText('设置已生效，但未能保存');
-    await expect(settings.select('颜色模式')).toHaveText(chosen);
+    await expect(
+      settings.radios('颜色模式').getByRole('radio', { name: chosen, exact: true }),
+    ).toBeChecked();
     expect(await trustedValue(page, key)).toBeNull();
     await settings.choose('音量刻度', '按分贝（同 foobar2000）');
     await expect(card).toContainText('未能保存');
@@ -68,7 +70,9 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(await trustedValue(page, key)).toBe(scheme === 'light' ? 'dark' : 'light');
     await page.reload();
     await enterSettings(page);
-    await expect(settings.select('颜色模式')).toHaveText(chosen);
+    await expect(
+      settings.radios('颜色模式').getByRole('radio', { name: chosen, exact: true }),
+    ).toBeChecked();
     expect(settings.errors).toEqual([]);
   });
 
@@ -120,7 +124,9 @@ test('宿主偏好保存失败汇总后重试，成功后原服务和页面一�
   host.answer('config.set', hostFailure('OPERATION_FAILED'));
   await page.goto('/');
   await expect(page.locator('[data-album-tile]').first()).toBeVisible();
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await page.locator('[data-info-center-trigger]').click();
   await expect(summary(page)).toContainText('部分设置未能保存');
   host.answer('config.set', (params) => {
@@ -132,13 +138,17 @@ test('宿主偏好保存失败汇总后重试，成功后原服务和页面一�
   await expect(summary(page)).toContainText('已保存');
   expect(host.config.get(key)).toBe('list');
   await page.keyboard.press('Escape');
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect.poll(() => host.config.get(key)).toBe('wall');
 });
 
 test('设置页恢复提醒的保存失败就地显示，重试不再改提醒数量', async ({ page }) => {
   const key = 'defaultTheme.infoCenter.dismissed';
-  const settings = await openSettings(page, { config: { [key]: { playcountMissing: '2.0.0' } } });
+  const settings = await openSettings(page, {
+    config: { [key]: { playcountMissing: HOST_VERSION } },
+  });
   settings.host.answer('config.set', hostFailure('OPERATION_FAILED'));
   const card = settings.card('已关闭的提醒');
   await card.getByRole('button', { name: '恢复 已关闭的提醒' }).click();
@@ -161,7 +171,9 @@ test('存储初始化不可用时直接说明，修改仍生效但不显示无�
   await expect(center(page)).toContainText('修改只在当前窗口生效');
   await page.keyboard.press('Escape');
   await settings.choose('颜色模式', '深色');
-  await expect(settings.select('颜色模式')).toHaveText('深色');
+  await expect(
+    settings.radios('颜色模式').getByRole('radio', { name: '深色', exact: true }),
+  ).toBeChecked();
   await expect(settings.card('颜色模式')).toContainText('修改只在当前窗口生效');
   await expect(settings.card('颜色模式').getByRole('button', { name: '重试保存' })).toHaveCount(0);
 });

@@ -1,4 +1,4 @@
-/* 小节之间一条线；小节名与每行的文字都和卡头的标题左对齐。 */
+/* 小节之间一条线；小节名与每行的文字都和卡头的标题左对齐 */
 .section {
   display: flex;
   flex-direction: column;
@@ -10,7 +10,7 @@
   border-top: var(--strokeWidthThin) solid var(--line);
 }
 
-/* 左边空出图标底那一列：28 的底加 8 的间隔，正好是卡头图标 20 加 16 的间隔。 */
+/* 左边空出图标底那一列：28 的底加 8 的间隔，正好是卡头图标 20 加 16 的间隔 */
 .heading {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -27,7 +27,7 @@
   content: '';
 }
 
-/* 一行：图标底、文字、许可、箭头；整行是一个按钮。 */
+/* 一行：图标底、文字、许可、箭头；整行是一个按钮 */
 .row {
   box-sizing: border-box;
   display: grid;
@@ -47,11 +47,11 @@
 }
 
 .row:not(:disabled):hover {
-  background-color: var(--colorSubtleBackgroundHover);
+  background-color: var(--state-hover);
 }
 
 .row:not(:disabled):active {
-  background-color: var(--colorSubtleBackgroundPressed);
+  background-color: var(--state-pressed);
 }
 
 .row:focus-visible {
@@ -130,7 +130,7 @@
   color: var(--text-muted);
 }
 
-/* 脚注的文字同样让出图标那一列。 */
+/* 脚注的文字同样让出图标那一列 */
 .note {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);

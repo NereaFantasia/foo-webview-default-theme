@@ -16,32 +16,32 @@ import {
 } from './artistTops.ts';
 
 export interface ArtistOnlineDeps {
-  /** 已认定身份的那位在 Last.fm 上的名字；没认定时为 null，不联网。 */
+  /** 已认定身份的那位在 Last.fm 上的名字；没认定时为 null，不联网 */
   readonly sourceArtist: Atom<string | null>;
   readonly apiKey: Atom<string>;
-  /** 在线内容开着。 */
+  /** 在线内容开着 */
   readonly enabled: Atom<boolean>;
   readonly active: Atom<boolean>;
-  /** 右半已取到的曲目与专辑，热门与它比对。 */
+  /** 右半已取到的曲目与专辑，热门与它比对 */
   readonly detail: Atom<ArtistDetailState>;
-  /** 库里的艺人名，相似艺人与它比对。 */
+  /** 库里的艺人名，相似艺人与它比对 */
   readonly libraryArtists: Atom<readonly string[]>;
 }
 
-/** 联网的这部分。noKey 是没填 key：热门只能经 API 取，这时只显示常听。 */
+/** 联网的这部分。noKey 是没填 key：热门只能经 API 取，这时只显示常听 */
 export type ArtistOnlineStatus = 'off' | 'noKey' | 'idle' | 'loading' | 'ready' | 'failed';
 
 export interface ArtistOnlineState {
   readonly status: ArtistOnlineStatus;
   readonly problem: BiographyProblem | null;
   readonly tracks: readonly TopTrackMatch[];
-  /** 热门专辑里库里没有的。 */
+  /** 热门专辑里库里没有的 */
   readonly missingAlbums: readonly LastfmTopAlbum[];
   readonly similar: readonly SimilarMatch[];
 }
 
 const DEBOUNCE_MS = 300;
-/** 内存里留几位的热门：在列表里来回看几位不重复请求。 */
+/** 内存里留几位的热门：在列表里来回看几位不重复请求 */
 const KEPT = 32;
 
 interface Fetched {
@@ -55,8 +55,8 @@ const NONE: Fetched = { artist: null, status: 'off', problem: null, tops: null }
 
 /**
  * 艺人页的在线补充：热门曲目、热门专辑与相似艺人。三样都经 Last.fm API 取（要 key），
- * 按有效期留在内存里；与右半已取到的本地曲目、专辑和库里的艺人名比对，标出能播的与库里有的。
- * 失败记到 retryAt，其间换回这位不再请求；主动刷新马上重试。
+ * 按有效期留在内存里；与右半已取到的本地曲目、专辑和库里的艺人名比对，标出能播的与库里有的
+ * 失败记到 retryAt，其间换回这位不再请求；主动刷新马上重试
  */
 export function startArtistOnline(
   store: ReturnType<typeof createStore>,
@@ -123,7 +123,7 @@ export function startArtistOnline(
     const artist = store.get(deps.sourceArtist);
     const key = store.get(deps.apiKey);
     if (key !== previousKey) {
-      // 凭据错误属于旧 key；换 key 后立即允许重试。网络与服务端限流仍遵守原退避。
+      // 凭据错误属于旧 key；换 key 后立即允许重试。网络与服务端限流仍遵守原退避
       for (const [name, failure] of failures)
         if (failure.problem === 'keyInvalid' || failure.problem === 'keySuspended')
           failures.delete(name);
@@ -153,7 +153,7 @@ export function startArtistOnline(
 
   const state = atom<ArtistOnlineState>((get) => {
     const { status, problem, tops } = get(fetched);
-    // `sourceArtist` 由装配按右半当前这位给出；右半换人时先清空，比对随之为空。
+    // `sourceArtist` 由装配按右半当前这位给出；右半换人时先清空，比对随之为空
     const detail = get(deps.detail).detail;
     const groups = detail ? [...detail.own, ...detail.guest] : [];
     return {

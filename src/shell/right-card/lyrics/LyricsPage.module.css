@@ -3,11 +3,14 @@
   min-height: 0;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   color: var(--colorNeutralForeground1);
 }
 
+/* 右边的 --edge-bleed 是页面伸到窗口右缘的那一段，头和脚退回原来的右缘 */
 .head {
+  margin-right: var(--edge-bleed, 0px);
   padding: calc(var(--lyrics-preview-top, 0px) + var(--spacingVerticalM)) var(--spacingHorizontalM)
     0;
 }
@@ -20,6 +23,7 @@
 
 .track {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   min-width: 0;
   font-size: var(--fontSizeBase300);
@@ -27,13 +31,14 @@
 }
 
 .track strong,
-.track span {
+.text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.track span,
+.byline,
 .source {
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase200);
@@ -72,7 +77,7 @@
   grid-row: 2;
 }
 
-/* 两种可见范围共用同一条渐变；遮罩只取透明度，不向窗口背景叠色。 */
+/* 两种可见范围共用同一条渐变；遮罩只取透明度，不向窗口背景叠色 */
 .root[data-lyrics-ready] > .body {
   --lyrics-inset-top: 0px;
   --lyrics-inset-bottom: 0px;
@@ -108,7 +113,8 @@
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
-  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  padding: var(--spacingVerticalM) calc(var(--spacingHorizontalL) + var(--edge-bleed, 0px))
+    var(--spacingVerticalM) var(--spacingHorizontalL);
   text-align: center;
 }
 
@@ -117,8 +123,9 @@
 }
 
 .footer {
+  margin-right: var(--edge-bleed, 0px);
   padding: var(--spacingVerticalS) var(--spacingHorizontalM);
-  border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-top: var(--strokeWidthThin) solid var(--line);
 }
 
 .head,
@@ -160,6 +167,7 @@
 
 .subpage {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
@@ -175,13 +183,14 @@
   flex-wrap: wrap;
   gap: var(--spacingHorizontalS);
 }
-.byline span {
+.field {
   display: inline-flex;
   align-items: center;
   gap: var(--spacingHorizontalXS);
   min-width: 0;
+  max-width: 100%;
 }
-.byline svg {
+.field svg {
   flex: none;
 }
 .tools {

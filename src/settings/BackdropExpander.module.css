@@ -12,7 +12,7 @@
   max-width: 100%;
 }
 
-/* 卡窄、滑块换到标题下面时占满一行。 */
+/* 卡窄、滑块换到标题下面时占满一行 */
 .fill {
   width: 100%;
 }
@@ -23,7 +23,7 @@
   text-align: right;
 }
 
-/* 展开区里的小标题：与子行文字对齐，与上一行之间一条分隔线。 */
+/* 展开区里的小标题：与子行文字对齐，与上一行之间一条分隔线 */
 .heading {
   display: flex;
   flex-wrap: wrap;
@@ -47,4 +47,15 @@
 
 .heading:not(:first-child) {
   border-top: var(--strokeWidthThin) solid var(--line);
+}
+
+/* 卡头收起时的当前来源：16:10 的小缩略图 */
+.sourcePreview {
+  position: relative;
+  display: block;
+  width: 44px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusSmall);
 }

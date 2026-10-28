@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { EMPTY_GENRE } from '../../../../src/library/genres/genresModel.ts';
-import { GENRES_VALUES_PATTERN } from '../../../../src/library/genres/genresCatalog.ts';
+import { EMPTY_GENRE } from '../../../../src/nav/places.ts';
+import { GENRES_VALUES_PATTERN } from '../../../../src/library/genreValues.ts';
 import { libraryTracksAtom } from '../../../../src/library/libraryTracks.ts';
 import { genreTracksAnswer, genresLibrary } from '../../../fixtures/genresLibrary.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';

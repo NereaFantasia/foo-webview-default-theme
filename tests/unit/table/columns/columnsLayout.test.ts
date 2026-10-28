@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_ORDER, DEFAULT_WIDTHS } from '../../../../src/table/columns/columns.ts';
 import {
   columnsLayout,
-  resizePartner,
+  canResizeColumn,
   type ColumnsState,
 } from '../../../../src/table/columns/columnsLayout.ts';
 
@@ -17,20 +17,20 @@ describe('列的版式', () => {
   it('这张表没有封面列时，封面列没有分隔条', () => {
     const layout = columnsLayout(STATE, ['number', 'title', 'artist', 'duration']);
     expect(layout.header).not.toContain('cover');
-    expect(resizePartner(layout, 'cover')).toBeNull();
+    expect(canResizeColumn(layout, 'cover')).toBe(false);
   });
 
-  it('封面列藏起来或窄档时也不画、没有分隔条', () => {
+  it('封面列隐藏时不画，窄窗仍保留封面', () => {
     const offered = [...DEFAULT_ORDER];
     const hidden = columnsLayout({ ...STATE, hidden: new Set(['cover']) }, offered);
-    expect(resizePartner(hidden, 'cover')).toBeNull();
+    expect(canResizeColumn(hidden, 'cover')).toBe(false);
     const narrow = columnsLayout({ ...STATE, containerWidth: 500 }, offered);
-    expect(narrow.coverWidth).toBe(0);
-    expect(resizePartner(narrow, 'cover')).toBeNull();
+    expect(narrow.coverWidth).toBe(120);
+    expect(canResizeColumn(narrow, 'cover')).toBe(true);
   });
 
   it('藏着的列没有分隔条', () => {
     const layout = columnsLayout(STATE, [...DEFAULT_ORDER]);
-    expect(resizePartner(layout, 'album')).toBeNull();
+    expect(canResizeColumn(layout, 'album')).toBe(false);
   });
 });

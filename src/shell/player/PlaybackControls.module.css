@@ -1,4 +1,4 @@
-/* 四键紧挨、不留间隙；整组退出标题栏的拖动区。 */
+/* 四键紧挨、不留间隙；整组退出标题栏的拖动区 */
 .root {
   display: flex;
   flex: none;
@@ -7,12 +7,12 @@
   app-region: no-drag;
 }
 
-/* 底部通栏里键与键隔 8。 */
+/* 底部通栏里键与键隔 8 */
 .root[data-prominent] {
   gap: var(--spacingHorizontalS);
 }
 
-/* 只为认出焦点在不在里面，不参与版式。 */
+/* 只为认出焦点在不在里面，不参与版式 */
 .slot {
   display: contents;
 }

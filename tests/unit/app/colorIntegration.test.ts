@@ -17,6 +17,7 @@ import { defer, foundCover } from '../../fixtures/coverArt.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
+import { hostArtwork } from '../../fixtures/trackArtwork.ts';
 
 const BLUE = profileFromPixels(new Uint8ClampedArray([40, 90, 200, 255]));
 const RED = profileFromPixels(new Uint8ClampedArray([200, 20, 30, 255]));
@@ -43,7 +44,7 @@ test('连接早于曲目初读时保留首帧缓存，结果到达才直接换�
   const playback = startPlayback(store, host.fb);
   const storage = memory();
   const service = startColorIntegration(store, {
-    host: host.fb,
+    artwork: hostArtwork(store, host.fb),
     storage,
     analysis: { read: () => color.promise },
   });
@@ -87,7 +88,10 @@ test('确认无曲目才清缓存；初读失败也会回退，但不伪装成�
   const held = host.hold('playback.getCurrentTrack');
   const store = createStore();
   const playback = startPlayback(store, host.fb);
-  const service = startColorIntegration(store, { host: host.fb, storage: memory() });
+  const service = startColorIntegration(store, {
+    artwork: hostArtwork(store, host.fb),
+    storage: memory(),
+  });
   onTestFinished(() => {
     service.dispose();
     playback.dispose();
@@ -113,7 +117,7 @@ test('初始化旧应答不能覆盖事件已确认的新曲目', async () => {
   const store = createStore();
   const playback = startPlayback(store, host.fb);
   const service = startColorIntegration(store, {
-    host: host.fb,
+    artwork: hostArtwork(store, host.fb),
     storage: memory(),
     analysis: { read: async () => RED },
   });

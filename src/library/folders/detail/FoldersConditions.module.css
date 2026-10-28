@@ -1,8 +1,0 @@
-.root {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacingHorizontalS);
-  max-height: 96px;
-  overflow: auto;
-}

@@ -1,0 +1,7 @@
+.image {
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.image[data-loading] {
+  opacity: 0;
+}

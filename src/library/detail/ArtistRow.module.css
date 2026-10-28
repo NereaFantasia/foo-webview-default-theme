@@ -1,0 +1,58 @@
+/* 名字下面一行：左边是艺术家，右边是箭头。整行不换到第二行，放不下的整枚收起 */
+.row {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  column-gap: var(--spacingHorizontalXL);
+  min-width: 0;
+  height: 32px;
+  overflow: hidden;
+}
+
+.chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  max-width: 100%;
+  height: 32px;
+}
+
+/* 收起的几位还留在第二行里量宽度，只是看不见、点不到、不进键盘序 */
+.chip[data-hidden] {
+  visibility: hidden;
+}
+
+.name {
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-chip);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  color: var(--text-muted);
+}

@@ -9,7 +9,10 @@ import type { AlbumSearchHitsFace } from './albumSearchHits.ts';
 import { filterAlbums, sectionAlbums, sortAlbums, type AlbumSection } from '../albumSections.ts';
 import { artistCreditsAtom, startArtistCredits } from './artistCredits.ts';
 import type { ArtistCreditsFace } from './artistCredits.ts';
-import { browserPrefsAtom } from './browserPrefs.ts';
+import { libraryTracksAtom } from '../libraryTracks.ts';
+import { playStatsAtom } from '../playStats.ts';
+import { isStatsField, sortListAlbums } from '../album-list/listSort.ts';
+import { browserPrefsAtom, wallSortAtom } from './browserPrefs.ts';
 import {
   collapsedSectionsAtom,
   startCollapsedSections,
@@ -30,27 +33,27 @@ import {
 import { libraryRootsAtom, startLibraryRoots, type LibraryRootsFace } from './libraryRoots.ts';
 
 // 专辑页的浏览状态：清单 → 筛选 → 过滤 → 排序 → 分节。换分节、换排序都不打宿主；打宿主的是清单
-// 本身、过滤词的曲目级命中、库根、艺术家档的署名表与折叠状态，各归各的服务。
-// 过滤词与筛选的勾选只活在这一次运行里；折叠了哪些节写进 config，跨重启记住。
+// 本身、过滤词的曲目级命中、库根、艺术家档的署名表与折叠状态，各归各的服务
+// 过滤词与筛选的勾选只活在这一次运行里；折叠了哪些节写进 config，跨重启记住
 
 /**
  * 此刻画哪一态。disabled：库没开，先于一切；loading：首次读取还没回来，或分节依据要的数据还在等；
  * empty：库开着但一张都没有；noMatch：有清单、过滤后一张不剩，曲目级命中还在路上时不判；
- * ready：照常画，读取失败（另有横幅）与宿主未连接也归这里。
+ * ready：照常画，读取失败（另有横幅）与宿主未连接也归这里
  */
 export type BrowsePhase = 'disabled' | 'loading' | 'empty' | 'noMatch' | 'ready';
 
 export interface AlbumBrowseState {
   readonly term: string;
   readonly facets: FacetSelection;
-  /** 当前分节依据下折叠了的节，按节键；null 是「未知」节。 */
+  /** 当前分节依据下折叠了的节，按节键；null 是「未知」节 */
   readonly collapsed: ReadonlySet<string | null>;
   readonly sections: readonly AlbumSection[];
-  /** 平铺档只有一个键为 null 的节，不画节头。 */
+  /** 平铺档只有一个键为 null 的节，不画节头 */
   readonly headers: boolean;
-  /** 艺术家档里一张专辑可能出现在几节。 */
+  /** 艺术家档里一张专辑可能出现在几节 */
   readonly repeats: boolean;
-  /** 过滤后有几张；艺术家档里一张占几块也只算一张。 */
+  /** 过滤后有几张；艺术家档里一张占几块也只算一张 */
   readonly shown: number;
   readonly phase: BrowsePhase;
 }
@@ -59,19 +62,27 @@ const termAtom = atom('');
 const facetSelectionAtom = atom<FacetSelection>(EMPTY_FACET_SELECTION);
 
 export const facetOptionsAtom: Atom<FacetOptions> = atom((get) =>
-  facetOptionsOf(get(albumsAtom).albums),
+  facetOptionsOf(get(albumsAtom).albums, get(facetSelectionAtom)),
 );
 
 const filteredAtom = atom((get) => {
   const selection = get(facetSelectionAtom);
   const faceted = applyFacets(get(albumsAtom).albums, selection);
   const filtered = filterAlbums(faceted, get(termAtom), get(albumSearchHitsAtom).hits);
-  return sortAlbums(filtered, get(browserPrefsAtom).sort);
+  const { sort, seed, custom } = get(wallSortAtom);
+  if (!custom) return sortAlbums(filtered, get(browserPrefsAtom).sort);
+  const { byAlbum } = get(libraryTracksAtom);
+  const stats = isStatsField(sort.field) ? get(playStatsAtom).byHandle : null;
+  return sortListAlbums(filtered, sort, {
+    seed,
+    tracksOf: (album) => byAlbum.get(albumKeyOf(album)),
+    statsOf: (track) => stats?.get(track.handle),
+  });
 });
 
 /**
  * 当前分节依据要的外部数据到没到：艺术家档等署名表（读失败是 failed），一级目录档等库根那一次读取，
- * 其余档不用等。没到时一节都不出，骨架与横幅由 phase 与界面画。
+ * 其余档不用等。没到时一节都不出，骨架与横幅由 phase 与界面画
  */
 const sectioningAtom = atom((get): 'waiting' | 'failed' | 'ready' => {
   const dimension = get(browserPrefsAtom).dimension;
@@ -84,7 +95,7 @@ const sectioningAtom = atom((get): 'waiting' | 'failed' | 'ready' => {
 
 /**
  * 分节已经排定：清单读回过，当前分节依据要的数据也到了。没排定时看得见的专辑是临时的空清单，
- * 多选不按它剔选中。
+ * 多选不按它剔选中
  */
 export const sectionsSettledAtom: Atom<boolean> = atom((get) => {
   const status = get(albumsAtom).status;
@@ -129,7 +140,7 @@ export const albumBrowseAtom: Atom<AlbumBrowseState> = atom((get) => {
   };
 });
 
-/** 看得见的专辑按阅读顺序排开，折叠的节不算；艺术家档的副本各占一位。多选按它记。 */
+/** 看得见的专辑按阅读顺序排开，折叠的节不算；艺术家档的副本各占一位。多选按它记 */
 export const visibleAlbumsAtom: Atom<readonly Album[]> = atom((get) => {
   const { sections, collapsed, headers } = get(albumBrowseAtom);
   return sections.flatMap((section) =>
@@ -145,23 +156,23 @@ export type AlbumBrowseFace = AlbumsFace &
 
 export interface AlbumBrowseService {
   readonly persistence: ConfigPersistence;
-  /** 连上宿主、清单、库根与折叠状态的初读做完时兑现，不会拒绝。 */
+  /** 连上宿主、清单、库根与折叠状态的初读做完时兑现，不会拒绝 */
   readonly ready: Promise<void>;
   setTerm(term: string): void;
   toggleFacet(field: FacetField, name: string): void;
   clearFacets(): void;
-  /** 折叠或展开当前分节依据下的一节，并记进 config；平铺档没有节可折。 */
+  /** 折叠或展开当前分节依据下的一节，并记进 config；平铺档没有节可折 */
   toggleSection(key: string | null): void;
-  /** 改折叠存档的整份并记进 config：列表形态的两层开合走这里。 */
+  /** 改折叠存档的整份并记进 config：列表形态的两层开合走这里 */
   updateCollapsed(change: (value: CollapsedSections) => CollapsedSections): void;
-  /** 失败横幅上的重试：重读专辑清单，署名表失败过的一并重读。 */
+  /** 失败横幅上的重试：重读专辑清单，署名表失败过的一并重读 */
   retry(): Promise<void>;
   dispose(): void;
 }
 
 /**
- * 启动专辑页的浏览：专辑清单、库根、署名表、曲目级命中与折叠状态五个服务在这里一起起停。
- * 分节依据与排序取自 `browserPrefsAtom`，要先启动偏好服务。
+ * 启动专辑页的浏览：专辑清单、库根、署名表、曲目级命中与折叠状态五个服务在这里一起起停
+ * 分节依据与排序取自 `browserPrefsAtom`，要先启动偏好服务
  */
 export function startAlbumBrowse(
   store: Store,
@@ -176,7 +187,7 @@ export function startAlbumBrowse(
   const hits = startAlbumSearchHits(store, host);
   const collapsed = startCollapsedSections(store, host, writer);
   let disposed = false;
-  // 库变了之后筛选里已经没有的值剔掉，否则筛出 0 张，又没有可以取消的那一项。
+  // 库变了之后筛选里已经没有的值剔掉，否则筛出 0 张，又没有可以取消的那一项
   const offOptions = store.sub(facetOptionsAtom, () => {
     const current = store.get(facetSelectionAtom);
     const next = pruneFacetSelection(current, store.get(facetOptionsAtom));

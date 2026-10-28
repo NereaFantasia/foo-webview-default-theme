@@ -4,6 +4,7 @@ import {
   fetchLastfmPhoto,
 } from '../../../../../src/library/biography/online/fetchLastfmPhoto.ts';
 import { TAISHI_PHOTO } from '../../../../fixtures/biographyPhotoSamples.ts';
+import { hostFailure } from '../../../../fixtures/hostAnswers.ts';
 import { installFakeHost } from '../../../../fixtures/unitHost.ts';
 
 describe('Last.fm 主图下载', () => {
@@ -52,6 +53,16 @@ describe('Last.fm 主图下载', () => {
     const result = await fetchLastfmPhoto(TAISHI_PHOTO, host.fb);
     expect(result).toMatchObject({ ok: false, problem });
     if (!result.ok) expect(result.retryAt).toBeGreaterThanOrEqual(now + 7200000);
+  });
+
+  it('传输失败随失败带出宿主原文', async () => {
+    const host = installFakeHost();
+    host.answer('http.get', hostFailure('OPERATION_FAILED', 'Send failed: DNS name not resolved'));
+    expect(await fetchLastfmPhoto(TAISHI_PHOTO, host.fb)).toMatchObject({
+      ok: false,
+      problem: 'dns',
+      detail: 'Send failed: DNS name not resolved',
+    });
   });
 
   it.each(['text/html', 'image/svg+xml', 'application/octet-stream'])(

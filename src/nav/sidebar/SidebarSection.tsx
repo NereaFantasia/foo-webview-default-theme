@@ -12,11 +12,11 @@ export interface SidebarSectionProps {
   readonly expanded: boolean;
   onToggle(): void;
   /**
-   * 为假时标题行只是标题、不能开合，节里的项一直画：图标态弹出的列表浮层就是这一节本身，不再收起。
-   * 缺省为真。
+   * 为假时标题行只是标题、不能开合，节里的项一直画：图标态弹出的列表浮层就是这一节本身，不再收起
+   * 缺省为真
    */
   readonly collapsible?: boolean;
-  /** 标题行右端的工具键，例如播放列表节的放大镜。 */
+  /** 标题行右端的工具键，例如播放列表节的放大镜 */
   readonly tools?: ReactNode;
   readonly className?: string;
   readonly children: ReactNode;
@@ -24,7 +24,7 @@ export interface SidebarSectionProps {
 
 /**
  * 节里的项在不在文档里。开合照 Expander（`flowFold.ts`）：项从标题下面滑出、滑回去，下面的内容同步让位、
- * 补位。收起播完才卸掉，所以比 `open` 晚一步变假；展开时当场放回文档。
+ * 补位。收起播完才卸掉，所以比 `open` 晚一步变假；展开时当场放回文档
  */
 function useFoldPresence(
   open: boolean,
@@ -44,7 +44,7 @@ function useFoldPresence(
     }),
   );
   useLayoutEffect(() => {
-    // 焦点在要收起的项上时交给开合键，不让它随项一起消失、落回 body。
+    // 焦点在要收起的项上时交给开合键，不让它随项一起消失、落回 body
     if (!open && body.current?.contains(document.activeElement)) toggle.current?.focus();
     fold.set(open, reduced);
   }, [fold, open, reduced, body, toggle]);
@@ -53,11 +53,11 @@ function useFoldPresence(
 }
 
 /**
- * 侧边栏的一个分节：标题行点了开合，开合由调用方持有并落盘。
+ * 侧边栏的一个分节：标题行点了开合，开合由调用方持有并落盘
  *
  * 工具键与开合键是兄弟而不是嵌套：按钮里不能再放按钮，所以开合键铺满整行，工具键叠在它右端、
  * 箭头之前。收起播完后节里的项不渲染。图标态的窗格里没有标题行，侧边栏在展开与图标态之间切换时它淡出淡入
- * （`paneFades.ts`）。
+ * （`paneFades.ts`）
  */
 export function SidebarSection({
   label,

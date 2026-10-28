@@ -1,0 +1,28 @@
+/* 在栏里居中；文字取外框给的两档文字色 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingVerticalM);
+  box-sizing: border-box;
+  height: 100%;
+  text-align: center;
+  outline: none;
+}
+
+.empty p {
+  margin: 0;
+}
+
+.message {
+  color: var(--text-secondary);
+}
+
+.privacy {
+  max-inline-size: 36ch;
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  overflow-wrap: anywhere;
+}

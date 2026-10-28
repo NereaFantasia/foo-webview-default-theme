@@ -31,12 +31,124 @@ export interface SettingsPage {
   expand(title: string): Promise<void>;
   /** 某张卡里的下拉框。 */
   select(title: string): Locator;
-  /** 展开下拉框并选一项。 */
+  /** 选一项：缩略图单选、图标分段（页签）或下拉框，按卡里实际是哪种控件来点。 */
   choose(title: string, option: string): Promise<void>;
+  /** 某张卡里的缩略图单选组。 */
+  radios(title: string): Locator;
+}
+
+const BACKGROUND_SOURCES = ['主题色背景', '系统材质', '正在播放的封面', '流动色场', '图片'];
+
+/** 窗口背景那张可展开卡。 */
+export const backgroundCard = (page: Page): Locator =>
+  page.locator('[data-settings-expander]').filter({
+    has: page.locator(':scope > :first-child').getByText('窗口背景', { exact: true }),
+  });
+
+/** 窗口背景的来源五选一；要先展开卡。 */
+export const backgroundSources = (page: Page): Locator =>
+  page.getByRole('radiogroup', { name: '背景来源', exact: true });
+
+/** 展开窗口背景卡；已展开就不动。 */
+export async function openBackground(page: Page): Promise<void> {
+  const toggle = backgroundCard(page).locator('[data-settings-toggle]');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+/** 材质一行：卡宽时是页签，卡窄（右侧卡开着、窄窗口）时是单选，按实际是哪种来点与断言。 */
+function materialRow(page: Page) {
+  return {
+    tabs: page.getByRole('tablist', { name: '材质', exact: true }),
+    radios: page.getByRole('radiogroup', { name: '材质', exact: true }),
+  };
+}
+
+/** 选窗口背景：五张来源图之一，或系统材质下的一档材质（没选系统材质就先选它）。 */
+export async function chooseBackground(page: Page, option: string): Promise<void> {
+  await openBackground(page);
+  const sources = backgroundSources(page);
+  if (BACKGROUND_SOURCES.includes(option)) {
+    await sources.getByRole('radio', { name: option, exact: true }).check();
+    return;
+  }
+  const material = sources.getByRole('radio', { name: '系统材质', exact: true });
+  if (!(await material.isChecked())) await material.check();
+  const { tabs, radios } = materialRow(page);
+  await tabs.or(radios).first().waitFor();
+  if ((await tabs.count()) > 0) await tabs.getByRole('tab', { name: option, exact: true }).click();
+  else await radios.getByRole('radio', { name: option, exact: true }).check();
+}
+
+/** 断言窗口背景此刻选的是这一项；会把卡展开。 */
+export async function expectBackground(page: Page, option: string): Promise<void> {
+  await openBackground(page);
+  const sources = backgroundSources(page);
+  if (BACKGROUND_SOURCES.includes(option)) {
+    await expect(sources.getByRole('radio', { name: option, exact: true })).toBeChecked();
+    return;
+  }
+  await expect(sources.getByRole('radio', { name: '系统材质', exact: true })).toBeChecked();
+  const { tabs, radios } = materialRow(page);
+  await tabs.or(radios).first().waitFor();
+  if ((await tabs.count()) > 0)
+    await expect(tabs.getByRole('tab', { name: option, exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  else await expect(radios.getByRole('radio', { name: option, exact: true })).toBeChecked();
+}
+
+/** 按控件类型选一项：缩略图单选组、图标分段，都不是就当下拉框；窗口背景是两层，单独走。 */
+export async function chooseOption(page: Page, title: string, option: string): Promise<void> {
+  if (title === '窗口背景') {
+    await chooseBackground(page, option);
+    return;
+  }
+  const { group, tabs, box } = controlsOf(page, title);
+  await group.or(tabs).or(box).first().waitFor();
+  if ((await group.count()) > 0) {
+    await group.getByRole('radio', { name: option, exact: true }).check();
+    return;
+  }
+  if ((await tabs.count()) > 0) {
+    await tabs.getByRole('tab', { name: option, exact: true }).click();
+    return;
+  }
+  await box.click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+}
+
+/** 某张卡里可能出现的三种控件：缩略图单选组、图标分段（页签）、下拉框。 */
+function controlsOf(page: Page, title: string) {
+  return {
+    group: page.getByRole('radiogroup', { name: title, exact: true }),
+    tabs: page.getByRole('tablist', { name: title, exact: true }),
+    box: page.getByRole('combobox', { name: title, exact: true }),
+  };
+}
+
+/** 断言某张卡里此刻选的是这一项：缩略图单选、图标分段（页签）或下拉框，按实际控件看选中态。 */
+export async function expectOption(page: Page, title: string, option: string): Promise<void> {
+  const { group, tabs, box } = controlsOf(page, title);
+  await group.or(tabs).or(box).first().waitFor();
+  if ((await group.count()) > 0) {
+    await expect(group.getByRole('radio', { name: option, exact: true })).toBeChecked();
+    return;
+  }
+  if ((await tabs.count()) > 0) {
+    await expect(tabs.getByRole('tab', { name: option, exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    return;
+  }
+  await expect(box).toHaveText(option);
 }
 
 function handle(page: Page): Omit<SettingsPage, 'host' | 'errors'> {
   const select = (title: string) => page.getByRole('combobox', { name: title, exact: true });
+  const radios = (title: string) => page.getByRole('radiogroup', { name: title, exact: true });
   const expander = (title: string) =>
     page.locator('[data-settings-expander]').filter({
       has: page.locator(':scope > :first-child').getByText(title, { exact: true }),
@@ -60,10 +172,8 @@ function handle(page: Page): Omit<SettingsPage, 'host' | 'errors'> {
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     },
     select,
-    async choose(title, option) {
-      await select(title).click();
-      await page.getByRole('option', { name: option, exact: true }).click();
-    },
+    choose: (title, option) => chooseOption(page, title, option),
+    radios,
   };
 }
 

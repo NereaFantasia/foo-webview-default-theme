@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { albumRow } from '../fixtures/libraryRows.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
@@ -28,20 +28,23 @@ test.afterEach(() => {
   expect(errors).toEqual([]);
 });
 
-test('悬停键整张网格只挂一对、跟着指针挪；播放键起播这一张，更多开专辑菜单', async ({ page }) => {
+test('悬停键跟着指针挪，可见的只有悬停那一块上的一对；播放键起播这一张，更多开专辑菜单', async ({
+  page,
+}) => {
   const host = await start(page);
-  const keys = page.locator('[data-tile-keys]');
+  const keys = page.locator('[data-tile-keys]:not([data-hidden])');
+  const play = keys.locator('[data-tile-play]');
   await tile(page, 'Blue Train').hover();
-  await expect(page.locator('[data-tile-play]')).toHaveCount(1);
+  await expect(play).toHaveCount(1);
   const first = await tile(page, 'Blue Train').boundingBox();
   await expect.poll(async () => (await keys.boundingBox())?.x).toBeCloseTo(first?.x ?? -1, 0);
 
   await tile(page, 'Kind of Blue').hover();
   const second = await tile(page, 'Kind of Blue').boundingBox();
   await expect.poll(async () => (await keys.boundingBox())?.x).toBeCloseTo(second?.x ?? -1, 0);
-  await expect(page.locator('[data-tile-play]')).toHaveCount(1);
+  await expect(play).toHaveCount(1);
 
-  await page.locator('[data-tile-play]').click();
+  await play.click();
   await expect.poll(() => host.callsTo('playlist.playTrack').length).toBe(1);
   expect(host.callsTo('library.getAlbumTracks')).toContainEqual({
     album: 'Kind of Blue',
@@ -49,12 +52,63 @@ test('悬停键整张网格只挂一对、跟着指针挪；播放键起播这�
   });
 
   await tile(page, 'Kind of Blue').hover();
-  await page.locator('[data-tile-more]').click();
+  await keys.locator('[data-tile-more]').click();
   await expect(caption(page)).toContainText('Kind of Blue');
   await expect(caption(page)).toContainText('Miles Davis · 10 首');
   await page.keyboard.press('Escape');
   await expect(menu(page)).toBeHidden();
   await expect(grid(page)).toBeFocused();
+});
+
+test('悬停键淡入淡出：离开后留在原处淡出，淡完不占位；再悬停同一块淡回', async ({ page }) => {
+  await start(page);
+  const keys = page.locator('[data-tile-keys]');
+  const style = (name: 'opacity' | 'display') => () =>
+    keys.evaluate(
+      (element, property) => getComputedStyle(element).getPropertyValue(property),
+      name,
+    );
+  await tile(page, 'Blue Train').hover();
+  await expect.poll(style('opacity')).toBe('1');
+  const at = await keys.boundingBox();
+
+  await page.mouse.move(1, 1);
+  await expect(keys).toHaveAttribute('data-hidden', 'true');
+  await expect.poll(style('opacity')).toBe('0');
+  await expect.poll(style('display')).toBe('none');
+
+  await tile(page, 'Blue Train').hover();
+  await expect(keys).not.toHaveAttribute('data-hidden');
+  await expect.poll(style('display')).toBe('block');
+  await expect.poll(style('opacity')).toBe('1');
+  expect(await keys.boundingBox()).toEqual(at);
+});
+
+test('换块时新旧两对键交叉渐变：旧的留在原处淡出，新的在新一块上淡入', async ({ page }) => {
+  await start(page);
+  // 把过渡拉长，才拿得到两对键都在半路上的那一刻。
+  await page.addStyleTag({ content: '[data-tile-keys] { transition-duration: 3s !important; }' });
+  const keys = page.locator('[data-tile-keys]');
+  const leaving = page.locator('[data-tile-keys][data-hidden]');
+  const entering = page.locator('[data-tile-keys]:not([data-hidden])');
+  const opacity = (pair: Locator) => () =>
+    pair.evaluate((element) => Number(getComputedStyle(element).opacity));
+
+  await tile(page, 'Blue Train').hover();
+  await expect(keys).toHaveCount(1);
+  const first = await tile(page, 'Blue Train').boundingBox();
+  await tile(page, 'Kind of Blue').hover();
+  const second = await tile(page, 'Kind of Blue').boundingBox();
+  await expect(keys).toHaveCount(2);
+  await expect.poll(async () => (await leaving.boundingBox())?.x).toBeCloseTo(first?.x ?? -1, 0);
+  await expect.poll(async () => (await entering.boundingBox())?.x).toBeCloseTo(second?.x ?? -1, 0);
+  await expect.poll(opacity(leaving)).toBeLessThan(1);
+  await expect.poll(opacity(entering)).toBeGreaterThan(0);
+
+  // 回到还在淡出的那一块：沿用原来那一对，不另起第三对。
+  await tile(page, 'Blue Train').hover();
+  await expect(keys).toHaveCount(2);
+  await expect.poll(async () => (await leaving.boundingBox())?.x).toBeCloseTo(second?.x ?? -1, 0);
 });
 
 test('右键落在选择里作用于整个选择；落在选择外改为只选它、只作用于它', async ({ page }) => {
@@ -161,7 +215,7 @@ test.describe('英文界面', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     await expect(tiles(page)).toHaveCount(1);
-    await expect(subtitle(page)).toHaveText(/^1 album · /);
+    await expect(subtitle(page)).toHaveText('1 album');
     const head = page.locator('[data-section-head]');
     await expect(head).toContainText('1 album');
     await expect(head).not.toContainText('albums');

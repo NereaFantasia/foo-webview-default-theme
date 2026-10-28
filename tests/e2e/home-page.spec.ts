@@ -3,6 +3,8 @@ import { openHome } from '../fixtures/homePage.ts';
 import type { HeldCalls } from '../fixtures/fakeHost.ts';
 import { hostFailure, listParam } from '../fixtures/hostAnswers.ts';
 
+test.use({ screenshot: 'off' });
+
 test('统计部分失败仍显示成功内容，重试恢复后撤下提示', async ({ page }) => {
   let fail = true;
   const { view } = await openHome(page, {
@@ -66,7 +68,8 @@ test('统计未完成不阻塞专辑，返回保持候选和滚动', async ({ pa
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-home-album'))),
   ).toEqual(before);
   await expect.poll(() => view.evaluate((node) => node.scrollTop)).toBeCloseTo(scroll, 0);
-  await explore.getByLabel('专辑时长', { exact: true }).selectOption('30');
+  await explore.getByRole('combobox', { name: '专辑时长', exact: true }).click();
+  await page.getByRole('option', { name: '30 分钟内', exact: true }).click();
   await expect(explore.getByText('没有符合条件的专辑')).toBeVisible();
   await explore.getByRole('tab', { name: '曲目推荐' }).click();
   await expect(explore.locator('[data-home-track]')).toHaveCount(6);
@@ -79,8 +82,9 @@ test('频道预览、保存、结果、编辑失败与删除', async ({ page }) 
   await view.getByRole('button', { name: '新建频道', exact: true }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByLabel('名称', { exact: false }).fill('夜间收藏');
-  await dialog.getByRole('button', { name: '高级查询', exact: true }).click();
-  await dialog.getByRole('combobox', { name: '查询', exact: true }).fill('ALL');
+  await dialog.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="advanced"]').click();
+  await dialog.getByRole('searchbox', { name: '查询', exact: true }).fill('ALL');
   await expect(dialog.getByText('匹配 16 首曲目')).toBeVisible();
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -96,7 +100,7 @@ test('频道预览、保存、结果、编辑失败与删除', async ({ page }) 
   ).toBeVisible();
   await channel.getByRole('button', { name: '编辑频道', exact: true }).click();
   dialog = page.getByRole('dialog');
-  await dialog.getByRole('combobox', { name: '查询', exact: true }).fill('invalid%');
+  await dialog.getByRole('searchbox', { name: '查询', exact: true }).fill('invalid%');
   await expect(dialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   await expect(dialog.getByText('查询未能执行')).toBeVisible();
   await expect(dialog.getByText('匹配 16 首曲目')).toHaveCount(0);
@@ -156,7 +160,13 @@ test('遗珠换到末批后刷新减少候选，不把越界偏移当成空结�
       })),
     };
   });
-  await host.emit('library:itemsModified', { count: 10, timestamp: 2 });
+  await host.emit('library:itemsModified', {
+    count: 10,
+    handles: [],
+    truncated: false,
+    fromHook: false,
+    timestamp: 2,
+  });
   await view.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(explore.locator('[data-home-track]')).toHaveCount(6);
   await expect(explore.getByText('没有符合条件的曲目')).toHaveCount(0);
@@ -177,7 +187,7 @@ for (const scheme of ['light', 'dark'] as const) {
       if (width === 390) {
         await view.getByRole('button', { name: '四星及以上', exact: true }).click();
         const dialog = page.getByRole('dialog');
-        await expect(dialog.getByRole('combobox', { name: '查询', exact: true })).toBeVisible();
+        await expect(dialog.getByRole('searchbox', { name: '查询', exact: true })).toBeVisible();
         await expect
           .poll(() => dialog.evaluate((node) => node.scrollWidth <= node.clientWidth))
           .toBe(true);
@@ -218,20 +228,22 @@ test('频道模板和普通查询预设可保存，模式草稿分别保留', as
   await view.getByRole('button', { name: '四星及以上', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('名称', { exact: false })).toHaveValue('四星及以上');
-  await expect(dialog.getByRole('combobox', { name: '查询', exact: true })).toHaveValue(
+  await expect(dialog.getByRole('searchbox', { name: '查询', exact: true })).toHaveValue(
     '%rating% GREATER 3',
   );
-  await dialog.getByRole('button', { name: '高级查询', exact: true }).click();
-  await dialog.getByRole('combobox', { name: '查询', exact: true }).fill('Jazz');
-  await dialog.locator('[data-query-funnel]').click();
-  await page.locator('[data-query-option="lossless"]').click();
+  await dialog.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="text"]').click();
+  await dialog.getByRole('searchbox', { name: '查询', exact: true }).fill('Jazz');
+  await dialog.locator('[data-preset="lossless"]').click();
   await expect(dialog.getByText('匹配 16 首曲目')).toBeVisible();
-  await dialog.getByRole('button', { name: '高级查询', exact: true }).click();
-  await expect(dialog.getByRole('combobox', { name: '查询', exact: true })).toHaveValue(
+  await dialog.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="advanced"]').click();
+  await expect(dialog.getByRole('searchbox', { name: '查询', exact: true })).toHaveValue(
     '%rating% GREATER 3',
   );
-  await dialog.getByRole('button', { name: '高级查询', exact: true }).click();
-  await expect(dialog.getByRole('combobox', { name: '查询', exact: true })).toHaveValue('Jazz');
+  await dialog.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="text"]').click();
+  await expect(dialog.getByRole('searchbox', { name: '查询', exact: true })).toHaveValue('Jazz');
   await expect(dialog.getByRole('button', { name: '保存', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   // 保存先等共享写锁，宿主收到写入要晚于点击。
@@ -242,6 +254,32 @@ test('频道模板和普通查询预设可保存，模式草稿分别保留', as
     }),
   ]);
   expect(JSON.stringify(channels())).toContain('%__encoding% IS lossless');
+});
+
+test('频道下拉选择模板和排序后保存对应查询，空模板保留当前草稿', async ({ page }) => {
+  const { view, channels, errors } = await openHome(page);
+  await view.getByRole('button', { name: '新建频道', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const template = dialog.getByRole('combobox', { name: '模板', exact: true });
+  await expect(template).toHaveText('自定义');
+  await template.click();
+  await dialog.getByRole('option', { name: '四星及以上', exact: true }).click();
+  await expect(dialog.getByLabel('名称', { exact: false })).toHaveValue('四星及以上');
+  await template.click();
+  await dialog.getByRole('option', { name: '自定义', exact: true }).click();
+  await expect(template).toHaveText('自定义');
+  await expect(dialog.getByRole('searchbox', { name: '查询', exact: true })).toHaveValue(
+    '%rating% GREATER 3',
+  );
+  await dialog.getByRole('combobox', { name: '排序', exact: true }).click();
+  await dialog.getByRole('option', { name: '标题', exact: true }).click();
+  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await expect
+    .poll(channels)
+    .toEqual([
+      expect.objectContaining({ name: '四星及以上', query: '%rating% GREATER 3', sort: 'title' }),
+    ]);
+  expect(errors).toEqual([]);
 });
 
 test('固定专辑可打开，重新加载保留固定入口', async ({ page }) => {

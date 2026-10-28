@@ -1,3 +1,4 @@
+import { onlineEn } from './onlineEn.ts';
 import { immersiveEn } from './immersiveEn.ts';
 import { genresEn } from './genresEn.ts';
 import { foldersEn } from './foldersEn.ts';
@@ -9,6 +10,8 @@ import { songsEn } from './songsEn.ts';
 import { contextMenuEn } from './contextMenuEn.ts';
 import { queueEn } from './queueEn.ts';
 import { searchEn } from './searchEn.ts';
+import { artistAlbumsEn } from './artistAlbumsEn.ts';
+import { detailEn } from './detailEn.ts';
 import { biographyEn } from './biographyEn.ts';
 import { videoEn } from './videoEn.ts';
 import { artistsEn } from './artistsEn.ts';
@@ -19,16 +22,19 @@ import { savingEn } from './savingEn.ts';
 import { startupEn } from './startupEn.ts';
 import { updateEn } from './updateEn.ts';
 import { miniPlayerEn } from './miniPlayerEn.ts';
+import { desktopLyricsEn } from './desktopLyricsEn.ts';
 import { lyricsEn } from './lyricsEn.ts';
 
 /**
- * 英文包，同时是键的真值来源：`MessageKey` 由它推出，别的包按 `Messages` 标注，缺键就编译不过。
- * 键扁平、按区域加前缀；用户放进 profile 的外部语言文件也是这个形状，对着一行一条地改就行。
- * `{name}` 是占位，取值时按参数替换。数字、时长与日期不进语言包，交给 `Intl`。
+ * 主英文语言包，兼作语言键真值来源。`MessageKey` 与 `Messages` 基于此对象推导。
+ * 键名扁平且按功能域加前缀，与 profile 外部语言包结构保持一致。
+ * `{name}` 为插值占位符，运行时按参数替换。数字、时长与日期由 `Intl` 格式化，不进语言包
  */
 export const en = {
+  ...onlineEn,
   ...lyricsEn,
   ...miniPlayerEn,
+  ...desktopLyricsEn,
   ...updateEn,
   ...startupEn,
   ...savingEn,
@@ -39,6 +45,8 @@ export const en = {
   ...videoEn,
   ...biographyEn,
   ...searchEn,
+  ...artistAlbumsEn,
+  ...detailEn,
   ...contextMenuEn,
   ...foldersEn,
   ...genresEn,
@@ -60,7 +68,6 @@ export const en = {
   'place.album': 'Album',
   'place.songs': 'Songs',
   'place.genres': 'Genres',
-  'place.genre': 'Genre',
   'place.folders': 'Folders',
   'place.playlists': 'All playlists',
   'place.playlist': 'Playlist',
@@ -77,19 +84,20 @@ export const en = {
   'album.newPlaylist': 'New Playlist',
   'album.batchName': '{first} and {rest} more',
   'album.title': 'Albums',
+  'album.playAll': 'Play all',
+  'album.shuffleAll': 'Shuffle',
+  'album.filterResult': 'Showing {count} of {total}',
   'album.countOne': '{count} album',
   'album.count': '{count} albums',
   'album.selectedCount': '{count} selected',
-  'album.sectionedBy': 'grouped by {dimension}',
   'album.loading': 'Loading…',
   'album.truncated': 'Showing the first {count}',
   'album.tools': 'Album view options',
   'album.form': 'View',
   'album.formWall': 'Cover wall',
   'album.formList': 'List',
-  'album.filter': 'Filter albums',
+  'album.filter': 'Search albums',
   'album.dimension': 'Group by',
-  'album.dimensionValue': 'Group: {value}',
   'album.dimAlbum': 'None',
   'album.dimAlbumArtist': 'Album artist',
   'album.dimArtist': 'Artist',
@@ -106,13 +114,11 @@ export const en = {
   'album.sortTrackCountShort': 'Track count',
   'album.tileSize': 'Cover size',
   'album.tileSizeValue': '{size} px',
-  'album.pageMenu': 'More options',
   'album.style': 'Style',
   'album.styleGrid': 'Grid',
   'album.styleCompact': 'Compact',
   'album.styleSpaced': 'Spaced',
   'album.styleGridNoText': 'Covers only',
-  'album.showFacets': 'Category filters',
   'album.facets': 'Filters',
   'album.facetGenre': 'Genre',
   'album.facetDecade': 'Decade',
@@ -270,17 +276,12 @@ export const en = {
   'table.nowPlaying': 'Now playing',
   'table.ratingFailed': 'Could not save the rating',
   'table.ratingTagFailed': 'The rating was cleared, but the RATING tag was not removed',
-  'table.columnsSection': 'Columns',
-  'table.sortSection': 'Sort',
   'table.shuffle': 'Randomize',
   'table.reverse': 'Reverse',
-  'table.grouping': 'Group tracks',
   'table.groupBy': 'Group by',
   'table.collapseAll': 'Collapse all',
   'table.expandAll': 'Expand all',
   'albumList.table': 'Albums',
-  'albumList.selectedTracks': '{count} tracks selected',
-  'albumList.expand': 'Expand or collapse',
   'albumList.expandAll': 'Expand all',
   'albumList.onlySections': 'Expand only {dimension}',
   'albumList.collapseAlbums': 'Collapse all albums',
@@ -292,14 +293,15 @@ export const en = {
   'albumList.onlySectionHint': 'Collapses the other sections',
   'albumList.expandAlbum': 'Expand',
   'albumList.collapseAlbum': 'Collapse',
-  'albumList.dimensionShared': 'Section by',
-  'albumList.dimensionScope': 'Also applies to the cover wall',
   'albumList.dimAlbumHint': 'Group by album only',
   'albumList.sectionOrder': 'Section order',
   'albumList.orderName': 'By name',
   'albumList.orderNameHint': 'Chinese names by pinyin',
   'albumList.orderCount': 'By album count',
-  'albumList.orderCountHint': 'Largest first',
+  'albumList.sectionDirection': 'Section direction',
+  'albumList.albumGroups': 'Album grouping',
+  'albumList.byAlbum': 'By album',
+  'albumList.ungrouped': 'None',
   'albumList.groupAlbum': 'Album',
   'albumList.groupFile': 'File',
   'albumList.groupStats': 'Play statistics',
@@ -332,6 +334,10 @@ export const en = {
   'trackMenu.selectedOne': '{count} track selected',
   'trackMenu.selected': '{count} tracks selected',
   'trackMenu.goToAlbum': 'Go to album',
+  'trackMenu.goToArtist': 'Go to artist',
+  'trackMenu.currentPlace': 'Current',
+  'trackMenu.noArtistPage': 'No artist page',
+  'trackMenu.noAlbumPage': 'No album page',
   'trackMenu.clickedTrack': 'Targeted track only',
   'trackMenu.rating': 'Rating',
   'trackMenu.ratingOne': '1 star',

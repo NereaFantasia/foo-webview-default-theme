@@ -8,7 +8,9 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/src/main.tsx', (route) =>
     route.fulfill({
       contentType: 'text/javascript',
-      body: "import '/tests/fixtures/surfaceMotionEntry.ts';",
+      body: `import '/tests/fixtures/surfaceMotionEntry.ts';
+        import { startupOverlay } from '/src/app/startupOverlay.ts';
+        startupOverlay.dismiss();`,
     }),
   );
 });

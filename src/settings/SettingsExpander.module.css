@@ -1,4 +1,4 @@
-/* 外框与设置卡相同；圆角里的悬停底色靠这里裁掉。图标 20 宽，换行的控件与子行按它对齐到文字左缘。 */
+/* 外框与设置卡相同；圆角里的悬停底色靠这里裁掉。图标 20 宽，换行的控件与子行按它对齐到文字左缘 */
 .root {
   --settings-icon-size: 20px;
   position: relative;
@@ -8,7 +8,7 @@
   background-color: var(--bg-view-control);
 }
 
-/* 卡头：图标 20、文字占余量，控件、预览与箭头按内容宽排在右边；连外框 58 高，与设置卡齐平。 */
+/* 卡头：图标 20、文字占余量，控件、预览与箭头按内容宽排在右边；连外框 58 高，与设置卡齐平 */
 .head {
   box-sizing: border-box;
   display: flex;
@@ -87,7 +87,7 @@ button.head:focus-visible {
   min-width: 0;
 }
 
-/* 卡窄：控件换到下一行，与文字左对齐、占满一行；箭头留在首行右端。 */
+/* 卡窄：控件换到下一行，与文字左对齐、占满一行；箭头留在首行右端 */
 .stacked {
   padding-bottom: var(--spacingVerticalM);
 }
@@ -105,7 +105,7 @@ button.head:focus-visible {
   flex: none;
 }
 
-/* 有控件时的开合键：命中区 32，箭头与无控件卡头里的箭头对在同一条竖线上。 */
+/* 有控件时的开合键：命中区 32，箭头与无控件卡头里的箭头对在同一条竖线上 */
 .toggle {
   display: inline-flex;
   flex: none;
@@ -142,7 +142,7 @@ button.head:focus-visible {
   transform: rotate(180deg);
 }
 
-/* 展开区滑进滑出时超出的部分裁掉；展开区自己不裁，里面的焦点环画得全。 */
+/* 展开区滑进滑出时超出的部分裁掉；展开区自己不裁，里面的焦点环画得全 */
 .clip {
   overflow: clip;
   border-top: var(--strokeWidthThin) solid var(--line);

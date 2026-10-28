@@ -59,7 +59,7 @@ function parameters(value: unknown, fallback: BackgroundParameters): BackgroundP
   return result;
 }
 
-/** 存档逐项校验，坏了哪一项补哪一项；不是 JSON 对象的整份按缺省。 */
+/** 存档逐项校验，坏了哪一项补哪一项；不是 JSON 对象的整份按缺省 */
 const backgroundPref = defineLocalPref<BackgroundPreferences>({
   key: WINDOW_BACKGROUND_KEY,
   fallback: BACKGROUND_DEFAULTS,
@@ -82,7 +82,7 @@ export const backgroundParametersAtom = atom(
   (get) => get(backgroundPref.atom)[get(colorSchemeAtom)],
 );
 
-/** 在首帧之前调。读不了或存档坏了用缺省材质。 */
+/** 在首帧之前调。读不了或存档坏了用缺省材质 */
 export function loadWindowBackground(store: Store, storage?: PrefStorage | null): void {
   backgroundPref.load(store, storage);
   loadBackgroundAppearance(store, storage);

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, sep } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startBackend, type BackendServer } from '../server.ts';
 import { BACKEND_ORIGIN, readBackendDescriptor } from '../../src/server/backendProtocol.ts';
@@ -89,6 +89,26 @@ describe('本地后端', () => {
     await env.server.close();
     await expect(fetch(env.url + '/health', { headers: env.headers })).rejects.toThrow();
   });
+  it('重启后先绑上次的端口，被占用时另选并记下新端口', async () => {
+    const env = await start();
+    const first = env.server.descriptor.port;
+    const restart = async () => {
+      const server = await startBackend({
+        ...env.identity,
+        directory: env.directory,
+        launchId: randomUUID(),
+        parentAlive: () => true,
+      });
+      servers.push(server);
+      return server.descriptor.port;
+    };
+    await env.server.close();
+    expect(await restart()).toBe(first);
+    const occupied = await restart();
+    expect(occupied).not.toBe(first);
+    const record = await readFile(join(env.directory, 'state', 'backend-port.v1.json'), 'utf8');
+    expect(JSON.parse(record)).toEqual({ port: occupied });
+  });
   it('发布身份与端口，健康应答不泄露令牌', async () => {
     const env = await start();
     const text = await readFile(
@@ -122,6 +142,52 @@ describe('本地后端', () => {
       ).status,
     ).toBe(403);
     expect((await fetch(env.url + '/execute', { headers: env.headers })).status).toBe(404);
+  });
+
+  it('手动联调：额外来源与定死令牌可用，主题来源不受影响，其余来源仍被拒', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'theme-backend-'));
+    directories.push(directory);
+    const identity = { version: '0.1.5', installId: randomUUID(), sessionId: randomUUID() };
+    const token = randomBytes(32).toString('hex');
+    const manual = await startBackend({
+      ...identity,
+      directory,
+      launchId: randomUUID(),
+      parentAlive: () => true,
+      extraOrigins: ['http://localhost:5190'],
+      token,
+    });
+    servers.push(manual);
+    expect(manual.descriptor.token).toBe(token);
+    const url = `http://127.0.0.1:${manual.descriptor.port}`;
+    const dev = { Origin: 'http://localhost:5190', Authorization: `Bearer ${token}` };
+    const preflight = await fetch(`${url}/health`, { method: 'OPTIONS', headers: dev });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('http://localhost:5190');
+    const health = await fetch(`${url}/health`, { headers: dev });
+    expect(health.status).toBe(200);
+    expect(health.headers.get('access-control-allow-origin')).toBe('http://localhost:5190');
+    expect(
+      (
+        await fetch(`${url}/health`, {
+          headers: { Origin: BACKEND_ORIGIN, Authorization: `Bearer ${token}` },
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(`${url}/health`, {
+          headers: { Origin: 'http://localhost:5190', Authorization: 'Bearer invalid' },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await fetch(`${url}/health`, {
+          headers: { Origin: 'https://example.com', Authorization: `Bearer ${token}` },
+        })
+      ).status,
+    ).toBe(403);
   });
 
   it('关闭旧服务不会删除新进程接管的描述文件', async () => {

@@ -1,26 +1,23 @@
-import {
-  mergeClasses,
-  Button,
-  Input,
-  Dropdown,
-  Option,
-  Tab,
-  TabList,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
+import { SegmentedTabs } from '../../kit/SegmentedTabs.tsx';
+import { SortMenu } from '../../kit/SortMenu.tsx';
+import { mergeClasses, Button, Input, makeStyles, tokens } from '@fluentui/react-components';
 import {
   ChevronRight20Regular,
   MoreHorizontal20Regular,
   Play20Regular,
   Add20Regular,
+  RecordRegular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
+import { pluralAtom } from '../../i18n/plural.ts';
+import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
 import type { KeyedSelection } from '../../kit/keyedSelection.ts';
-import { EMPTY_GENRE, genresQuery, type GenreEntry } from './genresModel.ts';
+import { EMPTY_GENRE } from '../../nav/places.ts';
+import { genresQuery, type GenreEntry } from './genresModel.ts';
 import { genresPrefsAtom } from './genresPrefs.ts';
 import { GenresMenu } from './GenresMenu.tsx';
 import { useGenresList } from './useGenresList.ts';
@@ -29,10 +26,11 @@ import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
+/** 流派列表可选的排序字段，菜单按这个顺序列 */
+const SORTS = ['name', 'tracks', 'albums'] as const;
+
 const useStyles = makeStyles({
-  input: { width: '100%' },
-  tabs: { padding: 0 },
-  sort: { minWidth: 0, flex: 1 },
+  input: { minWidth: 0, flex: 1 },
   action: { minWidth: '28px', padding: tokens.spacingHorizontalXXS },
 });
 export interface GenresListProps {
@@ -55,6 +53,7 @@ export function GenresList(props: GenresListProps) {
   const controls = useViewControlStyles();
   const genres = useService(genresKey);
   const t = useAtomValueRawSync(translateAtom);
+  const plural = useAtomValueRawSync(pluralAtom);
   const prefs = useAtomValueRawSync(genresPrefsAtom);
   const classes = useStyles();
   const root = useRef<HTMLDivElement>(null);
@@ -108,49 +107,40 @@ export function GenresList(props: GenresListProps) {
       aria-label={t('genres.title')}
     >
       <div className={styles.tools}>
-        <Input
-          className={mergeClasses(classes.input, controls.field)}
-          value={props.text}
-          onChange={(_, data) => props.onText(data.value)}
-          placeholder={t('genres.filter')}
-          aria-label={t('genres.filter')}
-        />
-        <TabList
-          className={classes.tabs}
-          size="small"
-          selectedValue={props.tidy ? 'tidy' : 'all'}
-          onTabSelect={(_, data) => props.onTidy(data.value === 'tidy')}
-        >
-          <Tab value="all">{t('genres.all')}</Tab>
-          <Tab value="tidy">{t('genres.tidy')}</Tab>
-        </TabList>
         <div className={styles.sort}>
-          <Dropdown
-            className={mergeClasses(classes.sort, controls.field)}
-            size="small"
-            value={t(`genres.sort.${prefs.sort}`)}
-            selectedOptions={[prefs.sort]}
-            aria-label={t('genres.sort')}
-            onOptionSelect={(_, data) => {
-              const sort = data.optionValue;
-              if (sort === 'name' || sort === 'tracks' || sort === 'albums')
-                genres.prefs.update({ sort });
-            }}
-          >
-            <Option value="name">{t('genres.sort.name')}</Option>
-            <Option value="tracks">{t('genres.sort.tracks')}</Option>
-            <Option value="albums">{t('genres.sort.albums')}</Option>
-          </Dropdown>
-          <Button
-            className={controls.icon}
-            size="small"
-            appearance="subtle"
-            aria-pressed={prefs.descending}
-            onClick={() => genres.prefs.update({ descending: !prefs.descending })}
-          >
-            {t('genres.descending')}
-          </Button>
+          <Input
+            className={mergeClasses(classes.input, controls.field)}
+            value={props.text}
+            onChange={(_, data) => props.onText(data.value)}
+            placeholder={t('genres.filter')}
+            aria-label={t('genres.filter')}
+          />
+          <SortMenu
+            directionKey={false}
+            groups={[
+              {
+                options: SORTS.map((value) => ({ value, label: t(`genres.sort.${value}`) })),
+              },
+            ]}
+            field={prefs.sort}
+            descending={prefs.descending}
+            onField={(sort) =>
+              genres.prefs.update(
+                sort === prefs.sort ? { sort } : { sort, descending: sort !== 'name' },
+              )
+            }
+            onDescending={(descending) => genres.prefs.update({ descending })}
+          />
         </div>
+        <SegmentedTabs
+          label={t('genres.title')}
+          value={props.tidy ? 'tidy' : 'all'}
+          options={[
+            { value: 'all', label: t('genres.all') },
+            { value: 'tidy', label: t('genres.tidy') },
+          ]}
+          onChange={(value) => props.onTidy(value === 'tidy')}
+        />
       </div>
       <div
         ref={props.scroll}
@@ -198,14 +188,25 @@ export function GenresList(props: GenresListProps) {
                   <span className={styles.name} title={name}>
                     {name}
                   </span>
-                  <span className={styles.count}>
-                    {entry.issue && props.tidy
-                      ? t(`genres.${entry.issue}`)
-                      : t('genres.counts', {
-                          albums: entry.albumCount,
-                          tracks: entry.tracks.length,
-                        })}
-                  </span>
+                  <Metadata className={styles.count}>
+                    {entry.issue && props.tidy ? (
+                      t(`genres.${entry.issue}`)
+                    ) : (
+                      <>
+                        <MetadataItem icon={<RecordRegular />}>
+                          {t(plural(entry.albumCount, 'album.countOne', 'album.count'), {
+                            count: entry.albumCount,
+                          })}
+                        </MetadataItem>
+                        <MetadataItem icon={<TextNumberListLtr16Regular />}>
+                          {t(
+                            plural(entry.tracks.length, 'album.menuTracksOne', 'album.menuTracks'),
+                            { count: entry.tracks.length },
+                          )}
+                        </MetadataItem>
+                      </>
+                    )}
+                  </Metadata>
                 </div>
                 <div
                   role="gridcell"

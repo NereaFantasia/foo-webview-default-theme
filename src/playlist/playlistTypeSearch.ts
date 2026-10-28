@@ -1,27 +1,27 @@
 import { fb } from 'foo-webview-sdk/bridge';
 import { findPlaylistPrefix, PREFIX_FIELDS } from './playlistPrefixSearch.ts';
 
-/** 打字即跳的串最长这么多个字符，再按字母键就吞掉，不再追加。 */
+/** 打字即跳的串最长这么多个字符，再按字母键就吞掉，不再追加 */
 const MAX_CHARS = 20;
-/** 键入到开始扫描的静默期，毫秒：每次扫描都要翻页取行，连着敲不该连着扫。 */
+/** 键入到开始扫描的静默期，毫秒：每次扫描都要翻页取行，连着敲不该连着扫 */
 export const TYPE_SEARCH_DEBOUNCE_MS = 500;
-/** 找完之后多久没有新键就清串，毫秒。 */
+/** 找完之后多久没有新键就清串，毫秒 */
 export const TYPE_SEARCH_EXPIRY_MS = 1000;
 
 export interface PlaylistTypeSearchState {
   readonly text: string;
-  /** 最近一次没找到；界面据此提示「没有以…开头的项」。 */
+  /** 最近一次没找到；界面据此提示「没有以…开头的项」 */
   readonly noMatch: boolean;
   readonly scanning: boolean;
-  /** 最近一次扫描取行失败了。 */
+  /** 最近一次扫描取行失败了 */
   readonly failed: boolean;
 }
 
-/** 此刻表格上是哪张列表、显示的是整张还是过滤命中。每次扫描前后各取一次，变了就作罢。 */
+/** 此刻表格上是哪张列表、显示的是整张还是过滤命中。每次扫描前后各取一次，变了就作罢 */
 export interface PlaylistTypeSearchTarget {
   readonly guid: string;
   readonly total: number;
-  /** 过滤态的命中；不在过滤态时为 null，扫描向宿主翻页。 */
+  /** 过滤态的命中；不在过滤态时为 null，扫描向宿主翻页 */
   readonly hits: readonly PlaylistTypeSearchHit[] | null;
 }
 
@@ -32,9 +32,9 @@ export interface PlaylistTypeSearchHit {
 
 export interface PlaylistTypeSearch {
   readonly state: PlaylistTypeSearchState;
-  /** 收下这个键就答 true（调用方据此 `preventDefault`）；不归打字即跳的键答 false。 */
+  /** 收下这个键就答 true（调用方据此 `preventDefault`）；不归打字即跳的键答 false */
   input(key: string): boolean;
-  /** 清串并作废进行中的扫描；换了列表、换了过滤词时调。 */
+  /** 清串并作废进行中的扫描；换了列表、换了过滤词时调 */
   clear(): void;
   subscribe(listener: () => void): () => void;
   dispose(): void;
@@ -49,11 +49,11 @@ const IDLE: PlaylistTypeSearchState = { text: '', noMatch: false, scanning: fals
 /**
  * 播放列表页的打字即跳：行是分页取的，找不能在内存里同步做，静默 `TYPE_SEARCH_DEBOUNCE_MS` 后从头翻页
  * 找前缀（字段优先级见 `findPlaylistPrefix`），找到交给 `locate` 落焦点与选中，`locate` 答假（那一行
- * 此刻看不见）也算没找到。过滤态只在命中里找，不向宿主要行。
+ * 此刻看不见）也算没找到。过滤态只在命中里找，不向宿主要行
  *
  * 只收单个可打印字符（码点不小于 32 且不是 DEL），首字符不能是空白，串长到上限就吞掉后续键；Backspace
  * 退一格。Esc 不归它：列表部件不认领 Esc，Esc 只关浮层。每次串变先作废上一次扫描；找完
- * `TYPE_SEARCH_EXPIRY_MS` 没有新键就清串。
+ * `TYPE_SEARCH_EXPIRY_MS` 没有新键就清串
  */
 export function createPlaylistTypeSearch(
   target: () => PlaylistTypeSearchTarget,
@@ -131,7 +131,7 @@ export function createPlaylistTypeSearch(
       failed = true;
     }
     if (!current()) {
-      // 扫描途中表格换了一份（换了过滤、增删了行）：结果对不上，这一串作罢。串变过、已释放的归新的那一轮。
+      // 扫描途中表格换了一份（换了过滤、增删了行）：结果对不上，这一串作罢。串变过、已释放的归新的那一轮
       if (!disposed && mine === generation) clear();
       return;
     }

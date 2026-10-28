@@ -23,6 +23,7 @@ export interface BiographyPhotosState {
   readonly truncated: boolean;
   readonly onlineLoading?: boolean;
   readonly onlineProblem?: BiographyPhotoProblem | null;
+  readonly onlineProblemDetail?: string | null;
 }
 
 export interface BiographyPhotosDeps {
@@ -85,7 +86,7 @@ export function startBiographyPhotos(
         if (!collecting()) return { ...EMPTY, artist };
         const path = album.firstTrackAbsolutePath || album.firstTrackPath;
         if (!path) continue;
-        // URL 接口不探测文件是否有图；先读 artist 类型，不能拿 front 或客串专辑补位。
+        // URL 接口不探测文件是否有图；先读 artist 类型，不能拿 front 或客串专辑补位
         const answer = await settle(() => host.artwork.getForTrack(path, 'artist'));
         if (!collecting()) return { ...EMPTY, artist };
         if (!answer || answer.success === false) {
@@ -197,6 +198,7 @@ export function startBiographyPhotos(
       photos,
       onlineLoading: online?.loading,
       onlineProblem: online?.problem,
+      onlineProblemDetail: online?.problemDetail,
     };
   });
   schedule();

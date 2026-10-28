@@ -285,7 +285,7 @@ test('无主图时从相册取多张照片，返回艺人页不重复请求', as
           body: `<link rel="canonical" href="${url.href}"><ul class="image-list">${ids
             .map(
               (id) =>
-                `<li><a href="/music/Nujabes/+images/${id}"><img src="https://lastfm-img.freetls.fastly.net/i/u/300x300/${id}.jpg"></a></li>`,
+                `<li><a href="/music/Nujabes/+images/${id}"><img src="https://lastfm-img.freetls.fastly.net/i/u/avatar170s/${id}" loading="lazy"></a></li>`,
             )
             .join('')}</ul>`,
         };

@@ -1,3 +1,4 @@
+import { MenuSurface as MenuPopover } from '../../src/theme/MenuSurface.tsx';
 import {
   Button,
   DialogBody,
@@ -9,7 +10,6 @@ import {
   FluentProvider,
   MenuItem,
   MenuList,
-  MenuPopover,
   MenuTrigger,
   PopoverSurface,
   PopoverTrigger,

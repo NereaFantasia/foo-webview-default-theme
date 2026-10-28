@@ -12,7 +12,7 @@ import { readBiographyDetails, readBiographyFacts } from './details/biographyDet
 import { readLastfmPhotoValue } from './online/lastfmPhoto.ts';
 import { readBiographyLinks } from './article/biographyLinks.ts';
 
-/** 简介与身份两份缓存都放在 profile 下的这个目录里。 */
+/** 简介与身份两份缓存都放在 profile 下的这个目录里 */
 export const BIOGRAPHY_CACHE_DIRECTORY = 'webview-ui-artists';
 export const BIOGRAPHY_CACHE_LIMIT = 64;
 export const BIOGRAPHY_CACHE_BYTES = 4 * 1024 * 1024;

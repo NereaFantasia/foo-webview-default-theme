@@ -12,6 +12,7 @@ const TRACK_FIELDS: ReadonlySet<string> = new Set([
   'artist',
   'artists',
   'album',
+  'albumId',
   'albumArtist',
   'albumArtists',
   'genre',
@@ -121,6 +122,7 @@ export class FakePlaylists {
   private serial: number;
   /** 按 GUID 记的行；没记的列表按清单里的曲目数现造（`makeRow`）。 */
   private readonly rows = new Map<string, PlaylistTrack[]>();
+  private readonly versions = new Map<string, number>();
 
   constructor(
     host: FakeHost,
@@ -264,6 +266,7 @@ export class FakePlaylists {
               playlistGuid: guid,
               start: 0,
               count: trackCount,
+              contentVersion: this.versionOf(guid),
             });
           }
           return {
@@ -309,6 +312,7 @@ export class FakePlaylists {
           if (!target) return hostFailure('NOT_FOUND');
           const { index, trackCount } = target;
           this.rows.delete(target.guid);
+          this.bump(target.guid);
           this.items = this.items.map((item) =>
             item === target ? { ...item, trackCount: 0 } : item,
           );
@@ -317,6 +321,7 @@ export class FakePlaylists {
             playlistGuid: target.guid,
             oldCount: trackCount,
             newCount: 0,
+            contentVersion: this.versionOf(target.guid),
           });
           return {
             success: true,
@@ -364,9 +369,19 @@ export class FakePlaylists {
       guid,
       tracks.map((track, index) => ({ ...track, index })),
     );
+    this.bump(guid);
     this.items = this.items.map((item) =>
       item.guid === guid ? { ...item, trackCount: tracks.length } : item,
     );
+  }
+
+  /** 一张列表的内容版本：每改一次行加一，宿主的应答与事件都带它。 */
+  versionOf(guid: string): string {
+    return String(this.versions.get(guid) ?? 0);
+  }
+
+  private bump(guid: string): void {
+    this.versions.set(guid, (this.versions.get(guid) ?? 0) + 1);
   }
 
   /** 一张列表此刻的行：记过的照记的，没记的按曲目数现造。 */

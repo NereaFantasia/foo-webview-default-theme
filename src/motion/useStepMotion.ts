@@ -5,11 +5,11 @@ import { edgeMove, stepEnter, type StepDirection } from './stepTransition.ts';
 import { CURVE, DURATION_MS, motionDuration } from './timing.ts';
 
 export interface StepMotionTargets {
-  /** 对话框的底板：顶边不动，底边随高度伸缩。 */
+  /** 对话框的底板：顶边不动，底边随高度伸缩 */
   readonly surface: RefObject<HTMLElement | null>;
-  /** 每一步换掉的那部分：标题与正文。 */
+  /** 每一步换掉的那部分：标题与正文 */
   readonly page: RefObject<HTMLElement | null>;
-  /** 页脚：跟着底边走。 */
+  /** 页脚：跟着底边走 */
   readonly footer: RefObject<HTMLElement | null>;
 }
 
@@ -21,7 +21,7 @@ interface EdgeRun {
   readonly animations: readonly Animation[];
 }
 
-/** 一次底边移动的进行状态与上一次量到的高度，跨渲染保留。 */
+/** 一次底边移动的进行状态与上一次量到的高度，跨渲染保留 */
 interface EdgeState {
   height: number | null;
   run: EdgeRun | null;
@@ -29,7 +29,7 @@ interface EdgeState {
 
 /**
  * 此刻看得见的底边高度：动画进行中按进度算，否则就是上一次量到的高度。高度一律量布局尺寸
- * （`offsetHeight`），不含变换：对话框入场时整体从 1.05 缩到 1，按屏幕上的尺寸量会差出这一截。
+ * （`offsetHeight`），不含变换：对话框入场时整体从 1.05 缩到 1，按屏幕上的尺寸量会差出这一截
  */
 function visibleHeight(state: EdgeState, surface: HTMLElement): number {
   const current = state.run;
@@ -39,7 +39,7 @@ function visibleHeight(state: EdgeState, surface: HTMLElement): number {
   return current.from + (current.to - current.from) * CURVE.pointToPoint.ease(ratio);
 }
 
-/** 撤掉进行中的动画与钉住的高度，量出布局本来的高度。 */
+/** 撤掉进行中的动画与钉住的高度，量出布局本来的高度 */
 function settle(state: EdgeState, surface: HTMLElement): number {
   state.run?.animations.forEach((animation) => animation.cancel());
   state.run = null;
@@ -50,7 +50,7 @@ function settle(state: EdgeState, surface: HTMLElement): number {
 /**
  * 底边从 `from` 高移到布局此刻的高度。变高时布局已经到位，只用裁剪露出；变矮时先把底板钉回 `from`，
  * 播完再撤掉，布局一次换到终值。`allowShrink` 为假时变矮直接到位：在 ResizeObserver 的回调里改高度，
- * 会让同一帧再报一次尺寸变化。
+ * 会让同一帧再报一次尺寸变化
  */
 function moveEdge(
   state: EdgeState,
@@ -91,9 +91,9 @@ function moveEdge(
 
 /**
  * 分步对话框的换步与高度变化（换步配方）。`step` 变了：标题与正文按方向横移进来，底板与页脚 250 ms
- * 点到点到新高度；同一步里内容长高（插进一块、说明行换行）：底板与页脚 167 ms。布局不逐帧改。
+ * 点到点到新高度；同一步里内容长高（插进一块、说明行换行）：底板与页脚 167 ms。布局不逐帧改
  * 中途再变，从此刻看得见的高度接着走。打开时的第一步不播，那时对话框本身在入场。`active` 是对话框
- * 开着：底板只在开着时存在，开了才开始量。
+ * 开着：底板只在开着时存在，开了才开始量
  */
 export function useStepMotion(
   targets: StepMotionTargets,
@@ -104,7 +104,7 @@ export function useStepMotion(
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const state = useRef<EdgeState>({ height: null, run: null });
   const shown = useRef(step);
-  // 换步时按这一次渲染的方向与减弱动效来播；两者变了不单独触发。
+  // 换步时按这一次渲染的方向与减弱动效来播；两者变了不单独触发
   const latest = useRef({ targets, direction, reduced });
   useLayoutEffect(() => {
     latest.current = { targets, direction, reduced };
@@ -128,7 +128,7 @@ export function useStepMotion(
     const edge = state.current;
     edge.height = surface.offsetHeight;
     const observer = new ResizeObserver(() => {
-      // 换步与钉住的高度由上面处理；这里只接同一步里内容自己变高变矮。
+      // 换步与钉住的高度由上面处理；这里只接同一步里内容自己变高变矮
       if (edge.run) return;
       const previous = edge.height;
       const next = surface.offsetHeight;

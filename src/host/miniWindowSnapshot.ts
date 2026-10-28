@@ -66,7 +66,7 @@ export function readMiniWindowSnapshot(storage: MiniWindowStorage): MiniWindowSn
   };
 }
 
-/** 恢复记录须先落盘；否则退出进程后宿主只剩迷你尺寸，无法找回原窗口。 */
+/** 恢复记录须先落盘；否则退出进程后宿主只剩迷你尺寸，无法找回原窗口 */
 export async function saveMiniWindowSnapshot(
   storage: MiniWindowStorage,
   snapshot: MiniWindowSnapshot | null,

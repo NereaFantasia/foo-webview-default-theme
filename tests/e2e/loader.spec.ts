@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   builtLoaderFiles,
   minimalFrontend,
@@ -52,16 +54,14 @@ test('产物是内联引导页与版本目录，安装标记的每个哈希均�
     raw.files === null
   )
     throw new Error('缺少安装标记');
-  for (const [path, hash] of Object.entries(raw.files)) {
-    const body = files.get(`fe/${CURRENT.dir}/${path}`);
-    expect(body, path).toBeDefined();
+  // 二进制资源按字节读：`builtLoaderFiles` 的文本副本会改坏它们的哈希
+  for (const [path, hash] of Object.entries(raw.files))
     expect(
       createHash('sha256')
-        .update(body ?? '')
+        .update(readFileSync(join('dist', 'fe', CURRENT.dir, path)))
         .digest('hex'),
       path,
     ).toBe(hash);
-  }
   expect(files.get(`fe/${CURRENT.dir}/loader.html`)).toBe(html);
 });
 
@@ -74,7 +74,7 @@ test('跳转保留查询与 hash，同会话不重复计数、不采用后来新
   minimalFrontend(files, NEXT);
   await serveLoader(page, files);
   await page.goto('/index.html?windowId=popup-1&route=queue%2Fnext#part-2');
-  await expect(page.getByRole('heading', { name: 'Frontend 0.1.0' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Frontend ${CURRENT.v}` })).toBeVisible();
   expect(new URL(page.url()).search).toBe('?windowId=popup-1&route=queue%2Fnext');
   expect(new URL(page.url()).hash).toBe('#part-2');
   expect((await counts(page)).installations['']?.[CURRENT.dir]).toBe(1);
@@ -83,7 +83,7 @@ test('跳转保留查询与 hash，同会话不重复计数、不采用后来新
   const popup = await context.newPage();
   await serveLoader(popup, files);
   await popup.goto('/');
-  await expect(popup.getByRole('heading', { name: 'Frontend 0.1.0' })).toBeVisible();
+  await expect(popup.getByRole('heading', { name: `Frontend ${CURRENT.v}` })).toBeVisible();
   expect((await session(popup, ''))?.sessionId).toBe(first?.sessionId);
   expect((await counts(popup)).installations['']?.[CURRENT.dir]).toBe(1);
 });
@@ -96,11 +96,11 @@ test('current 损坏改用 last-good；会话目录缺标记时重新选版', as
   files.set('current.json', 'broken');
   await serveLoader(page, files);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Frontend 0.1.0' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Frontend ${CURRENT.v}` })).toBeVisible();
   files.delete(`fe/${CURRENT.dir}/installed.json`);
   pointer(files, { version: CURRENT, pending: NEXT });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Frontend 0.2.0' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Frontend ${NEXT.v}` })).toBeVisible();
 });
 
 test('全部候选失败时说明尝试次数，重置只清本安装并重新选择', async ({ page }) => {
@@ -112,26 +112,26 @@ test('全部候选失败时说明尝试次数，重置只清本安装并重新�
   pointer(files, { pending: NEXT, version: CURRENT, previous: OLD });
   await serveLoader(page, files);
   await page.addInitScript(
-    ({ key, id, other }) => {
+    ({ key, id, other, dirs }) => {
       if (!localStorage.getItem(key))
         localStorage.setItem(
           key,
           JSON.stringify({
             schema: 1,
             installations: {
-              [id]: { '0.1.0': 3, '0.2.0_abc123': 3, '0.0.9_xyz789': 3 },
-              [other]: { '0.1.0': 2 },
+              [id]: Object.fromEntries(dirs.map((dir) => [dir, 3])),
+              [other]: { [dirs[0] ?? '']: 2 },
             },
           }),
         );
     },
-    { key: ATTEMPTS_KEY, id: ID, other: OTHER },
+    { key: ATTEMPTS_KEY, id: ID, other: OTHER, dirs: [CURRENT.dir, NEXT.dir, OLD.dir] },
   );
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '无法启动主题' })).toBeVisible();
   await expect(page.getByRole('listitem')).toHaveCount(3);
   await page.getByRole('button', { name: '重置启动计数并重试' }).click();
-  await expect(page.getByRole('heading', { name: 'Frontend 0.2.0' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Frontend ${NEXT.v}` })).toBeVisible();
   const saved = await counts(page);
   expect(saved.installations[ID]).toEqual({ [NEXT.dir]: 1 });
   expect(saved.installations[OTHER]).toEqual({ [CURRENT.dir]: 2 });
@@ -167,12 +167,9 @@ test('回退确认先记录坏版本，再改指针；写入失败能从信息�
   minimalFrontend(files, NEXT);
   pointer(files, { version: NEXT, previous: CURRENT });
   await page.addInitScript(
-    (key) =>
-      localStorage.setItem(
-        key,
-        JSON.stringify({ schema: 1, installations: { '': { '0.2.0_abc123': 3 } } }),
-      ),
-    ATTEMPTS_KEY,
+    ({ key, dir }) =>
+      localStorage.setItem(key, JSON.stringify({ schema: 1, installations: { '': { [dir]: 3 } } })),
+    { key: ATTEMPTS_KEY, dir: NEXT.dir },
   );
   const app = await serveLoader(page, files);
   app.failWrite.path = 'state/failed-releases.json';
@@ -209,8 +206,8 @@ test('两个窗口同时首次进入只选择一次，复用同一启动标识',
   await serveLoader(page, files);
   await serveLoader(other, files);
   await Promise.all([page.goto('/'), other.goto('/?windowId=popup-1')]);
-  await expect(page.getByRole('heading', { name: 'Frontend 0.1.0' })).toBeVisible();
-  await expect(other.getByRole('heading', { name: 'Frontend 0.1.0' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Frontend ${CURRENT.v}` })).toBeVisible();
+  await expect(other.getByRole('heading', { name: `Frontend ${CURRENT.v}` })).toBeVisible();
   expect((await session(page, ''))?.sessionId).toBe((await session(other, ''))?.sessionId);
   expect((await counts(page)).installations['']?.[CURRENT.dir]).toBe(1);
 });
@@ -258,10 +255,8 @@ test('根组件渲染失败不会被记成健康版本', async ({ page }) => {
   const chunk = [...files.keys()].find((path) => /\/assets\/App-[\w-]+\.js$/.test(path));
   if (!chunk) throw new Error('缺少应用入口');
   const original = files.get(chunk) ?? '';
-  const changed = original.replace(
-    /[$A-Za-z_][$A-Za-z_0-9]* as App(?=[,}])/,
-    '__brokenRoot as App',
-  );
+  // 入口取的是模块命名空间对象，`App` 的取值函数在里面；只改导出别名，入口读不到
+  const changed = original.replace(/App:\(\)=>[$A-Za-z_][$A-Za-z_0-9]*/, 'App:()=>__brokenRoot');
   expect(changed).not.toBe(original);
   files.set(
     chunk,

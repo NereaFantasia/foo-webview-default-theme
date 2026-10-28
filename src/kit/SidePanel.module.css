@@ -1,5 +1,5 @@
 .host {
-  /* 越过内容区外留白与面板内缩，再给阴影留出一份外留白。 */
+  /* 越过内容区外留白与面板内缩，再给阴影留出一份外留白 */
   --panel-slide-offset: calc(2 * var(--spacingHorizontalL) + var(--panel-inset));
   position: relative;
 }
@@ -24,7 +24,7 @@
 }
 
 .panel[data-side-panel='start'] {
-  /* 左侧还需移过侧栏列；列宽由主窗口提供，极窄时为零。 */
+  /* 左侧还需移过侧栏列；列宽由主窗口提供，极窄时为零 */
   --surface-slide-offset: calc(var(--panel-slide-offset) + var(--sidebar-column-width));
   left: var(--panel-inset);
 }

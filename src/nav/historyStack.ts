@@ -13,14 +13,14 @@ interface HistoryOptions<P, K> {
   readonly limit?: number;
 }
 
-/** 历史里的一条记录，对外只当身份用：页面按它登记快照钩子，中央区域按它区分新旧两层。 */
+/** 历史里的一条记录，对外只当身份用：页面按它登记快照钩子，中央区域按它区分新旧两层 */
 export interface HistoryEntry {
   readonly key: number;
 }
 
 interface Entry<P, K> extends HistoryEntry {
   place: P;
-  /** 从上一条走到这一条用的过渡；从这一条后退时反着播。 */
+  /** 从上一条走到这一条用的过渡；从这一条后退时反着播 */
   readonly arrivedBy: K;
 }
 
@@ -32,25 +32,25 @@ export interface HistoryArrival<K> {
 export interface HistoryState<P, K> {
   readonly entry: HistoryEntry;
   readonly place: P;
-  /** 此刻后退会去的地点，已跳过主体不在的记录；后退键的悬停提示写它的名字。退不回去时为 null。 */
+  /** 此刻后退会去的地点，已跳过主体不在的记录；后退键的悬停提示写它的名字。退不回去时为 null */
   readonly previous: P | null;
   readonly next: P | null;
-  /** 怎么到的当前这条；打开窗口时的第一条为 null，不播过渡。 */
+  /** 怎么到的当前这条；打开窗口时的第一条为 null，不播过渡 */
   readonly arrival: HistoryArrival<K> | null;
 }
 
-/** 一种带主体的地点的主体钩子。只有要跳过失效主体、要在回来时做动作的地点才登记。 */
+/** 一种带主体的地点的主体钩子。只有要跳过失效主体、要在回来时做动作的地点才登记 */
 export interface SubjectHooks {
-  /** 同页主体被移走后，用户仍可在原记录里选另一个；列表等独立地点保持原有失效记录。 */
+  /** 同页主体被移走后，用户仍可在原记录里选另一个；列表等独立地点保持原有失效记录 */
   readonly replaceMissing?: boolean;
-  /** 页面此刻的主体。去这个地点没指明主体、离开时改写这条记录，都按它。 */
+  /** 页面此刻的主体。去这个地点没指明主体、离开时改写这条记录，都按它 */
   current?(): string | null;
   exists(subject: string): boolean;
-  /** 后退、前进回到这个主体时调，例如在宿主里重新激活那张列表。直接去一个地点时由调用方自己做。 */
+  /** 后退、前进回到这个主体时调，例如在宿主里重新激活那张列表。直接去一个地点时由调用方自己做 */
   enter?(subject: string): void;
 }
 
-/** 放一种快照的地方：页面模块里建一个，快照按记录存在里面，形状由页面自己定。 */
+/** 放一种快照的地方：页面模块里建一个，快照按记录存在里面，形状由页面自己定 */
 export interface SnapshotSlot<S extends object> {
   readonly values: WeakMap<HistoryEntry, S>;
 }
@@ -65,24 +65,24 @@ export interface SnapshotHooks<S extends object> {
 }
 
 export interface HistoryService<P extends HistoryPlace, K extends string> {
-  /** 去一个地点：与当前相同就不记；否则丢掉前进的部分再记一条。过渡缺省按地点层级定。 */
+  /** 去一个地点：与当前相同就不记；否则丢掉前进的部分再记一条。过渡缺省按地点层级定 */
   navigate(place: P, kind?: K): void;
-  /** 改写当前页面，不新增记录；用于当前对象失效后的回退。 */
+  /** 改写当前页面，不新增记录；用于当前对象失效后的回退 */
   replace(place: P): void;
-  /** 退到上一条还在的记录，跳过主体已经不在的；一条都没有时返回 false，哪儿也不去。 */
+  /** 退到上一条还在的记录，跳过主体已经不在的；一条都没有时返回 false，哪儿也不去 */
   back(): boolean;
   forward(): boolean;
-  /** 登记一种地点的主体钩子，返回注销函数。 */
+  /** 登记一种地点的主体钩子，返回注销函数 */
   registerSubject(id: P['id'], hooks: SubjectHooks): () => void;
   /**
    * 主体的集合变了（列表删了、专辑移出媒体库、宿主激活了别的列表）时由主体的主人调：当前这条按页面
-   * 此刻的主体改写（规则同离开时），再重算后退、前进会去哪。
+   * 此刻的主体改写（规则同离开时），再重算后退、前进会去哪
    */
   subjectsChanged(): void;
   /**
-   * 为一条记录登记一份快照钩子，返回注销函数；同一条记录可以登记多份，各用各的槽。
+   * 为一条记录登记一份快照钩子，返回注销函数；同一条记录可以登记多份，各用各的槽
    * 登记时这条正是当前记录、槽里存着它的快照，就立即交还，每回到一次每个槽只交还一次；
-   * 离开这条时取。没登记的页面离开时不取，已存的快照留着等下一次。
+   * 离开这条时取。没登记的页面离开时不取，已存的快照留着等下一次
    */
   registerSnapshot<S extends object>(
     entry: HistoryEntry,
@@ -109,10 +109,10 @@ export function startHistory<P extends HistoryPlace, K extends string>(
   let index = 0;
   const subjects = new Map<P['id'], SubjectHooks>();
   const bindings = new Map<HistoryEntry, Set<Binding>>();
-  // 这一次回到当前记录之后已经交还过快照的槽。
+  // 这一次回到当前记录之后已经交还过快照的槽
   let restored = new WeakSet<object>();
   // 后退、前进进行中：`enter` 会让主体的主人同步改状态、回调 `subjectsChanged`，这时改写或删记录会让
-  // 已算好的去向指错。进行中只记一笔，到达之后再按新的当前记录同步。
+  // 已算好的去向指错。进行中只记一笔，到达之后再按新的当前记录同步
   let stepping = false;
   let syncPending = false;
 
@@ -138,7 +138,7 @@ export function startHistory<P extends HistoryPlace, K extends string>(
     return target === null ? null : at(target).place;
   }
 
-  // 算出来与现有的一样就不写，读历史的组件不必跟着重渲染。
+  // 算出来与现有的一样就不写，读历史的组件不必跟着重渲染
   function publish(arrival: HistoryArrival<K> | null): void {
     const entry = at(index);
     const next: HistoryState<P, K> = {
@@ -167,11 +167,11 @@ export function startHistory<P extends HistoryPlace, K extends string>(
     return subject === null ? place : { ...place, subject };
   }
 
-  // 主体可能在历史之外被换掉（宿主激活了另一张列表），离开或比较之前按页面此刻的主体改写当前这条。
+  // 主体可能在历史之外被换掉（宿主激活了另一张列表），离开或比较之前按页面此刻的主体改写当前这条
   // 这条原来的主体已经不在（列表删了）时不改写：页面此刻的主体已是另一张（删的是活动列表时会切到
   // 落在同一位的那张），改过去等于把记录挪到了另一个地点；留着原主体，后退、前进时按「主体不在就跳过」
   // 越过它。改写后，后退、前进会去的那条（已跳过主体不在的）与它同一地点时，去掉那一条，免得原地不动；
-  // 当前这条留着，它的快照最新。
+  // 当前这条留着，它的快照最新
   function syncSubject(): void {
     const entry = at(index);
     const hooks = subjects.get(entry.place.id);

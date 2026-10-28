@@ -36,7 +36,7 @@ export interface FoldersTrashService {
   dispose(): void;
 }
 
-/** 文件操作只接受宿主已解析的本机绝对路径，不把协议地址或环境变量交给文件接口。 */
+/** 文件操作只接受宿主已解析的本机绝对路径，不把协议地址或环境变量交给文件接口 */
 export function foldersTrashPaths(tracks: readonly LibraryTrack[]) {
   const paths = new Map<string, string>();
   let unsupported = 0;
@@ -89,13 +89,13 @@ export function startFoldersTrash(store: Store, host: FoldersTrashFace = fb): Fo
         if (disposed || stopped) break;
         let status: FoldersTrashItem['status'] = 'failed';
         if (info?.success === true && info.exists && info.isFile && !info.isDirectory) {
-          // 每次只下发一个文件；取消不能撤回宿主已经受理的删除。
+          // 每次只下发一个文件；取消不能撤回宿主已经受理的删除
           const result = await settle(() => host.file.delete(item.path, { moveToTrash: true }));
           status = result === null ? 'unknown' : result.success ? 'ok' : 'failed';
         }
         items[index] = { ...item, status };
         update({ items: [...items] });
-        // 通道超时无法证明未执行，停止后续操作，也不自动重发。
+        // 通道超时无法证明未执行，停止后续操作，也不自动重发
         if (status === 'unknown') break;
       }
       update({

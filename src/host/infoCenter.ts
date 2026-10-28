@@ -27,15 +27,15 @@ import {
 } from '../kit/prefStorage.ts';
 
 /**
- * 信息中心：汇总会一直存在、要用户去处理的问题，按种类去重。瞬时的操作结果不归这里，照旧走 Toast。
+ * 信息中心服务接口：汇总持久存在的系统级异常、环境配置缺失及更新状态提醒（按类型去重）
+ * 瞬时操作反馈走 Toast，不纳入信息中心
  *
- * 阻断级是宿主缺能力，主题有的功能用不了：插件版本低于 `REQUIRED_HOST_VERSION`、读不到版本、连不上宿主
- * （宿主在，版本核对却没有应答）、有调用答宿主不认这个方法。等不到宿主不报：普通浏览器里打开时本就没有
- * 宿主。提醒级是用户那边少配了东西：没装 foo_playcount、媒体库没配置。
+ * 消息分为以下级别：
+ * - 阻断级：宿主能力严重缺失导致主题不可用（版本过低、无法读取版本、调用遇到未实现方法等）
+ * - 提醒级：环境配置未就绪（如未安装播放统计组件、媒体库目录未配置、窗口透明效果受限等）
+ * - 存储与保存异常：偏好异步落盘失败报警
  *
- * 消息按此刻的状况现算，问题解决了消息随之消失。阻断级的横幅可以本次运行关掉，信息中心里照留；
- * 能力提醒可以「不再提示」，记进宿主 config，按种类与插件版本记，插件换了版本再提示。
- * 保存失败不能永久忽略，重试成功后自动消失；存储不可用时说明修改只在当前窗口生效。
+ * 消息根据当前状态动态计算，问题修复后自动清除；支持「不再提示」规则持久化
  */
 export interface InfoCenterFace extends ConfigPrefFace {
   config: Pick<typeof fb.config, 'get' | 'set' | 'getVersionInfo'>;
@@ -53,11 +53,11 @@ export const REMINDER_KINDS = [
   'windowEffectsLimited',
 ] as const;
 export type BlockingKind = (typeof BLOCKING_KINDS)[number];
-/** 也是 config 里「不再提示」的键，改名要写迁移。 */
+/** 提醒类型枚举，亦对应宿主 config 中「不再提示」的偏好键名（变更须处理数据迁移） */
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
 /**
- * 更新器交给信息中心的提示，只有要用户去处理的几种；正在检查、已是最新这类状态只在设置里显示。
- * updatePlugin 的 `required` 是插件要求的最低版本号，不带 `>=`。
+ * 更新服务同步至信息中心的通知类型，仅包含需用户介入的待处理状态
+ * `updatePlugin` 的 `required` 属性为插件最低版本要求数值（不含 `>=` 前缀）
  */
 export type UpdateNotice =
   | { readonly kind: 'updateReady'; readonly version: string }
@@ -110,7 +110,7 @@ export const preferenceSaveSummaryAtom = atom((get) => ({
 }));
 
 /**
- * 提醒级各种类此刻成不成立。条件出自媒体库与播放统计，由装配层传进来，信息中心只管去重、排序与「不再提示」。
+ * 提醒级各种类此刻成不成立。条件出自媒体库与播放统计，由装配层传进来，信息中心只管去重、排序与「不再提示」
  */
 export type ReminderSources = Readonly<
   Record<Exclude<ReminderKind, 'windowEffectsLimited'>, Atom<boolean>>
@@ -127,7 +127,7 @@ export interface InfoMessage {
   readonly level: 'blocking' | 'reminder';
   /**
    * 给界面拼文案的参数。hostTooOld 带 `version`（此刻的插件版本）与 `required`；hostMethodMissing 认出了
-   * 方法名时带 `methods`（逗号分隔），一个都没认出时不带。preferencesUnsaved 带未保存项数 count。
+   * 方法名时带 `methods`（逗号分隔），一个都没认出时不带。preferencesUnsaved 带未保存项数 count
    */
   readonly params: TranslateParams;
 }
@@ -138,11 +138,11 @@ type HostCheck =
 
 interface MissingMethods {
   readonly seen: boolean;
-  /** 认出的方法名，按先后，不重复。 */
+  /** 认出的方法名，按先后，不重复 */
   readonly methods: readonly string[];
 }
 
-/** 写成 type 而不是 interface：要直接存进 config。值是点「不再提示」时的插件版本。 */
+/** 写成 type 而不是 interface：要直接存进 config。值是点「不再提示」时的插件版本 */
 type DismissedReminders = { readonly [K in ReminderKind]?: string };
 
 function parseDismissed(raw: unknown): DismissedReminders | undefined {
@@ -165,14 +165,14 @@ const CHECKING: HostCheck = { state: 'checking' };
 const NO_MISSING: MissingMethods = { seen: false, methods: [] };
 const checkAtom = atom<HostCheck>(CHECKING);
 const missingAtom = atom<MissingMethods>(NO_MISSING);
-/** 本次运行关掉了横幅的种类，不落盘。 */
+/** 本次运行关掉了横幅的种类，不落盘 */
 const closedAtom = atom<ReadonlySet<InfoKind>>(new Set<InfoKind>());
 
 const versionOf = (check: HostCheck) => (check.state === 'read' ? check.info.plugin.version : '');
 
 /**
  * 宿主回的 reject 都带 `code`（插件 `src/api/BridgeCore.cpp` 的 `BridgeCore::SendError`）；注入脚本等了
- * 30 s 没有应答、自己放弃的那种不带。
+ * 30 s 没有应答、自己放弃的那种不带
  */
 function hasErrorCode(reason: unknown): boolean {
   return (
@@ -182,14 +182,14 @@ function hasErrorCode(reason: unknown): boolean {
 
 /**
  * 这一种提醒点过「不再提示」没有：按此刻的插件版本比；版本还没读到时，点过就算，比不出版本的时候
- * 宁可不提示，也不让关掉过的提醒在启动时闪一下。
+ * 宁可不提示，也不让关掉过的提醒在启动时闪一下
  */
 function dismissedNow(dismissed: DismissedReminders, kind: ReminderKind, check: HostCheck) {
   const at = dismissed[kind];
   return at !== undefined && (check.state !== 'read' || at === check.info.plugin.version);
 }
 
-/** 此刻的全部消息：阻断级在前，各级内按种类的固定顺序。 */
+/** 此刻的全部消息：阻断级在前，各级内按种类的固定顺序 */
 export const infoMessagesAtom: Atom<readonly InfoMessage[]> = atom((get) => {
   const check = get(checkAtom);
   const missing = get(missingAtom);
@@ -252,7 +252,7 @@ export const hasBlockingAtom: Atom<boolean> = atom((get) =>
   get(infoMessagesAtom).some((message) => message.level === 'blocking'),
 );
 
-/** 横幅上该出的阻断级消息；空的时候不出横幅。 */
+/** 横幅上该出的阻断级消息；空的时候不出横幅 */
 export const infoBannerAtom: Atom<readonly InfoMessage[]> = atom((get) => {
   const closed = get(closedAtom);
   return get(infoMessagesAtom).filter(
@@ -262,7 +262,7 @@ export const infoBannerAtom: Atom<readonly InfoMessage[]> = atom((get) => {
 
 /**
  * 点过「不再提示」、此刻还算数的提醒有几种；问题眼下在不在都算。插件换了版本的那些已经不算，本来就会
- * 再提示。
+ * 再提示
  */
 export const dismissedCountAtom: Atom<number> = atom((get) => {
   const dismissed = get(DISMISSED.atom);
@@ -270,7 +270,7 @@ export const dismissedCountAtom: Atom<number> = atom((get) => {
   return REMINDER_KINDS.filter((kind) => dismissedNow(dismissed, kind, check)).length;
 });
 
-/** 诊断信息，界面上的页脚与「复制诊断信息」（`diagnosticText`）用它；读到版本之前为 null。 */
+/** 诊断信息，界面上的页脚与「复制诊断信息」（`diagnosticText`）用它；读到版本之前为 null */
 export const diagnosticsAtom: Atom<Diagnostics | null> = atom((get) => {
   const check = get(checkAtom);
   if (check.state !== 'read') return null;
@@ -283,28 +283,28 @@ export const diagnosticsAtom: Atom<Diagnostics | null> = atom((get) => {
 
 export interface InfoCenterService {
   readonly persistence: ConfigPersistence;
-  /** 版本核对与「不再提示」的存档读回都做完时兑现，不会拒绝。 */
+  /** 版本核对与「不再提示」的存档读回都做完时兑现，不会拒绝 */
   readonly ready: Promise<void>;
-  /** 横幅上此刻的几条本次运行不再出横幅，信息中心里照留。之后新出的阻断级照常出横幅。 */
+  /** 横幅上此刻的几条本次运行不再出横幅，信息中心里照留。之后新出的阻断级照常出横幅 */
   closeBanner(): void;
   /**
    * 提醒级「不再提示」：按种类与此刻的插件版本记进 config。版本没读到时记成空串，下次读到了版本
-   * 会再提示一次。
+   * 会再提示一次
    */
   dismissReminder(kind: ReminderKind): void;
-  /** 忘掉所有「不再提示」，并清掉 config 里的记录；问题还在的提醒随即重新出现。一条都没记时不写。 */
+  /** 忘掉所有「不再提示」，并清掉 config 里的记录；问题还在的提醒随即重新出现。一条都没记时不写 */
   restoreReminders(): void;
-  /** 连不上宿主或读不到版本时再核对一次，成了对应的消息随之消失；其余时候不发。 */
+  /** 连不上宿主或读不到版本时再核对一次，成了对应的消息随之消失；其余时候不发 */
   retry(): void;
-  /** 只重试调用时失败的偏好，交回原服务使用当前值，已保存的项不重写。 */
+  /** 只重试调用时失败的偏好，交回原服务使用当前值，已保存的项不重写 */
   retryPreferences(): Promise<void>;
   retryStartup(): void;
   retryBackend(): void;
-  /** 新版本已下载时重启 foobar2000，让引导页换上新版本。 */
+  /** 新版本已下载时重启 foobar2000，让引导页换上新版本 */
   restartForUpdate(): void;
-  /** 更新多次失败后手动再试一次。 */
+  /** 更新多次失败后手动再试一次 */
   retryUpdate(): void;
-  /** 查到新版但没有自动下载时，由用户下载并安装。 */
+  /** 查到新版但没有自动下载时，由用户下载并安装 */
   installUpdate(): void;
   showChangelog(): void;
   dispose(): void;
@@ -331,7 +331,7 @@ export function startInfoCenter(
   store.set(retryingPreferencesAtom, false);
   let disposed = false;
   let checks = 0;
-  // 同步登记：宿主的应答最早也要等 startServices 返回之后才到，装配时排在哪一行都不会漏报。
+  // 同步登记：宿主的应答最早也要等 startServices 返回之后才到，装配时排在哪一行都不会漏报
   const offMissing = onMissingMethod((method) => {
     if (disposed) return;
     const { seen, methods } = store.get(missingAtom);
@@ -346,7 +346,7 @@ export function startInfoCenter(
 
   // 宿主答了却读不出版本（失败信封，或带错误码的 reject：宿主内部异常、不认这个方法）算读不到版本；
   // 不带错误码的 reject 是宿主那边一直没有应答、调用超时放弃了，才算连不上宿主。reject 照旧经 settle
-  // 走一遍，宿主不认的方法照常上报。
+  // 走一遍，宿主不认的方法照常上报
   async function check(): Promise<void> {
     const mine = ++checks;
     let answeredWithError = false;

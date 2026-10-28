@@ -1,0 +1,69 @@
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+
+/* 缩略图自带底，不继承阅读面的浓度；悬停与按下的状态层只画在这一层 */
+.thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--bg-elevated);
+  cursor: pointer;
+}
+
+.thumb::after {
+  position: absolute;
+  inset: 0;
+  background-color: transparent;
+  content: '';
+  pointer-events: none;
+}
+
+.tile:not([data-disabled], [data-selected]):hover .thumb {
+  border-color: var(--colorNeutralStroke1Hover);
+}
+
+.tile:not([data-disabled]):hover .thumb::after {
+  background-color: var(--state-hover);
+}
+
+.tile:not([data-disabled]):active .thumb::after {
+  background-color: var(--state-pressed);
+}
+
+/* 选中是持续状态：强调色边框加同色外环；悬停与按下时仍在 */
+.tile[data-selected] .thumb {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--strokeWidthThin) var(--accent);
+}
+
+.tile:has(:focus-visible) .thumb {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}
+
+/* 禁用不整体降透明度：缩略图盖一层遮罩，标签与单选的禁用色由 Fluent 给 */
+.tile[data-disabled] .thumb {
+  cursor: not-allowed;
+}
+
+.tile[data-disabled] .thumb::after {
+  background-color: color-mix(in srgb, var(--colorNeutralBackground1) 55%, transparent);
+}
+
+@media (forced-colors: active) {
+  .thumb {
+    border-color: CanvasText;
+  }
+
+  .tile[data-selected] .thumb {
+    border-color: Highlight;
+    box-shadow: 0 0 0 var(--strokeWidthThin) Highlight;
+  }
+}

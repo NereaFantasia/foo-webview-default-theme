@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLACES } from '../../../../src/nav/places.ts';
+import { defaultTransition, PLACES } from '../../../../src/nav/places.ts';
 import {
   itemKey,
   LIBRARY_ITEMS,
@@ -10,7 +10,7 @@ import {
 } from '../../../../src/nav/sidebar/sidebarNav.ts';
 
 describe('sidebar nav', () => {
-  it('每一项去一个一级地点，顶部只有首页；资料库六项', () => {
+  it('每一项去一个一级地点，顶部只有首页；资料库七项，视频在文件夹后面', () => {
     expect(TOP_ITEMS.map((item) => item.place)).toEqual(['home']);
     expect(LIBRARY_ITEMS.map((item) => item.place)).toEqual([
       'recent',
@@ -19,11 +19,12 @@ describe('sidebar nav', () => {
       'songs',
       'genres',
       'folders',
+      'video',
     ]);
     for (const item of SIDEBAR_ITEMS) expect(PLACES[item.place].level).toBe(1);
   });
 
-  it('首页、艺人、专辑、歌曲、流派、文件夹与设置上线，其余置灰', () => {
+  it('首页、艺人、专辑、歌曲、流派、文件夹、视频与设置上线，其余置灰', () => {
     expect(SIDEBAR_ITEMS.filter((item) => item.ready).map((item) => item.id)).toEqual([
       'home',
       'artists',
@@ -31,6 +32,7 @@ describe('sidebar nav', () => {
       'songs',
       'genres',
       'folders',
+      'video',
       'settings',
     ]);
     expect(SIDEBAR_ITEMS.find((item) => item.id === 'playlists')?.ready).toBe(false);
@@ -51,6 +53,12 @@ describe('sidebar nav', () => {
       id: 'artists',
     });
     expect(sidebarSelectionOf({ id: 'playlists' })).toEqual({ kind: 'item', id: 'playlists' });
+    expect(sidebarSelectionOf({ id: 'video' })).toEqual({ kind: 'item', id: 'video' });
+  });
+
+  it('视频从侧边栏进是页面刷新，从播放栏进由调用方指明深入', () => {
+    expect(defaultTransition('video')).toBe('refresh');
+    expect(defaultTransition('album')).toBe('drill');
   });
 
   it('播放列表页带着主体交给列表那一节认；搜索结果页与正在播放一项都不亮', () => {

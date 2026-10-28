@@ -4,7 +4,8 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { durationText } from '../../table/cellText.ts';
 import type { TablePoint } from '../../table/tableItems.ts';
-import { SongArt } from '../songs/SongArt.tsx';
+import { TrackArtists } from '../../track/TrackCredits.tsx';
+import { SongArt } from '../SongArt.tsx';
 import { useHomeServices } from './homeContext.ts';
 import type { HomeGemMode, HomeTrack } from './homeModel.ts';
 import styles from './HomeTrackRow.module.css';
@@ -48,7 +49,7 @@ export function HomeTrackRow({
         >
           {track.title || track.path}
         </button>
-        <span className={styles.detail}>{track.artist}</span>
+        <TrackArtists track={track} className={styles.detail} />
       </div>
       <span className={styles.date}>{lastPlayed.slice(0, 10)}</span>
       <span className={styles.duration}>{durationText(track.duration)}</span>

@@ -89,7 +89,7 @@ test('后退恢复多目录主体、当前范围筛选与组折叠', async ({ pa
     limit: 1000,
     hasMore: false,
   });
-  const query = env.view.getByRole('combobox', { name: '筛选此目录中的曲目' });
+  const query = env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' });
   await query.fill('Amber');
   await query.press('Enter');
   await expect(env.view.getByText('匹配 1 / 3 首', { exact: true })).toBeVisible();
@@ -109,7 +109,8 @@ test('后退恢复多目录主体、当前范围筛选与组折叠', async ({ pa
 });
 
 test('纯目录封面墙离开再后退恢复滚动位置', async ({ page }) => {
-  const names = Array.from({ length: 40 }, (_, index) => `Album ${index + 1}`);
+  // 名字排在 Alpha、Beta、Huge 之后，展开根目录时 Alpha 才不被它们挤出树的可视范围
+  const names = Array.from({ length: 40 }, (_, index) => `Zeta ${index + 1}`);
   const env = await openFolders(page, (host) => {
     host.answer('library.browseTree', (params) => {
       const pathId = String(params.pathId ?? '');
@@ -126,8 +127,10 @@ test('纯目录封面墙离开再后退恢复滚动位置', async ({ page }) => 
     });
   });
   await env.folder('Music').click();
-  await env.view.getByRole('button', { name: '封面', exact: true }).click();
-  const card = env.view.getByRole('button', { name: '进入目录 Album 1', exact: true });
+  await env.view.locator('[data-folders-view-panel]').click();
+  await page.getByRole('tab', { name: '封面', exact: true }).click();
+  await page.keyboard.press('Escape');
+  const card = env.view.getByRole('button', { name: '进入目录 Zeta 1', exact: true });
   await expect(card).toBeVisible();
   await expect(env.grid).toHaveCount(0);
   const scroller = card.locator('../../..');

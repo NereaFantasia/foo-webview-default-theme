@@ -120,8 +120,19 @@ describe('简介本地署名资料', () => {
     await env.service.ready;
     await tick();
     env.host.answer('library.getArtistTracks', hostFailure('OPERATION_FAILED'));
-    env.host.emit('library:itemsModified', { count: 1, timestamp: Date.now() });
-    env.host.emit('library:itemsAdded', { count: 1, timestamp: Date.now() });
+    env.host.emit('library:itemsModified', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      fromHook: false,
+      timestamp: Date.now(),
+    });
+    env.host.emit('library:itemsAdded', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      timestamp: Date.now(),
+    });
     await vi.advanceTimersByTimeAsync(999);
     expect(env.state().failed).toBe(false);
     await vi.advanceTimersByTimeAsync(2);
@@ -145,7 +156,12 @@ describe('简介本地署名资料', () => {
     await env.service.ready;
     await tick();
     env.store.set(env.active, false);
-    env.host.emit('library:itemsRemoved', { count: 1, timestamp: Date.now() });
+    env.host.emit('library:itemsRemoved', {
+      count: 1,
+      handles: [],
+      truncated: false,
+      timestamp: Date.now(),
+    });
     await vi.advanceTimersByTimeAsync(1001);
     expect(env.host.callsTo('library.getArtistTracks')).toHaveLength(1);
     env.store.set(env.active, true);

@@ -1,0 +1,105 @@
+/* 尺寸都按缩略图宽的百分比，宽卡与窄卡一个比例；底色由组件按深色主题给，底板与字用静态色，都不随深浅 */
+.root {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* 歌词窗：横跨缩略图的一条，字压在正中，工具条贴着上沿 */
+.window {
+  position: absolute;
+  inset: 29% 6cqw auto;
+  display: grid;
+  height: 44%;
+  align-content: center;
+  justify-items: center;
+  row-gap: 1.2cqw;
+  padding-top: 5.4cqw;
+  border: var(--strokeWidthThin) solid transparent;
+  border-radius: 3.2cqw;
+}
+
+/* 底板：浅色半透明的磨砂块，在深色底上看得清；透明背景没有它，字直接压在底上 */
+.root[data-background='plate'] .window {
+  border-color: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 20%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--colorNeutralForegroundStaticInverted) 20%,
+    transparent
+  );
+}
+
+.tools {
+  position: absolute;
+  top: 2.2cqw;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  column-gap: 2.4cqw;
+  transform: translateX(-50%);
+}
+
+.key,
+.icon {
+  display: block;
+  width: 2.6cqw;
+  height: 2.6cqw;
+  border-radius: 0.6cqw;
+  background-color: color-mix(
+    in srgb,
+    var(--colorNeutralForegroundStaticInverted) 70%,
+    transparent
+  );
+}
+
+.icon {
+  width: 3cqw;
+}
+
+.time {
+  display: block;
+  width: 6cqw;
+  height: 1.4cqw;
+  border-radius: var(--borderRadiusCircular);
+  background-color: color-mix(
+    in srgb,
+    var(--colorNeutralForegroundStaticInverted) 50%,
+    transparent
+  );
+}
+
+.main {
+  font-size: 5.7cqw;
+  font-weight: var(--fontWeightSemibold);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.sung {
+  color: var(--colorNeutralForegroundStaticInverted);
+}
+
+.unsung {
+  color: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 64%, transparent);
+}
+
+.sub {
+  font-size: 4cqw;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 72%, transparent);
+}
+
+/* 自定义的取色点 */
+.dot {
+  position: absolute;
+  right: 3.5cqw;
+  bottom: 3.5cqw;
+  width: 4.6cqw;
+  aspect-ratio: 1;
+  border: var(--strokeWidthThick) solid var(--colorNeutralForegroundStaticInverted);
+  border-radius: var(--borderRadiusCircular);
+  background-color: var(--colorPalettePinkBorderActive);
+}

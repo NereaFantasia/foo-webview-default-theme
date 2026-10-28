@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
-import { enterSettings, openSettings, openSettingsWithoutHost } from '../fixtures/settingsPage.ts';
+import {
+  enterSettings,
+  expectOption,
+  openSettings,
+  openSettingsWithoutHost,
+  backgroundSources,
+  openBackground,
+} from '../fixtures/settingsPage.ts';
 import { clickSideButton } from '../fixtures/sidebarPage.ts';
 
 // 「常规」一组：界面语言、启动时打开、托盘的两只开关、去 foobar2000 设置的两个入口，以及没有宿主时的禁用。
@@ -116,7 +123,8 @@ test('外部语言文件读不到：选中回到原来那一项，说明行写�
   // 再选一门读得到的，错误文案收走。
   await settings.choose('界面语言', '中文（中国）');
   await expect(settings.card('界面语言').getByRole('status')).toHaveText('');
-  await expect(settings.card('界面语言')).toContainText('当前：中文（中国）');
+  // 选定了一门语言，说明行不再复述下拉框里的值。
+  await expect(settings.card('界面语言')).not.toContainText('当前：');
   await expect(settings.select('界面语言')).toHaveText('中文（中国）');
   expect(settings.errors).toEqual([]);
 });
@@ -145,7 +153,7 @@ test('正在用的外部语言文件被移走：再进设置页，下拉框仍�
   await enterSettings(page);
   await expect.poll(() => settings.host.callsTo('file.list').length).toBeGreaterThan(2);
   await expect(settings.select('界面语言')).toHaveText('日本語');
-  await expect(settings.card('界面语言')).toContainText('当前：日本語');
+  await expect(settings.card('界面语言')).not.toContainText('当前：');
   expect(settings.errors).toEqual([]);
 });
 
@@ -206,7 +214,7 @@ test('托盘开关已生效但没存下时写出未保存，再拨存住后收�
 
 test('启动时打开：选了歌曲，重新打开窗口落在歌曲页，侧边栏亮「歌曲」', async ({ page }) => {
   const settings = await openSettings(page);
-  await expect(settings.select('启动时打开')).toHaveText('专辑');
+  await expectOption(page, '启动时打开', '专辑');
   await settings.choose('启动时打开', '歌曲');
   await expect(page.locator('[data-page="settings"]')).toBeVisible();
   await page.reload();
@@ -242,7 +250,8 @@ test('没有宿主：靠宿主生效的几项禁用并写明原因，语言与�
   await expect(page.getByRole('switch', { name: '关闭到托盘' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '打开 媒体库文件夹' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '打开 foobar2000 首选项' })).toBeDisabled();
-  await expect(settings.select('窗口背景')).toBeEnabled();
+  await openBackground(page);
+  await expect(backgroundSources(page).getByRole('radio', { name: '主题色背景' })).toBeEnabled();
   for (const title of ['最小化到托盘', '关闭到托盘']) {
     await expect(settings.row(title)).toContainText(NEEDS_HOST);
   }
@@ -250,13 +259,16 @@ test('没有宿主：靠宿主生效的几项禁用并写明原因，语言与�
     await expect(settings.card(title)).toContainText(NEEDS_HOST);
   }
   await expect(settings.card('窗口背景')).toContainText(NEEDS_HOST);
-  await settings.select('窗口背景').click();
-  await expect(page.getByRole('option', { name: 'Mica', exact: true })).toBeDisabled();
-  await expect(page.getByRole('option', { name: '流动色场', exact: true })).toBeEnabled();
-  await page.keyboard.press('Escape');
+  await expect(backgroundSources(page).getByRole('radio', { name: '系统材质' })).toBeDisabled();
+  await expect(backgroundSources(page).getByRole('radio', { name: '流动色场' })).toBeEnabled();
+  await expect(
+    page
+      .getByRole('tablist', { name: '材质', exact: true })
+      .getByRole('tab', { name: 'Mica', exact: true }),
+  ).toBeDisabled();
 
   await expect(settings.select('界面语言')).toBeEnabled();
-  await expect(settings.select('颜色模式')).toBeEnabled();
+  await expect(settings.radios('颜色模式').getByRole('radio').first()).toBeEnabled();
   await expect(settings.card('版本')).toContainText(NEEDS_HOST);
   await expect(page.getByRole('button', { name: '复制 版本' })).toBeDisabled();
   await expect(page.locator('[data-settings-credit]').first()).toBeDisabled();

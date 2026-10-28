@@ -7,7 +7,7 @@ export interface CoveredCommand {
   readonly label: string;
 }
 
-/** 保留宿主树的层级与身份；没有稳定语义声明时不按名称删除命令。 */
+/** 保留宿主树的层级与身份；没有稳定语义声明时不按名称删除命令 */
 export function contextMenuEntries(
   items: readonly MenuItem[],
   run: (command: MenuCommand) => void,

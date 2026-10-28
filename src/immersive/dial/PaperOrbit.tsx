@@ -19,24 +19,24 @@ import {
 } from './orbit.ts';
 import styles from './PaperOrbit.module.css';
 
-/** 两帧之间的墙钟一次最多记这么多毫秒：页面隐藏时 rAF 停着，回来接着转，不跳一大截。 */
+/** 两帧之间的墙钟一次最多记这么多毫秒：页面隐藏时 rAF 停着，回来接着转，不跳一大截 */
 const MAX_STEP_MS = 100;
-/** 轨道点转一整圈对应的播放秒数：seek 时按这个周期取短的那头转。 */
+/** 轨道点转一整圈对应的播放秒数：seek 时按这个周期取短的那头转 */
 const DOT_PERIOD_SECONDS = 360 / DOT_DEGREES_PER_SECOND;
 
 export interface PaperOrbitProps {
-  /** 罗盘圆心，在所在定位锚的坐标系里（CSS 像素）。 */
+  /** 罗盘圆心，在所在定位锚的坐标系里（CSS 像素） */
   readonly center: { readonly x: number; readonly y: number };
-  /** 半径的缩放，紧凑档是 0.8；canvas 跟着缩。 */
+  /** 半径的缩放，紧凑档是 0.8；canvas 跟着缩 */
   readonly scale: number;
-  /** 环、辐条与轨道点的尺寸；缺省版心那套 `SHEET_ORBIT`。 */
+  /** 环、辐条与轨道点的尺寸；缺省版心那套 `SHEET_ORBIT` */
   readonly spec?: OrbitSpec;
 }
 
-/** 环与辐条转过的墙钟时间；重开 canvas、换色、切换减弱动效时都留着，接着转。 */
+/** 环与辐条转过的墙钟时间；重开 canvas、换色、切换减弱动效时都留着，接着转 */
 interface WallClock {
   seconds: number;
-  /** 上一次画的时刻（rAF 时间戳）；还没画过为 `null`。 */
+  /** 上一次画的时刻（rAF 时间戳）；还没画过为 `null` */
   lastNow: number | null;
 }
 
@@ -53,15 +53,15 @@ function styleOf(canvas: HTMLCanvasElement): OrbitStyle {
 /**
  * 罗盘的转动层：只盖罗盘区的一块 canvas，画两圈虚线环、辐条与四个轨道点（`orbit.ts`）。三圈实线环、
  * 刻度字与封面留在罗盘的 DOM 里，封面压在这一层之上。canvas 以罗盘圆心 `center` 定位，半边长是
- * `spec.extent × scale`。
+ * `spec.extent × scale`
  *
- * 环与辐条按墙钟转，播放暂停时也照转。转过的时间只在真在画的帧之间累加，一次最多记 `MAX_STEP_MS`。
+ * 环与辐条按墙钟转，播放暂停时也照转。转过的时间只在真在画的帧之间累加，一次最多记 `MAX_STEP_MS`
  * 轨道点跟播放位置：暂停就停，播放中按墙钟从宿主最近一拍往后推，seek 时沿短的那头转过去（`positionGlide.ts`，
  * 过渡是 `GLIDE_MOTION`），与整轨波形的播放头同一段过渡。播放位置、状态与曲目在 `store.sub` 里现读、喂给
- * 外推时钟，不让这一层随每 100 ms 一次的进度更新重渲染；重画经帧调度，封顶 `ORBIT_FPS`。
+ * 外推时钟，不让这一层随每 100 ms 一次的进度更新重渲染；重画经帧调度，封顶 `ORBIT_FPS`
  *
  * 减弱动效下只画一帧：环停在当时的角度（一进来就是减弱动效时即初始角度），轨道点停在当时的位置，
- * 之后换色、换尺寸才重画。canvas 读不到 CSS 变量：挂上、封面 ramp 变、深浅档变时按变量名重读。
+ * 之后换色、换尺寸才重画。canvas 读不到 CSS 变量：挂上、封面 ramp 变、深浅档变时按变量名重读
  */
 export function PaperOrbit({ center, scale, spec = SHEET_ORBIT }: PaperOrbitProps) {
   const store = useStore();
@@ -74,7 +74,7 @@ export function PaperOrbit({ center, scale, spec = SHEET_ORBIT }: PaperOrbitProp
   const wallRef = useRef<WallClock>({ seconds: 0, lastNow: null });
   const extent = spec.extent * scale;
 
-  // 位置、播放状态或曲目变了才喂：同一拍晚些再喂一次，锚点就被拨回那一拍、轨道点往回跳。
+  // 位置、播放状态或曲目变了才喂：同一拍晚些再喂一次，锚点就被拨回那一拍、轨道点往回跳
   useEffect(() => {
     let last: { seconds: number; state: string; track: string } | null = null;
     const sample = (): void => {
@@ -90,7 +90,7 @@ export function PaperOrbit({ center, scale, spec = SHEET_ORBIT }: PaperOrbitProp
     return off;
   }, [store, dots]);
 
-  // 换档、舞台缩放变了都要重开 canvas；重设尺寸会清掉位图，要补画一帧。ramp 与深浅档只作重跑的依赖。
+  // 换档、舞台缩放变了都要重开 canvas；重设尺寸会清掉位图，要补画一帧。ramp 与深浅档只作重跑的依赖
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');

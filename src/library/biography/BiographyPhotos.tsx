@@ -8,6 +8,7 @@ import { BiographyPhotoImage } from './BiographyPhotoImage.tsx';
 import { BiographyPhotoViewer } from './BiographyPhotoViewer.tsx';
 import { BiographyPhotoSource } from './online/BiographyPhotoSource.tsx';
 import styles from './BiographyPhotos.module.css';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 interface PhotoListProps {
   readonly state: BiographyPhotosState;
@@ -18,6 +19,7 @@ interface PhotoListProps {
 }
 
 function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps) {
+  const viewControls = useViewControlStyles();
   const [selected, setSelected] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const { artist, photos } = state;
@@ -87,9 +89,13 @@ function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps)
             )}
           </span>
         )}
+        {state.onlineProblemDetail && (
+          <span className={styles.statusDetail}>{state.onlineProblemDetail}</span>
+        )}
         {(state.failed || state.onlineProblem) && (
           <Tooltip content={t('biography.retry')} relationship="label">
             <Button
+              className={viewControls.icon}
               appearance="subtle"
               icon={<ArrowClockwise20Regular />}
               disabled={state.loading || state.onlineLoading}

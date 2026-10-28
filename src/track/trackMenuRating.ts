@@ -22,7 +22,7 @@ export async function rateMenuTracks(
   value: number,
 ): Promise<boolean> {
   const unique = new Map(tracks.map((track) => [track.handle, track]));
-  // 首次失败就停下，避免后续成功写入清掉失败提示；已成功的曲目由评分账本保留。
+  // 首次失败就停下，避免后续成功写入清掉失败提示；已成功的曲目由评分账本保留
   for (const track of unique.values()) {
     if (!(await ratings.setRating(track, value))) return false;
   }

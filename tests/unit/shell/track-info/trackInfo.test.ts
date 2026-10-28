@@ -271,16 +271,20 @@ describe('曲目信息读取', () => {
     const held = host.hold('metadata.read');
     host.emit('metadb:changed', {
       tracks: [{ handle: 'E:/album.cue|subsong:1', path: 'E:/album.cue', subsong: 1 }],
+      handles: ['E:/album.cue|subsong:1'],
       count: 1,
       fromHook: false,
+      truncated: false,
       timestamp: Date.now(),
     });
     await new Promise((resolve) => setTimeout(resolve, 90));
     expect(held.pending).toEqual([]);
     host.emit('metadb:changed', {
       tracks: [{ handle: cue.handle, path: cue.absolutePath, subsong: 2 }],
+      handles: [cue.handle],
       count: 1,
       fromHook: true,
+      truncated: false,
       timestamp: Date.now(),
     });
     await new Promise((resolve) => setTimeout(resolve, 90));

@@ -3,6 +3,8 @@ import { createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
 import {
   browserPrefsAtom,
+  albumsFilterDockedAtom,
+  ALBUMS_FILTER_KEY,
   startBrowserPrefs,
   TILE_SIZE_DEFAULT,
   TILE_SIZE_MAX,
@@ -10,6 +12,7 @@ import {
 } from '../../../../src/library/albums/browserPrefs.ts';
 import { hostFailure, type ConfigValue } from '../../../fixtures/hostAnswers.ts';
 import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
+import type { PrefStorage } from '../../../../src/kit/localPref.ts';
 
 const KEY = {
   dimension: 'defaultTheme.browser.dimension',
@@ -30,6 +33,42 @@ function saved(entries: Record<string, ConfigValue>) {
 }
 
 describe('形态记忆', () => {
+  it('筛选形态只写自己的浏览器键，重建服务读回，坏值回弹出', async () => {
+    const host = installFakeHost();
+    const saved = new Map<string, string>();
+    const storage: PrefStorage = {
+      getItem: (key) => saved.get(key) ?? null,
+      setItem: (key, value) => {
+        saved.set(key, value);
+      },
+    };
+    const store = createStore();
+    const first = startBrowserPrefs(store, host.fb, createMemoryConfigWriter(host.fb), storage);
+    await first.ready;
+    expect(store.get(albumsFilterDockedAtom)).toBe(false);
+    first.setFilterDocked(true);
+    expect([...saved]).toEqual([[ALBUMS_FILTER_KEY, 'docked']]);
+    first.dispose();
+    first.setFilterDocked(false);
+    expect(saved.get(ALBUMS_FILTER_KEY)).toBe('docked');
+    const secondStore = createStore();
+    const second = startBrowserPrefs(
+      secondStore,
+      host.fb,
+      createMemoryConfigWriter(host.fb),
+      storage,
+    );
+    await second.ready;
+    expect(secondStore.get(albumsFilterDockedAtom)).toBe(true);
+    expect(host.callsTo('config.set')).toEqual([]);
+    second.dispose();
+    saved.set(ALBUMS_FILTER_KEY, 'invalid');
+    const third = startBrowserPrefs(store, host.fb, createMemoryConfigWriter(host.fb), storage);
+    await third.ready;
+    expect(store.get(albumsFilterDockedAtom)).toBe(false);
+    third.dispose();
+  });
+
   it('上次选的形态读回来；换形态记进 config，下次启动照样读回', async () => {
     const host = saved({ [KEY.form]: 'list' });
     const first = setup(host);

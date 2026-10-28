@@ -32,14 +32,14 @@ const INITIAL: MiniWindowState = {
   failure: null,
 };
 export const miniWindowAtom = atom<MiniWindowState>(INITIAL);
-/** 界面整体缩放的倍数：版式按下面的尺寸排，窗口取尺寸乘它，字号、按键与封面一同等比缩小。 */
+/** 迷你播放器 UI 等比缩放比例系数（整体等比缩放排版尺寸、字号与封面） */
 export const MINI_PLAYER_SCALE = 0.875;
-/** 缩放前的尺寸，CSS 像素。 */
+/** 迷你播放器各形态基础设计尺寸（CSS 像素，未乘缩放系数前） */
 export const MINI_PLAYER_SIZE = {
   compact: { width: 380, height: 152 },
   cover: { width: 320, height: 456 },
 } as const;
-/** 紧凑态打开更多菜单时临时增高到这里；封面态的菜单换下封面，尺寸不变。 */
+/** 紧凑形态下展开上下文菜单时的临时窗口自适应高度（CSS 像素） */
 export const MINI_MENU_HEIGHT = 292;
 
 export interface MiniWindowFace extends HostReadyFace {
@@ -72,8 +72,8 @@ export interface MiniWindowService {
   setMenu(open: boolean): Promise<void>;
   togglePin(): Promise<void>;
   /**
-   * 拖动窗口：在主键按下的那一刻调用，宿主接着按标题栏拖动处理，松手后才应答，这时记下新位置。
-   * 迷你态不用 CSS 拖动区，拖动区里的指针归宿主，页面收不到悬停。
+   * 拖动窗口：在主键按下的那一刻调用，宿主接着按标题栏拖动处理，松手后才应答，这时记下新位置
+   * 迷你态不用 CSS 拖动区，拖动区里的指针归宿主，页面收不到悬停
    */
   drag(): void;
   dismissFailure(): void;
@@ -125,7 +125,7 @@ export function startMiniWindow(
 
   /**
    * 换尺寸。`recall` 为真（进入时）把窗口放回上次记下的位置；没记过或平时贴着离屏幕边近的那一角伸缩：
-   * 靠下的往上长，靠右的往左长。
+   * 靠下的往上长，靠右的往左长
    */
   async function resize(form: MiniPlayerForm, menu: boolean, recall = false): Promise<void> {
     const size = MINI_PLAYER_SIZE[form];
@@ -225,7 +225,7 @@ export function startMiniWindow(
       try {
         await resize(previous.form, previous.menu);
       } catch {
-        // 恢复记录仍在，用户可以返回完整窗口。
+        // 恢复记录仍在，用户可以返回完整窗口
       }
       update({ failure: 'resize' });
     } finally {

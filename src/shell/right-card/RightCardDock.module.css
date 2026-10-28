@@ -1,4 +1,4 @@
-/* 内容卡与右侧卡同在一个网格里；列宽只在停靠时写在行内，其余时候只有内容卡一列。 */
+/* 内容卡与右侧卡同在一个网格里；列宽只在停靠时写在行内，其余时候只有内容卡一列 */
 .dock {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -7,7 +7,7 @@
   min-height: 0;
 }
 
-/* 停靠时直接露出窗口背景；次要文字提高对比，行级状态保留局部底色。透明边框维持与内容卡的内缘对齐。 */
+/* 停靠时直接露出窗口背景；次要文字提高对比，行级状态保留局部底色。透明边框维持与内容卡的内缘对齐 */
 .card[data-form='docked'] {
   --colorNeutralForeground3: var(--colorNeutralForeground2);
   --colorNeutralForeground4: var(--colorNeutralForeground2);
@@ -24,7 +24,17 @@
   border: var(--strokeWidthThin) solid transparent;
 }
 
-/* 收起那一程：版式已经只剩内容卡一列，卡按收起前的宽贴着右缘浮在原位，播完卸下。 */
+/*
+ * 歌词页的卡没有自己的底，滚动条要贴着窗口右缘：卡向右伸进内容区的右留白，右边的透明边框也去掉
+ * 页面里滚动区的右内边距加上 --edge-bleed，正文留在原来的位置，其余内容用同一个值把右缘退回去
+ */
+.card[data-form='docked'][data-card-page='lyrics'] {
+  --edge-bleed: calc(var(--content-gutter) + var(--strokeWidthThin));
+  margin-right: calc(-1 * var(--content-gutter));
+  border-right-width: 0;
+}
+
+/* 收起那一程：版式已经只剩内容卡一列，卡按收起前的宽贴着右缘浮在原位，播完卸下 */
 .card[data-form='docked'][data-leaving] {
   position: absolute;
   top: 0;

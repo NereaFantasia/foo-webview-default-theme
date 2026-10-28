@@ -1,0 +1,33 @@
+/* 与候选卡同一套网格与外距：封面一块，右边标题、艺人与专辑、来源三行；骨架撑出的高度就是结果该有的高度，
+   结果到了不跳 */
+.list {
+  display: block;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--spacingHorizontalM);
+  row-gap: var(--spacingVerticalS);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+  margin: var(--spacingVerticalS) var(--spacingHorizontalM);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--radius-card);
+}
+
+.cover {
+  grid-row: 1 / 4;
+}
+
+.title {
+  width: 62%;
+}
+
+.byline {
+  width: 44%;
+}
+
+.meta {
+  width: 30%;
+}

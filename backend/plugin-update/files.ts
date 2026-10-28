@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export const digest = (bytes: Uint8Array | string): string =>
   createHash('sha256').update(bytes).digest('hex');
@@ -51,6 +52,24 @@ export async function hashFile(path: string): Promise<string | null> {
   return bytes === null ? null : digest(bytes);
 }
 
+/** 目标文件被杀毒或索引短暂占用时，Windows 上覆盖式改名会报这几个错误 */
+const BUSY_CODES: readonly unknown[] = ['EPERM', 'EBUSY', 'EACCES'];
+/** 每次失败后的等待，累计不到一秒；仍失败就按原错误抛出，由调用方取消事务 */
+const BUSY_RETRY_MS = [25, 50, 100, 200, 400];
+
+async function renameReplacing(from: string, to: string): Promise<void> {
+  for (const delay of BUSY_RETRY_MS) {
+    try {
+      return await rename(from, to);
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && BUSY_CODES.includes(error.code)))
+        throw error;
+    }
+    await sleep(delay);
+  }
+  await rename(from, to);
+}
+
 /** 临时文件与目标同目录，先刷新内容，再替换目录项。 */
 export async function atomic(path: string, bytes: Uint8Array | string): Promise<void> {
   await canonical(dirname(path));
@@ -62,7 +81,7 @@ export async function atomic(path: string, bytes: Uint8Array | string): Promise<
     await handle.sync();
     await handle.close();
     handle = undefined;
-    await rename(temporary, path);
+    await renameReplacing(temporary, path);
   } finally {
     await handle?.close();
     await unlink(temporary).catch(() => {});

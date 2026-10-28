@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGenres,
-  EMPTY_GENRE,
   filterGenres,
   genresQuery,
 } from '../../../../src/library/genres/genresModel.ts';
+import { EMPTY_GENRE } from '../../../../src/nav/places.ts';
 import { albumRow, trackRow } from '../../../fixtures/libraryRows.ts';
 
 describe('流派归属与排序', () => {

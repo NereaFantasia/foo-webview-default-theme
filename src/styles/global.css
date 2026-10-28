@@ -1,4 +1,4 @@
-/* 全局只放与 token 无关的基础样式；Fluent 变量在 FluentProvider 之下才有定义。 */
+/* 全局只放与 token 无关的基础样式；Fluent 变量在 FluentProvider 之下才有定义 */
 html,
 body,
 #root {
@@ -13,13 +13,13 @@ html {
 }
 
 body {
-  /* Mica 由宿主窗口提供，页面根层保持透明才能透出来。 */
+  /* Mica 由宿主窗口提供，页面根层保持透明才能透出来 */
   background: transparent;
-  /* 界面文字默认不能选：Ctrl+A、拖动都不会把整页选中。要让人复制的文字单独写 user-select: text。 */
+  /* 界面文字默认不能选：Ctrl+A、拖动都不会把整页选中。要让人复制的文字单独写 user-select: text */
   user-select: none;
 }
 
-/* 输入框里的文字照常能选、能 Ctrl+A。 */
+/* 输入框里的文字照常能选、能 Ctrl+A */
 input,
 textarea,
 [contenteditable='true'] {

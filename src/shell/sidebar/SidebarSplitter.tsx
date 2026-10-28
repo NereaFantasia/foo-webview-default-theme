@@ -13,7 +13,7 @@ import { useService } from '../../kit/useService.ts';
 import { SplitterHandle } from '../SplitterHandle.tsx';
 
 export interface SidebarSplitterProps {
-  /** 侧边栏左缘所在的元素，用作拖动坐标原点。 */
+  /** 侧边栏左缘所在的元素，用作拖动坐标原点 */
   readonly origin: RefObject<HTMLElement | null>;
 }
 
@@ -22,9 +22,9 @@ const BOUNDS = { min: SIDEBAR_WIDTH.min, max: SIDEBAR_WIDTH.max } as const;
 /**
  * 主内容卡左缘的分栏握柄。拖动中按吸附规则实时换形态（`sidebarSnap.ts`），每一下都落盘；按 Esc 回到拖动
  * 之前的形态。双击在图标态与上次的展开宽度之间切换。焦点在握柄上时 ← / →、Home、End、Enter 按吸附规则
- * 换算。
+ * 换算
  *
- * 拖动状态挂在握柄自己身上（`data-dragging`），不经祖先的类去点亮它。
+ * 拖动状态挂在握柄自己身上（`data-dragging`），不经祖先的类去点亮它
  */
 export function SidebarSplitter({ origin }: SidebarSplitterProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -33,7 +33,7 @@ export function SidebarSplitter({ origin }: SidebarSplitterProps) {
   const sidebar = useService(sidebarPrefsKey);
   const handle = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  // 拖动中 Esc 调它：回到拖动之前的形态并结束这一次拖动。
+  // 拖动中 Esc 调它：回到拖动之前的形态并结束这一次拖动
   const cancel = useRef<(() => void) | null>(null);
   const finish = useRef<(() => void) | null>(null);
 
@@ -46,7 +46,7 @@ export function SidebarSplitter({ origin }: SidebarSplitterProps) {
     const left = origin.current?.getBoundingClientRect().left ?? 0;
     const prefs = store.get(sidebarPrefsAtom);
     const rest: SidebarShape = { rail: prefs.rail, width: prefs.width };
-    // 保存按下位置到侧栏右缘的距离，包含卡片留白与手柄内的抓取偏移。
+    // 保存按下位置到侧栏右缘的距离，包含卡片留白与手柄内的抓取偏移
     const offset = event.clientX - left - (rest.rail ? RAIL_WIDTH : rest.width);
     let shape = rest;
     event.preventDefault();
@@ -84,7 +84,7 @@ export function SidebarSplitter({ origin }: SidebarSplitterProps) {
     enabled: () => cancel.current !== null,
     run: () => cancel.current?.(),
   });
-  // 按键换算读 store 里此刻的形态：连按时不必等上一下的重渲染。
+  // 按键换算读 store 里此刻的形态：连按时不必等上一下的重渲染
   const resizeKey = (key: string) => ({
     id: `sidebar.resize.${key}`,
     layer: 'widget' as const,

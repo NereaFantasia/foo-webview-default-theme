@@ -5,10 +5,10 @@ export interface SceneSize {
   readonly height: number;
 }
 
-/** 还没量到时按的容器尺寸：窗口的常见大小，落在 full 档。 */
+/** 还没量到时按的容器尺寸：窗口的常见大小，落在 full 档 */
 const INITIAL_SIZE: SceneSize = { width: 1280, height: 800 };
 
-/** 场景根元素的内容盒尺寸（CSS 像素），跟着 ResizeObserver 走；只在宽或高真的变了时换新值。 */
+/** 场景根元素的内容盒尺寸（CSS 像素），跟着 ResizeObserver 走；只在宽或高真的变了时换新值 */
 export function useSceneSize(root: RefObject<HTMLElement | null>): SceneSize {
   const [size, setSize] = useState(INITIAL_SIZE);
   useLayoutEffect(() => {

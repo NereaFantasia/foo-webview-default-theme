@@ -1,6 +1,7 @@
 import { makeStyles, Title2 } from '@fluentui/react-components';
 import {
   Globe20Regular,
+  Headphones20Regular,
   Info20Regular,
   Keyboard20Regular,
   MusicNote220Regular,
@@ -30,6 +31,7 @@ import { AboutSection } from './AboutSection.tsx';
 import { AppearanceSection } from './AppearanceSection.tsx';
 import { GeneralSection } from './GeneralSection.tsx';
 import { PlaybackSection } from './PlaybackSection.tsx';
+import { OnlineMusicSection } from './OnlineMusicSection.tsx';
 import { SettingsGroup } from './SettingsGroup.tsx';
 import { SettingsNav } from './SettingsNav.tsx';
 import styles from './SettingsPage.module.css';
@@ -64,7 +66,7 @@ interface GroupSpec {
   readonly content: ReactElement;
 }
 
-/** 各组在页面上的先后，目录照这个顺序列。加一组设置就在这里加一行。 */
+/** 各组在页面上的先后，目录照这个顺序列。加一组设置就在这里加一行 */
 const GROUPS: readonly GroupSpec[] = [
   {
     id: 'general',
@@ -97,6 +99,12 @@ const GROUPS: readonly GroupSpec[] = [
     content: <LyricsSection />,
   },
   {
+    id: 'music',
+    label: 'place.online',
+    icon: <Headphones20Regular />,
+    content: <OnlineMusicSection />,
+  },
+  {
     id: 'online',
     label: 'biography.groupOnline',
     icon: <Globe20Regular />,
@@ -113,7 +121,7 @@ const GROUPS: readonly GroupSpec[] = [
 
 const ORDER: readonly string[] = GROUPS.map((group) => group.id);
 
-/** 回到这条历史记录时交还的滚动位置；亮哪一组由滚动位置算出，不另记。 */
+/** 回到这条历史记录时交还的滚动位置；亮哪一组由滚动位置算出，不另记 */
 const SCROLL_SLOT = createSnapshotSlot<{ readonly top: number }>();
 
 const useStyles = makeStyles({
@@ -121,8 +129,8 @@ const useStyles = makeStyles({
 });
 
 /**
- * 量一个元素的宽：挂上那一刻先量一次，画出来的第一帧就是对的排法，之后跟着它变。
- * 元素没有内边距，量到的就是能排版的宽。
+ * 量一个元素的宽：挂上那一刻先量一次，画出来的第一帧就是对的排法，之后跟着它变
+ * 元素没有内边距，量到的就是能排版的宽
  */
 function useWidth<E extends HTMLElement>(): [number | null, RefCallback<E>] {
   const [width, setWidth] = useState<number | null>(null);
@@ -140,7 +148,7 @@ function useWidth<E extends HTMLElement>(): [number | null, RefCallback<E>] {
     },
     [observe, publish],
   );
-  // 目录切成分类条会改变卡列宽度，绘制前补量；隐藏页面的零宽不作为布局依据。
+  // 目录切成分类条会改变卡列宽度，绘制前补量；隐藏页面的零宽不作为布局依据
   useLayoutEffect(() => {
     if (measured.current) publish(measured.current.clientWidth);
   });
@@ -148,8 +156,8 @@ function useWidth<E extends HTMLElement>(): [number | null, RefCallback<E>] {
 }
 
 /**
- * 设置页：页标题不动，下面左边是分类目录、右边是一列自己滚动的设置卡；页面窄时目录收成标题下面的一行。
- * 排法只看设置页自己分到的宽度，不看窗口。改动即时生效并保存，页面上没有确定键。
+ * 设置页：页标题不动，下面左边是分类目录、右边是一列自己滚动的设置卡；页面窄时目录收成标题下面的一行
+ * 排法只看设置页自己分到的宽度，不看窗口。改动即时生效并保存，页面上没有确定键
  */
 export function SettingsPage() {
   const t = useAtomValueRawSync(translateAtom);
@@ -161,7 +169,7 @@ export function SettingsPage() {
   const compact = columnWidth !== null && columnWidth < CARD_FIELD_MIN_WIDTH;
   const layout = useMemo(() => ({ compact }), [compact]);
   const nav = useSettingsNav(ORDER, reduced);
-  // 目录与卡列都在这一层里，页面上能接焦点的都在它下面。
+  // 目录与卡列都在这一层里，页面上能接焦点的都在它下面
   const body = useRef<HTMLDivElement>(null);
   useFocusReturn(body);
 

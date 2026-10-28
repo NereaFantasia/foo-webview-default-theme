@@ -1,13 +1,14 @@
+import { EMPTY_TRACK_FILTER, trackQueryOf, type TrackFilter } from '../../../track/trackFilter.ts';
 import type { LibraryTrack } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { normalizeHostPath } from '../../../host/hostPath.ts';
 import { settle } from '../../../host/hostCall.ts';
 import type { Store } from '../../../kit/store.ts';
-import { togglePreset, type PresetId } from '../../../track/queryPresets.ts';
-import { changeQueryText, QUERY_DEBOUNCE_MS, type QueryInput } from '../../../track/queryInput.ts';
-import { EMPTY_SONG_FACETS, toggleSongFacet, type SongFacet } from '../../songs/songsFacets.ts';
-import { EMPTY_SONGS_FILTER, songsQueryOf, type SongsFilter } from '../../songs/songsFilter.ts';
+import { isVideoPath } from '../../../track/mediaKind.ts';
+import { QUERY_DEBOUNCE_MS } from '../../../track/queryInput.ts';
+import { startTrackFilter, type TrackFilterService } from '../../../track/trackFilterState.ts';
+
 import { foldersPrefsAtom } from '../foldersPrefs.ts';
 import { foldersPreviewAtom } from './foldersPreview.ts';
 
@@ -28,29 +29,34 @@ const EMPTY: FoldersResultsState = {
   answered: null,
 };
 const stateAtom = atom<FoldersResultsState>(EMPTY);
-const filterAtom = atom<SongsFilter>(EMPTY_SONGS_FILTER);
+const filterAtom = atom<TrackFilter>(EMPTY_TRACK_FILTER);
 export const foldersResultsAtom: Atom<FoldersResultsState> = atom((get) => get(stateAtom));
-export const foldersConditionsAtom: Atom<SongsFilter> = atom((get) => get(filterAtom));
+export const foldersConditionsAtom: Atom<TrackFilter> = atom((get) => get(filterAtom));
+/**
+ * 媒体类型：只看视频时，作用域里只留视频文件，表头统计、分面、表格与播放都跟着它走；
+ * 按扩展名认，目录里的曲目已全部在手，不必再问宿主；和筛选条件一样只在内存与页面快照里留
+ */
+export type FoldersMedia = 'all' | 'video';
+const mediaAtom = atom<FoldersMedia>('all');
+export const foldersMediaAtom: Atom<FoldersMedia> = atom((get) => get(mediaAtom));
 export const foldersScopeTracksAtom = atom((get) => {
   const preview = get(foldersPreviewAtom);
-  if (get(foldersPrefsAtom).recursive) return preview.tracks;
-  const paths = new Set(
-    preview.nodes.map((node) => normalizeHostPath(node.absolutePath).replace(/\\+$/, '')),
-  );
-  return preview.tracks.filter((track) => {
-    const path = normalizeHostPath(track.absolutePath);
-    return paths.has(path.slice(0, path.lastIndexOf('\\')));
-  });
+  const video = get(mediaAtom) === 'video';
+  let inRange = preview.tracks;
+  if (!get(foldersPrefsAtom).recursive) {
+    const paths = new Set(
+      preview.nodes.map((node) => normalizeHostPath(node.absolutePath).replace(/\\+$/, '')),
+    );
+    inRange = preview.tracks.filter((track) => {
+      const path = normalizeHostPath(track.absolutePath);
+      return paths.has(path.slice(0, path.lastIndexOf('\\')));
+    });
+  }
+  return video ? inRange.filter((track) => isVideoPath(track.path)) : inRange;
 });
-export interface FoldersResultsService {
-  setText(text: string): void;
-  setQuery(input: QueryInput): void;
-  togglePreset(id: PresetId): void;
-  toggleFacet(facet: SongFacet, name: string): void;
-  clearConditions(): void;
-  restore(filter: SongsFilter): void;
+export interface FoldersResultsService extends TrackFilterService {
   flush(): void;
-  dispose(): void;
+  setMedia(media: FoldersMedia): void;
 }
 
 export function startFoldersResults(
@@ -58,7 +64,8 @@ export function startFoldersResults(
   host: { library: Pick<typeof fb.library, 'search'> } = fb,
 ): FoldersResultsService {
   store.set(stateAtom, EMPTY);
-  store.set(filterAtom, EMPTY_SONGS_FILTER);
+  store.set(filterAtom, EMPTY_TRACK_FILTER);
+  store.set(mediaAtom, 'all');
   let disposed = false;
   let serial = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -72,7 +79,7 @@ export function startFoldersResults(
   async function load(mine: number) {
     timer = undefined;
     const tracks = store.get(foldersScopeTracksAtom);
-    const query = songsQueryOf(store.get(filterAtom), store.get(foldersPrefsAtom).scope);
+    const query = trackQueryOf(store.get(filterAtom), store.get(foldersPrefsAtom).scope);
     const current = () => !disposed && mine === serial;
     if (!query.filtered || tracks.length === 0) {
       if (current())
@@ -148,30 +155,22 @@ export function startFoldersResults(
     preferences = next;
     if (changed) schedule(0, true);
   });
-  function change(patch: Partial<SongsFilter>, delay = 0) {
-    if (disposed) return;
-    store.set(filterAtom, { ...store.get(filterAtom), ...patch });
-    schedule(delay);
-  }
+  const offMedia = store.sub(mediaAtom, () => schedule(0, true));
+  const filter = startTrackFilter(store, filterAtom, (typing) =>
+    schedule(typing ? QUERY_DEBOUNCE_MS : 0),
+  );
   schedule();
   return {
-    setText: (text) => change(changeQueryText(store.get(filterAtom), text), QUERY_DEBOUNCE_MS),
-    setQuery: (input) =>
-      change(
-        { mode: input.mode, text: input.text, advancedText: input.advancedText },
-        input.mode === store.get(filterAtom).mode ? QUERY_DEBOUNCE_MS : 0,
-      ),
-    togglePreset: (id) => change({ presets: togglePreset(store.get(filterAtom).presets, id) }),
-    toggleFacet: (facet, name) =>
-      change({ facets: toggleSongFacet(store.get(filterAtom).facets, facet, name) }),
-    clearConditions: () => change({ presets: new Set(), facets: EMPTY_SONG_FACETS }),
-    restore: (filter) => change(filter),
+    ...filter,
     flush: () => schedule(),
+    setMedia: (media) => store.set(mediaAtom, media),
     dispose() {
       disposed = true;
+      filter.dispose();
       cancel();
       offPreview();
       offPrefs();
+      offMedia();
     },
   };
 }

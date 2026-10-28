@@ -66,7 +66,7 @@ describe('频道查询', () => {
     service.setQuery('ALL', 'album', true);
     await vi.waitFor(() => expect(state().status).toBe('ready'));
     host.answer('library.query', { success: true, tracks: [], total: 0 });
-    host.emit('library:itemsRemoved', { count: 2, timestamp: 1 });
+    host.emit('library:itemsRemoved', { count: 2, handles: [], truncated: false, timestamp: 1 });
     expect(state()).toMatchObject({ status: 'ready', dirty: true, tracks });
     service.retry();
     await vi.waitFor(() => expect(state().status).toBe('ready'));

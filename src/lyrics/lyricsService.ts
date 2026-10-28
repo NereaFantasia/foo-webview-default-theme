@@ -18,7 +18,7 @@ import type { FoundLyrics } from './online/lyricsSearch.ts';
 import type { LyricsCandidate, LyricsQuery } from './online/lyricsSource.ts';
 
 export interface LyricsTarget extends LyricsTrack {
-  /** 网络流的曲名可在相同路径下变化，查询元数据也参与过期保护。 */
+  /** 网络流的曲名可在相同路径下变化，查询元数据也参与过期保护 */
   readonly query: LyricsQuery;
 }
 
@@ -53,7 +53,7 @@ export interface LyricsService {
   readonly preview: Atom<LyricsCandidatePreview>;
   readonly offset: Atom<number>;
   readonly subject: Atom<string>;
-  /** 为当前曲目保留一次预览取词需求，沿用已有来源设置，不刷新已经完成的结果。 */
+  /** 为当前曲目保留一次预览取词需求，沿用已有来源设置，不刷新已经完成的结果 */
   requestPreview(): void;
   candidate(id: string): LyricsCandidate | undefined;
   previewCandidate(
@@ -71,7 +71,7 @@ export interface LyricsService {
 
 export const lyricsKey = serviceKey<LyricsService>('lyrics');
 
-/** 按用户顺序取词；只有界面有取词需求且已启用联网时才加载在线模块、发起搜索。 */
+/** 按用户顺序取词；只有界面有取词需求且已启用联网时才加载在线模块、发起搜索 */
 export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
   const state = atom<LyricsState>({ status: 'idle' });
   let disposed = false;
@@ -166,13 +166,14 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
       store.set(state, local);
       return;
     }
-    // 只交出查询字段，不把曲目路径或调用方附带的其他属性传进在线来源。
+    // 只交出查询字段，不把曲目路径或调用方附带的其他属性传进在线来源
     const query: LyricsQuery = {
       title: target.query.title.trim(),
       artists: [...target.query.artists],
       album: target.query.album,
       albumArtists: [...target.query.albumArtists],
       durationMs: target.query.durationMs,
+      ...(target.query.neteaseId ? { neteaseId: target.query.neteaseId } : {}),
     };
     const next = JSON.stringify([target.key, query, prefs]);
     if (next !== input) {

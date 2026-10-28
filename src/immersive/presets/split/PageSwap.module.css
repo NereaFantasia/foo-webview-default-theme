@@ -1,0 +1,26 @@
+.page,
+.swap {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 位移与淡入各走各的时长，所以分成两条动画 */
+.swap {
+  animation:
+    page-rise var(--motion-normal) var(--curveDecelerateMid),
+    page-fade var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes page-rise {
+  from {
+    translate: 0 20px;
+  }
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+}

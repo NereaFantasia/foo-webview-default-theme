@@ -1,7 +1,6 @@
 import {
   Button,
   Popover,
-  PopoverSurface,
   PopoverTrigger,
   Tooltip,
   makeStyles,
@@ -12,13 +11,14 @@ import {
 import { useAtomValueRawSync } from 'jotai/react';
 import { useRef, useState } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
-import { MENU_SURFACE_MOTION } from '../../../motion/MenuMotion.tsx';
+import { FLYOUT_MOTION } from '../../../motion/Surfaces.tsx';
 import { roleVar } from '../../../theme/roles.ts';
+import { PopoverSurface } from '../../../theme/PopoverSurface.tsx';
 import { OutputDeviceList } from './OutputDeviceList.tsx';
 import { PLAYER_KEY_ATTR, PLAYER_SURFACE_ATTR } from '../playerFocus.ts';
-import { VOLUME_ICONS_LARGE } from '../playerIcons.ts';
-import { useVolumeControl, type VolumeControl } from './useVolumeControl.ts';
-import { useVolumePreview } from './useVolumePreview.ts';
+import { VOLUME_ICONS_LARGE } from '../../../playback/playerIcons.ts';
+import { useVolumeControl, type VolumeControl } from '../../../playback/volume/useVolumeControl.ts';
+import { useVolumePreview } from '../../../playback/volume/useVolumePreview.ts';
 import { VolumeStack } from './VolumeStack.tsx';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
@@ -30,10 +30,10 @@ const useStyles = makeStyles({
     padding: '0',
     color: roleVar('text-secondary'),
   },
-  // 底部通栏里的键 36 见方。
+  // 底部通栏里的键 36 见方
   roomy: { minWidth: '36px', width: '36px' },
   // 不透明的菜单底、描边、阴影，宽 336；描边画在盒子里面，内边距扣掉它，两栏离外缘 8、各宽 320。上方空间
-  // 不够时浮层按可用高度收，先缩设备列表。
+  // 不够时浮层按可用高度收，先缩设备列表
   surface: {
     boxSizing: 'border-box',
     display: 'flex',
@@ -48,7 +48,7 @@ const useStyles = makeStyles({
 
 /**
  * 浮层里的内容。每次打开都重新挂上，所以设备栏总是从收着开始，不记上一次。选完设备列表收起，焦点回到设备栏，
- * 不随着卸掉的那一行掉出浮层。
+ * 不随着卸掉的那一行掉出浮层
  */
 function VolumeFlyout({ control }: { readonly control: VolumeControl }) {
   const [expanded, setExpanded] = useState(false);
@@ -75,15 +75,15 @@ function VolumeFlyout({ control }: { readonly control: VolumeControl }) {
 }
 
 export interface CapsuleVolumeProps {
-  /** 放在底部通栏里：命中区改为 36 见方。 */
+  /** 放在底部通栏里：命中区改为 36 见方 */
   readonly roomy?: boolean;
-  /** 放在标题栏里：浮层朝下开、左缘对齐这个键。缺省朝上开、右缘对齐。 */
+  /** 放在标题栏里：浮层朝下开、左缘对齐这个键。缺省朝上开、右缘对齐 */
   readonly below?: boolean;
 }
 
 /**
  * 标题栏里朝下开时浮层离键多远，CSS 像素：标题栏高 56、键高 36，键下沿离标题栏下沿 10，再空 4。浮层整个落在
- * 标题栏下面，不压进标题栏的拖动区：压进去的那一截在窗口里按标题栏算，点下去是拖窗口。
+ * 标题栏下面，不压进标题栏的拖动区：压进去的那一截在窗口里按标题栏算，点下去是拖窗口
  */
 const BELOW_TITLEBAR_OFFSET = (56 - 36) / 2 + 4;
 
@@ -92,7 +92,7 @@ const BELOW_TITLEBAR_OFFSET = (56 - 36) / 2 + 4;
  * 悬停提示写音量数值（0–100），滚轮直接调音量、提示跟着预览调到的值（`useVolumePreview`）；
  * 点开是音量浮层（缺省朝上、右缘对齐这个键，标题栏里朝下、左缘对齐），焦点进到浮层里。浮层两栏：音量一栏、设备一栏，点设备栏在原地
  * 展开成设备列表（`VolumeStack`、`OutputDeviceList`）。浮层不进历史，Esc 与点别处收起（Fluent 的
- * Popover 自己处理），焦点回到这个键。
+ * Popover 自己处理），焦点回到这个键
  */
 export function CapsuleVolume({ roomy = false, below = false }: CapsuleVolumeProps) {
   const viewControls = useViewControlStyles();
@@ -118,7 +118,7 @@ export function CapsuleVolume({ roomy = false, below = false }: CapsuleVolumePro
           : { position: 'above', align: 'end', autoSize: 'height' }
       }
       trapFocus
-      surfaceMotion={MENU_SURFACE_MOTION}
+      surfaceMotion={FLYOUT_MOTION}
     >
       <PopoverTrigger disableButtonEnhancement>
         {/* 提示只写音量数值，名字另由 aria-label 给；浮层开着时不出，它里面就有数值。 */}

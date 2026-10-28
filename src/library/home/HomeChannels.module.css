@@ -36,7 +36,7 @@
   gap: var(--spacingHorizontalS);
   min-width: 0;
   padding: var(--spacingVerticalS) 0;
-  border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke3);
+  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
 }
 .name {
   display: block;

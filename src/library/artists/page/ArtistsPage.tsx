@@ -17,6 +17,7 @@ import { ArtistHighlights } from './ArtistHighlights.tsx';
 import { ArtistAlbums } from './ArtistAlbums.tsx';
 import { ArtistMenu } from './ArtistMenu.tsx';
 import { ArtistRenameDialog } from './ArtistRenameDialog.tsx';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import styles from './ArtistsPage.module.css';
 import { AddFoldersAction } from '../../AddFoldersAction.tsx';
 
@@ -44,6 +45,7 @@ interface ArtistRenameState {
 
 function ArtistsContent() {
   const services = useArtists();
+  const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const catalog = useAtomValueRawSync(services.catalog.state);
   const all = useAtomValueRawSync(services.catalog.all);
@@ -156,6 +158,7 @@ function ArtistsContent() {
         <header className={styles.toolbar}>
           <Button
             {...drawerTrigger}
+            className={viewControls.icon}
             appearance="subtle"
             icon={<PanelLeft20Regular />}
             aria-expanded={directoryOpen}
@@ -174,13 +177,19 @@ function ArtistsContent() {
                 ? 'artists.truncated'
                 : 'artists.failed',
           )}
-          <Button onClick={services.retry}>{t('artists.retry')}</Button>
+          <Button className={viewControls.field} onClick={services.retry}>
+            {t('artists.retry')}
+          </Button>
         </div>
       )}
       {temporary && (
         <div className={styles.notice} role="status">
           {t('artists.temporary')}
-          <Button size="small" onClick={services.places.resetTemporary}>
+          <Button
+            className={viewControls.field}
+            size="small"
+            onClick={services.places.resetTemporary}
+          >
             {t('artists.reset')}
           </Button>
         </div>

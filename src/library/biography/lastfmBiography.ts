@@ -27,19 +27,24 @@ function plainText(node: Node): string {
   return BLOCKS.has(node.tagName) ? `\n\n${text}\n\n` : text;
 }
 
+/**
+ * 解析 Last.fm 的 +wiki 页。`pageArtist` 是取到的那一页的艺人名（名字规范化跳转后是
+ * 规范名），只用于校验；文档的归属名与链接保持 `artist`（请求名），缓存读回按它重建校验
+ */
 export function readLastfmBiography(
   html: string,
   artist: string,
   language: BiographyLanguage,
+  pageArtist: string = artist,
 ): LastfmBiographyResult {
   if (html.length > 2_000_000) return { kind: 'invalid' };
-  // template 内的网页保持惰性，解析时不执行脚本，也不请求网页里的图片或嵌入资源。
+  // template 内的网页保持惰性，解析时不执行脚本，也不请求网页里的图片或嵌入资源
   const template = document.createElement('template');
   template.innerHTML = html;
   const root = template.content;
   const canonical = root.querySelector('link[rel="canonical"]')?.getAttribute('href');
   const sourceArtist = canonical ? lastfmArtistFromUrl(canonical) : null;
-  if (!sourceArtist || sourceArtist.toLowerCase() !== artist.toLowerCase())
+  if (!sourceArtist || sourceArtist.toLowerCase() !== pageArtist.toLowerCase())
     return { kind: 'invalid' };
   const wiki = root.querySelector('.wiki-content');
   if (!wiki)
@@ -78,7 +83,7 @@ export function readLastfmBiography(
       licenseUrl: license.url,
       license: license.name,
       facts: readLastfmFacts(root),
-      photo: readLastfmPhoto(root, artist, language),
+      photo: readLastfmPhoto(root, artist, language, pageArtist),
     },
   };
 }

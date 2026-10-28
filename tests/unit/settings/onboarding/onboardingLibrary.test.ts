@@ -111,7 +111,7 @@ describe('第 1 步的媒体库', () => {
     await vi.advanceTimersByTimeAsync(0);
     for (let i = 1; i <= 5; i += 1) {
       library.count = i * 100;
-      host.emit('library:itemsAdded', { count: 100, timestamp: i });
+      host.emit('library:itemsAdded', { count: 100, handles: [], truncated: false, timestamp: i });
       await vi.advanceTimersByTimeAsync(300);
     }
     expect(host.callsTo('library.getStatus').length).toBeGreaterThanOrEqual(2);
@@ -161,7 +161,7 @@ describe('第 1 步的媒体库', () => {
     await vi.advanceTimersByTimeAsync(0);
     watch.dispose();
     library.count = 99;
-    host.emit('library:itemsAdded', { count: 98, timestamp: 1 });
+    host.emit('library:itemsAdded', { count: 98, handles: [], truncated: false, timestamp: 1 });
     await vi.advanceTimersByTimeAsync(ROOTS_SETTLE_MS * 2);
     expect(read()).toMatchObject({ count: 1 });
     expect(host.callsTo('library.getRoots')).toHaveLength(0);

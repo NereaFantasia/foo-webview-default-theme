@@ -1,8 +1,9 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
 /**
- * 一条媒体查询此刻是否成立，随窗口变化重渲染；首帧就是对的，不等量元素。没有 `matchMedia` 的环境答假。
- * `query` 应当是模块顶层的常量字符串。
+ * 监听指定 CSS 媒体查询匹配状态的 Hook
+ * 基于 `useSyncExternalStore` 实现首帧即时同步，窗口变动触发匹配变化时重新渲染；不支持 `matchMedia` 的环境安全回退为 false
+ * @param query 媒体查询字符串（建议传入静态常量以避免重复订阅）
  */
 export function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(

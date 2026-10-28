@@ -1,6 +1,7 @@
 import { atom, type Atom } from 'jotai/vanilla';
 import { fb } from 'foo-webview-sdk/bridge';
 import { miniWindowAtom } from '../host/miniWindow.ts';
+import type { WindowShellService } from '../host/windowShell.ts';
 import { windowActivityAtom } from '../host/windowActivity.ts';
 import { registerImmersiveCommands } from '../immersive/page/immersiveKeys.ts';
 import { immersiveHostFullscreenAtom } from '../immersive/page/immersivePrefs.ts';
@@ -29,6 +30,8 @@ export function startImmersiveIntegration(
     readonly history: Pick<NavHistoryService, 'back' | 'navigate'>;
     readonly commands: CommandRegistry;
     readonly playback: Pick<PlaybackService, 'playOrPause' | 'seek' | 'stepVolume'>;
+    /** 视图盖住标题栏的这段时间不向宿主报最大化键的矩形，右上角悬停才不会弹出贴靠布局 */
+    readonly windowShell: Pick<WindowShellService, 'coverMaximizeButton'>;
   },
   host: ImmersiveHost = fb,
 ) {
@@ -71,6 +74,7 @@ export function startImmersiveIntegration(
     session = null;
     unregister?.();
     unregister = undefined;
+    if (previous) deps.windowShell.coverMaximizeButton(false);
     try {
       previous?.end();
     } finally {
@@ -88,12 +92,20 @@ export function startImmersiveIntegration(
   const offActive = store.sub(visible, syncCommands);
 
   return {
-    // 工厂随页面加载，同一记录只调用一次；Activity 清理不结束全屏记账或取数服务。
-    enter(entry: HistoryEntry, startResources?: (active: Atom<boolean>) => ImmersiveResources) {
+    // 沉浸视图的生命周期管理：同一条历史记录只初始化一次；
+    // startResources 传 null 时销毁前序取数服务，未传递时保留既有资源
+    enter(
+      entry: HistoryEntry,
+      startResources?: ((active: Atom<boolean>) => ImmersiveResources) | null,
+    ) {
       const current = store.get(historyAtom);
       if (disposed || entry !== current.entry || current.place.id !== 'nowPlaying') return null;
       if (session?.entry === entry) {
-        session.resources ??= startResources?.(session.active);
+        if (startResources === null) {
+          const stopped = session.resources;
+          session.resources = undefined;
+          stopped?.dispose();
+        } else session.resources ??= startResources?.(session.active);
         return session;
       }
       initializeImmersivePrefs(store);
@@ -110,6 +122,7 @@ export function startImmersiveIntegration(
         active,
       });
       session = { entry, shell, active, end: () => store.set(alive, false) };
+      deps.windowShell.coverMaximizeButton(true);
       session.resources = startResources?.(active);
       syncCommands();
       return session;

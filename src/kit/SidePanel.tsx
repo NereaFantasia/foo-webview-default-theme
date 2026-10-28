@@ -10,7 +10,7 @@ interface SidePanelHostProps extends ComponentProps<'div'> {
   readonly compact: boolean;
 }
 
-/** 页面里的面板也挂在内容区根部，避开页面滚动、裁剪和切换位移。 */
+/** 页面里的面板也挂在内容区根部，避开页面滚动、裁剪和切换位移 */
 export function SidePanelHost({ ref, compact, className, children, ...props }: SidePanelHostProps) {
   const [node, setNode] = useState<HTMLDivElement | null>(null);
   const hostRef = useMergedRefs(ref, setNode);
@@ -34,7 +34,7 @@ interface SidePanelProps extends ComponentProps<'div'> {
   readonly onMotionFinish?: PresenceComponentProps['onMotionFinish'];
 }
 
-/** 共用外框和进退场；开合、内容、焦点及轻关闭由调用方提供。 */
+/** 共用外框和进退场；开合、内容、焦点及轻关闭由调用方提供 */
 export function SidePanel({
   open,
   side,

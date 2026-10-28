@@ -27,7 +27,7 @@
   white-space: nowrap;
 }
 
-/* 行尾：播放列表是曲目数，数字等宽，增减时不左右晃。 */
+/* 行尾：播放列表是曲目数，数字等宽，增减时不左右晃 */
 .end {
   display: inline-flex;
   flex: none;
@@ -40,7 +40,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 图标右上角的小圆点，6 见方，压在图标的角上。 */
+/* 图标右上角的小圆点，6 见方，压在图标的角上 */
 .dot {
   position: absolute;
   top: -2px;

@@ -1,4 +1,4 @@
-/* 封面左侧圆角由封面自己画；进度线命中区伸出下沿，容器不能裁剪。 */
+/* 封面左侧圆角由封面自己画；进度线命中区伸出下沿，容器不能裁剪 */
 .root {
   position: relative;
   display: grid;
@@ -14,7 +14,7 @@
   app-region: no-drag;
 }
 
-/* 两行文字靠上排，上 5、左右 12，进度线贴底另放、与文字同宽（`ScrubSeek.module.css`）。 */
+/* 两行文字靠上排，上 5、左右 12，进度线贴底另放、与文字同宽（`ScrubSeek.module.css`） */
 .main {
   position: relative;
   display: grid;
@@ -33,7 +33,7 @@
   height: 18px;
 }
 
-/* 截断与渐隐归 `TruncatedText`：只在真的放不下时才渐隐。 */
+/* 截断与渐隐归 `TruncatedText`：只在真的放不下时才渐隐 */
 .title {
   flex: 1 1 auto;
   min-width: 0;
@@ -47,7 +47,7 @@
   color: var(--text-secondary);
 }
 
-/* 第二行：艺人与专辑占满余宽，星贴右，右缘与上一行的格式标记对齐；字放不下时先截字，星不让位。 */
+/* 第二行：艺人与专辑占满余宽，星贴右，右缘与上一行的格式标记对齐；字放不下时先截字，星不让位 */
 .subRow {
   display: flex;
   align-items: center;
@@ -68,7 +68,7 @@
   display: flex;
 }
 
-/* 进度条悬停态（`ScrubSeek`）：封面以外的东西淡到 35% 并模糊，指针穿过去落到进度线上。淡入淡出 83 ms。 */
+/* 进度条悬停态（`ScrubSeek`）：封面以外的东西淡到 35% 并模糊，指针穿过去落到进度线上。淡入淡出 83 ms */
 .soft {
   transition:
     opacity var(--motion-faster) var(--curveLinear),

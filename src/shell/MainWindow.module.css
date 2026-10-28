@@ -1,4 +1,4 @@
-/* 标题栏与底部通栏按内容高，播放栏不在底部时最后一行是空的；侧边栏的列宽随形态变，写在行内。
+/* 标题栏与底部通栏按内容高，播放栏不在底部时最后一行是空的；侧边栏的列宽随形态变，写在行内
    内容区左右留 16，底部随播放栏收紧，容纳阴影的柔化尾部；分栏握柄骑在主内容卡的边线上。 */
 .root {
   --content-bottom-gap: var(--spacingVerticalL);
@@ -10,7 +10,7 @@
   background: var(--bg-app);
 }
 
-/* 换形态时裁掉移出的内容，但为上下阴影留出绘制余量；窗口边界仍由全局裁剪。
+/* 换形态时裁掉移出的内容，但为上下阴影留出绘制余量；窗口边界仍由全局裁剪
    用 clip 避免聚焦滚动带动整层；浮层由内容区内的容器定位。 */
 .body {
   --panel-top: var(--spacingVerticalS);
@@ -49,20 +49,22 @@
   overflow: hidden;
 }
 
+/* 内容区左右的留白；停靠的右侧卡要伸进右边这一段时按它算 */
 .content {
+  --content-gutter: var(--spacingHorizontalL);
   position: relative;
   grid-column: 2;
   display: grid;
   min-width: 0;
   min-height: 0;
-  padding: 0 var(--spacingHorizontalL) var(--content-bottom-gap);
+  padding: 0 var(--content-gutter) var(--content-bottom-gap);
 }
 
 .root[data-bottom-player] {
   --content-bottom-gap: var(--spacingVerticalS);
 }
 
-/* 悬浮控件按卡片定位。整页滚动时首部空间随内容滚走，固定工具栏保持原位；尾部空间放进滚动内容。
+/* 悬浮控件按卡片定位。整页滚动时首部空间随内容滚走，固定工具栏保持原位；尾部空间放进滚动内容
    卡片自成一层，播放栏与导航键的层级不越过窄窗的侧边栏浮层。 */
 .card {
   --player-inset: 0px;
@@ -79,18 +81,15 @@
   box-shadow: var(--reading-shadow);
 }
 
-/* 没有导航行（播放栏在底部）时整张卡给页面；页面自己的上内边距 16，再加 4，页头离卡片上缘 20。 */
+/* 没有导航行（播放栏在底部）时整张卡给页面；页面自己的上内边距 16，再加 4，页头离卡片上缘 20
+   这 4 由中央区的各层自己带，见 CentralView */
 .card:not([data-with-nav-row]) {
-  padding-top: var(--spacingVerticalXS);
+  --layer-top-gap: var(--spacingVerticalXS);
 }
 
 .card[data-with-nav-row] {
   --nav-inset: calc(36px + var(--spacingVerticalM));
   --header-background-scroll: 0;
-}
-
-.card:not([data-with-nav-row]):has([data-cover-glow]) {
-  padding-top: 0;
 }
 
 .card[data-capsule] {

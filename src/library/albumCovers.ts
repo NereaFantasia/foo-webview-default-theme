@@ -6,6 +6,7 @@ import type { HostReadyFace } from '../host/waitForHost.ts';
 import type { Store } from '../kit/store.ts';
 import { albumsAtom } from './albums.ts';
 import { albumKeyOf, type Album, type AlbumKey } from '../host/libraryContract.ts';
+import { coverAnalysis, type CoverAnalysis } from '../covers/coverAnalysis.ts';
 import { CoverGate, type CoverOutcome } from '../covers/coverGate.ts';
 import { fetchCoverProbe, type CoverProbe } from '../covers/coverProbe.ts';
 
@@ -48,6 +49,8 @@ export interface AlbumCoversOptions {
   readonly retryDelays?: readonly number[];
   /** 出错后问地址的状态，缺省用 fetch；null 不问，出错一律退避重试。 */
   readonly probe?: CoverProbe | null;
+  /** 清单整份换时丢掉按地址记的取色档案：地址不变，背后的封面可能已经换了。 */
+  readonly analysis?: Pick<CoverAnalysis, 'forget'>;
 }
 
 export interface AlbumCoversService {
@@ -63,6 +66,8 @@ export interface AlbumCoversService {
   acquire(album: Album): boolean;
   /** 图块报回 `<img>` 的结局；重试用完的判缺图。 */
   settle(album: Album, outcome: CoverOutcome): void;
+  /** 这张的封面此前加载完过，图在浏览器缓存里；图块据此挂上时直接画出，不再淡入。 */
+  shown(album: Album): boolean;
   /** 排队等名额，见 `CoverGate.wait`；图块卸掉或不再要这个地址时撤出。 */
   wait(retry: () => void): () => void;
   dispose(): void;
@@ -92,6 +97,7 @@ export function startAlbumCovers(
 ): AlbumCoversService {
   const pixelRatio = options.pixelRatio ?? browserPixelRatio;
   const probe = options.probe === undefined ? fetchCoverProbe() : options.probe;
+  const analysis = options.analysis ?? coverAnalysis;
   const covers = new Map<AlbumKey, AlbumCover>();
   const pending = new Set<AlbumKey>();
   /** 已换上更大一档、新图还没加载完时，加载过的旧那一档；新图出错就退回它。 */
@@ -114,6 +120,7 @@ export function startAlbumCovers(
     fallbacks.clear();
     declined.clear();
     gate.reset();
+    analysis.forget();
     if (covers.size > 0) {
       covers.clear();
       bump();
@@ -231,6 +238,7 @@ export function startAlbumCovers(
       if (phase === 'cooling' && known?.status === 'ready')
         confirm(key, known, withRetry(known.url, attempt));
     },
+    shown: (album) => !disposed && gate.isShown(albumKeyOf(album)),
     wait: (retry) => gate.wait(retry),
     dispose() {
       disposed = true;

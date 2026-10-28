@@ -1,28 +1,16 @@
+import { mergeClasses, Button, makeStyles, tokens } from '@fluentui/react-components';
 import {
-  mergeClasses,
-  Button,
-  Input,
-  Menu,
-  MenuDivider,
-  MenuItemCheckbox,
-  MenuItemRadio,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
-  Tab,
-  TabList,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
-import {
-  ChevronDown16Regular,
-  Filter16Regular,
   MoreHorizontal20Regular,
+  RecordRegular,
+  MicRegular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
+import { pluralAtom } from '../../../i18n/plural.ts';
+import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
 import type { CommandRegistry } from '../../../nav/commandRegistry.ts';
 import type { KeyedSelection } from '../../../kit/keyedSelection.ts';
 import { useArtists } from '../artistsContext.ts';
@@ -30,11 +18,10 @@ import { filterArtists } from '../artistCatalog.ts';
 import { isCompilation } from '../artistNames.ts';
 import { useArtistList } from './useArtistList.ts';
 import styles from './ArtistsList.module.css';
+import { ArtistListTools } from './ArtistListTools.tsx';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
-  input: { minWidth: 0, flex: 1 },
-  tabs: { padding: 0 },
   action: { minWidth: '28px', padding: tokens.spacingHorizontalXXS },
 });
 export interface ArtistsListProps {
@@ -57,6 +44,7 @@ export function ArtistsList(props: ArtistsListProps) {
   const controls = useViewControlStyles();
   const services = useArtists();
   const t = useAtomValueRawSync(translateAtom);
+  const plural = useAtomValueRawSync(pluralAtom);
   const locale = useAtomValueRawSync(localeAtom).active;
   const catalog = useAtomValueRawSync(services.catalog.state);
   const prefs = useAtomValueRawSync(services.prefs.state);
@@ -124,82 +112,18 @@ export function ArtistsList(props: ArtistsListProps) {
     >
       <header className={styles.heading}>
         {!props.compact && <h1>{t('artists.title')}</h1>}
-        <span>
-          {t('artists.total', { count: catalog.rows.length })} · {t(`artists.${catalog.basis}`)}
-        </span>
+        <Metadata>
+          <MetadataItem icon={<MicRegular />} label={t('trackInfo.artist')}>
+            {t('artists.total', { count: catalog.rows.length })}
+          </MetadataItem>
+        </Metadata>
       </header>
-      <div className={styles.tools}>
-        <div className={styles.filter}>
-          <Input
-            className={mergeClasses(classes.input, controls.field)}
-            contentBefore={<Filter16Regular />}
-            value={props.text}
-            aria-label={t('artists.filter')}
-            placeholder={t('artists.filter')}
-            onChange={(_, data) => props.onText(data.value)}
-          />
-          <Menu
-            checkedValues={{
-              basis: [prefs.basis],
-              sort: [prefs.sort],
-              descending: prefs.descending ? ['yes'] : [],
-            }}
-          >
-            <MenuTrigger disableButtonEnhancement>
-              <Button
-                className={controls.field}
-                aria-label={t('artists.sort')}
-                icon={<ChevronDown16Regular />}
-                iconPosition="after"
-              >
-                {t(`artists.${prefs.sort}`)}
-              </Button>
-            </MenuTrigger>
-            <MenuPopover>
-              <MenuList>
-                {(['albumArtist', 'credited'] as const).map((basis) => (
-                  <MenuItemRadio
-                    key={basis}
-                    name="basis"
-                    value={basis}
-                    onClick={() => services.prefs.update({ basis })}
-                  >
-                    {t(`artists.${basis}`)}
-                  </MenuItemRadio>
-                ))}
-                <MenuDivider />
-                {(['name', 'albums', 'tracks'] as const).map((sort) => (
-                  <MenuItemRadio
-                    key={sort}
-                    name="sort"
-                    value={sort}
-                    onClick={() => services.prefs.update({ sort })}
-                  >
-                    {t(`artists.${sort}`)}
-                  </MenuItemRadio>
-                ))}
-                <MenuDivider />
-                <MenuItemCheckbox
-                  name="descending"
-                  value="yes"
-                  onClick={() => services.prefs.update({ descending: !prefs.descending })}
-                >
-                  {t('artists.descending')}
-                </MenuItemCheckbox>
-              </MenuList>
-            </MenuPopover>
-          </Menu>
-        </div>
-        <TabList
-          className={classes.tabs}
-          size="small"
-          selectedValue={props.tidy ? 'tidy' : 'all'}
-          onTabSelect={(_, data) => props.onTidy(data.value === 'tidy')}
-        >
-          <Tab value="all">{t('artists.all', { count: catalog.rows.length })}</Tab>
-          <Tab value="tidy">{t('artists.tidy', { count: catalog.issues.size })}</Tab>
-        </TabList>
-      </div>
+      <ArtistListTools
+        text={props.text}
+        tidy={props.tidy}
+        onText={props.onText}
+        onTidy={props.onTidy}
+      />
       <div
         ref={props.scroll}
         className={styles.scroll}
@@ -264,9 +188,18 @@ export function ArtistsList(props: ArtistsListProps) {
                   )}
                 </div>
                 <div role="gridcell" className={styles.end}>
-                  <span className={styles.count}>
-                    {t('artists.counts', { albums: row.albumCount, tracks: row.trackCount })}
-                  </span>
+                  <Metadata className={styles.count}>
+                    <MetadataItem icon={<RecordRegular />} label={t('trackInfo.album')}>
+                      {t(plural(row.albumCount, 'album.countOne', 'album.count'), {
+                        count: row.albumCount,
+                      })}
+                    </MetadataItem>
+                    <MetadataItem icon={<TextNumberListLtr16Regular />}>
+                      {t(plural(row.trackCount, 'album.menuTracksOne', 'album.menuTracks'), {
+                        count: row.trackCount,
+                      })}
+                    </MetadataItem>
+                  </Metadata>
                   <span className={styles.actions}>
                     <Button
                       className={mergeClasses(classes.action, controls.icon)}

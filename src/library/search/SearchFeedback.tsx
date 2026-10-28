@@ -3,16 +3,25 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { albumsAtom } from '../albums.ts';
 import type { SearchResultsService } from './searchResults.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './SearchFeedback.module.css';
 
-export function SearchFeedback({ results }: { readonly results: SearchResultsService }) {
+export function SearchFeedback({
+  results,
+  onSearchOnline,
+}: {
+  readonly results: SearchResultsService;
+  /** 媒体库没有匹配时给一个切到在线音乐范围的键；不给就不出 */
+  onSearchOnline?(): void;
+}) {
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const state = useAtomValueRawSync(results.state);
   const albums = useAtomValueRawSync(results.albums);
   const catalog = useAtomValueRawSync(albumsAtom);
   if (!state.text) return null;
   const retry = (
-    <Button size="small" onClick={() => results.retry()}>
+    <Button className={viewControls.field} size="small" onClick={() => results.retry()}>
       {t('album.retry')}
     </Button>
   );
@@ -40,7 +49,14 @@ export function SearchFeedback({ results }: { readonly results: SearchResultsSer
         catalog.status === 'ready' &&
         state.total === 0 &&
         albums.length === 0 && (
-          <div>{t(state.libraryEmpty ? 'album.empty' : 'search.noMatch')}</div>
+          <div className={onSearchOnline ? styles.empty : undefined}>
+            {t(state.libraryEmpty ? 'album.empty' : 'search.noMatch')}
+            {onSearchOnline && (
+              <Button className={viewControls.field} onClick={onSearchOnline}>
+                {t('online.searchOnline')}
+              </Button>
+            )}
+          </div>
         )}
       {state.moreFailed && <div role="status">{t('search.moreFailed')}</div>}
       {state.limited && <div>{t('search.limited', { count: state.tracks.length })}</div>}

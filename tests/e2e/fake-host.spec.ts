@@ -108,9 +108,9 @@ test('事件推进页面的监听器，并在 window 上派发 fb2k: 前缀的 C
     Reflect.set(window, '__received', Promise.all([viaListener, viaWindow]));
   });
   await expect.poll(() => host.listenerCount('library:itemsAdded')).toBeGreaterThan(base);
-  await host.emit('library:itemsAdded', { count: 2, timestamp: 1 });
+  await host.emit('library:itemsAdded', { count: 2, handles: [], truncated: false, timestamp: 1 });
 
-  const payload = { count: 2, timestamp: 1 };
+  const payload = { count: 2, handles: [], truncated: false, timestamp: 1 };
   const received = await page.evaluate((): unknown => Reflect.get(window, '__received'));
   expect(received).toEqual([payload, payload]);
   expect(errors).toEqual([]);

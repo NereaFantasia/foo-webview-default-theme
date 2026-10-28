@@ -1,4 +1,4 @@
-/** 引导页独立发布，应用按同一份持久契约读写；两端不能互相导入实现。 */
+/** 引导程序与主应用共享的持久化契约；两端独立发布且禁止跨端导入实现 */
 export interface VersionRef {
   readonly v: string;
   readonly dir: string;
@@ -151,10 +151,15 @@ export function loadedVersion(url: URL): VersionRef | null {
   return dir ? versionRef({ v: dir.split('_')[0], dir }) : null;
 }
 
-/** 只移除本次引导实际跳过的引用，运行中新增的 pending 留到下次启动。 */
+/**
+ * 构建启动确认后的版本指针
+ * 清理引导流程中实际跳过的失效引用，运行阶段新增的 pending 保留至下次启动；
+ * 手动解压安装包缺失 previous 时，从 known 历史完整版本中补入回退目标
+ */
 export function confirmedPointer(
   pointer: Pointer,
   session: LoaderSession,
+  known: readonly VersionRef[] = [],
 ): Record<string, unknown> | null {
   if (!pointer.refs.some((ref) => sameVersion(ref, session.version))) return null;
   const frontend = { ...pointer.frontend };
@@ -173,10 +178,14 @@ export function confirmedPointer(
   }
   for (const key of ['pending', 'previous'])
     if (skipped(versionRef(frontend[key]))) delete frontend[key];
+  const fallback = versionRef(frontend.previous)
+    ? undefined
+    : known.find((ref) => !sameVersion(ref, session.version) && !skipped(ref));
+  if (fallback) frontend.previous = { v: fallback.v, dir: fallback.dir };
   return { ...pointer.raw, frontend };
 }
 
-/** 换掉或去掉 pending；原来的 pending 不再被引用，它的目录留给清理。其余字段原样保留。 */
+/** 更新或移除指针中的 pending 字段；作废的原 pending 目录交由清理调度，其余字段保持不变 */
 export function pendingPointer(
   pointer: Pointer,
   pending: VersionRef | null,

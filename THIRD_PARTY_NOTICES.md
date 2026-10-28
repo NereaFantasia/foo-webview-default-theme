@@ -2,6 +2,8 @@
 
 本主题的源码改写或收录了下面几个项目的代码与数据。随 npm 依赖打进产物的组件以各包自带的许可为准，这里不重复。
 
+在线音乐用到的两个组件不在主题安装包里，由主题发行为单独的附件，用户在设置里确认后才下载，见下面的「网易云组件」与「lxserver 组件」。
+
 ## Lyricify Lyrics Helper
 
 - 项目：https://github.com/WXRIW/Lyricify-Lyrics-Helper ，提交 53a2f81
@@ -28,6 +30,58 @@
 - 用在：
   - `src/playback/volumeScale.ts`：音量条的听感曲线。
   - `src/playlist/sortPatterns.ts`：排序用的标题格式化串，取自 `jsplaylist.js`。
+
+## Tabler Icons
+
+- 项目：https://github.com/tabler/tabler-icons
+- 版权：Copyright (c) 2020-2026 Paweł Kuna
+- 许可：MIT License，全文见下
+- 用在：`src/immersive/lyrics-column/RomanizationIcon.tsx`：歌词工具条里「音译」键的图标，取自 `alphabet-latin`。
+- 改动：视口收紧到字形并补成正方形，线宽改为 1.6。
+
+```text
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## 网易云组件
+
+- 项目：https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced ，npm 包 `@neteasecloudmusicapienhanced/api` 4.41.1
+- 许可：MIT License，各依赖的许可原文随组件分发
+- 用在：在线音乐的网易云搜索、登录与取地址。组件作为单独的依赖目录存放在后端旁，用户可以替换。
+- 内容：该包及其依赖闭包的原始文件。其中：
+  - `@unblockneteasemusic/server` 0.28.0（https://github.com/UnblockNeteaseMusic/server ），LGPL-3.0-only，随 `COPYING`、`COPYING.LESSER` 分发。它由「解灰」功能使用；该功能默认关闭，但组件下载时仍会包含它。
+  - `node-forge`，双许可（BSD-3-Clause 或 GPL-2.0），按 BSD-3-Clause 使用。
+- 改动：不改任何包的源码，只去掉 `.md`、`.d.ts`、`.map` 文件与 test、docs、example 目录，许可文件一律保留。
+
+## lxserver 组件
+
+- 项目：https://github.com/XCQ0607/lxserver ，提交 d428806，包名 `lx-music-sync-server` 2.1.3
+- 许可：Apache License 2.0，全文见文末；组件内附带 `LICENSE` 与各依赖的许可原文
+- 用在：QQ 音乐、酷我、酷狗、咪咕的搜索与取地址，由主题启动为只监听 127.0.0.1 的本机子进程。主题不附带任何音源脚本，音源由用户自行导入。
+- 改动：
+  - 两处补丁：AES 算法名的兼容修复；监听地址改为读取 `BIND_IP`，缺省 127.0.0.1（上游写死 `0.0.0.0`）。
+  - 只安装生产依赖；`music-tag-native` 换成用到时才报错的空壳，并去掉 `ws` 的两个可选原生包，包内没有原生文件。
+  - 去掉 `.md`、`.d.ts`、`.map` 文件与 test、docs、example 目录和 `node_modules/.bin`。
 
 ## Apache License 2.0
 

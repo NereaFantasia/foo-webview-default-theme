@@ -62,8 +62,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
     await page.setViewportSize({ width: 1280, height: 1000 });
     const env = await openGenres(page);
-    await env.view.getByRole('combobox', { name: '分组依据' }).click();
+    await env.view.locator('[data-genres-view]').click();
+    await page.locator('[data-view-grouping]').click();
     await page.getByRole('option', { name: '专辑与碟号', exact: true }).click();
+    await page.keyboard.press('Escape');
     const disc = env.grid.locator('[data-genre-group="第 1 碟"]');
     await expect(disc).toBeVisible();
     await closeGroup(page, disc.getByRole('button'), 'Workinonit');

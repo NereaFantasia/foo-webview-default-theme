@@ -188,22 +188,6 @@ test('行尾平时是曲目数；悬停、焦点在这一行、菜单开着时�
   expect(errors).toEqual([]);
 });
 
-test('菜单弹出按 Windows 11 的入场：83 ms 淡入配 250 ms 位移，不用 Fluent 缺省的 400 ms', async ({
-  page,
-}) => {
-  const { entry, errors } = await openSidebar(page);
-  await entry('Road Trip').click({ button: 'right' });
-  await expect(menuOf(page)).toBeVisible();
-  const durations = await page.evaluate(() =>
-    [...document.querySelectorAll('.fui-MenuPopover')]
-      .flatMap((popover) => popover.getAnimations())
-      .map((animation) => animation.effect?.getTiming().duration),
-  );
-  expect(durations.sort()).toEqual([250, 83].sort());
-  await page.keyboard.press('Escape');
-  expect(errors).toEqual([]);
-});
-
 test('新建先在节末出一行名字框、缺省名全选；Esc 什么都不建，清单与历史不变，焦点回到「新建」', async ({
   page,
 }) => {
@@ -280,7 +264,7 @@ test('删除非空列表先确认；确认时按 GUID 删，清单跟着少一�
   await entry('Road Trip').click({ button: 'right' });
   await menuOf(page).getByRole('menuitem', { name: '删除' }).click();
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toContainText('「Road Trip」里有 48 首曲目');
+  await expect(dialog).toContainText('「Road Trip」包含 48 首曲目');
   await dialog.getByRole('button', { name: '删除' }).click();
   await expect.poll(() => host.callsTo('playlist.remove')).toEqual([{ playlistGuid: road }]);
   await expect(nav.locator(`[data-playlist-entry="${road}"]`)).toHaveCount(0);

@@ -19,7 +19,7 @@ export function useVideoWakeLock(playing: boolean): void {
         if (disposed || document.visibilityState !== 'visible') await next.release();
         else lock = next;
       } catch {
-        // 电源策略可以拒绝常亮请求，不影响音频或画面播放。
+        // 电源策略可以拒绝常亮请求，不影响音频或画面播放
       } finally {
         pending = false;
       }

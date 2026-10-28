@@ -13,7 +13,7 @@ export interface ConfigWriter {
   remove(key: string, signal?: AbortSignal): Promise<DataWriteResult<number>>;
 }
 
-/** 宿主确认写入或清除后才记代数；缺少写入助手时明确失败，不绕过锁直接写。 */
+/** 创建带排他写锁与代数记录的宿主配置写入助手。仅在宿主持久化成功后更新代数；若缺少写入互斥器则明确拒绝，严禁无保护并发写入 */
 export function createConfigWriter(
   host: ConfigWriteFace,
   writer: Pick<DataWriter, 'run'> | undefined,
@@ -30,7 +30,7 @@ export function createConfigWriter(
 
   return {
     async set(key, value, signal) {
-      // 等锁期间调用方可能继续修改对象，宿主收到的应是发起这次写入时的值。
+      // 快照防并发篡改：在等待获锁期间对象可能被外部异步修改，深拷贝保证持久化快照的一致性
       let snapshot: ConfigValue;
       try {
         snapshot = structuredClone(value);

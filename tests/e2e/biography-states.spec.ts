@@ -59,7 +59,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
       '3 首 · 45分钟 · 1 张专辑 · 1 张参与专辑',
     );
     await expect(panel(page).locator('[data-biography-collaborators]')).toHaveText(
-      '常合作 Guest · Other',
+      '常合作艺人 Guest · Other',
     );
     await expect(panel(page).locator('[data-biography-photos]')).toHaveCount(0);
     expect(lastfmCalls(env.host.callsTo('http.get'))).toEqual([]);

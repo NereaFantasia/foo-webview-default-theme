@@ -11,7 +11,7 @@ interface GroupFoldOptions<G> {
   readonly enabled: ((item: TableGroupItem<G>) => boolean) | undefined;
 }
 
-/** 副本按这些属性画列宽、展开箭头、层级缩进与碟号。 */
+/** 副本按这些属性画列宽、展开箭头、层级缩进与碟号 */
 const KEEP = new Set(['data-column-id', 'data-expanded', 'data-level', 'data-disc']);
 
 function spanOf<G>(options: GroupFoldOptions<G>, index: number): FoldSpan {
@@ -30,7 +30,7 @@ function spanOf<G>(options: GroupFoldOptions<G>, index: number): FoldSpan {
   return { body, below: new Set(options.items.slice(end).map((item) => item.key)), height };
 }
 
-/** 表格分组的单组开合动画：只有 `enabled` 认可的组播放，其余组和批量开合照常直接到位。 */
+/** 表格分组的单组开合动画：只有 `enabled` 认可的组播放，其余组和批量开合照常直接到位 */
 export function useTableGroupFold<G>(options: GroupFoldOptions<G>) {
   const { items, enabled } = options;
   const fold = useVirtualFold({

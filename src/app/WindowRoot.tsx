@@ -7,12 +7,14 @@ import { translateAtom } from '../i18n/locale.ts';
 import { useService } from '../kit/useService.ts';
 import { useCommand } from '../nav/useCommand.ts';
 import { MiniPlayer } from '../shell/miniplayer/MiniPlayer.tsx';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
 import styles from './WindowRoot.module.css';
 
 export function WindowRoot({ children }: { readonly children: ReactNode }) {
   const state = useAtomValueRawSync(miniWindowAtom);
   const mini = useService(miniWindowKey);
   const t = useAtomValueRawSync(translateAtom);
+  const viewControls = useViewControlStyles();
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasMini = useRef(state.active);
   useEffect(() => {
@@ -57,7 +59,11 @@ export function WindowRoot({ children }: { readonly children: ReactNode }) {
               }
             >
               {state.active && (
-                <Button disabled={state.busy} onClick={() => void mini.leave()}>
+                <Button
+                  className={viewControls.field}
+                  disabled={state.busy}
+                  onClick={() => void mini.leave()}
+                >
                   {t('mini.restore')}
                 </Button>
               )}

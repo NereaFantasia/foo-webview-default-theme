@@ -15,7 +15,14 @@
   flex: none;
   padding: var(--spacingVerticalS) var(--spacingHorizontalS);
 }
+/* 顶部的「媒体库｜在线音乐」，两段平分整宽 */
+.scope {
+  flex: none;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+}
 .scroller {
+  margin: 0 calc(-1 * var(--spacingHorizontalXS)) calc(-1 * var(--spacingVerticalXS));
+  padding: 0 var(--spacingHorizontalXS) var(--spacingVerticalXS);
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -60,7 +67,7 @@
 .footer {
   flex: none;
   padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
-  border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-top: var(--strokeWidthThin) solid var(--line);
 }
 .notice {
   padding: var(--spacingVerticalS) var(--spacingHorizontalS);

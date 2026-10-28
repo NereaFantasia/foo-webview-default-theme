@@ -151,4 +151,18 @@ describe('orderSections', () => {
     expect(keys(orderSections(sections, 'count'))).toEqual(['Jazz', 'Blues', 'Rock', null]);
     expect(keys(orderSections(sections, 'name'))).toEqual(['Blues', 'Jazz', 'Rock', null]);
   });
+
+  it('方向可以改：名称倒序、张数少的在前；张数相同仍保持名称序，「未知」仍在最后', () => {
+    const sections = [
+      section('Blues', 2),
+      section('Jazz', 5),
+      section('Rock', 2),
+      section(null, 9),
+    ];
+    expect(keys(orderSections(sections, 'name', true))).toEqual(['Rock', 'Jazz', 'Blues', null]);
+    expect(keys(orderSections(sections, 'name', false))).toEqual(['Blues', 'Jazz', 'Rock', null]);
+    expect(keys(orderSections(sections, 'count', false))).toEqual(['Blues', 'Rock', 'Jazz', null]);
+    expect(keys(orderSections(sections, 'count', true))).toEqual(['Jazz', 'Blues', 'Rock', null]);
+    expect(sections.map((s) => s.key)).toEqual(['Blues', 'Jazz', 'Rock', null]);
+  });
 });

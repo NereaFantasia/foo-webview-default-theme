@@ -9,7 +9,7 @@ const SHAPE = STEPS.map((step) => ({
   tone: Hct.fromInt(argbFromHex(tealBrand[step])).tone,
 }));
 
-/** 保留青绿的明度阶梯；彩度只受 sRGB 色域限制，不主动放大低彩度封面。 */
+/** 保留青绿的明度阶梯；彩度只受 sRGB 色域限制，不主动放大低彩度封面 */
 export function rampFrom(seed: CoverSeed): BrandVariants {
   const palette = TonalPalette.fromHueAndChroma(seed.hue, seed.chroma);
   const ramp: BrandVariants = { ...tealBrand };

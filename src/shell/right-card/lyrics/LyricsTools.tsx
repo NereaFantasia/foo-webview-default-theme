@@ -1,11 +1,11 @@
+import { MenuSurface as MenuPopover } from '../../../theme/MenuSurface.tsx';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
+import { PopoverSurface } from '../../../theme/PopoverSurface.tsx';
 import {
   Button,
   MenuItem,
   MenuList,
-  MenuPopover,
   MenuTrigger,
-  PopoverSurface,
   PopoverTrigger,
   SpinButton,
   Switch,
@@ -16,6 +16,7 @@ import {
 } from '@fluentui/react-components';
 import { MoreHorizontal16Regular, Search16Regular, TextFont16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
+import { useState } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
 import { useService } from '../../../kit/useService.ts';
 import { lyricsDisplayKey } from '../../../lyrics/lyricsDisplay.ts';
@@ -55,6 +56,12 @@ export function LyricsTools({
   const display = useAtomValueRawSync(service.display);
   const classes = useStyles();
   const controls = useViewControlStyles();
+  // 「歌词设置」会换到设置页，浮层要先自己收起；不收的话它留在歌词栏上，焦点已经走了，Esc 也关不掉
+  const [displayOpen, setDisplayOpen] = useState(false);
+  const changeDisplayOpen = (open: boolean) => {
+    setDisplayOpen(open);
+    onOpenChange(open);
+  };
   return (
     <>
       <Tooltip content={t('lyrics.search')} relationship="label">
@@ -73,7 +80,8 @@ export function LyricsTools({
           overflowBoundaryPadding: 12,
           autoSize: 'width',
         }}
-        onOpenChange={(_, data) => onOpenChange(data.open)}
+        open={displayOpen}
+        onOpenChange={(_, data) => changeDisplayOpen(data.open)}
       >
         <PopoverTrigger disableButtonEnhancement>
           <Button
@@ -104,7 +112,14 @@ export function LyricsTools({
               onChange={(_, data) => void service.update({ [name]: data.checked })}
             />
           ))}
-          <Button appearance="subtle" className={controls.field} onClick={onSettings}>
+          <Button
+            appearance="subtle"
+            className={controls.field}
+            onClick={() => {
+              changeDisplayOpen(false);
+              onSettings();
+            }}
+          >
             {t('lyrics.settings')}
           </Button>
         </PopoverSurface>

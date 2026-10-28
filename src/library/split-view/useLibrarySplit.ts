@@ -8,13 +8,13 @@ interface SplitSizes {
   readonly height: number;
 }
 
-/** 一个区域一个键，缺省宽度由调用方给，所以不用 `defineLocalPref`；读不了、坏了的那一项按缺省。 */
+/** 一个区域一个键，缺省宽度由调用方给，所以不用 `defineLocalPref`；读不了、坏了的那一项按缺省 */
 function readSizes(key: string, width: number): SplitSizes {
   let saved: Readonly<Record<string, unknown>> = {};
   try {
     saved = storedRecord(browserStorage()?.getItem(key) ?? null);
   } catch {
-    // 存储读不了：两项都按缺省。
+    // 存储读不了：两项都按缺省
   }
   const { width: savedWidth, height } = saved;
   return {
@@ -72,7 +72,7 @@ export function useLibrarySplit(area: 'artists' | 'genres' | 'folders', defaultW
     try {
       browserStorage()?.setItem(key, JSON.stringify(sizes));
     } catch {
-      /* 存储不可用时仍可拖动。 */
+      /* 存储不可用时仍可拖动 */
     }
   }, [key, sizes]);
   useCommand({

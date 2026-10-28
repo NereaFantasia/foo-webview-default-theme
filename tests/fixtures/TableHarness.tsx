@@ -10,7 +10,9 @@ import {
 } from 'react';
 import { createTypeSearch, type TypeSearch } from '../../src/kit/typeSearch.ts';
 import type { AppServices } from '../../src/app/services.ts';
+import { startupOverlay } from '../../src/app/startupOverlay.ts';
 import { useStore } from 'jotai/react';
+import { ServicesContext, serviceMap } from '../../src/kit/useService.ts';
 import { CommandsContext } from '../../src/nav/useCommand.ts';
 import { TableContext } from '../../src/table/tableContext.ts';
 import { PlayingMark } from '../../src/track/PlayingMark.tsx';
@@ -41,7 +43,6 @@ import {
   type HarnessGroup,
   type HarnessScenario,
 } from './tableHarnessScenario.ts';
-import { useHarnessMenu } from './useHarnessMenu.ts';
 
 // 浏览器测试用的表格试验页：按地址栏参数（见 `HarnessScenario`）造一条条目流，扮演表格的调用方（开合、排序、
 // 选中），把交给调用方的动作记进 `window.__tableLog`，测试在 Node 那边读出来断言。句柄的 `reveal` 挂在
@@ -136,7 +137,6 @@ function HarnessTable({ scenario, columns, scrollParent, ratingStamp }: HarnessT
   const fillers = Math.ceil(layout.coverWidth / ROW_HEIGHT);
   const items = useMemo(() => flatten(tree, collapsed, fillers), [tree, collapsed, fillers]);
   const search = useHarnessSearch(scenario.asyncSearch, items, handle);
-  const columnMenu = useHarnessMenu(scenario.menu, items, setCollapsed);
   useEffect(() => {
     Reflect.set(window, '__tableReveal', (index: number, select: boolean) =>
       handle.current ? handle.current.reveal(index, select) : false,
@@ -229,7 +229,6 @@ function HarnessTable({ scenario, columns, scrollParent, ratingStamp }: HarnessT
           : undefined
       }
       typeSearch={search}
-      columnMenu={columnMenu}
       onRange={scenario.range ? (start, end) => log({ type: 'range', start, end }) : undefined}
       loading={scenario.loading}
       empty={<div data-empty>空表</div>}
@@ -276,6 +275,7 @@ export interface TableHarnessProps {
 
 /** 试验页：与正式页面同一套 store、服务与主题根，只把主窗换成一张定宽定高的表。 */
 export function TableHarness({ services, scenario }: TableHarnessProps) {
+  useEffect(() => startupOverlay.dismiss(), []);
   const table = useMemo(
     () => ({
       ratings: services.ratings,
@@ -290,32 +290,35 @@ export function TableHarness({ services, scenario }: TableHarnessProps) {
     const offered: ColumnId[] = HARNESS_COLUMNS.filter((id) => scenario.cover || id !== 'cover');
     return createColumnsModel(services.store, { key: scenario.key, offered });
   });
+  const serviceTable = useMemo(() => serviceMap(services.bindings), [services]);
   return (
     <Provider store={services.store}>
-      <CommandsContext value={services.commands}>
-        <TableContext value={table}>
-          <ThemeRoot>
-            {scenario.page ? (
-              <PageScrollBox
-                scenario={scenario}
-                columns={columns}
-                ratingStamp={services.ratings.stamp}
-              />
-            ) : (
-              <div
-                data-harness-box
-                style={{ display: 'flex', width: scenario.width, height: scenario.height }}
-              >
-                <HarnessTable
+      <ServicesContext value={serviceTable}>
+        <CommandsContext value={services.commands}>
+          <TableContext value={table}>
+            <ThemeRoot>
+              {scenario.page ? (
+                <PageScrollBox
                   scenario={scenario}
                   columns={columns}
                   ratingStamp={services.ratings.stamp}
                 />
-              </div>
-            )}
-          </ThemeRoot>
-        </TableContext>
-      </CommandsContext>
+              ) : (
+                <div
+                  data-harness-box
+                  style={{ display: 'flex', width: scenario.width, height: scenario.height }}
+                >
+                  <HarnessTable
+                    scenario={scenario}
+                    columns={columns}
+                    ratingStamp={services.ratings.stamp}
+                  />
+                </div>
+              )}
+            </ThemeRoot>
+          </TableContext>
+        </CommandsContext>
+      </ServicesContext>
     </Provider>
   );
 }

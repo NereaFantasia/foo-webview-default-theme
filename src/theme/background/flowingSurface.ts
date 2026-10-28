@@ -27,7 +27,7 @@ export interface FlowMemory {
   preview: { readonly pixels: ImageData; readonly scheme: ColorScheme } | null;
 }
 
-/** 实例独占请求、绘制表面和 GPU；休眠只留当前封面像素与静态预览，迟到位图仍须关闭。 */
+/** 管理流动背景 Canvas、渲染循环与 GPU 资源生命周期；挂起休眠时仅保留当前封面像素及静态预览快照 */
 export function createFlowingSurface(
   parent: Pick<HTMLElement, 'append'>,
   memory: FlowMemory,
@@ -235,7 +235,7 @@ export function createFlowingSurface(
   }
   function neutral() {
     if (!input) return;
-    // 让最后画面淡出到窗口的中性底，避免将强调色放大成整窗背景。
+    // 让最后画面淡出到窗口的中性底，避免将强调色放大成整窗背景
     imageReady = false;
     memory.cover = null;
     memory.preview = null;
@@ -261,7 +261,7 @@ export function createFlowingSurface(
         context.drawImage(bitmap, 0, 0);
         const pixels = context.getImageData(0, 0, 512, 512);
         const current = memory.cover;
-        // 地址包含曲目路径；逐像素比较封面本身，不能用暂时沿用的取色结果判断身份。
+        // 地址包含曲目路径；逐像素比较封面本身，不能用暂时沿用的取色结果判断身份
         if (
           imageReady &&
           current &&
@@ -326,7 +326,7 @@ export function createFlowingSurface(
           : canvas?.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
       memory.preview = pixels && input ? { pixels, scheme: input.scheme } : null;
     } catch {
-      // 上下文丢失时保留已有预览，资源仍须同步释放。
+      // 上下文丢失时保留已有预览，资源仍须同步释放
     }
     showPreview();
     if (scheme) discardPreview(scheme);
@@ -374,7 +374,7 @@ export function createFlowingSurface(
         clearPreview();
       }
       if (schemeChanged) {
-        // 与主题文字在同一轮更新呈色，避免等下一帧时露出另一主题的背景。
+        // 与主题文字在同一轮更新呈色，避免等下一帧时露出另一主题的背景
         try {
           if (imageReady) renderer.draw(memory.motion, progress(), next.scheme);
           reveal();

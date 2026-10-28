@@ -15,7 +15,7 @@ import type { LyricsCandidate, LyricsQuery, LyricsSource } from './lyricsSource.
 
 const GET_URL = 'https://api.lrcmux.dev/get';
 
-/** `level` 是 word、line、none：逐字带 `words`，逐行只有行的起止，none 连起止都没有。时间是毫秒。 */
+/** `level` 是 word、line、none：逐字带 `words`，逐行只有行的起止，none 连起止都没有。时间是毫秒 */
 function contentOf(level: string, rows: readonly unknown[]): LyricsContent | null {
   if (level === 'none') {
     return plainContent(rows.map((row) => asText(field(row, 'text'))).join('\n'));
@@ -48,7 +48,7 @@ function contentOf(level: string, rows: readonly unknown[]): LyricsContent | nul
 /**
  * lrcmux：自己再去问酷狗、LRCLIB 等几家、只回最好的一份的聚合服务，作备选。公共实例每个 IP 每分钟 60 次，
  * 命中它的缓存不计数。时长按秒传。应答里的 `track` 是它从 Deezer 查到的曲目信息，不是出词那家给的：
- * 打分照样用它，但时长对得上不保证词的时间轴对得上，它会交回时长差近 30 秒的版本的词。
+ * 打分照样用它，但时长对得上不保证词的时间轴对得上，它会交回时长差近 30 秒的版本的词
  */
 export function createLrcmuxSource(host: LyricsHttpHost): LyricsSource {
   return {

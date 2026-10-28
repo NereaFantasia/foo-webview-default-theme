@@ -3,12 +3,21 @@ import { expect, it, onTestFinished, vi } from 'vitest';
 import { startFolders, foldersFocusAtom } from '../../../../src/library/folders/foldersServices.ts';
 import { foldersTreeAtom } from '../../../../src/library/folders/tree/foldersTree.ts';
 import { foldersPreviewAtom } from '../../../../src/library/folders/detail/foldersPreview.ts';
+import { foldersMediaAtom } from '../../../../src/library/folders/detail/foldersResults.ts';
 import {
   foldersDirectory,
+  foldersRoot,
+  foldersSubject,
   foldersSubjects,
 } from '../../../../src/library/folders/tree/foldersModel.ts';
 import { UnitHost } from '../../../fixtures/unitHost.ts';
-import { foldersAnswers, folderDirectory } from '../../../fixtures/foldersLibrary.ts';
+import { hostFailure } from '../../../fixtures/hostAnswers.ts';
+import {
+  foldersAnswers,
+  folderDirectory,
+  FOLDER_ROOT,
+  FOLDER_TRACKS,
+} from '../../../fixtures/foldersLibrary.ts';
 import {
   createSnapshotSlot,
   historyAtom,
@@ -87,6 +96,61 @@ it('首次选目录填入当前空记录，后退直接回到之前的页面', a
   expect(env.store.get(historyAtom).place.subject).toBe(alpha.key);
   expect(env.history.back()).toBe(true);
   expect(env.store.get(historyAtom).place.id).toBe('albums');
+});
+it('定位文件所在的目录：库根之下答目录主体，库外答 null，读不到库根答 undefined；只查不动历史', async () => {
+  const env = setup();
+  env.history.navigate({ id: 'songs' });
+  expect(await env.service.locateFile('E:\\Music\\Alpha\\Disc\\a.flac')).toBe(
+    // 目录 id 按宿主路径的小写形式算，目录树的缓存查找也不分大小写
+    foldersSubject({ rootId: 'E:\\Music', pathId: 'alpha/disc' }),
+  );
+  expect(await env.service.locateFile('D:\\Elsewhere\\clip.mp4')).toBeNull();
+  env.host.answer('library.getRoots', hostFailure('OPERATION_FAILED'));
+  expect(await env.service.locateFile('E:\\Music\\Alpha\\Disc\\a.flac')).toBeUndefined();
+  expect(env.store.get(historyAtom).place.id).toBe('songs');
+});
+it('进目录记一条深入历史，主体就是目录；在资源管理器里选中答宿主收没收', async () => {
+  const env = setup();
+  env.history.navigate({ id: 'songs' });
+  const subject = foldersSubject({ rootId: 'E:\\Music', pathId: 'alpha/disc' });
+  env.service.enter(subject);
+  expect(env.store.get(historyAtom).place).toEqual({ id: 'folders', subject });
+  env.host.answer('shell.showInExplorer', { success: true });
+  expect(await env.service.showInExplorer('D:\\Elsewhere\\clip.mp4')).toBe(true);
+  expect(env.host.callsTo('shell.showInExplorer')).toEqual([{ path: 'D:\\Elsewhere\\clip.mp4' }]);
+  env.host.answer('shell.showInExplorer', hostFailure('OPERATION_FAILED'));
+  expect(await env.service.showInExplorer('D:\\Elsewhere\\clip.mp4')).toBe(false);
+});
+it('播放并观看：宿主确认起播后才进视频页，失败留在原处', async () => {
+  const env = setup();
+  env.history.navigate({ id: 'folders' });
+  const target = { nodes: [foldersRoot(FOLDER_ROOT)], tracks: FOLDER_TRACKS };
+  env.host.answer('library.addToPlaylist', { success: true, added: 1 });
+  await env.service.playAndWatch(target);
+  expect(env.store.get(historyAtom).place.id).toBe('folders');
+  expect(env.host.callsTo('playlist.playTrack')).toEqual([]);
+  env.host.answer('library.addToPlaylist', { success: true, added: FOLDER_TRACKS.length });
+  await env.service.playAndWatch(target);
+  expect(env.host.callsTo('playlist.playTrack')).toHaveLength(1);
+  expect(env.store.get(historyAtom).place.id).toBe('video');
+});
+it('浏览视频：打开文件夹页并只看视频，文件在库根下就落在它所在的目录', async () => {
+  const env = setup();
+  env.history.navigate({ id: 'video' });
+  await env.service.browseVideo('E:\\Music\\Alpha\\Disc\\clip.mp4');
+  expect(env.store.get(foldersMediaAtom)).toBe('video');
+  expect(env.store.get(historyAtom).place).toEqual({
+    id: 'folders',
+    subject: foldersSubject({ rootId: 'E:\\Music', pathId: 'alpha/disc' }),
+  });
+  env.history.navigate({ id: 'video' });
+  env.service.results.setMedia('all');
+  await env.service.browseVideo(null);
+  expect(env.store.get(foldersMediaAtom)).toBe('video');
+  expect(env.store.get(historyAtom).place).toEqual({ id: 'folders' });
+  env.history.navigate({ id: 'video' });
+  await env.service.browseVideo('D:\\Elsewhere\\clip.mp4');
+  expect(env.store.get(historyAtom).place).toEqual({ id: 'folders' });
 });
 it('两个页面交接时，旧使用者释放不能清掉新页的预览', async () => {
   const env = setup();

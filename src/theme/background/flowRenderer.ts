@@ -20,7 +20,7 @@ interface Target {
   frame: WebGLFramebuffer;
 }
 
-/** 每个实例独占全部 GPU 对象，构造失败也回收已创建的对象。 */
+/** 每个实例独占全部 GPU 对象，构造失败也回收已创建的对象 */
 export function createFlowRenderer(canvas: HTMLCanvasElement) {
   const context = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false });
   if (!context) throw new Error('无法创建背景绘制上下文');
@@ -193,7 +193,7 @@ export function createFlowRenderer(canvas: HTMLCanvasElement) {
       },
       snapshot(): ImageData | null {
         if (disposed || !activeMotion || gl.isContextLost()) return null;
-        // 默认缓冲在呈现后可被清空；只在休眠时从保留的末级纹理重画一次缩略图。
+        // 默认缓冲在呈现后可被清空；只在休眠时从保留的末级纹理重画一次缩略图
         const size = 256;
         draw(output, composition, vertical.texture, vertical.texture, 1, 0, 0, size);
         const raw = new Uint8Array(size * size * 4);

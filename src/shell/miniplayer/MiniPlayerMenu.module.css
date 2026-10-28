@@ -17,7 +17,7 @@
   font-weight: var(--fontWeightSemibold);
 }
 
-/* 列表超出时在里面滚动，不撑高窗口。 */
+/* 列表超出时在里面滚动，不撑高窗口 */
 .list {
   display: flex;
   flex: 1 1 auto;
@@ -26,7 +26,7 @@
   overflow-y: auto;
 }
 
-/* 一行 32 高、左右 4：图标 16、隔 10、名字 12；右侧是当前值与指示。 */
+/* 一行 32 高、左右 4：图标 16、隔 10、名字 12；右侧是当前值与指示 */
 .row {
   display: flex;
   flex: none;
@@ -46,11 +46,11 @@
 }
 
 .row:hover {
-  background: var(--colorSubtleBackgroundHover);
+  background: var(--state-hover);
 }
 
 .row:active {
-  background: var(--colorSubtleBackgroundPressed);
+  background: var(--state-pressed);
 }
 
 .row:disabled {

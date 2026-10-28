@@ -1,10 +1,10 @@
 /**
  * ITU-R BS.1770-4 的响度（EBU R128 用的那一套），单位 LUFS：K 加权后每 100 ms 算一块能量，
  * Momentary 取最近 4 块（400 ms），Short-term 取最近 30 块（3 s）；整首的 Integrated 用 400 ms 块、100 ms 步进，
- * 先过绝对门限 −70 LUFS，再过「绝对门限后的均值减 10 LU」的相对门限。
+ * 先过绝对门限 −70 LUFS，再过「绝对门限后的均值减 10 LU」的相对门限
  *
  * 块能量是各声道 K 加权后均方的加权和：1 至 4 路权重都是 1；5 路以上按 fb2k 的声道次序，第 4 路（LFE）不计、
- * 第 5 路起取 1.41。单声道按一路算，不当双单声道补 3 dB。
+ * 第 5 路起取 1.41。单声道按一路算，不当双单声道补 3 dB
  */
 
 export const BLOCK_SECONDS = 0.1;
@@ -13,7 +13,7 @@ export const SHORT_TERM_BLOCKS = 30;
 export const ABSOLUTE_GATE_LUFS = -70;
 export const RELATIVE_GATE_LU = -10;
 
-/** 双二阶的系数，`a0` 已归一化为 1。 */
+/** 双二阶的系数，`a0` 已归一化为 1 */
 export interface Biquad {
   b0: number;
   b1: number;
@@ -24,7 +24,7 @@ export interface Biquad {
 
 /**
  * 按采样率求 K 加权的两级系数：高架（头部的声学效应）与 RLB 高通。f0、增益与 Q 是 BS.1770 附件 1
- * 在 48 kHz 下那两个滤波器的模拟原型，换采样率时做预畸变的双线性变换；48 kHz 下与标准表一致。
+ * 在 48 kHz 下那两个滤波器的模拟原型，换采样率时做预畸变的双线性变换；48 kHz 下与标准表一致
  */
 export function kWeighting(sampleRate: number): [Biquad, Biquad] {
   const shelfK = Math.tan((Math.PI * 1681.974450955533) / sampleRate);
@@ -60,7 +60,7 @@ export function channelWeights(channels: number): number[] {
   });
 }
 
-/** 块能量换成 LUFS；没有能量给 `null`（数学上是 −∞）。 */
+/** 块能量换成 LUFS；没有能量给 `null`（数学上是 −∞） */
 export function loudnessOf(energy: number): number | null {
   return energy > 0 ? -0.691 + 10 * Math.log10(energy) : null;
 }
@@ -68,9 +68,9 @@ export function loudnessOf(energy: number): number | null {
 const energyAt = (lufs: number): number => 10 ** ((lufs + 0.691) / 10);
 
 export interface BlockMeter {
-  /** 喂一段逐声道样本：每路取 `[from, to)`。每凑满一块回调一次该块的能量。 */
+  /** 喂一段逐声道样本：每路取 `[from, to)`。每凑满一块回调一次该块的能量 */
   push(planes: readonly Float32Array[], from?: number, to?: number): void;
-  /** 清滤波状态与没凑满的那一块：seek、换曲、丢帧之后前后的样本不连续。 */
+  /** 清滤波状态与没凑满的那一块：seek、换曲、丢帧之后前后的样本不连续 */
   reset(): void;
 }
 
@@ -82,7 +82,7 @@ export function createBlockMeter(
   const [shelf, pass] = kWeighting(sampleRate);
   const weights = channelWeights(channels);
   const blockFrames = Math.max(1, Math.round(sampleRate * BLOCK_SECONDS));
-  // 每路四个状态：两级各两个，转置直接 II 型。
+  // 每路四个状态：两级各两个，转置直接 II 型
   const state = new Float64Array(channels * 4);
   const sums = new Float64Array(channels);
   let filled = 0;
@@ -143,15 +143,15 @@ export function createBlockMeter(
 export interface LoudnessWindow {
   push(energy: number): void;
   clear(): void;
-  /** 已有的块数，最多 `SHORT_TERM_BLOCKS`。 */
+  /** 已有的块数，最多 `SHORT_TERM_BLOCKS` */
   readonly size: number;
-  /** 最近 4 块的响度；不满 4 块按已有的算，一块都没有给 `null`。 */
+  /** 最近 4 块的响度；不满 4 块按已有的算，一块都没有给 `null` */
   momentary(): number | null;
-  /** 最近 30 块的响度，不满同上。 */
+  /** 最近 30 块的响度，不满同上 */
   shortTerm(): number | null;
 }
 
-/** 实时读数的窗：只留最近 30 块。 */
+/** 实时读数的窗：只留最近 30 块 */
 export function createLoudnessWindow(): LoudnessWindow {
   const ring = new Float64Array(SHORT_TERM_BLOCKS);
   let next = 0;
@@ -183,7 +183,7 @@ export function createLoudnessWindow(): LoudnessWindow {
   };
 }
 
-/** 整首的 Integrated：`blocks` 是按时间顺序的 100 ms 块能量；不够一个 400 ms 块或全被门限挡掉给 `null`。 */
+/** 整首的 Integrated：`blocks` 是按时间顺序的 100 ms 块能量；不够一个 400 ms 块或全被门限挡掉给 `null` */
 export function integratedLoudness(blocks: ArrayLike<number>): number | null {
   const count = blocks.length - MOMENTARY_BLOCKS + 1;
   if (count <= 0) return null;

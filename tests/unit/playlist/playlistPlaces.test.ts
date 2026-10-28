@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { en } from '../../../src/i18n/en.ts';
 import { createTranslate } from '../../../src/i18n/translate.ts';
 import { historyAtom, startNavHistory } from '../../../src/nav/navHistory.ts';
+import { startObjectOpener } from '../../../src/nav/objectOpener.ts';
 import { placeName } from '../../../src/nav/places.ts';
-import { startPlaylistPlaces } from '../../../src/playlist/playlistPlaces.ts';
+import { playlistKind, startPlaylistPlaces } from '../../../src/playlist/playlistPlaces.ts';
 import { startPlaylists } from '../../../src/playback/playlists.ts';
 import { FakePlaylists, guidOf, makePlaylist } from '../../fixtures/fakePlaylists.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
+import { READY_KINDS } from '../../fixtures/objectKinds.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -23,9 +25,13 @@ async function start(names: readonly string[]) {
   const history = startNavHistory(store);
   const playlists = startPlaylists(store, host.fb);
   await playlists.ready;
-  const places = startPlaylistPlaces(store, history, playlists);
+  const objects = startObjectOpener(store, {
+    history,
+    kinds: { ...READY_KINDS, playlist: playlistKind(store, playlists) },
+  });
+  const places = startPlaylistPlaces(store, history, playlists, objects);
   const current = () => store.get(historyAtom);
-  return { host, fake, history, places, current };
+  return { host, fake, history, places, current, store, objects };
 }
 
 describe('startPlaylistPlaces', () => {
@@ -158,6 +164,32 @@ describe('startPlaylistPlaces', () => {
     await settle();
     expect(current().place).toEqual({ id: 'playlist', subject: guidOf(0) });
     expect(current().previous).toEqual({ id: 'playlist', subject: guidOf(1) });
+  });
+
+  it('从一张列表去另一张：先进历史再激活，前一条记录仍是前一张', async () => {
+    const { places, current } = await start(['Default', 'Chill', 'Road']);
+    places.open(guidOf(1));
+    places.open(guidOf(2));
+    await settle();
+    expect(current().place).toEqual({ id: 'playlist', subject: guidOf(2) });
+    expect(current().previous).toEqual({ id: 'playlist', subject: guidOf(1) });
+  });
+
+  it('可用性：清单里有的能去，读回之后没有的不能；还没读回时说不准', async () => {
+    const { objects } = await start(['Default', 'Chill']);
+    expect(objects.availability({ kind: 'playlist', guid: guidOf(1) })).toBe('ready');
+    expect(objects.availability({ kind: 'playlist', guid: guidOf(9) })).toBe('missing');
+
+    const store = createStore();
+    const idle = startObjectOpener(store, {
+      history: startNavHistory(store),
+      kinds: {
+        ...READY_KINDS,
+        playlist: playlistKind(store, { activate: () => Promise.resolve(true) }),
+      },
+    });
+    expect(idle.availability({ kind: 'playlist', guid: guidOf(1) })).toBe('pending');
+    idle.dispose();
   });
 
   it('地点名按 GUID 从清单里查列表名，查不到写地点名', () => {

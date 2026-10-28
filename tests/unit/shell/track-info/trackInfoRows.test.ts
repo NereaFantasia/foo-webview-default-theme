@@ -56,3 +56,28 @@ test('无损位深未知和有损不适用分开，源文件大小不当作分�
     trackInfoRows(state, 'file', t, 'en').some((row) => row.label === 'trackInfo.sourceSize'),
   ).toBe(true);
 });
+
+test('在线曲目的来源写平台、请求的音质与曲目 ID，走了补全时多一行音源；本地曲目没有这一节', () => {
+  const path = 'http://127.0.0.1:51234/music/stream/wy/186016.flac?q=flac';
+  const state = emptyTrackInfo(makeTrack({ path }));
+  const source = {
+    ref: { platform: 'wy', id: '186016' },
+    quality: 'flac',
+    unblocked: false,
+  } as const;
+  const values = (unblocked: boolean) =>
+    trackInfoRows(state, 'source', t, 'en', { ...source, unblocked }).map((row) => [
+      row.label,
+      row.values,
+    ]);
+  expect(values(false)).toEqual([
+    ['trackInfo.platform', ['NetEase Cloud Music']],
+    ['trackInfo.requestedQuality', ['Lossless']],
+    ['trackInfo.trackId', ['186016']],
+  ]);
+  expect(values(true)).toContainEqual(['trackInfo.audioSource', ['Third-party source']]);
+  expect(trackInfoRows(state, 'source', t, 'en')).toEqual([]);
+  expect(JSON.parse(copyInfoFields(state, t, 'en', { ...source, unblocked: true }))).toMatchObject({
+    Source: { Platform: 'NetEase Cloud Music', 'Audio source': 'Third-party source' },
+  });
+});

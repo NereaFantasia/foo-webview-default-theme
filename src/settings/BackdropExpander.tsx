@@ -7,12 +7,9 @@ import { translateAtom } from '../i18n/locale.ts';
 import {
   BACKDROP_STORAGE_KEY,
   backdropChoiceAtom,
-  backdropKey,
   materialAtom,
   backdropFallbackAtom,
-  nativeMaterialsAllowedAtom,
   backdropSolidAtom,
-  type BackdropChoice,
   type BackdropEffect,
 } from '../theme/backdrop.ts';
 import {
@@ -25,10 +22,8 @@ import {
   WINDOW_BACKGROUND_KEY,
   backgroundPreferencesAtom,
   chooseBackgroundParameter,
-  chooseBackgroundSource,
   resetBackgroundParameters,
   type BackgroundParameters,
-  type BackgroundSource,
 } from '../theme/background/windowBackground.ts';
 import {
   APPEARANCE_LIMITS,
@@ -45,32 +40,15 @@ import {
   chooseThemeBackgroundTint,
   resetThemeBackgroundTint,
 } from '../theme/background/themeBackground.ts';
-import { useService } from '../kit/useService.ts';
 import styles from './BackdropExpander.module.css';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
-import { SettingsSelect } from './SettingsSelect.tsx';
+import { BackgroundSourceRows, useBackgroundTile } from './BackgroundSourceRows.tsx';
+import { BackgroundThumb } from './thumbnails/BackgroundThumb.tsx';
 import { useHostAbsent } from './useHostAbsent.ts';
 import { useSettingsLayout } from './useSettingsLayout.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
-
-/** 跟随首选项在前，之后是主题自绘底与原生材质。 */
-const BACKDROP_CHOICES: readonly BackdropChoice[] = [
-  'inherit',
-  'none',
-  'mica',
-  'mica-alt',
-  'acrylic',
-];
-
-const CHOICE_LABELS: Readonly<Record<BackdropChoice, MessageKey>> = {
-  inherit: 'settings.backdropInherit',
-  none: 'settings.backdropNone',
-  mica: 'settings.backdropMica',
-  'mica-alt': 'settings.backdropMicaAlt',
-  acrylic: 'settings.backdropAcrylic',
-};
 
 const EFFECT_LABELS: Readonly<Record<BackdropEffect, MessageKey>> = {
   none: 'settings.backdropNone',
@@ -128,9 +106,7 @@ const IMAGE_ERRORS: Readonly<Record<BackgroundImageFailure, MessageKey>> = {
   pixels: 'settings.backgroundImageTooManyPixels',
 };
 
-type SourceChoice = BackdropChoice | Exclude<BackgroundSource, 'material'>;
-
-/** 背景图片读不出来时的错误文案；不是图片来源、没有宿主或没出错时是 undefined。 */
+/** 背景图片读不出来时的错误文案；不是图片来源、没有宿主或没出错时是 undefined */
 function useImageError(): string | undefined {
   const t = useAtomValueRawSync(translateAtom);
   const { source } = useAtomValueRawSync(backgroundPreferencesAtom);
@@ -141,7 +117,7 @@ function useImageError(): string | undefined {
     : undefined;
 }
 
-/** 选背景图片、按原路径重新读；说明行写文件名与大小限制，读不出来时写原因。 */
+/** 选背景图片、按原路径重新读；说明行写文件名与大小限制，读不出来时写原因 */
 function ImageRow() {
   const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
@@ -217,7 +193,7 @@ function ThemeTintRow() {
   );
 }
 
-/** 自绘背景的几项数值。深浅两套各记一份，调的是此刻这一档，小标题写明是哪一档。 */
+/** 自绘背景的几项数值。深浅两套各记一份，调的是此刻这一档，小标题写明是哪一档 */
 function ParameterRows() {
   const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
@@ -298,18 +274,16 @@ function ParameterRows() {
 }
 
 /**
- * 原生材质由宿主绘制；主题背景与材质回退共用取色和阅读面参数。封面、色场和图片使用各自的背景参数。
+ * 原生材质由宿主绘制；主题背景与材质回退共用取色和阅读面参数。封面、色场和图片使用各自的背景参数
  */
 export function BackdropExpander() {
   const t = useAtomValueRawSync(translateAtom);
   const choice = useAtomValueRawSync(backdropChoiceAtom);
   const material = useAtomValueRawSync(materialAtom);
   const fallback = useAtomValueRawSync(backdropFallbackAtom);
-  const allowed = useAtomValueRawSync(nativeMaterialsAllowedAtom);
   const solid = useAtomValueRawSync(backdropSolidAtom);
   const { source } = useAtomValueRawSync(backgroundPreferencesAtom);
-  const backdrop = useService(backdropKey);
-  const store = useStore();
+  const tile = useBackgroundTile();
   const absent = useHostAbsent();
   const imageError = useImageError();
   const description =
@@ -344,39 +318,16 @@ export function BackdropExpander() {
           ]}
         />
       }
-      field
+      preview={
+        <span className={styles.sourcePreview}>
+          <BackgroundThumb tile={tile} />
+        </span>
+      }
       defaultOpen={false}
-      control={(ids) => (
-        <SettingsSelect<SourceChoice>
-          {...ids}
-          options={[
-            ...BACKDROP_CHOICES.map((value) => ({
-              value,
-              label: t(CHOICE_LABELS[value]),
-              disabled: value !== 'none' && (absent || !allowed),
-            })),
-            { value: 'cover', label: t('settings.backgroundCover') },
-            { value: 'palette', label: t('settings.backgroundPalette') },
-            { value: 'image', label: t('settings.backgroundImage') },
-          ]}
-          value={source === 'material' ? (fallback ? 'none' : choice) : source}
-          onChange={(value) => {
-            if (value === 'cover' || value === 'palette' || value === 'image')
-              chooseBackgroundSource(store, value);
-            else {
-              backdrop.choose(value);
-              chooseBackgroundSource(store, 'material');
-            }
-          }}
-        />
-      )}
     >
-      {source === 'material' && !solid ? null : (
-        <>
-          {source === 'image' && <ImageRow />}
-          <ParameterRows />
-        </>
-      )}
+      <BackgroundSourceRows />
+      {source === 'image' && <ImageRow />}
+      {(source !== 'material' || solid) && <ParameterRows />}
     </SettingsExpander>
   );
 }

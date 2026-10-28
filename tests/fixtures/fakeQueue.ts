@@ -46,8 +46,15 @@ export function installFakeQueue(
 ): FakeQueue {
   const items: FakeQueueItem[] = initial.map(plain);
   const byHandle = new Map([...initial, ...known].map((track) => [track.handle, track]));
-  const changed = (origin: 'user_added' | 'user_removed' | 'playback_advance' | 'unknown') =>
-    host.emit('playback:queueChanged', { origin, count: items.length });
+  let version = 0;
+  const changed = (origin: 'user_added' | 'user_removed' | 'playback_advance' | 'unknown') => {
+    version += 1;
+    host.emit('playback:queueChanged', {
+      origin,
+      count: items.length,
+      contentVersion: String(version),
+    });
+  };
   const wire = () =>
     items.map((item, queueIndex) => ({
       ...item.track,
@@ -60,7 +67,12 @@ export function installFakeQueue(
 
   host.answerAll({
     queue: {
-      get: () => ({ success: true, items: wire(), count: items.length }),
+      get: () => ({
+        success: true,
+        items: wire(),
+        count: items.length,
+        contentVersion: String(version),
+      }),
       getCount: () => ({ success: true, count: items.length, hasItems: items.length > 0 }),
       remove: (params: HostParams) => {
         const single = numberParam(params, 'index');
@@ -68,7 +80,12 @@ export function installFakeQueue(
         const gone = new Set(indices.filter((index) => typeof index === 'number'));
         replace(items.filter((_, index) => !gone.has(index)));
         changed('user_removed');
-        return { success: true, removedCount: gone.size, queueCount: items.length };
+        return {
+          success: true,
+          removedCount: gone.size,
+          queueCount: items.length,
+          contentVersion: String(version),
+        };
       },
       clear: () => {
         const clearedCount = items.length;
@@ -81,7 +98,12 @@ export function installFakeQueue(
         const [moved] = items.splice(index, 1);
         if (moved) items.unshift(moved);
         changed('unknown');
-        return { success: true, movedIndex: index, queueCount: items.length };
+        return {
+          success: true,
+          movedIndex: index,
+          queueCount: items.length,
+          contentVersion: String(version),
+        };
       },
       setContents: (params: HostParams) => {
         const refs = listParam(params, 'items');
@@ -92,7 +114,7 @@ export function installFakeQueue(
         });
         replace(next);
         changed('unknown');
-        return { success: true, queueCount: items.length };
+        return { success: true, queueCount: items.length, contentVersion: String(version) };
       },
       insertNext: (params: HostParams) => {
         const paths = listParam(params, 'paths').filter((path) => typeof path === 'string');
@@ -123,6 +145,7 @@ export function installFakeQueue(
           movedCount,
           queueCount: items.length,
           invalidCount: 0,
+          contentVersion: String(version),
         };
       },
       playNow: (params: HostParams) => {
@@ -130,7 +153,12 @@ export function installFakeQueue(
         const [played] = items.splice(index, 1);
         if (played) host.emit('playback:trackChanged', played.track);
         changed('playback_advance');
-        return { success: true, playedIndex: index, queueCount: items.length };
+        return {
+          success: true,
+          playedIndex: index,
+          queueCount: items.length,
+          contentVersion: String(version),
+        };
       },
     },
   });

@@ -6,7 +6,7 @@ import {
 } from '../biographyModel.ts';
 import { readLastfmPhotoValue, type LastfmPhoto } from '../online/lastfmPhoto.ts';
 
-/** 有 kind 的来自 MusicBrainz，按界面语言显示；没有的是网页资料栏原文。 */
+/** 有 kind 的来自 MusicBrainz，按界面语言显示；没有的是网页资料栏原文 */
 export type BiographyFactKind = 'born' | 'died' | 'formed' | 'disbanded' | 'area' | 'aliases';
 
 export const BIOGRAPHY_FACT_KINDS: readonly BiographyFactKind[] = [
@@ -24,7 +24,7 @@ export interface BiographyFact {
   readonly value: string;
 }
 
-/** 有 kind 的按界面语言显示；没有的（网页上抄来的）照原文显示 label。 */
+/** 有 kind 的按界面语言显示；没有的（网页上抄来的）照原文显示 label */
 export type BiographyCounterKind = 'listeners' | 'plays';
 
 export interface BiographyCounter {

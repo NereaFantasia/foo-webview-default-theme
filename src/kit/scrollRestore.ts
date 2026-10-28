@@ -1,27 +1,28 @@
 /**
- * 交还的滚动位置最多挂这么久，毫秒；过了就作罢。挂着是在等条目流按快照里的过滤词重排，那在交还后的
- * 一两次提交里就到；再晚才变的条目流是用户自己的操作带来的，不该把视图拉回旧位置。
+ * 恢复滚动位置的最大等待窗口时长（毫秒）
+ * 在返回视图时等待条目流根据历史快照完成重排渲染；超时后废弃恢复请求，
+ * 避免后续由用户新操作引起的布局变动被异常拉回旧滚动位置
  */
 export const RESTORE_WINDOW_MS = 1000;
 
-/** 滚动容器上用到的那一项；浏览器会把越界的值夹到能滚到的范围里。 */
+/** 滚动容器接口，仅提取 `scrollTop` 属性；浏览器会自动限制越界赋值 */
 export interface ScrollElement {
   scrollTop: number;
 }
 
 export interface ScrollRestore {
-  /** 交还一个滚动位置；`items` 是交还时的条目流，只按身份比。 */
+  /** 挂起指定的目标滚动位置与对应的条目流引用 */
   hold(top: number, items: object): void;
-  /** 用户动了（按键、按下指针、滚轮）：挂着的作罢。 */
+  /** 用户主动交互（按键、按指针或滚轮）时取消挂起中的恢复任务 */
   cancel(): void;
-  /** 每次提交后在布局阶段调，该设就设。 */
+  /** 布局完成阶段尝试应用恢复位置，若满足重试条件则更新挂起状态 */
   commit(element: ScrollElement, items: object): void;
 }
 
 /**
- * 封面墙交还滚动的挂起。每一份条目流只设一次：滚到位就撤；目标超出了现在的内容高（库里少了专辑、
- * 换了更小的封面），浏览器停在最低处，这时只等条目流再变一次再设，其间用户自己滚过、动过或过了期限
- * 就作罢。
+ * 创建滚动位置恢复控制器，在列表条目流重新布局完成前保持预设的滚动偏移
+ * 每次条目更新仅尝试恢复一次，成功到位即解除挂起。若目标位置超出当前内容高度，
+ * 则等待下一次条目重排时重试；期间发生用户主动滚动或超时（`RESTORE_WINDOW_MS`）则自动终止恢复
  */
 export function createScrollRestore(now: () => number = () => performance.now()): ScrollRestore {
   let pending: { top: number; items: object; until: number; left?: number } | null = null;
@@ -40,7 +41,7 @@ export function createScrollRestore(now: () => number = () => performance.now())
         return;
       }
       if (waiting.left !== undefined) {
-        // 设过一次没滚到位：停下的位置变了是用户滚过，条目流没变就不必再设。
+        // 曾尝试赋值但未滚动到位：若位置变化说明发生了用户交互，若条目流未变则无需重复设置
         if (Math.abs(element.scrollTop - waiting.left) >= 1) {
           pending = null;
           return;

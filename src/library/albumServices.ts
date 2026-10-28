@@ -25,7 +25,7 @@ import { startAlbumSelection, type AlbumSelectionService } from './albums/albumS
 import { startBrowserPrefs, type BrowserPrefsService } from './albums/browserPrefs.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
-/** 专辑页用到的服务。随页面存活，离开专辑页也不停：回来时清单、封面与折叠都还在手上。 */
+/** 专辑页用到的服务。随页面存活，离开专辑页也不停：回来时清单、封面与折叠都还在手上 */
 export interface AlbumServices {
   readonly prefs: BrowserPrefsService;
   readonly browse: AlbumBrowseService;
@@ -34,9 +34,9 @@ export interface AlbumServices {
   readonly menu: AlbumMenuService;
   readonly actions: AlbumActionsService;
   readonly drag: AlbumDragService;
-  /** 封面墙下拉里的曲目。 */
+  /** 封面墙下拉里的曲目 */
   readonly dropdown: DropdownTracksService;
-  /** 按启动的逆序释放。 */
+  /** 按启动的逆序释放 */
   dispose(): void;
 }
 
@@ -49,8 +49,8 @@ export type AlbumServicesFace = AlbumBrowseFace &
 
 /**
  * 启动专辑页的各服务。它们共用一个 `store`，彼此只经原子读写，不直接互调：浏览读偏好里的分节与排序，
- * 多选读浏览算出的可见顺序，原子都有初值，所以起的先后只影响发请求的先后。逆序释放只是约定。
- * 拖出凭证由整个窗口的 `dragOut` 协调，起播、入队与发送经整页共用的 `tracks`，都从外面传进来。
+ * 多选读浏览算出的可见顺序，原子都有初值，所以起的先后只影响发请求的先后。逆序释放只是约定
+ * 拖出凭证由整个窗口的 `dragOut` 协调，起播、入队与发送经整页共用的 `tracks`，都从外面传进来
  */
 export function startAlbumServices(
   store: Store,

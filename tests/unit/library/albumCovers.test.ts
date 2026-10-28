@@ -47,6 +47,7 @@ interface SetupOptions {
   readonly retryDelays?: readonly number[];
   /** 缺省不问状态，出错一律按退避重试算。 */
   readonly probe?: CoverProbe;
+  readonly analysis?: { forget(): void };
 }
 
 function setup(host: UnitHost, options: SetupOptions = {}) {
@@ -57,6 +58,7 @@ function setup(host: UnitHost, options: SetupOptions = {}) {
     limit: options.limit ?? 24,
     retryDelays: options.retryDelays ?? [5000],
     probe: options.probe ?? null,
+    ...(options.analysis ? { analysis: options.analysis } : {}),
   });
   const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
   return {
@@ -363,6 +365,41 @@ describe('startAlbumCovers', () => {
     expect(covers.coverOf(C, 160)).toBeUndefined();
     await flush();
     expect(host.callsTo('artwork.getFb2kUrlByPath')).toHaveLength(2);
+  });
+
+  it('shown：加载完过才答 true；升档换地址、清单整份换了都要重新加载过', async () => {
+    const host = installFakeHost();
+    sizedUrls(host);
+    host.answer('library.getAlbums', albumsAnswer([A, B]));
+    const { store, covers, flush } = setup(host);
+    const albums = startAlbums(store, host.fb);
+    await albums.ready;
+    covers.coverOf(A, 160);
+    await flush();
+    expect(covers.acquire(A)).toBe(true);
+    expect(covers.shown(A)).toBe(false);
+    covers.settle(A, 'load');
+    expect(covers.shown(A)).toBe(true);
+    covers.coverOf(A, 300);
+    await flush();
+    expect(covers.shown(A)).toBe(false);
+    expect(covers.acquire(A)).toBe(true);
+    covers.settle(A, 'load');
+    expect(covers.shown(A)).toBe(true);
+    await albums.retry();
+    expect(covers.shown(A)).toBe(false);
+  });
+
+  it('清单整份换了，按地址记的取色档案一并丢掉', async () => {
+    const host = installFakeHost();
+    host.answer('library.getAlbums', albumsAnswer([A, B]));
+    const analysis = { forget: vi.fn() };
+    const { store } = setup(host, { analysis });
+    const albums = startAlbums(store, host.fb);
+    await albums.ready;
+    const before = analysis.forget.mock.calls.length;
+    await albums.retry();
+    expect(analysis.forget).toHaveBeenCalledTimes(before + 1);
   });
 
   it('释放之后不给名额，也不再叫排队的', async () => {

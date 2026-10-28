@@ -3,6 +3,8 @@ import {
   makeStyles,
   Menu as FluentMenu,
   mergeClasses,
+  resolvePositioningShorthand,
+  useMenuContext_unstable,
   OverlayDrawer as FluentOverlayDrawer,
   Popover as FluentPopover,
   TabList as FluentTabList,
@@ -10,42 +12,72 @@ import {
   type MenuProps,
   type OverlayDrawerProps,
   type PresenceComponentProps,
+  type PositioningProps,
 } from '@fluentui/react-components';
-import { useState, type ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { SurfacePresence } from './SurfacePresence.tsx';
 import { CURVE, durationVar } from './timing.ts';
+import { MENU_SURFACE_MOTION } from './MenuMotion.tsx';
+import { MENU_OVERLAP } from '../theme/menuStyles.ts';
 
 /**
- * 菜单、Popover 这类锚在控件上的浮层，照 Windows 11 的菜单：打开时 83 ms 线性淡入，同时从锚点一侧移动 10 px
+ * Popover 这类锚在控件上的浮层：打开时 83 ms 线性淡入，同时从锚点一侧移动 10 px
  * 到位，250 ms、`(0,0,0,1)`；关闭按直接退场，167 ms 反向移动，同时 83 ms 淡出，期间不接指针，
- * 选了命令的那一下之后不会再点中别的项。
+ * 选了命令的那一下之后不会再点中别的项
  *
  * 替掉 Fluent 缺省的那一套：它的淡入长 400 ms，要过一百多毫秒才接近不透明。窗口底下是宿主提供的
- * Mica，页面层是透明的，半透明的菜单在这段时间里透出底下的内容与材质，看上去像背景在闪。
+ * Mica，页面层是透明的，半透明的菜单在这段时间里透出底下的内容与材质，看上去像背景在闪
  *
  * 位移方向读 Fluent 定位层写在弹出层上的方向变量（`@fluentui/react-positioning` 的
  * `POSITIONING_SLIDE_DIRECTION_VAR_X` / `_Y`，按弹出方向取 -1、0、1），没有时不位移；位移叠加在定位层
- * 自己的 transform 之外，不顶掉它。减弱动效时缩成 1 ms，退场保护与完成回调照常执行。
+ * 自己的 transform 之外，不顶掉它。减弱动效时缩成 1 ms，退场保护与完成回调照常执行
  */
 export function FlyoutMotion(props: PresenceComponentProps) {
   return <SurfacePresence {...props} kind="flyout" />;
 }
 
-/** 菜单与 Popover 的 `surfaceMotion`，两者的插槽类型相同。 */
+/** 菜单与 Popover 的 `surfaceMotion`，两者的插槽类型相同 */
 export const FLYOUT_MOTION: MenuProps['surfaceMotion'] = {
   children: (_, props) => <FlyoutMotion {...props} />,
 };
 
 /**
  * 对话框照 WinUI ContentDialog：打开时从 1.05 缩到原大，250 ms、`(0,0,0,1)`，配 83 ms 淡入；
- * 关闭反着放大到 1.05，167 ms，配 83 ms 淡出。
+ * 关闭反着放大到 1.05，167 ms，配 83 ms 淡出
  */
 const DIALOG_MOTION: DialogProps['surfaceMotion'] = {
   children: (_, props) => <SurfacePresence {...props} kind="dialog" />,
 };
 
+const SUBMENU_OFFSET: PositioningProps['offset'] = ({ alignment }) => ({
+  mainAxis: 4 - MENU_OVERLAP,
+  crossAxis: alignment === 'bottom' ? 4 : -4,
+});
+
 export function Menu(props: ComponentProps<typeof FluentMenu>) {
-  return <FluentMenu surfaceMotion={FLYOUT_MOTION} {...props} />;
+  const parentId = useMenuContext_unstable((context) => context.triggerId);
+  const parentOpen = useMenuContext_unstable((context) => context.open);
+  const [open, setOpen] = useState(props.defaultOpen ?? false);
+  useEffect(() => {
+    if (parentId && !parentOpen) setOpen(false);
+  }, [parentId, parentOpen]);
+  return (
+    <FluentMenu
+      hoverDelay={400}
+      {...props}
+      open={parentId && !parentOpen ? false : (props.open ?? open)}
+      onOpenChange={(event, data) => {
+        setOpen(data.open);
+        props.onOpenChange?.(event, data);
+      }}
+      surfaceMotion={props.surfaceMotion ?? MENU_SURFACE_MOTION}
+      positioning={{
+        // 锚点是内缩4px的菜单项；外框之间保留8px重叠
+        ...(parentId ? { offset: SUBMENU_OFFSET } : {}),
+        ...resolvePositioningShorthand(props.positioning),
+      }}
+    />
+  );
 }
 
 export function Popover(props: ComponentProps<typeof FluentPopover>) {
@@ -70,7 +102,7 @@ export function OverlayDrawer(props: ComponentProps<typeof FluentOverlayDrawer>)
  * Tab 选中条照 WinUI SelectorBar：不在两项之间滑动，新选中项的条从中间横向展开、同时淡入，
  * 167 ms、`(0,0,0,1)`；旧的条直接消失。Fluent 的条画在选中项的 `::after` 上，自带的滑动是 `transform`
  * 过渡；这里关掉过渡，换成新选中项上的一段 CSS 动画。动画期间 Fluent 量位置时写的偏移被动画盖住，
- * 播完它已归零。只在用户换到另一项时播；首次显示、状态恢复与重复点击不播。
+ * 播完它已归零。只在用户换到另一项时播；首次显示、状态恢复与重复点击不播
  */
 const useTabListStyles = makeStyles({
   still: {

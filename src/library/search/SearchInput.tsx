@@ -7,6 +7,7 @@ import { TEXTBOX_KEYS } from '../../kit/textboxKeys.ts';
 import { useCommand } from '../../nav/useCommand.ts';
 import { SEARCH_TAB_KEYS, useSearchSession } from './searchContext.ts';
 import { searchOptionId } from './searchSuggestions.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { roleVar } from '../../theme/roles.ts';
 
 const useStyles = makeStyles({
@@ -19,6 +20,7 @@ export function SearchInput({ mode = 'sidebar' }: { readonly mode?: 'sidebar' | 
   const session = useSearchSession();
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
+  const viewControls = useViewControlStyles();
   const input = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const id = useId();
@@ -78,7 +80,11 @@ export function SearchInput({ mode = 'sidebar' }: { readonly mode?: 'sidebar' | 
       contentAfter={
         <Tooltip content={t('search.clear')} relationship="label">
           <Button
-            className={mergeClasses(classes.clear, !session.draft && classes.hidden)}
+            className={mergeClasses(
+              classes.clear,
+              viewControls.icon,
+              !session.draft && classes.hidden,
+            )}
             appearance="subtle"
             icon={<Dismiss16Regular />}
             aria-label={t('search.clear')}

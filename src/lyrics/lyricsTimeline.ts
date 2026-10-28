@@ -27,7 +27,7 @@ function wordText(word: LyricWord, display: LyricsDisplay): string {
     .join('');
 }
 
-/** 按歌词时间轴查询，毫秒；endTime也须先扣除播放校正。保留明确空白，不提前显示下一句。 */
+/** 按歌词时间轴查询，毫秒；endTime也须先扣除播放校正。保留明确空白，不提前显示下一句 */
 export function createLyricsTimeline(
   source: readonly LyricLine[],
   display: LyricsDisplay,

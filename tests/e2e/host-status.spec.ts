@@ -62,5 +62,8 @@ test('读不到版本时标题栏报读取失败', async ({ page }) => {
   });
   await page.goto('/');
   await expect(hint(page)).toHaveText('组件版本读取失败');
+  const trigger = page.locator('[data-info-center-trigger]');
+  await expect(trigger).toHaveAccessibleName(/^组件版本读取失败/);
+  await expect(trigger.locator('[data-info-badge="danger"]')).toHaveCount(1);
   expect(errors).toEqual([]);
 });

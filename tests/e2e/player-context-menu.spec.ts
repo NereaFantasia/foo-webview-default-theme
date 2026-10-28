@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+
+test.use({ screenshot: 'off' });
 import type { MenuCommand } from 'foo-webview-sdk';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import {

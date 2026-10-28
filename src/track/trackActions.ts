@@ -24,37 +24,37 @@ const BUSY: MessageKey = 'album.busy';
 
 const noticeAtom = atom<MessageKey | null>(null);
 
-/** 起播与菜单命令的失败，或上一串还没跑完、这一次没执行的提示；界面挂成横幅。 */
+/** 起播与菜单命令的失败，或上一串还没跑完、这一次没执行的提示；界面挂成横幅 */
 export const trackActionsNoticeAtom: Atom<MessageKey | null> = atom((get) => get(noticeAtom));
 
 export interface TrackActionsFace
   extends Pick<HostReadyFace, 'isAvailable'>, TrackListFace, ContextMenuFace {}
 
 /**
- * 手上已有的一批曲目（`paths` 按显示顺序，由 `trackPathOf` 拼好）怎么起播、入队、发送与执行宿主命令。
- * 起播与入队动到专用列表，整页同一时刻只跑一串，正忙时不跑、挂忙碌提示，免得用户以为没点中。
- * 失败都挂横幅；没连上宿主时一律不发、答 false。
+ * 手上已有的一批曲目（`paths` 按显示顺序，由 `trackPathOf` 拼好）怎么起播、入队、发送与执行宿主命令
+ * 起播与入队动到专用列表，整页同一时刻只跑一串，正忙时不跑、挂忙碌提示，免得用户以为没点中
+ * 失败都挂横幅；没连上宿主时一律不发、答 false
  *
  * 起播必须带上来源，宿主收下后在这里记下：专用列表里换成了什么只有起播的一方知道，漏记的话播放来源会
- * 停在上一次起播的地方。
+ * 停在上一次起播的地方
  */
 export interface TrackActionsService {
-  /** 换进专用列表，从第 `index` 首起播。 */
+  /** 换进专用列表，从第 `index` 首起播 */
   playPaths(paths: readonly string[], index: number, source: PlaybackSource): Promise<boolean>;
-  /** 同上，路径在独占的那一串里现取：正忙时不取；取不到（null）算起播失败。 */
+  /** 同上，路径在独占的那一串里现取：正忙时不取；取不到（null）算起播失败 */
   playLoaded(
     load: () => Promise<readonly string[] | null>,
     index: number,
     source: PlaybackSource,
   ): Promise<boolean>;
-  /** `next` 插到队首（下一首播放），否则接在队尾。 */
+  /** `next` 插到队首（下一首播放），否则接在队尾 */
   queuePaths(paths: readonly string[], next: boolean): Promise<boolean>;
-  /** 发到「发送到」子菜单里点的那一项；那张列表已经删了或锁着时宿主拒收，同样挂命令失败。 */
+  /** 发到「发送到」子菜单里点的那一项；那张列表已经删了或锁着时宿主拒收，同样挂命令失败 */
   sendPathsTo(paths: readonly string[], target: SendTarget): Promise<boolean>;
   sendPathsToNew(paths: readonly string[], name: string): Promise<boolean>;
-  /** 对着 `tree` 生成时的那批曲目执行其中一条命令。 */
+  /** 对着 `tree` 生成时的那批曲目执行其中一条命令 */
   runCommandIn(tree: ContextTree, node: MenuCommand): Promise<boolean>;
-  /** 其余不动专用列表的宿主命令（建智能列表之类），失败同样挂命令失败。 */
+  /** 其余不动专用列表的宿主命令（建智能列表之类），失败同样挂命令失败 */
   command(step: () => Promise<boolean>): Promise<boolean>;
   dismissNotice(): void;
   dispose(): void;
@@ -69,7 +69,7 @@ export function startTrackActions(
   let disposed = false;
   const usable = () => !disposed && host.isAvailable();
 
-  /** 成功清掉上一次的失败；被挡下时挂的忙碌提示留着，等下一次被收下再清。 */
+  /** 成功清掉上一次的失败；被挡下时挂的忙碌提示留着，等下一次被收下再清 */
   function finish(ok: boolean, failure: MessageKey): boolean {
     if (disposed) return ok;
     if (!ok) store.set(noticeAtom, failure);
@@ -122,7 +122,7 @@ export function startTrackActions(
 
 /**
  * 曲目菜单里的播放、入队与发送按这批路径执行；`name` 是发送到新列表时给新列表起的名字，`source` 是
- * 播放时记的来源。
+ * 播放时记的来源
  */
 export function pathHandlers(
   actions: Pick<TrackActionsService, 'playPaths' | 'queuePaths' | 'sendPathsTo' | 'sendPathsToNew'>,

@@ -4,8 +4,8 @@ export { seedFromPixels, type CoverSeed } from './coverPalette.ts';
 export const SAMPLE_SIZE = 64;
 
 /**
- * 必须 fetch 后解码位图：直接把 fb2k 协议的 img 画进 canvas 会导致像素读取被安全策略拒绝。
- * 非 2xx 或没有上下文时答 null；网络和解码失败时 reject。
+ * 必须 fetch 后解码位图：直接把 fb2k 协议的 img 画进 canvas 会导致像素读取被安全策略拒绝
+ * 非 2xx 或没有上下文时答 null；网络和解码失败时 reject
  */
 export async function samplePixels(
   url: string,
@@ -27,7 +27,7 @@ export async function samplePixels(
   }
 }
 
-/** Worker 完成或失败后立即释放；超时不能让换曲请求永久悬挂。 */
+/** Worker 完成或失败后立即释放；超时不能让换曲请求永久悬挂 */
 export async function seedFromUrl(url: string): Promise<CoverSeed | null> {
   const pixels = await samplePixels(url);
   if (!pixels) return null;
@@ -35,7 +35,7 @@ export async function seedFromUrl(url: string): Promise<CoverSeed | null> {
   return accent ? { hue: accent.hue, chroma: accent.chroma } : null;
 }
 
-/** 输入缓冲会转移给 Worker；需要保留像素时由调用方先复制。 */
+/** 输入缓冲会转移给 Worker；需要保留像素时由调用方先复制 */
 export function analyzeCoverPixels(
   pixels: Uint8ClampedArray<ArrayBuffer>,
   signal?: AbortSignal,

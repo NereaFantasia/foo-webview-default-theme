@@ -32,7 +32,7 @@ const INPUT = atom<PlayingCoverInput>((get) => {
   };
 });
 
-export function startColorIntegration(store: Store, options: PlayingCoverOptions = {}) {
+export function startColorIntegration(store: Store, options: PlayingCoverOptions) {
   const update = () => store.set(backgroundTransportAtom, store.get(TRANSPORT));
   const off = store.sub(TRANSPORT, update);
   update();

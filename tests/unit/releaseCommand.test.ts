@@ -59,6 +59,7 @@ function network(
     downloadStatus?: number;
     existingStable?: boolean;
     runtime?: Map<string, Uint8Array>;
+    components?: Map<string, Uint8Array>;
   } = {},
 ) {
   const calls: NetworkCall[] = [];
@@ -73,6 +74,11 @@ function network(
     if (url.includes('/releases/download/rt-node-')) {
       const bytes = options.runtime?.get(url);
       events.push(`runtime-download:${url.split('/').pop()}`);
+      return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
+    }
+    if (/\/releases\/download\/(?:ncm|lxserver)-/.test(url)) {
+      const bytes = options.components?.get(url);
+      events.push(`component-download:${url.split('/').pop()}`);
       return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
     }
     if (url === ROOT_URL)
@@ -191,6 +197,59 @@ describe('CNB 发布命令', () => {
           'runtime-download:node.part000',
           'runtime-download:LICENSE',
         ]);
+      }
+    },
+  );
+  it.each(['ncm', 'lxserver', null])(
+    '组件附件 %s 取不到时不推进根清单，两个组件都对上才发布',
+    async (missing) => {
+      const base = `https://cnb.cool/${REPO}/-/releases/download`;
+      const zips = new Map([
+        ['ncm', new Uint8Array([1])],
+        ['lxserver', new Uint8Array([2])],
+      ]);
+      const components = Object.fromEntries(
+        [...zips].map(([name, bytes]) => [
+          name,
+          {
+            version: '1.0.0',
+            url: `${base}/${name}-1.0.0/${name}-1.0.0.zip`,
+            size: bytes.length,
+            sha256: createHash('sha256').update(bytes).digest('hex'),
+            unpackedSize: 1,
+            licenses: ['MIT'],
+          },
+        ]),
+      );
+      mocks.verify.mockResolvedValueOnce({
+        version: '0.1.0',
+        tag: 'v0.1.0',
+        serial: 1,
+        manifest: MANIFEST,
+        notes: {},
+        assets: ASSETS,
+        components,
+      });
+      const { events } = network({
+        components: new Map(
+          [...zips]
+            .filter(([name]) => name !== missing)
+            .map(([name, bytes]) => [`${base}/${name}-1.0.0/${name}-1.0.0.zip`, bytes]),
+        ),
+      });
+      if (missing) {
+        await expect(command()).rejects.toThrow(
+          `公开的组件附件不可用或校验失败：${base}/${missing}-`,
+        );
+        expect(mocks.write).not.toHaveBeenCalled();
+        expect(mocks.git).not.toHaveBeenCalled();
+      } else {
+        await expect(command()).resolves.toBeUndefined();
+        const written = events.findIndex((event) => event.endsWith('manifest.json'));
+        expect(written).toBeGreaterThan(-1);
+        expect(
+          events.slice(0, written).filter((event) => event.startsWith('component-download:')),
+        ).toEqual(['component-download:ncm-1.0.0.zip', 'component-download:lxserver-1.0.0.zip']);
       }
     },
   );

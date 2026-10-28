@@ -1,3 +1,4 @@
+import { COLUMN_PREFS } from '../../../table/columns/columnMigration.ts';
 import type { LibraryTrack } from 'foo-webview-sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { useAtomValueRawSync } from 'jotai/react';
@@ -5,14 +6,9 @@ import { createColumnsModel } from '../../../table/columns/columnsModel.ts';
 import { createRowSelection } from '../../../table/rowSelection.ts';
 import { rowsOf } from '../../../table/rangeSelection.ts';
 import { TrackTable } from '../../../table/TrackTable.tsx';
-import type {
-  TableArtwork,
-  TableLinks,
-  TablePoint,
-  TableTrack,
-} from '../../../table/tableItems.ts';
+import type { TableArtwork, TablePoint, TableTrack } from '../../../table/tableItems.ts';
 import { TrackMenu } from '../../TrackMenu.tsx';
-import { SongArt } from '../../songs/SongArt.tsx';
+import { SongArt } from '../../SongArt.tsx';
 import { trackPathOf } from '../../../host/libraryContract.ts';
 import { useArtists } from '../artistsContext.ts';
 
@@ -37,7 +33,7 @@ export function ArtistHighlightTable({
   const columns = useMemo(
     () =>
       createColumnsModel(services.store, {
-        key: 'default-theme.artists-highlights-columns.v1',
+        ...COLUMN_PREFS.artists,
         offered: ['number', 'art', 'title', 'album', 'playCount', 'rating', 'duration'],
         hidden: ['rating'],
       }),
@@ -82,15 +78,6 @@ export function ArtistHighlightTable({
     () => (track, size) => <SongArt album={albumFor(track)} size={size} />,
     [albumFor],
   );
-  const links = useMemo<TableLinks>(
-    () => ({
-      album: (track) => {
-        const album = albumFor(track);
-        if (album) services.openAlbum(album);
-      },
-    }),
-    [albumFor, services],
-  );
   return (
     <>
       <TrackTable
@@ -102,7 +89,6 @@ export function ArtistHighlightTable({
         ratingStamp={state.stamp}
         numberText={numberText}
         artwork={artwork}
-        links={links}
         scrollParent={scroll}
         rank={(item, text) =>
           item.kind === 'row' && item.track?.title.toLocaleLowerCase().startsWith(text)

@@ -6,7 +6,7 @@ import {
   startSongs,
   TYPING_DEBOUNCE_MS,
 } from '../../../../src/library/songs/songsServices.ts';
-import { SONGS_SORT } from '../../../../src/library/songs/songsSort.ts';
+import { TRACK_SORT } from '../../../../src/track/trackSort.ts';
 import { songsFilterAtom } from '../../../../src/library/songs/songsFilter.ts';
 import { historyAtom, startNavHistory } from '../../../../src/nav/navHistory.ts';
 import { stringParam } from '../../../fixtures/hostAnswers.ts';
@@ -45,6 +45,7 @@ describe('歌曲页的装配', () => {
       mode: 'text',
       text: '',
       advancedText: '',
+      conditions: [],
       presets: new Set(),
       facets: { genre: new Set(['Jazz', 'Hip-Hop']), decade: new Set(), artist: new Set() },
     });
@@ -70,7 +71,7 @@ describe('歌曲页的装配', () => {
     const { store } = setup();
     expect(store.get(songsFillAtom)).toEqual({
       query: 'ALL',
-      sort: SONGS_SORT.artist,
+      sort: TRACK_SORT.artist,
       descending: false,
     });
   });
@@ -91,7 +92,7 @@ describe('歌曲页的装配', () => {
     expect(queries()).toHaveLength(3);
     songs.prefs.sortBy('title');
     await vi.advanceTimersByTimeAsync(0);
-    expect(host.callsTo('library.query').at(-1)).toMatchObject({ sort: SONGS_SORT.title });
+    expect(host.callsTo('library.query').at(-1)).toMatchObject({ sort: TRACK_SORT.title });
   });
 
   it('高级模式立即切换，编辑高级草稿仍去抖，回车立即发送', async () => {

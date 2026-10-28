@@ -33,7 +33,7 @@ test('目录定位不改变右侧集合，范围筛选与折叠后的主播放�
     limit: 1000,
     hasMore: false,
   });
-  const query = env.view.getByRole('combobox', { name: '筛选此目录中的曲目' });
+  const query = env.view.getByRole('searchbox', { name: '搜索此目录中的曲目' });
   await query.fill('Amber');
   await query.press('Enter');
   await expect(env.view.getByText('匹配 1 / 2 首').first()).toBeVisible();
@@ -47,29 +47,39 @@ test('封面、仅本层、密度和固定目录正常切换，叶目录不显�
   const env = await openFolders(page);
   await env.folder('Alpha').click();
   await expect(env.grid.getByText('Zebra', { exact: true })).toBeVisible();
-  await env.view.getByRole('button', { name: '固定目录', exact: true }).click();
+  await env.view.locator('[data-folders-more]').click();
+  await page.locator('[data-action="pin"]').click();
   await expect(env.view.getByText('常用位置', { exact: true })).toBeVisible();
-  await env.view.getByRole('button', { name: '封面', exact: true }).click();
+  await env.view.locator('[data-folders-view-panel]').click();
+  await page.getByRole('tab', { name: '封面', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(env.view.getByRole('button', { name: '进入目录 Disc', exact: true })).toBeVisible();
   await expect(env.grid.getByText('Zebra', { exact: true })).toBeVisible();
   await env.view.getByRole('button', { name: '进入目录 Disc', exact: true }).click();
   await expect(env.grid.getByText('Amber', { exact: true })).toBeVisible();
-  await env.view.getByRole('button', { name: '列表', exact: true }).click();
-  await env.view.getByRole('combobox', { name: '密度', exact: true }).click();
-  await expect(page.getByRole('option', { name: '标准', exact: true })).toHaveAttribute(
+  await env.view.locator('[data-folders-view-panel]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '标准', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
-  await page.getByRole('option', { name: '紧凑', exact: true }).click();
+  await page.getByRole('tab', { name: '紧凑', exact: true }).click();
+  await page.keyboard.press('Escape');
   const row = env.grid.getByRole('row').filter({ hasText: 'Amber' });
   await expect.poll(async () => (await row.boundingBox())?.height).toBe(32);
   await env.folder('Alpha').click();
-  await env.view.getByRole('button', { name: '仅此目录', exact: true }).click();
+  await env.view.locator('[data-filter-toggle]').click();
+  await page.getByRole('tab', { name: '仅此目录', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(env.grid.getByText('Zebra', { exact: true })).toBeVisible();
   await expect(env.grid.getByText('Amber', { exact: true })).toHaveCount(0);
-  await env.view.getByRole('button', { name: '含子目录', exact: true }).click();
+  await env.view.locator('[data-filter-toggle]').click();
+  await page.getByRole('tab', { name: '含子目录', exact: true }).click();
+  await page.keyboard.press('Escape');
   await env.folder('Music').click();
-  await env.view.getByRole('button', { name: '封面', exact: true }).click();
+  await env.view.locator('[data-folders-view-panel]').click();
+  await page.getByRole('tab', { name: '封面', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(env.view.getByRole('button', { name: '进入目录 Alpha', exact: true })).toBeVisible();
   await expect(env.grid).toHaveCount(0);
   expect(env.errors).toEqual([]);

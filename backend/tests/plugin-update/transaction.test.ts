@@ -305,7 +305,8 @@ describe('插件替换事务', () => {
       env.states.map((state) => state.phase).lastIndexOf('backingUp'),
     );
   });
-  it('没有本次的退出请求时，退出超时只取消，不结束原宿主', async () => {
+  // 下面三条真的等退出超时，单条就要 4 到 5 s，满载时会碰到默认的 5 s 上限
+  it('没有本次的退出请求时，退出超时只取消，不结束原宿主', { timeout: 20_000 }, async () => {
     const env = await setup();
     env.refuseExit();
     await env.requestExit({ attempt: 'e'.repeat(64) });
@@ -314,7 +315,7 @@ describe('插件替换事务', () => {
     expect(await env.guard.hostExited()).toBe(false);
     expect(env.guard.terminate).not.toHaveBeenCalled();
   });
-  it('收到本次退出请求后超时，强制结束原宿主再替换', async () => {
+  it('收到本次退出请求后超时，强制结束原宿主再替换', { timeout: 20_000 }, async () => {
     const env = await setup();
     env.refuseExit();
     await env.requestExit();
@@ -324,7 +325,7 @@ describe('插件替换事务', () => {
     for (const file of env.payload.files)
       expect(await hashFile(join(env.plan.componentDirectory, file.path))).toBe(file.sha256);
   });
-  it('原宿主身份核对不通过或强制结束后仍不退出时取消，不改文件', async () => {
+  it('原宿主身份核对不通过或强制结束后仍不退出时取消，不改文件', { timeout: 20_000 }, async () => {
     const refused = await setup();
     refused.refuseExit();
     await refused.requestExit();

@@ -1,3 +1,4 @@
+import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
 import {
   Button,
   DialogActions,
@@ -8,7 +9,6 @@ import {
   MenuDivider,
   MenuItem,
   MenuList,
-  MenuPopover,
   type PositioningVirtualElement,
 } from '@fluentui/react-components';
 import { Dialog, Menu } from '../../motion/Surfaces.tsx';
@@ -33,21 +33,21 @@ import { playlistsAtom } from '../../playback/playlists.ts';
 import { useService } from '../../kit/useService.ts';
 import { playlistActionsKey } from '../playlistActions.ts';
 
-/** 右键落在哪、针对哪一张（GUID）；落在清单空白处时 `guid` 为 null。 */
+/** 右键落在哪、针对哪一张（GUID）；落在清单空白处时 `guid` 为 null */
 export interface PlaylistMenuTarget {
   readonly guid: string | null;
   readonly x: number;
   readonly y: number;
-  /** 菜单关掉后焦点回到这里：没有触发键，Fluent 不会自己交还。 */
+  /** 菜单关掉后焦点回到这里：没有触发键，Fluent 不会自己交还 */
   readonly returnFocus: HTMLElement | null;
 }
 
 export interface PlaylistMenuProps {
   readonly target: PlaylistMenuTarget | null;
   onClose(): void;
-  /** 要改名的那一张；编辑态由清单那边画。 */
+  /** 要改名的那一张；编辑态由清单那边画 */
   onRename(guid: string): void;
-  /** 新建一张，与节里的「新建」是同一件事：清单那边先出一行输入名字，名字定了再建。 */
+  /** 新建一张，与节里的「新建」是同一件事：清单那边先出一行输入名字，名字定了再建 */
   onCreate(): void;
 }
 
@@ -64,12 +64,12 @@ function pointAt(x: number, y: number): PositioningVirtualElement {
 
 /**
  * 播放列表节的右键菜单与删除前的确认。菜单针对右键落在的那一张，不切换活动列表：右键一张列表本没打算
- * 去那里。落在清单空白处时换成新建、载入、保存全部三项。
+ * 去那里。落在清单空白处时换成新建、载入、保存全部三项
  *
  * 改内容的几项按锁置灰；只作用于活动列表的几项在别的列表上置灰，并提示先切过去。「转为普通列表」
- * 只在智能列表上出现。删除非空列表先确认：宿主没有回收站，删了就没了；空列表直接删。
+ * 只在智能列表上出现。删除非空列表先确认：宿主没有回收站，删了就没了；空列表直接删
  *
- * 目标按 GUID 记：菜单开着时那张被删了，菜单直接收起；确认框开着时被删了，确认也不会删到别的列表上。
+ * 目标按 GUID 记：菜单开着时那张被删了，菜单直接收起；确认框开着时被删了，确认也不会删到别的列表上
  */
 export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMenuProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -83,7 +83,7 @@ export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMe
   const inactive = entry !== undefined && entry.guid !== activeGuid;
   const activeHint = inactive ? t('playlist.activeOnly') : undefined;
 
-  /** 先把焦点交还，再跑动作：动作可能弹宿主的对话框，焦点得先落回原处。 */
+  /** 先把焦点交还，再跑动作：动作可能弹宿主的对话框，焦点得先落回原处 */
   const run = (action: () => unknown) => () => {
     target?.returnFocus?.focus();
     void action();
@@ -92,7 +92,7 @@ export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMe
     if (count > 0) setConfirming({ guid, name, count, returnFocus: target?.returnFocus ?? null });
     else void actions.remove(guid);
   };
-  // 对话框关掉时焦点回到右键的那一行：菜单先关、对话框后开，Fluent 记下的是菜单那一刻的焦点。
+  // 对话框关掉时焦点回到右键的那一行：菜单先关、对话框后开，Fluent 记下的是菜单那一刻的焦点
   const closeConfirm = (confirmed: boolean) => {
     if (confirmed && confirming) void actions.remove(confirming.guid);
     confirming?.returnFocus?.focus();

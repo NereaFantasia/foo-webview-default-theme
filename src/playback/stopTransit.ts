@@ -1,34 +1,34 @@
 /**
- * 停止之后去哪。宿主对另一行 `playTrack`（专辑起播就是这样）时，先报一次原因为 `user` 的停止，再报 starting
- * 与新曲目；照停止处理的话，播放栏会先闪成「未在播放」再画回新曲目。所以用户停止与放完先不清展示
- * （`stopping`），问一次宿主现在的状态：宿主这一轮已经发出的事件都排在应答前面，应答到时还没见到 starting，
- * 就是真的停了。见到 starting 或在放的状态，就是在换曲（`switching`）：旧曲目留着，等 trackChanged 换上新的；
- * 这期间报来的进度与时长属于还没打开的新曲目，不用。
- * 手动上一首、下一首可能直接报starting，没有先报用户停止，也要进入换曲保护。
+ * 停止状态过渡防护（TransitPhase）
+ * 当宿主切换播放目标（如从专辑起播）时，通常先广播 reason 为 'user' 的停止事件，随后立即广播 starting 与新曲目；
+ * 若直接响应停止事件，播放栏会短暂闪烁为「未在播放」再刷新新曲目
+ * 为此，收到停止事件后暂不清空界面展示（进入 `stopping` 阶段），并向宿主异步核实状态：
+ * 宿主事件排在异步响应前到达；若收到响应时仍未收到 starting 事件，则判定为真正停止并清空展示；
+ * 若期间收到 starting 事件或播放中状态，则判定为切歌过渡（进入 `switching` 阶段），保留旧曲目展示直至新曲目到达
  */
 export type TransitPhase = 'steady' | 'stopping' | 'switching';
 
 export interface StopTransit {
   phase(): TransitPhase;
-  /** 宿主报了停止（换曲途中的 `starting_another` 除外）：先核对，再决定清不清。 */
+  /** 宿主回报停止事件（换曲过程中的 starting_another 除外）：进入核对流程，暂缓清空展示 */
   stopped(): void;
-  /** 开始打开曲目：保留旧曲目与位置，不再等待停止核对。 */
+  /** 开始打开新曲目：保留旧曲目展示，解除停止核对流程 */
   starting(): void;
-  /** 新曲目到了：回到平常，答它是不是停止之后重新放起来的一首（同一首重放也要从 0 起）。 */
+  /** 新曲目就绪：恢复稳态，返回是否为停止后重新起播的曲目（用于确保同曲重播进度归零） */
   arrived(): boolean;
   dispose(): void;
 }
 
 /**
- * `confirm` 问宿主此刻是不是停着，问不到答 null；`commit` 真正清掉展示。问不到也照停止处理：事件本身
- * 就是宿主报的。
+ * 创建停止过渡协调器
+ * `confirm` 查询宿主是否处于真实停止状态（无法判定时返回 null）；`commit` 执行实际的清空展示动作
  */
 export function createStopTransit(
   confirm: () => Promise<boolean | null>,
   commit: () => void,
 ): StopTransit {
   let phase: TransitPhase = 'steady';
-  // 核对的代次：只认最近一次，换曲与释放时作废在途的那次。
+  // 状态核对代次：仅认准最新一次核对，切歌或释放时作废在途检查
   let generation = 0;
   let disposed = false;
 

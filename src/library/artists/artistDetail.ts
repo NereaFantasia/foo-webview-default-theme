@@ -7,7 +7,7 @@ import { fetchAlbumTracks, type AlbumTracksFace } from '../albumTracks.ts';
 import { albumKeyOf, albumYearOf, trackPathOf, type Album } from '../../host/libraryContract.ts';
 import type { ArtistRow, CreditedArtistsState } from './artistIndex.ts';
 
-/** 右半一张专辑：「专辑」节里是整张，「参与」节里只留他署名的那几首。 */
+/** 右半一张专辑：「专辑」节里是整张，「参与」节里只留他署名的那几首 */
 export interface ArtistAlbumGroup {
   readonly album: Album;
   readonly tracks: readonly LibraryTrack[];
@@ -17,16 +17,16 @@ export interface ArtistSummary {
   readonly ownAlbums: number;
   readonly guestAlbums: number;
   readonly tracks: number;
-  /** 秒。 */
+  /** 秒 */
   readonly duration: number;
-  /** 年份跨度，取专辑年份的最早与最晚；都没有年份时为空串。 */
+  /** 年份跨度，取专辑年份的最早与最晚；都没有年份时为空串 */
   readonly firstYear: string;
   readonly lastYear: string;
 }
 
 export interface Collaborator {
   readonly name: string;
-  /** 一起署名的曲目数。 */
+  /** 一起署名的曲目数 */
   readonly tracks: number;
 }
 
@@ -38,7 +38,7 @@ export interface PlayedTrack {
 export type ArtistPlays =
   | { readonly status: 'idle' | 'loading' }
   | { readonly status: 'ready'; readonly top: readonly PlayedTrack[] }
-  /** 播放次数取不到：多半没装 foo_playcount。不当作「都没听过」。 */
+  /** 播放次数取不到：多半没装 foo_playcount。不当作「都没听过」 */
   | { readonly status: 'unavailable' };
 
 export interface ArtistDetail {
@@ -53,23 +53,23 @@ export interface ArtistDetailState {
   readonly status: 'idle' | 'loading' | 'ready' | 'failed';
   readonly subject: string | null;
   readonly detail: ArtistDetail | null;
-  /** 有几张专辑的曲目没取到：表照出，缺的那几张不在里面。 */
+  /** 有几张专辑的曲目没取到：表照出，缺的那几张不在里面 */
   readonly partial: boolean;
   readonly refreshFailed: boolean;
   readonly stamp: number;
-  /** 署名清单还没取到（或取不到）：「参与」节空着，界面按署名清单的状态写原因。 */
+  /** 署名清单还没取到（或取不到）：「参与」节空着，界面按署名清单的状态写原因 */
   readonly guestPending: boolean;
   readonly plays: ArtistPlays;
 }
 
-/** 焦点停这么久才取右半：在列表里按方向键连续经过的艺人不取。 */
+/** 焦点停这么久才取右半：在列表里按方向键连续经过的艺人不取 */
 export const DETAIL_DEBOUNCE_MS = 300;
-/** 同时在途的取曲目请求数。 */
+/** 同时在途的取曲目请求数 */
 const CONCURRENCY = 3;
-/** 一次求值的曲目数。 */
+/** 一次求值的曲目数 */
 const PLAY_BATCH = 500;
 export const TOP_PLAYED = 10;
-/** 常合作最多列几位。 */
+/** 常合作最多列几位 */
 export const COLLABORATOR_LIMIT = 12;
 
 const IDLE: ArtistDetailState = {
@@ -90,7 +90,7 @@ function byYearThenName(a: Album, b: Album): number {
 
 /**
  * 两节各有哪些专辑。「专辑」节是专辑艺术家等于他的行；「参与」节是他署名过、专辑艺术家却不是他的
- * 其余专辑。两节都按年份从早到晚，没有年份的排在后面。
+ * 其余专辑。两节都按年份从早到晚，没有年份的排在后面
  */
 export function artistSections(
   subject: string,
@@ -105,7 +105,7 @@ export function artistSections(
   return { own: [...own].sort(byYearThenName), guest: [...guest].sort(byYearThenName) };
 }
 
-/** 统计与常合作。常合作从这些曲目的 artist 多值计数，不拆 feat. 这类字符串。 */
+/** 统计与常合作。常合作从这些曲目的 artist 多值计数，不拆 feat. 这类字符串 */
 export function summarizeArtist(
   subject: string,
   own: readonly ArtistAlbumGroup[],
@@ -146,13 +146,13 @@ export interface ArtistDetailDeps {
   readonly subject: Atom<string | null>;
   readonly albums: Atom<AlbumsState>;
   readonly credited: Atom<CreditedArtistsState>;
-  /** 艺人地点正在显示；隐藏时不启动读取。 */
+  /** 艺人地点正在显示；隐藏时不启动读取 */
   readonly active: Atom<boolean>;
 }
 
 /**
  * 读一批曲目的播放次数，取次数大于 0 的前 `TOP_PLAYED` 首。全都读不出次数时答 unavailable：
- * 没装 foo_playcount 时 `%play_count%` 不存在，`$if2` 答空串。
+ * 没装 foo_playcount 时 `%play_count%` 不存在，`$if2` 答空串
  */
 export async function readTopPlayed(
   host: Pick<ArtistDetailFace, 'titleformat'>,
@@ -183,7 +183,7 @@ export async function readTopPlayed(
 
 /**
  * 右半的取数：选中一位后停 `DETAIL_DEBOUNCE_MS` 再取，逐张取曲目（宿主缓存归组）、限并发；
- * 换人时立刻撤掉上一位的表，晚到的应答丢掉；同一位重取失败时留着旧表。曲目齐了再读播放次数。
+ * 换人时立刻撤掉上一位的表，晚到的应答丢掉；同一位重取失败时留着旧表。曲目齐了再读播放次数
  */
 export function startArtistDetail(
   store: ReturnType<typeof createStore>,
@@ -291,7 +291,7 @@ export function startArtistDetail(
     }
   }
 
-  // 上一次排程看到的输入。专辑清单与署名清单换了引用才算库变了，只是状态从读取中变成就绪不算。
+  // 上一次排程看到的输入。专辑清单与署名清单换了引用才算库变了，只是状态从读取中变成就绪不算
   let seen: {
     readonly subject: string | null;
     readonly active: boolean;
@@ -337,7 +337,7 @@ export function startArtistDetail(
   schedule();
   return {
     state: atom((get) => get(state)),
-    /** 失败后重试，或用户要求刷新：同一位重取。 */
+    /** 失败后重试，或用户要求刷新：同一位重取 */
     refresh(): void {
       schedule(true);
     },

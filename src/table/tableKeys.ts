@@ -1,8 +1,8 @@
 import type { Modifiers } from '../kit/keyedSelection.ts';
 
-// 曲目表格的键盘落点与打字即跳的匹配：在条目流上算，不碰 DOM 与滚动。位置一律是显示位（条目流的下标）。
+// 曲目表格的键盘落点与打字即跳的匹配：在条目流上算，不碰 DOM 与滚动。位置一律是显示位（条目流的下标）
 
-/** 键盘要知道的那几项；`TableItem` 满足它。 */
+/** 键盘要知道的那几项；`TableItem` 满足它 */
 export interface KeyEntry {
   readonly kind: 'row' | 'group' | 'filler';
   readonly level?: number;
@@ -15,13 +15,13 @@ export interface KeyEntries {
 }
 
 export interface TableKeySource extends KeyEntries {
-  /** 焦点所在的显示位；没有焦点时为 -1。 */
+  /** 焦点所在的显示位；没有焦点时为 -1 */
   readonly focus: number;
-  /** 一屏放得下几个条目，翻页按它跳。 */
+  /** 一屏放得下几个条目，翻页按它跳 */
   readonly pageSize: number;
   /**
    * 上下键停不停在分组头上。不停时分组头只能点到；焦点在它上面时开合键（回车、空格、← →、`*`）照样管用，
-   * 曲目行上的 ← 不回分组头。
+   * 曲目行上的 ← 不回分组头
    */
   readonly groupFocus: boolean;
 }
@@ -30,8 +30,8 @@ export type TableKeyInput = Pick<KeyboardEvent, 'key'> &
   Partial<Pick<KeyboardEvent, 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey'>>;
 
 /**
- * 一次按键归表格做什么。`land` 是焦点落到那一位上：落在曲目行上按修饰键改选中，落在分组头上只移焦点。
- * `block` 是移动键到了头：什么都不做，但缺省要拦下，外层不跟着滚。
+ * 一次按键归表格做什么。`land` 是焦点落到那一位上：落在曲目行上按修饰键改选中，落在分组头上只移焦点
+ * `block` 是移动键到了头：什么都不做，但缺省要拦下，外层不跟着滚
  */
 export type TableKeyAction =
   | { readonly kind: 'land'; readonly index: number; readonly modifiers: Modifiers }
@@ -52,7 +52,7 @@ function focusable(source: TableKeySource, index: number): boolean {
   return kind === 'row' || (kind === 'group' && source.groupFocus);
 }
 
-/** 从 `from` 起（含）朝 `step` 方向找第一个能拿焦点的位置；出界答 -1。 */
+/** 从 `from` 起（含）朝 `step` 方向找第一个能拿焦点的位置；出界答 -1 */
 function seek(source: TableKeySource, from: number, step: 1 | -1): number {
   for (let at = from; at >= 0 && at < source.count; at += step) {
     if (focusable(source, at)) return at;
@@ -60,7 +60,7 @@ function seek(source: TableKeySource, from: number, step: 1 | -1): number {
   return -1;
 }
 
-/** 翻页落点：跳一屏，落在空位上就往前找，前面没有再往回找。 */
+/** 翻页落点：跳一屏，落在空位上就往前找，前面没有再往回找 */
 function page(source: TableKeySource, step: 1 | -1): number {
   const target = Math.min(source.count - 1, Math.max(0, source.focus + step * source.pageSize));
   const ahead = seek(source, target, step);
@@ -69,7 +69,7 @@ function page(source: TableKeySource, step: 1 | -1): number {
 
 /**
  * 这一位外面套着的分组头，由外到里。上面第一个比它层级浅的分组头是它的上一层，依次往外找；
- * 曲目行与空位比任何分组头都深。
+ * 曲目行与空位比任何分组头都深
  */
 export function ancestorsOf(entries: KeyEntries, index: number): number[] {
   const item = entries.itemAt(index);
@@ -107,7 +107,7 @@ function moveTarget(source: TableKeySource, key: string): number | undefined {
   }
 }
 
-/** 分组头上的 ← →：← 收起，已收起就去上一层；→ 展开，已展开就进到下面第一条。 */
+/** 分组头上的 ← →：← 收起，已收起就去上一层；→ 展开，已展开就进到下面第一条 */
 function groupArrow(source: TableKeySource, item: KeyEntry, left: boolean): TableKeyAction {
   const { focus } = source;
   const plain = { ctrl: false, shift: false };
@@ -122,7 +122,7 @@ function groupArrow(source: TableKeySource, item: KeyEntry, left: boolean): Tabl
  * 空格：分组头开合，曲目行按修饰键选中焦点行；`*`：展开焦点分组头的同级。上下、翻页、Home、End 移焦点，
  * 带 Shift 扩选、带 Ctrl 切换落点那一行；还没有焦点时都落到第一条。分组头上的 ← → 按树的惯例开合；分组头
  * 能拿焦点时，曲目行上的 ← 回到它的分组头。Ctrl+A 全选。Shift+F10 开焦点那一条的菜单，没有焦点时也拦下缺省，
- * 与 Menu 键一致。
+ * 与 Menu 键一致
  */
 export function resolveTableKey(source: TableKeySource, input: TableKeyInput): TableKeyAction {
   if (input.altKey) return NONE;
@@ -161,9 +161,9 @@ export function resolveTableKey(source: TableKeySource, input: TableKeyInput): T
 }
 
 /**
- * 打字即跳：`rank` 给每一条打分（越小越先，undefined 是不中），分最小的赢，同分取焦点之后最近的一条。
+ * 打字即跳：`rank` 给每一条打分（越小越先，undefined 是不中），分最小的赢，同分取焦点之后最近的一条
  * 从焦点那一条（含）往下找，到头绕回。焦点外面套着的分组头与焦点本身同算「焦点自己」，最先比：接着打
- * 同一前缀时焦点留在原地。`needle` 已按 `toLocaleLowerCase` 折过，`rank` 要按同一口径比。空位不参与。
+ * 同一前缀时焦点留在原地。`needle` 已按 `toLocaleLowerCase` 折过，`rank` 要按同一口径比。空位不参与
  */
 export function findTablePrefix(
   entries: KeyEntries,

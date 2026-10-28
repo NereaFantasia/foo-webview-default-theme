@@ -25,14 +25,26 @@ export function requestBackgroundImage(store: Store, choose: boolean): void {
   store.set(requestAtom, (current) => ({ serial: current.serial + 1, choose }));
 }
 
+/** 只读图片头里的像素数，不整图解码 */
+function pixelCountOf(blob: Blob): Promise<number> {
+  const url = URL.createObjectURL(blob);
+  return new Promise<number>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image.naturalWidth * image.naturalHeight);
+    image.onerror = () => reject(new Error('图片无法读取'));
+    image.src = url;
+  }).finally(() => URL.revokeObjectURL(url));
+}
+
 async function decodeImage(bytes: Uint8Array): Promise<string> {
   if (!bytes.length) throw new Error('图片内容为空');
   const blob = new Blob([new Uint8Array(bytes)]);
-  const bitmap = await createImageBitmap(blob);
-  const pixels = bitmap.width * bitmap.height;
-  bitmap.close();
+  // 先读尺寸再解码：整图解码要先分配全部像素，超限的图不能走到这一步
+  const pixels = await pixelCountOf(blob);
   if (pixels > 64_000_000) throw new ImagePixelLimitError('图片尺寸超限');
   if (pixels <= 0) throw new Error('图片尺寸无效');
+  // 读尺寸只证明图片头可读，这里实际解码一次，确认整图可解
+  (await createImageBitmap(blob)).close();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () =>
@@ -54,7 +66,7 @@ export interface BackgroundImageOptions {
   readonly decode?: (bytes: Uint8Array) => Promise<string>;
 }
 
-/** 固定私有副本只在新图可解码后原子替换；取消选择与迟到应答不改当前图片。 */
+/** 固定私有副本只在新图可解码后原子替换；取消选择与迟到应答不改当前图片 */
 export function startBackgroundImage(store: Store, options: BackgroundImageOptions = {}) {
   const host = options.host ?? fb;
   const decode = options.decode ?? decodeImage;

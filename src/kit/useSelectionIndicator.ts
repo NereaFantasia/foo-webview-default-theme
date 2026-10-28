@@ -1,16 +1,16 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { indicatorMotion } from '../motion/selectionIndicator.ts';
 
-/** 每个导航项的竖条带 `data-nav-indicator`，值是该项的选中键；按它找出旧项与新项的竖条。 */
+/** 提取带有 `data-nav-indicator` 属性并匹配指定选中键的导航指示条元素 */
 function indicatorIn(root: HTMLElement, key: string): HTMLElement | null {
   return root.querySelector<HTMLElement>(`[data-nav-indicator="${CSS.escape(key)}"]`);
 }
 
 /**
- * 选中项换了就让竖条从旧项移到新项（`selectionIndicator.ts`）。选中键为 null 表示一项都不亮。
- *
- * 动画中又选了别的，就停掉这一段、从刚才的目标重新起步；选中键没变不打断，等它做完。
- * 任一头找不到竖条（那一节收起了、被过滤掉了、列表删了）或减弱动效时直接到位，不播。
+ * 驱动导航选中指示条平滑位移的 Hook
+ * 当选中项切换时，控制指示条从前一项平滑过渡至目标项（动画参数遵循 `selectionIndicator.ts`）
+ * - 动画进行中再次切换时，立即中断旧动画并基于当前态衔接至新目标；
+ * - 若任一端指示条节点不可用（如折叠、过滤剔除）或开启了减弱动效，则跳过补间直接定位
  */
 export function useSelectionIndicator(
   root: RefObject<HTMLElement | null>,

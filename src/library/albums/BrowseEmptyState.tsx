@@ -12,7 +12,7 @@ export interface BrowseEmptyStateProps {
   readonly phase: Extract<BrowsePhase, 'disabled' | 'empty' | 'noMatch'>;
 }
 
-/** 网格上没有图块可画时占住它的位置：媒体库没开、库是空的、过滤后一张不剩。 */
+/** 网格上没有图块可画时占住它的位置：媒体库没开、库是空的、过滤后一张不剩 */
 export function BrowseEmptyState({ phase }: BrowseEmptyStateProps) {
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();

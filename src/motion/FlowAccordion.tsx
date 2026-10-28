@@ -35,7 +35,7 @@ const useStyles = makeStyles({
   },
 });
 
-/** Fluent 保留标题与按键语义，箭头与内容使用同一组开合状态。 */
+/** Fluent 保留标题与按键语义，箭头与内容使用同一组开合状态 */
 export function AccordionHeader(props: ComponentProps<typeof FluentAccordionHeader>) {
   const { open } = useAccordionItemContext_unstable();
   const { dir } = useFluent();
@@ -104,7 +104,7 @@ const FLOW_PANEL_MOTION: AccordionPanelProps['collapseMotion'] = {
   children: (_, props) => <FlowPanelMotion {...props} />,
 };
 
-/** 内容滑回标题下方，退场完成才卸载；调用方不再按 open 提前移除子内容。 */
+/** 内容滑回标题下方，退场完成才卸载；调用方不再按 open 提前移除子内容 */
 export function AccordionPanel({
   className,
   ...props

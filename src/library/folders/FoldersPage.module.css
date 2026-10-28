@@ -1,12 +1,17 @@
+/* 筛选浮层按页面根定位，只在页面范围内移动 */
 .root {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   min-width: 0;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalL);
+  padding-top: var(--spacingVerticalL);
   gap: var(--spacingVerticalM);
   container: folders / inline-size;
+}
+.root > :not(.body) {
+  margin-inline: var(--spacingHorizontalL);
 }
 .body {
   display: flex;
@@ -20,7 +25,8 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding-inline-end: var(--spacingHorizontalM);
+  --library-content-inset: var(--spacingHorizontalL);
+  padding-inline-end: 0;
 }
 .notice {
   display: flex;

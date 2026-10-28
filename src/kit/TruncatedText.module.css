@@ -1,0 +1,50 @@
+/* 一行放不下时截断，不加省略号，右缘 24 像素渐隐。渐隐只在真的截断时才有：遮罩挂在一段以自己的横向滚动为
+   时间线的动画上，字放得下时这条时间线没有可滚的量、动画不生效，字盒与字一样宽时末尾几个字就不会被淡掉。
+   遮罩只看不透明度，实色一段取哪种不透明的颜色都一样。定时滚动时由 `marquee.ts` 的遮罩接管，宽度同为 24。 */
+.clip {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: fade-when-truncated linear both;
+  animation-timeline: scroll(self inline);
+}
+
+/* 字本身：定时滚动时整行一起位移（`useMarquee`），位移只对行内块生效 */
+.text {
+  display: inline-block;
+}
+
+/* 传送带：字后面接一份相同的字，两份之间隔 2 个字宽 */
+.gap {
+  display: inline-block;
+  width: 2em;
+}
+
+/* 传送带里左缘渐隐的宽，不滚时 0、滚动中 24，由 `marquee.ts` 的动画推 */
+@property --marquee-left {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* 传送带只在放不下时才有第二份字，所以右缘一直淡；左缘只在移动期间淡，静态的渐隐动画让位给它 */
+.clip[data-conveyor] {
+  animation: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--colorNeutralForeground1) var(--marquee-left),
+    var(--colorNeutralForeground1) calc(100% - 24px),
+    transparent
+  );
+}
+
+@keyframes fade-when-truncated {
+  from,
+  to {
+    mask-image: linear-gradient(
+      to right,
+      var(--colorNeutralForeground1) calc(100% - 24px),
+      transparent
+    );
+  }
+}

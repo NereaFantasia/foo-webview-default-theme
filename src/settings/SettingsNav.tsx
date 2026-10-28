@@ -8,7 +8,7 @@ import { reducedMotionAtom } from '../motion/reducedMotion.ts';
 import styles from './SettingsNav.module.css';
 
 export interface SettingsNavItem {
-  /** 组名，与 `SettingsGroup` 的 `group` 相同。 */
+  /** 组名，与 `SettingsGroup` 的 `group` 相同 */
   readonly id: string;
   readonly label: string;
   readonly icon: ReactElement;
@@ -16,9 +16,9 @@ export interface SettingsNavItem {
 
 export interface SettingsNavProps {
   readonly items: readonly SettingsNavItem[];
-  /** 亮着的那一组。 */
+  /** 亮着的那一组 */
   readonly current: string;
-  /** 页面窄：排成页标题下面的一行，只写组名。 */
+  /** 页面窄：排成页标题下面的一行，只写组名 */
   readonly strip: boolean;
   onSelect(id: string): void;
 }
@@ -28,13 +28,13 @@ const useStyles = makeStyles({
 });
 
 interface LayoutProps extends SettingsNavProps {
-  /** 换排法时焦点在不在卸掉的那一排里，由卸掉的一方记下、换上的一方取走。 */
+  /** 换排法时焦点在不在卸掉的那一排里，由卸掉的一方记下、换上的一方取走 */
   readonly handoff: RefObject<boolean>;
 }
 
 /**
  * 设置页的分类导航：页内导航，点一项滚到那一组，不换页。宽的时候是卡列左边的目录，导航项与侧边栏
- * 同一种；窄的时候是页标题下面的一行，放不下时横向滚。
+ * 同一种；窄的时候是页标题下面的一行，放不下时横向滚
  */
 export function SettingsNav(props: SettingsNavProps) {
   const handoff = useRef(false);
@@ -47,7 +47,7 @@ export function SettingsNav(props: SettingsNavProps) {
 
 /**
  * 页宽跨过分界时目录与分类条互换，旧的一排卸掉，焦点在它里面的话会掉到 body。卸掉时记下焦点在不在里面，
- * 换上的一排挂上时把焦点交给它亮着的那一项。卸掉一方的布局清理跑在节点移出文档之前，还查得到焦点。
+ * 换上的一排挂上时把焦点交给它亮着的那一项。卸掉一方的布局清理跑在节点移出文档之前，还查得到焦点
  */
 function useFocusHandoff(root: RefObject<HTMLElement | null>, handoff: RefObject<boolean>) {
   useLayoutEffect(() => {
@@ -100,7 +100,7 @@ function SettingsStrip({ items, current, onSelect, handoff }: LayoutProps) {
   const arrows = useArrowNavigationGroup({ axis: 'horizontal', memorizeCurrent: true });
   useFocusHandoff(root, handoff);
 
-  // 亮着的那一项滚出了这一行就带回来；竖直方向已经看得见，不会去动外面的滚动。
+  // 亮着的那一项滚出了这一行就带回来；竖直方向已经看得见，不会去动外面的滚动
   useEffect(() => {
     root.current
       ?.querySelector('[aria-current]')

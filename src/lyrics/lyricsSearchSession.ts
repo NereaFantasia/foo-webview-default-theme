@@ -40,7 +40,7 @@ export const lyricsCandidateId = (candidate: Pick<LyricsCandidate, 'source' | 'r
 export const lyricsTargetId = (target: LyricsTarget | null) =>
   target ? JSON.stringify([target.key, target.query]) : '';
 
-/** 搜索结果与已取回正文按当前曲目保留，离开页面后仍可恢复。 */
+/** 搜索结果与已取回正文按当前曲目保留，离开页面后仍可恢复 */
 export function startLyricsSearchSession(
   store: Store,
   deps: {

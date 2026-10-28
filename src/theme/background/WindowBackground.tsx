@@ -27,7 +27,7 @@ interface BackgroundView {
 }
 interface Layer {
   readonly id: number;
-  // 退出层沿用切换前的滤镜和遮罩，避免来源变更时旧画面先跳色。
+  // 退出层沿用切换前的滤镜和遮罩，避免来源变更时旧画面先跳色
   readonly view: BackgroundView;
 }
 interface Scene {
@@ -144,7 +144,7 @@ export function WindowBackground({ solidColor }: { readonly solidColor: string }
   if (sameSource(scene.current.view, view)) {
     if (scene.current.view !== view) setScene({ ...scene, current: { ...scene.current, view } });
   } else if (scene.phase !== 'fading') {
-    // 未显现的目标可直接换掉；已经开始交接时先完成这一程，再采用最新选择，避免叠层累积。
+    // 未显现的目标可直接换掉；已经开始交接时先完成这一程，再采用最新选择，避免叠层累积
     const previous = scene.phase === 'waiting' ? scene.previous : scene.current;
     setScene(
       previous && sameSource(previous.view, view)

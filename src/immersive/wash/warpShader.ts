@@ -1,18 +1,18 @@
 import { GRID, ZOOM } from './coverWarp.ts';
 
 /**
- * 封面网格变形流动的 WebGL 渲染：`coverWarp.ts` 的 `warp`、`sampleCover`、`shade` 搬进片元着色器，逐像素、全程浮点算。
+ * 封面网格变形流动的 WebGL 渲染：`coverWarp.ts` 的 `warp`、`sampleCover`、`shade` 搬进片元着色器，逐像素、全程浮点算
  *
  * 纸面色在着色器里混，canvas 不透明：若让 canvas 半透明再由合成器叠到纸面上，最后一次 8 bit 量化发生在合成器里，
  * 着色器加的抖动到那里只剩几分之一，挡不住断层。输出前加三角分布的抖动，种子逐帧换，画面流动时量化边界
- * 也不会停在同一处；canvas 必须按设备像素 1:1 渲染，低分辨率放大会把抖动抹成几个像素的团块。
+ * 也不会停在同一处；canvas 必须按设备像素 1:1 渲染，低分辨率放大会把抖动抹成几个像素的团块
  *
  * 建上下文时带 `failIfMajorPerformanceCaveat`：浏览器判定只能软件渲染（显卡进黑名单、远程桌面、
  * 无 GPU 的虚拟机）时直接拒绝，`createWarpRenderer` 返回 `null`，调用方退到静态档。着色器编译或链接失败
- * 也返回 `null`，那时这块 canvas 已经开过 WebGL、要不到 2D 上下文，静态档得换一块 canvas 画。
+ * 也返回 `null`，那时这块 canvas 已经开过 WebGL、要不到 2D 上下文，静态档得换一块 canvas 画
  */
 
-/** 抖动幅度，单位是 8 bit 色阶。 */
+/** 抖动幅度，单位是 8 bit 色阶 */
 const DITHER_LEVELS = 1.5;
 const glsl = (value: number) => value.toFixed(4);
 
@@ -88,21 +88,21 @@ void main() {
 export interface WarpFrame {
   width: number;
   height: number;
-  /** 各控制点的位移，来自 `controlOffsets`。 */
+  /** 各控制点的位移，来自 `controlOffsets` */
   offsets: Float32Array;
-  /** 整幅旋转角，来自 `rotationAt`。 */
+  /** 整幅旋转角，来自 `rotationAt` */
   angle: number;
-  /** 纸面色，线性光 0–1。 */
+  /** 纸面色，线性光 0–1 */
   paper: readonly [number, number, number];
   strength: number;
   saturation: number;
-  /** 抖动种子，每帧换一个；取值落在几百以内，太大时 `sin` 哈希在部分显卡上精度不够。 */
+  /** 抖动种子，每帧换一个；取值落在几百以内，太大时 `sin` 哈希在部分显卡上精度不够 */
   seed: number;
 }
 
 export interface WarpRenderer {
   draw(frame: WarpFrame): void;
-  /** 上下文是否已丢（驱动重置、显卡被拔）；丢了就不会再画出东西。 */
+  /** 上下文是否已丢（驱动重置、显卡被拔）；丢了就不会再画出东西 */
   lost(): boolean;
   dispose(): void;
 }
@@ -117,7 +117,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   return null;
 }
 
-/** `cover` 是预糊过的源图，边长须是 2 的幂（镜像环绕的要求）。 */
+/** `cover` 是预糊过的源图，边长须是 2 的幂（镜像环绕的要求） */
 export function createWarpRenderer(
   canvas: HTMLCanvasElement,
   cover: ImageData,
@@ -142,7 +142,7 @@ export function createWarpRenderer(
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
   gl.useProgram(program);
 
-  // 一个盖满视口的大三角形，比两个三角形拼的矩形少一条对角线上的重复着色。
+  // 一个盖满视口的大三角形，比两个三角形拼的矩形少一条对角线上的重复着色
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);

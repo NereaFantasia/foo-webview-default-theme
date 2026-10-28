@@ -11,7 +11,7 @@ import type { Store } from '../../kit/store.ts';
 import { SECTION_DIMENSIONS, type SectionDimension } from '../albumSections.ts';
 import { browserPrefsAtom } from './browserPrefs.ts';
 
-/** 有节头、能折叠的分节依据；平铺档没有节头。 */
+/** 有节头、能折叠的分节依据；平铺档没有节头 */
 export type FoldableDimension = Exclude<SectionDimension, 'album'>;
 
 const FOLDABLE = SECTION_DIMENSIONS.filter(
@@ -20,20 +20,20 @@ const FOLDABLE = SECTION_DIMENSIONS.filter(
 
 /**
  * 每个分节依据最多记这么多个折叠的节，多了丢最早折叠的：文件夹档的节键是完整路径，会一直攒。列表形态里
- * 与缺省相反的专辑也最多记这么多张。
+ * 与缺省相反的专辑也最多记这么多张
  */
 export const COLLAPSED_LIMIT = 500;
 
-/** 一种形态下各分节依据折叠了的节，数组按折叠的先后。 */
+/** 一种形态下各分节依据折叠了的节，数组按折叠的先后 */
 export type FoldedSections = Partial<Record<FoldableDimension, (string | null)[]>>;
 
 /**
  * 折叠了哪些节，存进宿主 config：`{ wall: { <分节依据>: [节键, …] } }`，节键 null 是「未知」节，
- * 数组按折叠的先后。按分节依据分开记：流派档的「未知」与文件夹档的「未知」不是同一节。
+ * 数组按折叠的先后。按分节依据分开记：流派档的「未知」与文件夹档的「未知」不是同一节
  * 按形态分开放：列表形态的节记在并列的 `list` 里，专辑分组记在 `listAlbums` 里：缺省折不折，加上与缺省
- * 相反的那些专辑键。两项没折过时不写，只有 `wall` 的旧存档原样读回。
+ * 相反的那些专辑键。两项没折过时不写，只有 `wall` 的旧存档原样读回
  *
- * 写成 type 而不是 interface：interface 没有隐式的索引签名，赋不给 config 收的 JSON 值类型。
+ * 写成 type 而不是 interface：interface 没有隐式的索引签名，赋不给 config 收的 JSON 值类型
  */
 export type CollapsedSections = {
   wall: FoldedSections;
@@ -51,7 +51,7 @@ function isPlainObject(value: unknown): value is object {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 一个分节依据下的节键：只留字符串与 null，去重，超出上限丢最早的。 */
+/** 一个分节依据下的节键：只留字符串与 null，去重，超出上限丢最早的 */
 function keysOf(raw: unknown): (string | null)[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const values: unknown[] = raw;
@@ -72,7 +72,7 @@ function sectionsOf(raw: unknown): FoldedSections {
   return folded;
 }
 
-/** 列表形态的专辑分组：缺省不是布尔值当展开；例外只留字符串，去重，超出上限丢最早的。 */
+/** 列表形态的专辑分组：缺省不是布尔值当展开；例外只留字符串，去重，超出上限丢最早的 */
 function listAlbumsOf(raw: unknown): CollapsedSections['listAlbums'] {
   if (!isPlainObject(raw)) return undefined;
   const collapsedByDefault = Reflect.get(raw, 'collapsedByDefault') === true;
@@ -84,7 +84,7 @@ function listAlbumsOf(raw: unknown): CollapsedSections['listAlbums'] {
 
 /**
  * 读回与写入都过它：整份不是对象时答 undefined，当没存；不认的分节依据、不是数组的值、不是字符串也
- * 不是 null 的节键都丢掉，其余照用。列表形态的两项没有内容时不出现。
+ * 不是 null 的节键都丢掉，其余照用。列表形态的两项没有内容时不出现
  */
 export function parseCollapsed(raw: unknown): CollapsedSections | undefined {
   if (!isPlainObject(raw)) return undefined;
@@ -96,7 +96,7 @@ export function parseCollapsed(raw: unknown): CollapsedSections | undefined {
   return value;
 }
 
-/** 封面墙在这个分节依据下折叠了哪些节；平铺档恒为空。 */
+/** 封面墙在这个分节依据下折叠了哪些节；平铺档恒为空 */
 function collapsedIn(
   value: CollapsedSections,
   dimension: SectionDimension,
@@ -104,7 +104,7 @@ function collapsedIn(
   return new Set(isFoldable(dimension) ? (value.wall[dimension] ?? []) : []);
 }
 
-/** 折叠或展开一节，答新的一份；原来的不改。平铺档原样答回。 */
+/** 折叠或展开一节，答新的一份；原来的不改。平铺档原样答回 */
 function toggleCollapsed(
   value: CollapsedSections,
   dimension: SectionDimension,
@@ -122,26 +122,26 @@ const COLLAPSED = defineConfigPref<CollapsedSections>(
   parseCollapsed,
 );
 
-/** 封面墙在当前分节依据下折叠了的节，按节键；null 是「未知」节。 */
+/** 封面墙在当前分节依据下折叠了的节，按节键；null 是「未知」节 */
 export const collapsedSectionsAtom: Atom<ReadonlySet<string | null>> = atom((get) =>
   collapsedIn(get(COLLAPSED.atom), get(browserPrefsAtom).dimension),
 );
 
-/** 存着的整份，两种形态都在里面；列表形态从这里算自己的折叠。 */
+/** 存着的整份，两种形态都在里面；列表形态从这里算自己的折叠 */
 export const collapsedValueAtom: Atom<CollapsedSections> = COLLAPSED.atom;
 
 export interface CollapsedSectionsService {
   readonly persistence: ConfigPersistence;
-  /** 连上宿主、存档读回或补写完时兑现，不会拒绝。 */
+  /** 连上宿主、存档读回或补写完时兑现，不会拒绝 */
   readonly ready: Promise<void>;
-  /** 折叠或展开当前分节依据下的一节，并记进 config；平铺档没有节可折。 */
+  /** 折叠或展开当前分节依据下的一节，并记进 config；平铺档没有节可折 */
   toggle(key: string | null): void;
-  /** 按 `change` 改整份并记进 config：列表形态的批量开合走这里。改出来的先过 `parseCollapsed`。 */
+  /** 按 `change` 改整份并记进 config：列表形态的批量开合走这里。改出来的先过 `parseCollapsed` */
   update(change: (value: CollapsedSections) => CollapsedSections): void;
   dispose(): void;
 }
 
-/** 启动折叠状态：跨重启记住，按分节依据分开。分节依据取自 `browserPrefsAtom`。 */
+/** 启动折叠状态：跨重启记住，按分节依据分开。分节依据取自 `browserPrefsAtom` */
 export function startCollapsedSections(
   store: Store,
   host: ConfigPrefFace = fb,

@@ -1,6 +1,6 @@
 import { FluentProvider, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useEffect, useId, useMemo, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createDarkTheme, createLightTheme } from '@fluentui/react-components';
 import { localeAtom } from '../i18n/locale.ts';
 import { reducedMotionAtom } from '../motion/reducedMotion.ts';
@@ -17,18 +17,24 @@ import {
 } from './background/windowBackground.ts';
 import { backgroundAppearanceAtom, tintedSurface } from './background/backgroundAppearance.ts';
 import { WindowBackground } from './background/WindowBackground.tsx';
+import { CAPSULE_FILTER, CAPSULE_GRAIN, capsuleTint } from './capsuleMaterial.ts';
 import { capsuleBlurAtom } from './playerBarStyle.ts';
 import { themeBackgroundTintAtom } from './background/themeBackground.ts';
+import { SCROLLBAR_CSS_RULES, SCROLLBAR_STYLES } from './scrollbarStyles.ts';
+import { useScrollbarActivity } from './useScrollbarActivity.ts';
+import { MenuBackgroundContext } from './MenuSurface.tsx';
+import { PanelBackgroundContext } from './PopoverSurface.tsx';
+import { surfaceTintAtom } from './surfaceTint.ts';
 
 // 改 Fluent 组件自身的样式要用 makeStyles：它和组件内部的原子类合并时后者让位，
-// CSS Modules 的类与之同优先级，谁生效取决于样式表的插入顺序。
+// CSS Modules 的类与之同优先级，谁生效取决于样式表的插入顺序
 //
 // FluentProvider 的 className 会原样抄到 Menu、Tooltip 这些浮层的挂载节点上，所以这里只放浮层里也该生效的：
 // 字体、透明底、深浅、语义变量与动效变量。高度、内边距这类版式不能放：挂载节点是贴在 body 上、
-// z-index 很高的绝对定位层，带上 `height: 100%` 就会盖住整个窗口、吞掉点击。
+// z-index 很高的绝对定位层，带上 `height: 100%` 就会盖住整个窗口、吞掉点击
 const useStyles = makeStyles({
   root: {
-    // 背景由宿主材质或独立背景层绘制，覆盖 FluentProvider 的缺省底色后才能透出。
+    // 背景由宿主材质或独立背景层绘制，覆盖 FluentProvider 的缺省底色后才能透出
     backgroundColor: 'transparent',
     fontFamily: `'Segoe UI Variable', ${tokens.fontFamilyBase}, 'Microsoft YaHei UI', sans-serif`,
     ...roleProperties(ROLE_VALUES),
@@ -41,22 +47,9 @@ const useStyles = makeStyles({
     '--capsule-filter': 'none',
     '--capsule-grain': '0',
     '--surface-grain': '0',
-    // 滚动条只留拖拽手柄：轨道、两端箭头与拐角都透明或去掉。手柄离轨道两边各让 2px 透明边，
-    // 看起来是 6px 的圆条，命中区仍是整条 10px。浮层的挂载节点也带这个类，菜单里的滚动条同样生效。
-    '& ::-webkit-scrollbar': { width: '10px', height: '10px', backgroundColor: 'transparent' },
-    '& ::-webkit-scrollbar-track, & ::-webkit-scrollbar-corner': { backgroundColor: 'transparent' },
-    '& ::-webkit-scrollbar-button': { display: 'none' },
-    '& ::-webkit-scrollbar-thumb': {
-      backgroundColor: tokens.colorNeutralStroke1,
-      backgroundClip: 'content-box',
-      border: '2px solid transparent',
-      borderRadius: tokens.borderRadiusCircular,
-    },
-    '& ::-webkit-scrollbar-thumb:hover, & ::-webkit-scrollbar-thumb:active': {
-      backgroundColor: tokens.colorNeutralStrokeAccessible,
-    },
+    '& *': SCROLLBAR_STYLES,
   },
-  // 表单控件这类由浏览器自绘的部分跟着深浅走。
+  // 表单控件这类由浏览器自绘的部分跟着深浅走
   light: { colorScheme: 'light' },
   dark: { colorScheme: 'dark' },
   reducedMotion: REDUCED_MOTION_VARIABLES,
@@ -86,10 +79,12 @@ export interface ThemeRootProps {
 }
 
 /**
- * 主题根：按系统深浅选档，挂上语义变量与动效变量，并按宿主实际用的材质调底色浓度。
- * 页面语言跟着界面语言走：读屏按它选发音，中日韩文字按它选字形。
+ * 主题根：按系统深浅选档，挂上语义变量与动效变量，并按宿主实际用的材质调底色浓度
+ * 页面语言跟着界面语言走：读屏按它选发音，中日韩文字按它选字形
  */
 export function ThemeRoot({ children }: ThemeRootProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollbarActivity(rootRef);
   const panelScope = `panel-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const ramp = useAtomValueRawSync(accentRampAtom);
   const scheme = useAtomValueRawSync(colorSchemeAtom);
@@ -102,6 +97,7 @@ export function ThemeRoot({ children }: ThemeRootProps) {
   const themed = solid && !drawn;
   const accentTone = useAtomValueRawSync(globalAccentToneAtom);
   const themeTint = useAtomValueRawSync(themeBackgroundTintAtom);
+  const surfaceTint = useAtomValueRawSync(surfaceTintAtom);
   const { content } = useAtomValueRawSync(backgroundParametersAtom);
   const appearance = useAtomValueRawSync(backgroundAppearanceAtom);
   const capsuleBlur = useAtomValueRawSync(capsuleBlurAtom);
@@ -127,14 +123,13 @@ export function ThemeRoot({ children }: ThemeRootProps) {
     }
     return next;
   }, [scheme, ramp, drawn, themed, content, tone, tint, saturation]);
-  const panelBackground = tintedSurface(
+  const surfaceNeutral =
     (drawn || themed) && scheme === 'dark'
       ? theme.colorNeutralBackground3
-      : theme.colorNeutralBackground1,
-    tone,
-    scheme,
-    { tint, saturation },
-  );
+      : theme.colorNeutralBackground1;
+  const surfaceBackground = tintedSurface(surfaceNeutral, tone, scheme, { tint, saturation });
+  const panelBackground = surfaceTint.panels ? surfaceBackground : surfaceNeutral;
+  const menuBackground = surfaceTint.menus ? surfaceBackground : surfaceNeutral;
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
@@ -153,10 +148,9 @@ export function ThemeRoot({ children }: ThemeRootProps) {
     ? `blur(${appearance.surfaceBlur}px) saturate(1.1)`
     : 'none';
   if ((drawn || material === 'none') && capsuleBlur) {
-    style['--bg-player-overlay'] =
-      `color-mix(in srgb, ${theme.colorNeutralBackground1} 45%, transparent)`;
-    style['--capsule-filter'] = 'blur(24px) saturate(1.1)';
-    style['--capsule-grain'] = '0.02';
+    style['--bg-player-overlay'] = capsuleTint(theme.colorNeutralBackground1);
+    style['--capsule-filter'] = CAPSULE_FILTER;
+    style['--capsule-grain'] = CAPSULE_GRAIN;
   }
   if (drawn || themed) {
     style['--surface-filter'] = surfaceFilter;
@@ -165,16 +159,18 @@ export function ThemeRoot({ children }: ThemeRootProps) {
   style['--reading-edge-filter'] =
     scheme === 'dark' ? 'blur(6px) saturate(1.25) brightness(1.35)' : 'blur(6px)';
   return (
-    <FluentProvider theme={theme} className={className} style={style}>
+    <FluentProvider ref={rootRef} theme={theme} className={className} style={style}>
       {/* Portal 复制类名而不复制行内变量；作用域规则让覆盖面板共享同一份不透明底色。 */}
-      <style>{`.${panelScope}.${panelScope} { --bg-panel-overlay: ${panelBackground}; }`}</style>
+      <style>{`.${panelScope}.${panelScope} { --bg-panel-overlay: ${panelBackground}; }\n${SCROLLBAR_CSS_RULES}`}</style>
       <WindowBackground
         solidColor={tintedSurface(tokens.colorNeutralBackground2, tone, scheme, {
           tint: themeTint,
           saturation: 100,
         })}
       />
-      {children}
+      <PanelBackgroundContext value={panelBackground}>
+        <MenuBackgroundContext value={menuBackground}>{children}</MenuBackgroundContext>
+      </PanelBackgroundContext>
     </FluentProvider>
   );
 }

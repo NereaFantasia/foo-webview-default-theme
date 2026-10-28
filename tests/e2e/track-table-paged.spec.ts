@@ -95,8 +95,10 @@ test('按行给评分戳：事件晚于各页的戳，两页的行都换成事�
       { handle: file('0002'), path: file('0002'), subsong: 0, rating: 4 },
       { handle: file('0008'), path: file('0008'), subsong: 0, rating: 3 },
     ],
+    handles: [file('0002'), file('0008')],
     count: 2,
     fromHook: false,
+    truncated: false,
     timestamp: 0,
   });
   await expect(row(page, 'Track 0002').getByRole('radio', { name: '4' })).toBeChecked();

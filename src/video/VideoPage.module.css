@@ -25,15 +25,34 @@
   padding-left: var(--spacingHorizontalL);
   background: var(--colorNeutralBackground1);
 }
-.heading span {
+.title {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.actions {
+  display: flex;
+  flex: none;
+  gap: var(--spacingHorizontalXS);
+  margin-inline-end: var(--spacingHorizontalS);
+}
 .controls {
   position: absolute;
   inset: auto var(--spacingHorizontalL) calc(var(--player-inset, 0px) + var(--spacingVerticalL));
+}
+/* 全屏、定位失败这类一次性提示：贴在控制条上方居中，质地与控制条一致 */
+.toast {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto var(--spacingVerticalS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+  border-radius: var(--borderRadiusMedium);
+  background: color-mix(in srgb, var(--colorNeutralBackground1) 80%, transparent);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow16);
+  color: var(--colorNeutralForeground1);
+  text-align: center;
 }
 .stage[data-expanded] .controls {
   bottom: var(--spacingVerticalL);

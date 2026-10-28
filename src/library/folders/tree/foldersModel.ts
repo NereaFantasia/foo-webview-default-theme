@@ -2,7 +2,9 @@ import type { LibraryRootInfo, LibraryDirectoryNodeInfo } from 'foo-webview-sdk'
 import { normalizeHostPath } from '../../../host/hostPath.ts';
 import { PLAY_LIMIT } from '../../../playback/libraryView.ts';
 
-/** 一次预览、播放的曲目上限，同媒体库各处起播的上限；筛选也只要这么多条命中。提示文案里写着这个数。 */
+const NAME_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/** 一次预览、播放的曲目上限，同媒体库各处起播的上限；筛选也只要这么多条命中。提示文案里写着这个数 */
 export const FOLDERS_LIMIT = PLAY_LIMIT;
 export interface FolderAddress {
   readonly rootId: string;
@@ -19,6 +21,10 @@ export interface FolderNode extends FolderAddress {
 export interface FolderRow {
   readonly node: FolderNode;
   readonly level: number;
+}
+export function compareFolderNames(a: string, b: string): number {
+  // 等价名称仍需确定次序，目录树与曲目分组的输入顺序可能不同
+  return NAME_COLLATOR.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 }
 export function foldersSubject(address: FolderAddress): string {
   return JSON.stringify([address.rootId, address.pathId]);
@@ -96,7 +102,7 @@ export function foldersVisible(
   return rows;
 }
 
-/** 只用宿主给出的绝对路径；无法归根的归档路径交给调用方提示，不能猜一个目录。 */
+/** 只用宿主给出的绝对路径；无法归根的归档路径交给调用方提示，不能猜一个目录 */
 export function foldersHitAddress(
   absolutePath: string,
   roots: readonly FolderNode[],

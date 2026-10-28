@@ -1,4 +1,4 @@
-/** 新人引导的英文文案，并进英文包；键都以 `onboarding.` 开头。 */
+/** 新人引导界面的英文文案，供主英文包合入 */
 export const onboardingEn = {
   'onboarding.step': 'Step {current} of {total}',
   'onboarding.titleLibrary': 'Media library',

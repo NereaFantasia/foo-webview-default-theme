@@ -14,7 +14,7 @@ export interface ArtistPlacesDeps {
   readonly complete?: Atom<boolean>;
 }
 
-/** 列表选择改写当前记录，外部深入才新增记录；历史中的无主体记录始终保留无主体。 */
+/** 列表选择改写当前记录，外部深入才新增记录；历史中的无主体记录始终保留无主体 */
 export function startArtistPlaces(
   store: ReturnType<typeof createStore>,
   deps: ArtistPlacesDeps,

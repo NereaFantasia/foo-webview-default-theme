@@ -1,4 +1,4 @@
-import { Button, makeStyles, Spinner } from '@fluentui/react-components';
+import { Button, makeStyles, mergeClasses, Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useState } from 'react';
 import { lastfmArtistUrl } from '../biographyModel.ts';
@@ -7,6 +7,7 @@ import type { BiographyTranslate } from '../BiographyPanel.tsx';
 import type { BiographyIdentityService } from './biographyIdentity.ts';
 import type { MusicbrainzCandidate } from './musicbrainzArtist.ts';
 import styles from './BiographyIdentityChoice.module.css';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   candidate: {
@@ -23,7 +24,7 @@ function years({ begin, end }: MusicbrainzCandidate): string {
   return from || to ? `${from}–${to}` : '';
 }
 
-/** 同名候选里帮用户辨认的一行：消歧说明、国家、起止年份，有哪项写哪项。 */
+/** 同名候选里帮用户辨认的一行：消歧说明、国家、起止年份，有哪项写哪项 */
 function describe(candidate: MusicbrainzCandidate): string {
   return [candidate.disambiguation, candidate.country, years(candidate)]
     .filter(Boolean)
@@ -39,7 +40,7 @@ export interface BiographyIdentityChoiceProps {
 
 /**
  * 没认定身份时简介里显示的那一块：正在认定、同名候选、查无此人或认定失败。选中一位后存成手选，
- * 之后取简介按他在 Last.fm 上的名字。粘贴链接确认的表单仍在面板里，排在这一块下面。
+ * 之后取简介按他在 Last.fm 上的名字。粘贴链接确认的表单仍在面板里，排在这一块下面
  */
 export function BiographyIdentityChoice({
   artist,
@@ -48,6 +49,7 @@ export function BiographyIdentityChoice({
   t,
 }: BiographyIdentityChoiceProps) {
   const classes = useStyles();
+  const viewControls = useViewControlStyles();
   const state = useAtomValueRawSync(identity.state);
   const settings = useAtomValueRawSync(prefs.state);
   const [busy, setBusy] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function BiographyIdentityChoice({
         <span>
           {t('biography.identityFailed')} · {t(`biography.${state.problem}`)}
         </span>
-        <Button size="small" onClick={() => identity.refresh()}>
+        <Button className={viewControls.field} size="small" onClick={() => identity.refresh()}>
           {t('biography.retry')}
         </Button>
       </div>
@@ -84,7 +86,7 @@ export function BiographyIdentityChoice({
           <li key={candidate.mbid}>
             <Button
               appearance="subtle"
-              className={classes.candidate}
+              className={mergeClasses(classes.candidate, viewControls.icon)}
               disabled={!!busy || !settings.loaded || settings.busy}
               icon={busy === candidate.mbid ? <Spinner size="extra-tiny" /> : undefined}
               onClick={() => void pick(candidate.mbid)}

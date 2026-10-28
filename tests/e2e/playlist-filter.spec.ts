@@ -10,8 +10,9 @@ import { albumTracks, openPlaylist, PLAYLIST_LISTS } from '../fixtures/playlistP
 
 test('列表内容变了：按同一个词重扫，框里的词不动', async ({ page }) => {
   const { host, lists, guid, view, row, errors } = await openPlaylist(page, 'Mix');
-  const filter = view.getByRole('textbox', { name: '筛选此播放列表' });
-  await filter.fill('Mix 1');
+  const filter = view.getByRole('searchbox', { name: '在此播放列表中搜索' });
+  await filter.pressSequentially('Mix 1');
+  await expect(filter).toHaveValue('Mix 1');
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 4 首');
   const tracks = [...Array.from({ length: 12 }, (_, at) => makeRow('Mix', at)), makeRow('Mix', 12)];
   lists.setTracks(guid, tracks);
@@ -20,6 +21,7 @@ test('列表内容变了：按同一个词重扫，框里的词不动', async ({
     playlist: 1,
     start: 12,
     count: 1,
+    contentVersion: '1',
   });
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 5 首');
   await expect(row('Mix 13')).toBeVisible();
@@ -27,24 +29,25 @@ test('列表内容变了：按同一个词重扫，框里的词不动', async ({
   expect(errors).toEqual([]);
 });
 
-test('进过滤前选着的行只留命中的几行，宿主那份跟着收窄；Delete 不删看不见的行', async ({
-  page,
-}) => {
-  const { lists, guid, view, row, errors } = await openPlaylist(page, 'Mix');
+test('多选后从行菜单筛选，只保留命中的选中行；Delete 不删看不见的行', async ({ page }) => {
+  const { lists, guid, view, row, errors } = await openPlaylist(
+    page,
+    'Mix',
+    albumTracks('Mix', 3, 4),
+  );
   await row('Mix 2').click();
   await page.keyboard.press('Control+A');
   await expect.poll(() => lists.content.selection(guid)).toHaveLength(12);
-  const filter = view.getByRole('textbox', { name: '筛选此播放列表' });
-  // 逐字敲：词间的空格要留在框里。
-  await filter.pressSequentially('Mix 1');
-  await expect(filter).toHaveValue('Mix 1');
+  await row('Mix 2').click({ button: 'right' });
+  await page.locator('[data-playlist-track-menu] [data-action="filter"]').click();
+  await page.locator('[data-filter="album"]').click();
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 4 首');
-  await expect.poll(() => lists.content.selection(guid)).toEqual([0, 9, 10, 11]);
-  await row('Mix 10').click({ modifiers: ['Control'] });
-  await expect.poll(() => lists.content.selection(guid)).toEqual([0, 10, 11]);
+  await expect.poll(() => lists.content.selection(guid)).toEqual([0, 1, 2, 3]);
+  await row('Mix 2').click({ modifiers: ['Control'] });
+  await expect.poll(() => lists.content.selection(guid)).toEqual([0, 2, 3]);
   await page.keyboard.press('Delete');
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 1 首');
-  await filter.fill('');
+  await view.getByRole('button', { name: '移除「专辑 Album 1」' }).click();
   await expect(row('Mix 2')).toBeVisible();
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('9 首');
   expect(errors).toEqual([]);
@@ -65,7 +68,7 @@ test('行菜单「筛选」加条件：条件行出现、只列命中；清空�
   await expect(subtitle).toContainText('匹配 4 首');
   await expect(row('Mix 1')).toHaveCount(0);
 
-  const filter = view.getByRole('textbox', { name: '筛选此播放列表' });
+  const filter = view.getByRole('searchbox', { name: '在此播放列表中搜索' });
   const clear = view.getByRole('button', { name: '清空输入' });
   await expect(clear).toHaveCount(0);
   await filter.fill('Mix 8');
@@ -89,12 +92,14 @@ test('⋯ 对命中：只保留命中先让宿主选中命中的行再裁剪；�
   const selectedAtCrop: number[][] = [];
   host.answer('menu.runMainMenuCommand', () => {
     selectedAtCrop.push(lists.content.selection(guid));
-    return { success: true };
+    return { success: true, completion: 'unknown' };
   });
-  await expect(view.getByRole('button', { name: '结果操作' })).toHaveCount(0);
-  await view.getByRole('textbox', { name: '筛选此播放列表' }).fill('Mix 1');
+  const more = view.locator('[data-playlist-more]');
+  await more.click();
+  await expect(page.locator('[data-action="keep-hits"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await view.getByRole('searchbox', { name: '在此播放列表中搜索' }).fill('Mix 1');
   await expect(view.locator('[data-playlist-subtitle]')).toContainText('匹配 4 首');
-  const more = view.getByRole('button', { name: '结果操作' });
   await more.click();
   const keep = page.locator('[data-action="keep-hits"]');
   await expect(keep).toContainText('移除其余 8 首');
@@ -114,7 +119,7 @@ test('⋯ 对命中：只保留命中先让宿主选中命中的行再裁剪；�
 
 test('离开这一页再后退回来：过滤词、条件与过滤后的行都还在', async ({ page }) => {
   const { view, row, entry, errors } = await openPlaylist(page, 'Mix', albumTracks('Mix', 3, 4));
-  await view.getByRole('textbox', { name: '筛选此播放列表' }).fill('Mix 1');
+  await view.getByRole('searchbox', { name: '在此播放列表中搜索' }).fill('Mix 1');
   await row('Mix 10').click({ button: 'right' });
   await page.locator('[data-playlist-track-menu] [data-action="filter"]').click();
   await page.locator('[data-filter="artist"]').click();
@@ -125,7 +130,7 @@ test('离开这一页再后退回来：过滤词、条件与过滤后的行都�
   await page.keyboard.press('Alt+ArrowLeft');
   const back = page.getByRole('region', { name: 'Mix', exact: true });
   await expect(back.getByRole('heading', { level: 1, name: 'Mix', exact: true })).toBeVisible();
-  await expect(back.getByRole('textbox', { name: '筛选此播放列表' })).toHaveValue('Mix 1');
+  await expect(back.getByRole('searchbox', { name: '在此播放列表中搜索' })).toHaveValue('Mix 1');
   await expect(back.locator('[data-playlist-conditions]').getByText('艺人 Artist 3')).toBeVisible();
   await expect(back.locator('[data-playlist-subtitle]')).toContainText('匹配 3 首');
   await expect(row('Mix 12')).toBeVisible();

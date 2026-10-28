@@ -41,7 +41,7 @@
   background: var(--paper-cross);
 }
 
-/* 格高 `--grid-step` 由件按刻度数给在行内样式上。 */
+/* 格高 `--grid-step` 由件按刻度数给在行内样式上 */
 .plot {
   position: absolute;
   inset: var(--spectrum-plot-inset);

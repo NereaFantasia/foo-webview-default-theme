@@ -4,7 +4,7 @@ import { biographyField } from '../details/biographyDetailsModel.ts';
 import { requestLastfmApi } from './lastfmApi.ts';
 
 export interface LastfmTopTrack {
-  /** 从 1 起。 */
+  /** 从 1 起 */
   readonly rank: number;
   readonly title: string;
   readonly plays: number;
@@ -20,7 +20,7 @@ export interface LastfmTopAlbum {
 
 export interface LastfmSimilarArtist {
   readonly artist: string;
-  /** Last.fm 给的相似度，0 到 1。 */
+  /** Last.fm 给的相似度，0 到 1 */
   readonly match: number;
   readonly url: string;
 }
@@ -40,21 +40,21 @@ function record(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Last.fm 的 JSON 由 XML 转来：只有一项时那一项是对象，不是数组。 */
+/** Last.fm 的 JSON 由 XML 转来：只有一项时那一项是对象，不是数组 */
 function items(data: unknown, outer: string, inner: string): readonly unknown[] {
   const box = record(data) ? data[outer] : undefined;
   const list = record(box) ? box[inner] : undefined;
   return Array.isArray(list) ? list : record(list) ? [list] : [];
 }
 
-/** 次数有的是字符串（曲目）、有的是数字（专辑）。 */
+/** 次数有的是字符串（曲目）、有的是数字（专辑） */
 function count(value: unknown): number {
   const number =
     typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
   return Number.isSafeInteger(number) && number >= 0 ? number : 0;
 }
 
-/** 链接要在 Last.fm 上；曲目与专辑的链接是 /music/<艺人>/... 下的页面，只认 HTTPS。 */
+/** 链接要在 Last.fm 上；曲目与专辑的链接是 /music/<艺人>/... 下的页面，只认 HTTPS */
 function lastfmUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   try {
@@ -90,7 +90,7 @@ export function readTopTracks(data: unknown): readonly LastfmTopTrack[] {
 
 export function readTopAlbums(data: unknown): readonly LastfmTopAlbum[] {
   return items(data, 'topalbums', 'album').flatMap((item): LastfmTopAlbum[] => {
-    // 有的艺人的热门专辑里混着名字是 null 的条目，那不是一张专辑。
+    // 有的艺人的热门专辑里混着名字是 null 的条目，那不是一张专辑
     if (!record(item) || !biographyField(item['name'], 500)) return [];
     if (/^\(?null\)?$/i.test(item['name'].trim())) return [];
     const url = lastfmUrl(item['url']);
@@ -112,7 +112,7 @@ export function readSimilarArtists(data: unknown, self: string): readonly Lastfm
 
 /**
  * 取一位的热门曲目、热门专辑与相似艺人，三个请求按顺序发。任一请求失败就整份失败、交回原因；
- * 查无此人当作三样都没有。有效期取三者里最早的。
+ * 查无此人当作三样都没有。有效期取三者里最早的
  */
 export async function fetchLastfmTops(
   artist: string,

@@ -19,8 +19,8 @@ export interface BrowserDataStorageOptions {
 
 export interface BrowserDataStorage extends DataWriteStorage {
   /**
-   * 一次事务读出数据库里全部业务键，不含代数；用户清除过的键为 null，原存储里的兼容值不在其中。
-   * 格式不对的值也给 null：一个坏键不连累其他键，也不退回兼容值掩盖损坏，下次写入时覆盖它。
+   * 单次事务批量读取数据库中的全部业务键值（不含内部代数键）
+   * 主动清除的键对应值为 null；若某项数据损坏或格式不符亦返回 null 并等待下次写入覆盖，避免单项错误影响整库
    */
   entries(): Promise<ReadonlyMap<string, string | null>>;
   dispose(): void;
@@ -31,8 +31,9 @@ function isGenerationKey(key: string): boolean {
 }
 
 /**
- * IndexedDB 保存可信副本；数据库没有的业务键先读原存储，写入时保留原键的兼容值。
- * 每次调用使用短事务，等 complete 才兑现，避免窗口接过写锁后仍读到上一个窗口的旧缓存。
+ * 创建基于 IndexedDB 的本地数据存储
+ * 以 IndexedDB 保存主副本，当键不存在时回退读取兼容存储，写入时同步保留兼容值
+ * 每次调用均开启独立短事务，并在事务 complete 后兑现 Promise，防止跨窗口读到陈旧缓存
  */
 export function createBrowserDataStorage(options: BrowserDataStorageOptions): BrowserDataStorage {
   let disposed = false;
@@ -110,7 +111,7 @@ export function createBrowserDataStorage(options: BrowserDataStorageOptions): Br
       await database();
       if (disposed) throw new Error('存储已关闭');
       if (!isGenerationKey(key)) options.legacy?.removeItem(key);
-      // 空值保留用户清除的事实，避免再次从旧键恢复已经删掉的值。
+      // 空值保留用户清除的事实，避免再次从旧键恢复已经删掉的值
       await transact('readwrite', (store) => store.put(null, key));
     },
     async entries() {
@@ -119,7 +120,7 @@ export function createBrowserDataStorage(options: BrowserDataStorageOptions): Br
       const [keys, values] = await new Promise<[IDBValidKey[], unknown[]]>((resolve, reject) => {
         const transaction = db.transaction(VALUES_STORE, 'readonly');
         const store = transaction.objectStore(VALUES_STORE);
-        // 同一个只读事务里的两次读取看到同一份数据，按键升序一一对应。
+        // 同一个只读事务里的两次读取看到同一份数据，按键升序一一对应
         const keyRequest = store.getAllKeys();
         const valueRequest = store.getAll();
         transaction.oncomplete = () => resolve([keyRequest.result, valueRequest.result]);
@@ -139,13 +140,13 @@ export function createBrowserDataStorage(options: BrowserDataStorageOptions): Br
 }
 
 export interface BrowserDataWriter extends DataWriter {
-  /** 读出数据库里的全部业务键；数据库或写锁不可用时明确失败，不改读原存储。 */
+  /** 读出数据库里的全部业务键；数据库或写锁不可用时明确失败，不改读原存储 */
   readAll(): Promise<DataWriteResult<ReadonlyMap<string, string | null>>>;
-  /** 取消等锁的请求；已经持锁的写入完成后再关闭数据库。 */
+  /** 取消等锁的请求；已经持锁的写入完成后再关闭数据库 */
   dispose(): void;
 }
 
-/** 每个页面由装配层持有一份，业务经传入的 run 共享它的生命周期。 */
+/** 每个页面由装配层持有一份，业务经传入的 run 共享它的生命周期 */
 export function startBrowserDataWriter(): BrowserDataWriter {
   let storage: BrowserDataStorage | null = null;
   let legacy: BrowserDataStorageOptions['legacy'] = null;
@@ -153,7 +154,7 @@ export function startBrowserDataWriter(): BrowserDataWriter {
   try {
     legacy = typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
-    // 原存储被禁不影响数据库中的宿主配置代数；尚未导入的浏览器偏好仍需由调用方处理。
+    // 原存储被禁不影响数据库中的宿主配置代数；尚未导入的浏览器偏好仍需由调用方处理
   }
   try {
     if (typeof indexedDB !== 'undefined') {

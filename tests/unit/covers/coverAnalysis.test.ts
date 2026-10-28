@@ -105,6 +105,131 @@ test('灰图的档案也可复用，不把它当作失败反复量化', async ()
   expect(analyze).toHaveBeenCalledOnce();
 });
 
+test('读成功的档案按地址记下供 peek，forget 清掉；读不到图的不记，read 仍不凭地址复用', async () => {
+  const sample = vi.fn(async (url: string) => (url === 'none' ? null : pixels()));
+  const service = createCoverAnalysis({
+    sample,
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  expect(service.peek('a')).toBeUndefined();
+  const profile = await service.read('a');
+  expect(service.peek('a')).toBe(profile);
+  await service.read('none');
+  expect(service.peek('none')).toBeUndefined();
+  service.forget();
+  expect(service.peek('a')).toBeUndefined();
+  await service.read('a');
+  expect(sample).toHaveBeenCalledTimes(3);
+});
+
+test('按地址记的档案留最近 512 份，peek 命中也算最近用过', async () => {
+  const service = createCoverAnalysis({
+    sample: async () => pixels(),
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  for (let index = 0; index < 512; index += 1) await service.read(String(index));
+  expect(service.peek('0')).toBeDefined();
+  await service.read('512');
+  expect(service.peek('0')).toBeDefined();
+  expect(service.peek('1')).toBeUndefined();
+  expect(service.peek('512')).toBeDefined();
+});
+
+test('读取者都中止后，没开始的排队请求不再采样；有人还要就留着', async () => {
+  const gate = defer<Uint8ClampedArray<ArrayBuffer> | null>();
+  const sample = vi.fn((url: string) =>
+    url === 'busy' ? gate.promise : Promise.resolve(pixels()),
+  );
+  const service = createCoverAnalysis({
+    sample,
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  const busy = service.read('busy');
+  await flush();
+  const first = new AbortController();
+  const second = new AbortController();
+  const dropped = service.read('dropped', first.signal);
+  const droppedRejected = expect(dropped).rejects.toThrow('已取消');
+  service.read('shared', first.signal);
+  const shared = service.read('shared', second.signal);
+  first.abort();
+  gate.resolve(pixels());
+  await busy;
+  await droppedRejected;
+  expect(await shared).not.toBeNull();
+  expect(sample.mock.calls.map(([url]) => url)).toEqual(['busy', 'shared']);
+  second.abort();
+});
+
+test('已开始的请求不因读取者中止而放弃，档案照样记下', async () => {
+  const gate = defer<Uint8ClampedArray<ArrayBuffer> | null>();
+  const service = createCoverAnalysis({
+    sample: () => gate.promise,
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  const reader = new AbortController();
+  const reading = service.read('a', reader.signal);
+  await flush();
+  reader.abort();
+  gate.resolve(pixels());
+  expect(service.peek('a')).toBeUndefined();
+  expect(await reading).not.toBeNull();
+  expect(service.peek('a')).toBe(await reading);
+});
+
+test('作废的请求让位给同地址后来的读取，收尾时不把新的摘掉；已中止的信号不排队', async () => {
+  const busy = defer<Uint8ClampedArray<ArrayBuffer> | null>();
+  const next = defer<Uint8ClampedArray<ArrayBuffer> | null>();
+  const sample = vi.fn((url: string) => (url === 'busy' ? busy.promise : next.promise));
+  const service = createCoverAnalysis({
+    sample,
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  const holding = service.read('busy');
+  await flush();
+  const left = new AbortController();
+  const old = service.read('a', left.signal);
+  const oldRejected = expect(old).rejects.toThrow('已取消');
+  left.abort();
+  const again = service.read('a');
+  expect(again).not.toBe(old);
+  const aborted = AbortSignal.abort(new Error('不要了'));
+  await expect(service.read('b', aborted)).rejects.toThrow('不要了');
+  busy.resolve(pixels());
+  await holding;
+  await oldRejected;
+  expect(service.read('a')).toBe(again);
+  next.resolve(pixels());
+  expect(await again).not.toBeNull();
+  expect(sample.mock.calls.map(([url]) => url)).toEqual(['busy', 'a']);
+});
+
+test('作废的请求不占队列名额', async () => {
+  const gate = defer<Uint8ClampedArray<ArrayBuffer> | null>();
+  const service = createCoverAnalysis({
+    sample: () => gate.promise,
+    analyze: async (data) => profileFromPixels(data),
+  });
+  onTestFinished(() => service.dispose());
+  const busy = service.read('busy');
+  const left = new AbortController();
+  const rejected = Array.from({ length: 31 }, (_, at) =>
+    expect(service.read(String(at), left.signal)).rejects.toThrow('已取消'),
+  );
+  await expect(service.read('overflow')).rejects.toThrow('队列已满');
+  left.abort();
+  const fresh = service.read('fresh');
+  gate.resolve(pixels());
+  await busy;
+  await Promise.all(rejected);
+  expect(await fresh).not.toBeNull();
+});
+
 test('读取超时会中止信号，后续请求仍能继续', async () => {
   vi.useFakeTimers();
   const sample = (url: string, signal: AbortSignal) =>

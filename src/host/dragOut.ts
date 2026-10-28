@@ -3,13 +3,12 @@ import { settle } from './hostCall.ts';
 import { waitForHost, type HostReadyFace } from './waitForHost.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
-/** 宿主给的凭证 30 s 过期；留出余量，快到期的不再用，免得拖出去被宿主拒掉。毫秒。 */
+/** 拖拽外发凭证的本地安全有效期（毫秒，留出 5 秒余量防止向宿主提交时越界失效） */
 const TOKEN_TTL_MS = 25_000;
 
 /**
- * `prepareDrag` 答这几种时，这个页面本次运行里都拖不出去：文档来源不受信（开发服务器）、这个窗口
- * 不能拖出、窗口没有拖放登记。记成不支持，不再每次按下都去取曲目、换凭证；宿主之后经
- * `dnd:capabilitiesChanged` 报能拖了，照新的来。
+ * 判定为当前环境完全不支持原生拖拽外发的错误码集合（如同源未受信任、窗口未注册 OLE 拖放等）
+ * 命中后标记为不可用以避免后续每次按键均发起无效凭证申请，直到接收到宿主的能力变更通知
  */
 const UNSUPPORTED_CODES: ReadonlySet<string> = new Set([
   'ORIGIN_DENIED',
@@ -17,7 +16,7 @@ const UNSUPPORTED_CODES: ReadonlySet<string> = new Set([
   'NOT_FOUND',
 ]);
 
-/** `dragstart` 里要写的那两样；浏览器的 `DataTransfer` 满足它。 */
+/** HTML5 拖拽事件 `dragstart` 中 DataTransfer 所需的最小操作接口 */
 export type DragData = Pick<DataTransfer, 'setData' | 'effectAllowed'>;
 
 export interface DragOutFace extends HostReadyFace {
@@ -27,36 +26,35 @@ export interface DragOutFace extends HostReadyFace {
   };
 }
 
-/** 一次按下拿到的票据。 */
+/** 指针按下触发的单次拖拽凭据上下文对象 */
 export interface DragOutTicket {
-  /** 还是不是最近一次按下；不是了，这一次取到的东西都该丢掉。 */
+  /** 检查当前票据是否仍对应最近一次指针交互；若已被后续操作顶替则废弃 */
   current(): boolean;
-  /** 宿主支不支持把文件拖出窗口。 */
+  /** 检查宿主当前是否支持文件外拖能力 */
   supported(): Promise<boolean>;
-  /** 用这批路径换凭证，记在 `owner` 名下（拖出源自己认得的载荷身份）。票据过期了就不发。 */
+  /** 提交待拖拽文件路径集合换取 OLE 凭证，并绑定载荷属主（`owner`） */
   mint(owner: string, paths: readonly string[]): Promise<void>;
 }
 
 /**
- * 整个窗口的拖出凭证。宿主每个窗口同时只认一张凭证，后换的顶掉先换的；所以各拖出源（封面墙、曲目表）
- * 共用这里的代次：哪个源被按下都先 `claim`，此前任何源在途的换凭证随之作废、到手的凭证丢掉，
- * 晚到的旧应答顶不掉新的。
+ * 窗口级原生文件外拖服务接口
+ * 宿主单窗口仅保留一份有效凭据；多个拖拽触发源共用单例代数机制，任一源触发 `claim` 即自动废弃先前在途的所有旧请求
  */
 export interface DragOutService {
   claim(): DragOutTicket;
-  /** 作废最近一次按下（例如普通单击收成了单选，不会接着拖）：在途的不再发，到手的丢掉。 */
+  /** 作废最近一次交互（例如普通单击收敛为单选而无需拖拽）：在途任务丢弃，不再发起凭据申请 */
   cancel(): void;
   /**
-   * `dragstart` 里同步调：`owner` 的凭证到手、没过期就交给宿主，用过即丢。答有没有带上文件。
-   * 交给宿主之后不许再改 `effectAllowed`：宿主要它恰好是 `copy`，`applyDragToken` 已经写好。
+   * 在 `dragstart` 事件中同步调用：验证凭证有效且未过期后注入宿主 OLE 载荷，用后即弃
+   * 凭证应用后禁止修改 `effectAllowed`（须严格保持为 `copy`）
    */
   apply(dataTransfer: DragData, owner: string): boolean;
   dispose(): void;
 }
 
 /**
- * 启动拖出凭证的协调。能力（`dnd.getCapabilities` 的 `dragOut`）只缓存成功的应答，宿主重新注册时
- * 经 `dnd:capabilitiesChanged` 改；问失败了下次按下再问。
+ * 启动窗口原生拖拽凭据调度服务
+ * 仅缓存成功的外拖能力状态；若查询失败则在下次按键时重试，环境能力变动时根据事件动态同步
  */
 export function startDragOut(host: DragOutFace = fb): DragOutService {
   let disposed = false;

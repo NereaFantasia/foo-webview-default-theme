@@ -32,7 +32,7 @@ export function createFlowMotion(): FlowMotion {
   };
 }
 
-/** 反向时从当前速度开始；初次显示、静止或休眠恢复时可直接采用当前播放状态。 */
+/** 反向时从当前速度开始；初次显示、静止或休眠恢复时可直接采用当前播放状态 */
 export function setFlowPaused(state: FlowMotion, paused: boolean, immediate = false): void {
   const target = paused ? 0.08 : 1;
   if (immediate) {
@@ -45,7 +45,7 @@ export function setFlowPaused(state: FlowMotion, paused: boolean, immediate = fa
   }
 }
 
-/** 固定为 120 BPM、60 Hz 的运动配方；绘制限帧不改变速度，休眠时间由调用方排除。 */
+/** 固定为 120 BPM、60 Hz 的运动配方；绘制限帧不改变速度，休眠时间由调用方排除 */
 export function advanceFlowMotion(state: FlowMotion, milliseconds: number): void {
   const elapsed = Math.max(0, Math.min(100, milliseconds));
   const changing = Math.min(elapsed, DURATION_MS.slow - state.speedElapsed);
@@ -56,7 +56,7 @@ export function advanceFlowMotion(state: FlowMotion, milliseconds: number): void
       ? state.speedTarget
       : state.speedFrom +
         ((state.speedTarget - state.speedFrom) * state.speedElapsed) / DURATION_MS.slow;
-  // 速度线性变化时按梯形面积积分；跨过过渡终点的余下时间按目标速度推进。
+  // 速度线性变化时按梯形面积积分；跨过过渡终点的余下时间按目标速度推进
   state.remainder +=
     ((changing * (previousSpeed + state.speed)) / 2 + (elapsed - changing) * state.speedTarget) *
     FLOW_RATE;

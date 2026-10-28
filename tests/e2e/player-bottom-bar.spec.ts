@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { VOLUME_MEMORY_MS } from '../../src/shell/player/volume/volumeControl.ts';
+import { VOLUME_MEMORY_MS } from '../../src/playback/volume/volumeControl.ts';
 import { positionOf } from '../../src/playback/volumeScale.ts';
 import { boxOf, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 
@@ -43,6 +43,7 @@ test('缺省是底部通栏：标题栏 48 高、没有播放的件，通栏 88 
     'output',
     'mute',
     'volume-slider',
+    'desktopLyrics',
     'mini',
     'immersive',
   ]);

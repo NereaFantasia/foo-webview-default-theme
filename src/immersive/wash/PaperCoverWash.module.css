@@ -1,4 +1,4 @@
-/* 字色只用来读回算好的纸面染色，这一层里没有字。 */
+/* 字色只用来读回算好的纸面染色，这一层里没有字 */
 .wash {
   position: absolute;
   inset: 0;
@@ -7,7 +7,7 @@
   color: var(--paper-tint);
 }
 
-/* 两档的根元素自己铺满这一层，这里只管显隐。 */
+/* 两档的根元素自己铺满这一层，这里只管显隐 */
 .layer {
   opacity: 0;
   transition: opacity var(--motion-faster) var(--curveLinear);

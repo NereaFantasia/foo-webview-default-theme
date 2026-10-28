@@ -1,16 +1,20 @@
 import { Button, Spinner } from '@fluentui/react-components';
+import { CalendarLtr16Regular, TextNumberListLtr16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useState } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
 import type { TablePoint } from '../../../table/tableItems.ts';
 import { TrackMenu } from '../../TrackMenu.tsx';
 import { albumKeyOf, albumYearOf } from '../../../host/libraryContract.ts';
-import { SongArt } from '../../songs/SongArt.tsx';
+import { SongArt } from '../../SongArt.tsx';
 import { useArtists } from '../artistsContext.ts';
+import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import styles from './ArtistAlbums.module.css';
+import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
 
 export function ArtistAlbums() {
   const services = useArtists();
+  const viewControls = useViewControlStyles();
   const state = useAtomValueRawSync(services.detail.state);
   const t = useAtomValueRawSync(translateAtom);
   const [menu, setMenu] = useState<{ at: TablePoint; detail: typeof state.detail } | null>(null);
@@ -33,7 +37,7 @@ export function ArtistAlbums() {
                   ? 'artists.guestPending'
                   : 'artists.failed',
           )}
-          <Button size="small" onClick={services.retry}>
+          <Button className={viewControls.field} size="small" onClick={services.retry}>
             {t('artists.retry')}
           </Button>
         </div>
@@ -61,11 +65,16 @@ export function ArtistAlbums() {
                     <SongArt album={album} size={56} />
                     <span className={styles.text}>
                       <span className={styles.name}>{album.name}</span>
-                      <span className={styles.meta}>
-                        {[albumYearOf(album), t('artists.trackCount', { count: tracks.length })]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
+                      <Metadata className={styles.meta}>
+                        {albumYearOf(album) && (
+                          <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
+                            {albumYearOf(album)}
+                          </MetadataItem>
+                        )}
+                        <MetadataItem icon={<TextNumberListLtr16Regular />}>
+                          {t('artists.trackCount', { count: tracks.length })}
+                        </MetadataItem>
+                      </Metadata>
                     </span>
                   </button>
                 </li>

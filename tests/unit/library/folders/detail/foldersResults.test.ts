@@ -4,6 +4,7 @@ import { startFoldersPreview } from '../../../../../src/library/folders/detail/f
 import {
   foldersResultsAtom,
   foldersConditionsAtom,
+  foldersMediaAtom,
   foldersScopeTracksAtom,
   startFoldersResults,
 } from '../../../../../src/library/folders/detail/foldersResults.ts';
@@ -14,8 +15,10 @@ import {
   FOLDER_TRACKS,
   folderDirectory,
   foldersAnswers,
+  foldersBrowseAnswer,
 } from '../../../../fixtures/foldersLibrary.ts';
 import { hostFailure } from '../../../../fixtures/hostAnswers.ts';
+import { trackRow } from '../../../../fixtures/libraryRows.ts';
 import { UnitHost } from '../../../../fixtures/unitHost.ts';
 
 async function setup() {
@@ -142,4 +145,22 @@ it('两种模式独立保存，普通输入去抖 300ms，切换模式不等待'
   env.results.setQuery({ ...env.store.get(foldersConditionsAtom), mode: 'text' });
   await vi.advanceTimersByTimeAsync(0);
   expect(env.state().answered).toContain('HAS "amber"');
+});
+it('只看视频：作用域只留视频文件，统计与结果按这份算，切回全部立即恢复', async () => {
+  const env = await setup();
+  const clip = trackRow('Beta', 'Clip', { path: 'file://E:\\Music\\Beta\\clip.MP4' });
+  const song = trackRow('Beta', 'Song', { path: 'file://E:\\Music\\Beta\\song.flac' });
+  env.host.answer('library.browseTree', {
+    ...foldersBrowseAnswer('Beta', true),
+    files: [clip, song],
+  });
+  env.preview.select(foldersDirectory(folderDirectory('Beta', 2)));
+  await vi.waitFor(() => expect(env.state().total).toBe(2));
+  env.results.setMedia('video');
+  await vi.waitFor(() => expect(env.state().tracks.map((track) => track.title)).toEqual(['Clip']));
+  expect(env.state()).toMatchObject({ status: 'ready', total: 1, filtered: false });
+  expect(env.store.get(foldersMediaAtom)).toBe('video');
+  expect(env.store.get(foldersScopeTracksAtom)).toHaveLength(1);
+  env.results.setMedia('all');
+  await vi.waitFor(() => expect(env.state().total).toBe(2));
 });

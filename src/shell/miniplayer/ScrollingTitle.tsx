@@ -1,21 +1,23 @@
 import { Tooltip } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import styles from './ScrollingTitle.module.css';
 
 /**
  * 溢出时来回滚动的一行字：开头停 2 秒，每秒 36 像素滚到末尾，停 1 秒再同速滚回。只移动文字，裁切层和
- * 相邻控件保持原位；每行按自己的实际溢出距离计时。字号与颜色由 `className` 给。
+ * 相邻控件保持原位；每行按自己的实际溢出距离计时。字号与颜色由 `className` 给
  */
 export function ScrollingTitle({
   text,
   className,
   primary = false,
+  children,
 }: {
   readonly text: string;
   readonly className: string;
   readonly primary?: boolean;
+  readonly children?: ReactNode;
 }) {
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const clip = useRef<HTMLSpanElement>(null);
@@ -93,7 +95,7 @@ export function ScrollingTitle({
         data-primary={primary || undefined}
       >
         <span ref={inner} className={styles.text}>
-          {text}
+          {children ?? text}
         </span>
       </span>
     </Tooltip>

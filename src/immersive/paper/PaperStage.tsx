@@ -13,18 +13,18 @@ import styles from './PaperStage.module.css';
 import { StageScaleContext } from './stageScale.ts';
 
 export interface PaperStageProps {
-  /** 舞台缩放：宽高两个比值里较小的那个。 */
+  /** 舞台缩放：宽高两个比值里较小的那个 */
   readonly scale: number;
-  /** 舞台左上角在场景里的位置，CSS 像素。 */
+  /** 舞台左上角在场景里的位置，CSS 像素 */
   readonly origin: { readonly x: number; readonly y: number };
 }
 
 /**
  * full 档的图纸内容：1920 × 1080 的舞台，整幅 `scale(s)` 等比缩放、居中放进场景，里面一律写舞台坐标
- * （`paperStage.ts`）。s 经 `StageScaleContext` 交给舞台里的 canvas 件，canvas 的物理尺寸按它开。
+ * （`paperStage.ts`）。s 经 `StageScaleContext` 交给舞台里的 canvas 件，canvas 的物理尺寸按它开
  *
  * 罗盘左区、右栏上半与仪表第一行、歌词卡各自按舞台坐标定位；频谱、整轨波形、量表与文件信息放进这里定位好的
- * 外框，外框上给全它们的几何变量（件里不写缺省，别的档在自己的外框上另给一套）。
+ * 外框，外框上给全它们的几何变量（件里不写缺省，别的档在自己的外框上另给一套）
  */
 export function PaperStage({ scale, origin }: PaperStageProps) {
   const frame: CSSProperties = {

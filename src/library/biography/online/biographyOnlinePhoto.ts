@@ -15,6 +15,8 @@ export interface BiographyOnlinePhotoState {
   readonly photos?: readonly BiographyPhoto[];
   readonly loading: boolean;
   readonly problem: BiographyPhotoProblem | null;
+  /** problem 的宿主失败原文，只在内存里给界面诊断用 */
+  readonly problemDetail?: string | null;
   readonly bytes: number;
 }
 export interface BiographyOnlinePhotoDeps {
@@ -45,7 +47,11 @@ export function startBiographyOnlinePhoto(
   let running = false;
   let pending = false;
   let forced = false;
-  let blocked: { problem: BiographyPhotoProblem; retryAt: number } | null = null;
+  let blocked: {
+    problem: BiographyPhotoProblem;
+    retryAt: number;
+    detail?: string | null;
+  } | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   function key() {
@@ -90,6 +96,7 @@ export function startBiographyOnlinePhoto(
     photos: readonly BiographyPhoto[],
     loading = false,
     problem: BiographyPhotoProblem | null = null,
+    problemDetail: string | null = null,
   ) {
     if (disposed) return;
     if (!loading) {
@@ -110,6 +117,7 @@ export function startBiographyOnlinePhoto(
       ...(photos.length ? { photos } : {}),
       loading,
       problem,
+      problemDetail,
       bytes,
     });
   }
@@ -122,12 +130,14 @@ export function startBiographyOnlinePhoto(
     const fresh = forced;
     forced = false;
     const old = store.get(state).photos ?? [];
-    if (blocked && blocked.retryAt > Date.now()) return publish(old, false, blocked.problem);
+    if (blocked && blocked.retryAt > Date.now())
+      return publish(old, false, blocked.problem, blocked.detail ?? null);
     blocked = null;
     let list = sources(deps.artist ? cache.peekGallery(artistUrl) : []);
     const photos: BiographyPhoto[] = [];
     const attempted = new Set<string>();
     let problem: BiographyPhotoProblem | null = null;
+    let detail: string | null = null;
     const read = async (source: LastfmPhoto) => {
       if (!current()) return;
       attempted.add(source.pageUrl);
@@ -143,11 +153,12 @@ export function startBiographyOnlinePhoto(
       if (!current()) return;
       if (!entry.ok) {
         problem = entry.problem;
+        detail = entry.detail ?? null;
         if (['blocked', 'rateLimited'].includes(entry.problem)) blocked = entry;
         const previous = old.find((item) => item.sourceUrl === source.pageUrl);
         if (previous) photos.push(previous);
       } else photos.push(photo(source, entry));
-      publish(photos, true, problem);
+      publish(photos, true, problem, detail);
     };
     if (list[0]) await read(list[0]);
     if (!current()) return;
@@ -158,6 +169,7 @@ export function startBiographyOnlinePhoto(
       if (result.ok) list = sources(result.photos);
       else {
         problem = result.problem;
+        detail = result.detail ?? null;
         if (['blocked', 'rateLimited'].includes(result.problem)) blocked = result;
       }
     }
@@ -165,7 +177,7 @@ export function startBiographyOnlinePhoto(
       if (!current() || blocked) break;
       if (!attempted.has(source.pageUrl)) await read(source);
     }
-    if (current()) publish(photos.length ? photos : old, false, problem);
+    if (current()) publish(photos.length ? photos : old, false, problem, detail);
   }
   async function pump() {
     if (disposed || running) return;
@@ -227,7 +239,9 @@ export function startBiographyOnlinePhoto(
     state,
     refresh() {
       clearedKey = '';
-      if (blocked && blocked.retryAt <= Date.now()) blocked = null;
+      // 被拒访问可能只是因为出口，主动刷新放行；限流仍等到期
+      if (blocked && (blocked.retryAt <= Date.now() || blocked.problem === 'blocked'))
+        blocked = null;
       schedule(true);
     },
     clear() {

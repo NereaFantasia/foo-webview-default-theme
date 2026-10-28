@@ -1,0 +1,9 @@
+{
+  "name": "@applemusic-like-lyrics/core",
+  "version": "0.6.0",
+  "repository": "https://github.com/amll-dev/applemusic-like-lyrics",
+  "commit": "5fee356362353dbb24ce9bea3a62536478040de7",
+  "sha256": "1992e3da4a752e78646c70f7535f11a747e0a9255fc22f95ef277b673d14ad0c",
+  "bytes": 574278,
+  "build": "git config core.autocrlf false 后检出该提交；pnpm install --frozen-lockfile --ignore-scripts；在 packages/core 里 pnpm exec tsdown，再 pnpm pack"
+}

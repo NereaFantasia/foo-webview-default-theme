@@ -1,6 +1,6 @@
 import type { onboardingEn } from './onboardingEn.ts';
 
-/** 新人引导的中文文案，并进简体中文包。键集按英文那一份标注，缺键编译不过。 */
+/** 新人引导界面的简体中文文案，供主中文包合入 */
 export const onboardingZhCN: Record<keyof typeof onboardingEn, string> = {
   'onboarding.step': '第 {current} 步，共 {total} 步',
   'onboarding.titleLibrary': '媒体库',

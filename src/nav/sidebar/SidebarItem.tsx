@@ -5,26 +5,26 @@ import { translateAtom } from '../../i18n/locale.ts';
 import styles from './SidebarItem.module.css';
 import { useSidebarItemStyles } from './useSidebarItemStyles.ts';
 
-/** `data-*` 属性照常可以传，原样落到这一项的按钮上。 */
+/** `data-*` 属性照常可以传，原样落到这一项的按钮上 */
 export interface SidebarItemProps {
-  /** 选中键：`Nav` 按它认选中项，竖条按它找自己。 */
+  /** 选中键：`Nav` 按它认选中项，竖条按它找自己 */
   readonly value: string;
   readonly icon: ReactElement;
   readonly label: string;
   readonly selected: boolean;
-  /** 页面还没上线时为假：置灰，悬停提示「即将推出」，点了不报。缺省为真。 */
+  /** 页面还没上线时为假：置灰，悬停提示「即将推出」，点了不报。缺省为真 */
   readonly ready?: boolean;
-  /** 压暗但照样能点，锁定的列表用。 */
+  /** 压暗但照样能点，锁定的列表用 */
   readonly muted?: boolean;
-  /** 图标态：只画图标，名字放进悬停提示，也当这一项的无障碍名。 */
+  /** 图标态：只画图标，名字放进悬停提示，也当这一项的无障碍名 */
   readonly compact?: boolean;
-  /** 图标右上角的小圆点：这一项底下有东西，比如队列不空、有列表在播。 */
+  /** 图标右上角的小圆点：这一项底下有东西，比如队列不空、有列表在播 */
   readonly dot?: boolean;
-  /** 行尾的东西，播放列表是曲目数。 */
+  /** 行尾的东西，播放列表是曲目数 */
   readonly end?: ReactNode;
   readonly className?: string;
   readonly title?: string;
-  /** 单击或回车；`event.detail` 是连击的第几下，键盘触发时为 0。 */
+  /** 单击或回车；`event.detail` 是连击的第几下，键盘触发时为 0 */
   onSelect(event: MouseEvent<HTMLElement>): void;
   onPointerDown?(event: PointerEvent<HTMLElement>): void;
   onMouseDown?(event: MouseEvent<HTMLElement>): void;
@@ -33,7 +33,7 @@ export interface SidebarItemProps {
 
 /**
  * 侧边栏的一个导航项：Fluent `NavItem` 换上侧边栏的外观。点击只往上报，去哪由调用方定；
- * 选中与否由调用方按当前地点给，`Nav` 自己不改选中。图标态与展开态是同一个件，选中的浅底与竖条相同。
+ * 选中与否由调用方按当前地点给，`Nav` 自己不改选中。图标态与展开态是同一个件，选中的浅底与竖条相同
  */
 export function SidebarItem({
   value,
@@ -62,7 +62,7 @@ export function SidebarItem({
             {dot && <span className={styles.dot} data-sidebar-dot aria-hidden />}
           </>
         ),
-        className: classes.icon,
+        className: mergeClasses(classes.icon, compact && classes.compactIcon),
       }}
       aria-disabled={ready ? undefined : true}
       className={mergeClasses(
@@ -74,7 +74,7 @@ export function SidebarItem({
         className,
       )}
       onClick={(event) => {
-        // 不交给 Nav 改选中：选中跟着历史的当前地点走。
+        // 不交给 Nav 改选中：选中跟着历史的当前地点走
         event.preventDefault();
         if (ready) onSelect(event);
       }}

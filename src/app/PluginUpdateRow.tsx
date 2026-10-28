@@ -31,7 +31,9 @@ function description(status: PluginUpdateStatus, t: Translate): string | undefin
     case 'checking':
       return t('update.checking');
     case 'available':
-      return t('update.available', { version: status.version });
+      return t(status.staged ? 'update.pluginStaged' : 'update.available', {
+        version: status.version,
+      });
     case 'downloading':
       return t('update.downloading', { version: status.version });
     case 'preparing':

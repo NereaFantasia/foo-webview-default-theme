@@ -7,6 +7,7 @@ import {
   type FoldersActionsDeps,
   type FoldersActionsFace,
   type FoldersActionsService,
+  type FoldersTarget,
 } from './actions/foldersActions.ts';
 import {
   startFoldersPreview,
@@ -16,6 +17,8 @@ import {
 import { startFoldersFilter, type FoldersFilterService } from './tree/foldersFilter.ts';
 import {
   foldersAddress,
+  foldersHitAddress,
+  foldersRoot,
   foldersSubject,
   foldersSubjects,
   foldersSelection,
@@ -36,6 +39,7 @@ import {
   type FoldersTreeService,
 } from './tree/foldersTree.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
+import { settle } from '../../host/hostCall.ts';
 
 const focusAtom = atom<string | null>(null);
 export const foldersFocusAtom: Atom<string | null> = atom((get) => get(focusAtom));
@@ -57,6 +61,19 @@ export interface FoldersServices {
   selectMany(nodes: readonly FolderNode[], delay?: number): void;
   open(subject: string, reveal?: boolean): Promise<boolean | null>;
   visit(subject: string): Promise<boolean | null>;
+  /**
+   * 解析指定文件所在目录的页面主体标识；位于媒体库根目录下返回主体键，非库路径返回 null，库根未就绪返回 undefined；
+   * 仅查询不执行页面跳转，跳转由调用方按需执行
+   */
+  locateFile(absolutePath: string): Promise<string | null | undefined>;
+  /** 导航进入文件夹页目标目录 */
+  enter(subject: string): void;
+  /** 在系统资源管理器中定位并高亮显示目标文件 */
+  showInExplorer(absolutePath: string): Promise<boolean>;
+  /** 打开文件夹页并应用视频筛选模式（若路径位于库根下则定位至其所在目录，否则还原上次浏览位置） */
+  browseVideo(absolutePath: string | null): Promise<void>;
+  /** 播放视频文件，待宿主确认起播成功后导航至视频页面（失败保留原状并通过通知提示） */
+  playAndWatch(target: FoldersTarget): Promise<void>;
   dispose(): void;
 }
 export function startFolders(
@@ -136,6 +153,14 @@ export function startFolders(
     selectMany(nodes);
     return true;
   }
+  // 文件夹页没挂载时目录树不在读，库根直接问宿主；去的是带主体的地点，页面挂载后自己定位；
+  // 文件不在任何库根下答 null，读不到库根答 undefined
+  async function directoryOf(absolutePath: string): Promise<string | null | undefined> {
+    const answer = await settle(() => host.library.getRoots());
+    if (disposed || !answer || answer.success === false) return undefined;
+    const address = foldersHitAddress(absolutePath, answer.roots.map(foldersRoot));
+    return address ? foldersSubject(address) : null;
+  }
   const offSubject = deps.history.registerSubject('folders', {
     current: () => store.get(focusAtom),
     enter(subject) {
@@ -188,12 +213,29 @@ export function startFolders(
     open,
     visit(subject) {
       if (disposed || !active) return Promise.resolve(null);
-      // 离开快照必须先记录旧主体，随后再切换预览。
+      // 离开快照必须先记录旧主体，随后再切换预览
       const current = store.get(historyAtom).place;
       if (current.id !== 'folders' || current.subject !== undefined)
         deps.history.navigate({ id: 'folders', subject });
       store.set(focusAtom, subject);
       return open(subject);
+    },
+    locateFile: directoryOf,
+    enter(subject) {
+      if (!disposed) deps.history.navigate({ id: 'folders', subject });
+    },
+    async showInExplorer(absolutePath) {
+      const shown = await settle(() => host.shell.showInExplorer(absolutePath));
+      return shown?.success === true;
+    },
+    async browseVideo(absolutePath) {
+      results.setMedia('video');
+      const subject = absolutePath === null ? null : await directoryOf(absolutePath);
+      if (disposed) return;
+      deps.history.navigate(subject ? { id: 'folders', subject } : { id: 'folders' });
+    },
+    async playAndWatch(target) {
+      if (await actions.run(target, 'play')) deps.history.navigate({ id: 'video' }, 'drill');
     },
     want() {
       active += 1;

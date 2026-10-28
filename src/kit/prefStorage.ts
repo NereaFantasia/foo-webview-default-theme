@@ -3,7 +3,7 @@ import type { PrefStorage } from './localPref.ts';
 import { atom } from 'jotai/vanilla';
 import { serviceKey } from './serviceKey.ts';
 
-/** 启动时最多等可信存储这么久（毫秒）；超时按不可用处理，免得页面一直不出。 */
+/** 启动初始化等待底层可信存储就绪的超时上限（毫秒，默认 3000 ms）；超时后降级运行以避免白屏 */
 export const PREF_STORAGE_TIMEOUT_MS = 3000;
 
 export type PrefSaveState =
@@ -17,25 +17,27 @@ export interface PrefStorageSource {
 }
 
 /**
- * 页面的浏览器偏好存储。打开时一次读出可信副本，之后同步读内存：数据库有记录的键以它为准（null 是用户
- * 清除过），没有记录的才读原 localStorage 的兼容值。写入立即改内存，再经写入助手排队落盘；同一个键在上一
- * 次落盘结束前又改了，只再写最新一份。写入失败保留内存里的值，按键记下失败。
+ * 页面偏好存储接口
+ * 初始化时全量读取持久化副本并缓存在内存，后续读取均为同步内存操作；
+ * 写入时立即同步更新内存，并经数据写入互斥器异步排队刷盘。若在刷盘期间再次修改，仅排队写入最新值；
+ * 若写入失败则保留内存状态并在该键上记录错误状态
  *
- * 可信存储不可用（打不开、超时、没有写锁）时仍读兼容值供本次显示，写入只改内存并记为失败，不改用无锁写入。
+ * 当底层可信存储不可用（损坏、超时或缺少写锁支持）时，回退读取本地兼容值，写入仅保留于内存并标记失败，
+ * 绝不绕过写锁进行无保护写入
  */
 export interface PagePrefStorage extends PrefStorage {
-  /** 可信存储读成了，写入会落盘。 */
+  /** 指示底层可信存储是否成功就绪且支持异步刷盘 */
   readonly available: boolean;
   removeItem(key: string): void;
-  /** 这个键本次启动以来最近一次写入的结果；没写过时为 undefined。 */
+  /** 查询指定键自本次启动以来的最新写入状态；未触发过写入时返回 undefined */
   saveState(key: string): PrefSaveState | undefined;
-  /** 同一份快照保持到下一次状态变化，订阅者可据此更新界面。 */
+  /** 获取所有键保存状态的只读快照；状态变化前保持引用稳定 */
   snapshot(): ReadonlyMap<string, PrefSaveState>;
   subscribe(listener: () => void): () => void;
-  /** 只重试失败键的当前值；启动时存储不可用时仍明确失败，不绕过写锁。 */
+  /** 重试指定处于失败状态的键的当前内存值；若底层存储整体不可用则依然返回失败，不绕开锁保护 */
   retry(key: string): Promise<boolean>;
   settled(): Promise<void>;
-  /** 取消还在等写锁的写入；已经持锁的照常完成。 */
+  /** 释放资源并取消排队等待写锁的任务；已获取锁的任务将执行完毕 */
   dispose(): void;
 }
 
@@ -76,7 +78,7 @@ export async function openPrefStorage(
       const result = await source
         .run((scope) => scope.setLocal(key, value), lifetime.signal)
         .catch(() => ({ success: false as const, reason: 'write-failed' as const }));
-      // 落盘期间又改了：这次的结果由下一轮写入取代。
+      // 落盘期间又改了：这次的结果由下一轮写入取代
       if (disposed || queued.has(key)) continue;
       report(
         key,
@@ -85,7 +87,7 @@ export async function openPrefStorage(
           : { status: 'failed', reason: result.reason },
       );
     }
-    // 退出与上面最后一次检查在同一段同步代码里：之后到的写入会另起一轮。
+    // 退出与上面最后一次检查在同一段同步代码里：之后到的写入会另起一轮
     flushing.delete(key);
   }
 
@@ -142,18 +144,18 @@ export async function openPrefStorage(
   };
 }
 
-/** 页面装配订阅偏好存储后发布；不可用与单项失败分开，尚未改设置时也能说明保存受限。 */
+/** 页面装配订阅偏好存储后发布；不可用与单项失败分开，尚未改设置时也能说明保存受限 */
 export const prefStorageAvailableAtom = atom(true);
 export const prefSaveStatesAtom = atom<ReadonlyMap<string, PrefSaveState>>(new Map());
 export const prefStorageKey = serviceKey<Pick<PagePrefStorage, 'retry'>>('prefStorage');
 
-/** 页面用的一份：兼容值读页面的 localStorage，被禁时不读。 */
+/** 页面用的一份：兼容值读页面的 localStorage，被禁时不读 */
 export function openBrowserPrefStorage(source: PrefStorageSource): Promise<PagePrefStorage> {
   let legacy: Pick<Storage, 'getItem'> | null = null;
   try {
     legacy = typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
-    // 原存储被禁时只读可信副本。
+    // 原存储被禁时只读可信副本
   }
   return openPrefStorage(source, legacy);
 }

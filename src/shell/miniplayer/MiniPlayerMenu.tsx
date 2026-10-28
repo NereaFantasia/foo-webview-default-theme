@@ -1,4 +1,4 @@
-import { Button, makeStyles } from '@fluentui/react-components';
+import { Button, makeStyles, mergeClasses } from '@fluentui/react-components';
 import {
   ArrowLeft16Regular,
   ArrowUpRight16Regular,
@@ -29,11 +29,15 @@ import { useCommand } from '../../nav/useCommand.ts';
 import { currentTrackAtom, playbackOrderAtom } from '../../playback/playback.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
 import { ORDER_IDS, ORDER_LABEL_KEYS } from '../../playback/playbackOrder.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { roleVar } from '../../theme/roles.ts';
-import { albumNavigationKey } from '../../track/albumNavigation.ts';
+import { useTrackGoTo } from '../../track/useTrackGoTo.ts';
 import { ratingsKey } from '../../track/trackRatings.ts';
-import { nowPlayingMenuAtom, nowPlayingMenuKey } from '../player/context-menu/nowPlayingMenu.ts';
-import { ORDER_KEY_ICONS } from '../player/playerIcons.ts';
+import {
+  nowPlayingMenuAtom,
+  nowPlayingMenuKey,
+} from '../../playback/now-playing/nowPlayingMenu.ts';
+import { ORDER_KEY_ICONS } from '../../playback/playerIcons.ts';
 import { OutputDeviceList } from '../player/volume/OutputDeviceList.tsx';
 import { outputDevicesAtom } from '../player/volume/outputDevices.ts';
 import styles from './MiniPlayerMenu.module.css';
@@ -52,7 +56,7 @@ type Page = 'main' | 'order' | 'devices';
 
 const ROW = '[data-mini-row]';
 
-/** 上下键、Home、End 在可用的行之间挪焦点；到头停住。 */
+/** 上下键、Home、End 在可用的行之间挪焦点；到头停住 */
 function moveFocus(event: KeyboardEvent<HTMLDivElement>): void {
   const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>(ROW)].filter(
     (row) => !row.disabled,
@@ -111,7 +115,7 @@ function Row({
 /**
  * 迷你播放器的更多菜单，排在窗口里而不是弹出层：播放顺序与输出设备在原位换成各自的列表，顶上的返回键回到
  * 上一页，在第一页上返回即关闭；Esc 同返回。选完一项即关闭，焦点由外面送回更多键。转到专辑先离开迷你模式，
- * 回到完整界面后再打开专辑。整个菜单的展开与收起由外面播，这里只管换页。
+ * 回到完整界面后再打开专辑。整个菜单的展开与收起由外面播，这里只管换页
  */
 export function MiniPlayerMenu({ onClose }: { readonly onClose: () => void }) {
   const t = useAtomValueRawSync(translateAtom);
@@ -119,21 +123,22 @@ export function MiniPlayerMenu({ onClose }: { readonly onClose: () => void }) {
   const playback = useService(playbackKey);
   const menu = useService(nowPlayingMenuKey);
   const ratings = useService(ratingsKey);
-  const albumNavigation = useService(albumNavigationKey);
   const store = useStore();
   const track = useAtomValueRawSync(currentTrackAtom);
   const order = useAtomValueRawSync(playbackOrderAtom);
   const { current } = useAtomValueRawSync(outputDevicesAtom);
-  const { stopAfter, album } = useAtomValueRawSync(nowPlayingMenuAtom);
+  const { stopAfter } = useAtomValueRawSync(nowPlayingMenuAtom);
+  const album = useTrackGoTo(track)?.album;
   const [page, setPage] = useState<{ readonly at: Page; readonly from?: Page }>({ at: 'main' });
   const classes = useStyles();
+  const viewControls = useViewControlStyles();
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (track) void menu.prepare(track, ratings.stamp());
     return () => menu.close();
   }, [track, menu, ratings]);
-  // 换页后焦点落在这一页的当前项上：顺序页是当前顺序，设备页是当前设备，回到第一页时是刚才进去的那一行。
-  // 新一页按换步入场：进二级页从右、回第一页从左；刚打开菜单的那一页由外面的展开动画负责。
+  // 换页后焦点落在这一页的当前项上：顺序页是当前顺序，设备页是当前设备，回到第一页时是刚才进去的那一行
+  // 新一页按换步入场：进二级页从右、回第一页从左；刚打开菜单的那一页由外面的展开动画负责
   useLayoutEffect(() => {
     const element = list.current;
     if (!element) return;
@@ -173,7 +178,7 @@ export function MiniPlayerMenu({ onClose }: { readonly onClose: () => void }) {
       <div className={styles.header}>
         <Button
           appearance="subtle"
-          className={classes.back}
+          className={mergeClasses(classes.back, viewControls.icon)}
           icon={<ArrowLeft16Regular />}
           aria-label={t('mini.back')}
           onClick={goBack}
@@ -231,10 +236,10 @@ export function MiniPlayerMenu({ onClose }: { readonly onClose: () => void }) {
               icon={<Record16Regular />}
               label={t('mini.goToAlbum')}
               trailing={<ArrowUpRight16Regular />}
-              disabled={!album}
+              disabled={!album?.open}
               onClick={() => {
                 void mini.leave().then(() => {
-                  if (!store.get(miniWindowAtom).active && album) albumNavigation.open(album);
+                  if (!store.get(miniWindowAtom).active) album?.open?.();
                 });
               }}
             />

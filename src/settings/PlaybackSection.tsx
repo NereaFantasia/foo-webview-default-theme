@@ -18,7 +18,7 @@ const SCALE_LABELS: Readonly<Record<VolumeScale, MessageKey>> = {
   db: 'settings.volumeScaleDb',
 };
 
-/** 「播放」一组：音量条的刻度。只改条上的位置怎么换算，不动 foobar2000 的音量。 */
+/** 「播放」一组：音量条的刻度。只改条上的位置怎么换算，不动 foobar2000 的音量 */
 export function PlaybackSection() {
   const t = useAtomValueRawSync(translateAtom);
   const scale = useAtomValueRawSync(volumeScaleAtom);

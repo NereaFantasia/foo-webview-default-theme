@@ -2,8 +2,9 @@ import { createStore } from 'jotai/vanilla';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { READY_TIMEOUT_MS } from '../../../src/host/waitForHost.ts';
 import { currentTrackAtom, playbackAtom, startPlayback } from '../../../src/playback/playback.ts';
+import { startOnlineTracks } from '../../../src/playback/onlineTracks.ts';
 import { HIGH_RES_SILENCE_MS } from '../../../src/playback/playbackEvents.ts';
-import { createVolumeSender } from '../../../src/shell/player/volume/volumeControl.ts';
+import { createVolumeSender } from '../../../src/playback/volume/volumeControl.ts';
 import { amplitudeOf } from '../../../src/playback/volumeScale.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
@@ -84,9 +85,9 @@ describe('startPlayback', () => {
       await settle();
       expect(state()).toMatchObject({ trackGeneration: first + 1, position: 42 });
       host.emit('playback:stopped', { reason: 'starting_another' });
-      expect(state().trackGeneration).toBe(first + 1);
+      expect(state().trackGeneration).toBe(first + 2);
       host.emit('playback:trackChanged', LUV);
-      expect(state()).toMatchObject({ trackGeneration: first + 2, position: 0 });
+      expect(state()).toMatchObject({ trackGeneration: first + 3, position: 0 });
     } finally {
       playback.dispose();
     }
@@ -194,6 +195,27 @@ describe('startPlayback', () => {
     vi.setSystemTime(Date.now() + HIGH_RES_SILENCE_MS + 1);
     host.emit('playback:time', { position: 12 });
     expect(state().position).toBe(12);
+  });
+
+  it('手动切歌：新一轮从 starting 起算，一次切换只开一轮；没有曲目时不开', async () => {
+    const host = installFakeHost();
+    playing(host);
+    const { state } = await start(host);
+    const first = state().trackGeneration;
+    host.emit('playback:stopped', { reason: 'starting_another' });
+    host.emit('playback:starting', { command: 'next', paused: false });
+    expect(state().trackGeneration).toBe(first + 1);
+    expect(state().track?.title).toBe('Feather');
+    host.emit('playback:trackChanged', LUV);
+    expect(state()).toMatchObject({ trackGeneration: first + 2, position: 0 });
+
+    host.answer('playback.getState', STOPPED);
+    host.emit('playback:stopped', { reason: 'user' });
+    await settle();
+    expect(state().track).toBeNull();
+    const idle = state().trackGeneration;
+    host.emit('playback:starting', { command: 'play', paused: false });
+    expect(state().trackGeneration).toBe(idle);
   });
 
   it('换曲过程中的停止不清展示；用户停止先核对，宿主答停着才清', async () => {
@@ -317,6 +339,46 @@ describe('startPlayback', () => {
     expect(state().track?.title).toBe('Luv (sic) Part 3');
     host.emit('playback:trackChanged', station);
     expect(state().track?.title).toBe('Station');
+  });
+
+  it('在线曲目向展示信息要一次，取到后盖上去，不算换曲；换回本地曲目照宿主的标签', async () => {
+    const host = installFakeHost();
+    const path = 'http://127.0.0.1:51234/music/stream/wy/7.mp3?q=320k';
+    const online = makeTrack({ path, title: path, artist: '', artists: [] });
+    host.answer('playback.getCurrentTrack', { success: true, found: true, track: online });
+    const store = createStore();
+    const info = {
+      ref: { platform: 'wy', id: '7' },
+      title: '在线曲目',
+      subtitle: null,
+      artists: [{ ref: null, name: '艺人' }],
+      album: null,
+      durationMs: 1000,
+      artwork: null,
+      qualities: [],
+      access: null,
+    } as const;
+    let answer: (value: (typeof info)[]) => void = () => {};
+    const client = {
+      tracks: vi.fn(() => new Promise<(typeof info)[]>((resolve) => (answer = resolve))),
+    };
+    const tracks = startOnlineTracks(store, client);
+    const playback = startPlayback(store, host.fb, tracks);
+    await playback.ready;
+    await settle();
+    const state = () => store.get(playbackAtom);
+    expect(client.tracks).toHaveBeenCalledWith({ platform: 'wy', ids: ['7'] }, expect.anything());
+    expect(state().track?.title).toBe(path);
+    const generation = state().trackGeneration;
+    answer([info]);
+    await settle();
+    expect(state().track).toMatchObject({ title: '在线曲目', artist: '艺人', path });
+    expect(state().trackGeneration).toBe(generation);
+    host.emit('playback:trackChanged', LUV);
+    expect(state().track?.title).toBe('Luv (sic) Part 3');
+    expect(client.tracks).toHaveBeenCalledTimes(1);
+    tracks.dispose();
+    playback.dispose();
   });
 
   it('能不能 seek 跟着 stateChanged 走：换曲后紧跟的状态事件带新曲目的值，不另读 getState', async () => {

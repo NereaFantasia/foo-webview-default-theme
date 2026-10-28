@@ -1,0 +1,24 @@
+.note {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+}
+
+/* 已经有候选时再搜一次：列表留着，顶上一条细的不定进度 */
+.progress {
+  padding: 0 var(--spacingHorizontalM);
+}
+
+/* 筛选行：来源与格式两个多选菜单、含译文一个开关，行尾是「x / y 条」；窄了换行，条数留在最后一行的右边 */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalM);
+}
+
+.count {
+  margin-inline-start: auto;
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}

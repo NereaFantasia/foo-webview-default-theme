@@ -21,7 +21,7 @@ export interface FoldersCoversService {
   dispose(): void;
 }
 
-/** 目录以实际首曲取图，不依赖专辑标签；图片加载名额与重试共用封面闸门。 */
+/** 目录以实际首曲取图，不依赖专辑标签；图片加载名额与重试共用封面闸门 */
 export function startFoldersCovers(
   store: Store,
   host: Pick<typeof fb, 'artwork' | 'isAvailable'> = fb,

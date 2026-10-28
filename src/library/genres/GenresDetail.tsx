@@ -1,27 +1,30 @@
+import { mergeClasses, Button, Spinner, makeStyles, tokens } from '@fluentui/react-components';
 import {
-  mergeClasses,
-  Button,
-  Dropdown,
-  Option,
-  Spinner,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
-import { Play20Filled, ArrowShuffle20Regular } from '@fluentui/react-icons';
+  Play20Filled,
+  ArrowShuffle20Regular,
+  RecordRegular,
+  Clock16Regular,
+  TextNumberListLtr16Regular,
+} from '@fluentui/react-icons';
+import type { LibraryTrack } from 'foo-webview-sdk';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useCallback, useState, type RefObject } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
+import { pluralAtom } from '../../i18n/plural.ts';
+import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
 import { rowsOf } from '../../table/rangeSelection.ts';
 import { TrackTable, type TrackTableHandle } from '../../table/TrackTable.tsx';
 import type { TablePoint, TableTrack } from '../../table/tableItems.ts';
 import { TrackMenu } from '../TrackMenu.tsx';
 import { AlbumMenu } from '../AlbumMenu.tsx';
-import { SongArt } from '../songs/SongArt.tsx';
+import { albumArtwork, SongArt } from '../SongArt.tsx';
 import { GenreGroupHead } from './GenreGroupHead.tsx';
 import { GenresMenu } from './GenresMenu.tsx';
 import { genresQuery, type GenreEntry } from './genresModel.ts';
 import { genreKeys, genreName } from './genresSubject.ts';
-import { GENRE_GROUPS, isGenreGrouping } from './genresPrefs.ts';
+import { GenresTools } from './GenresTools.tsx';
+import { genresToolsPrefsAtom } from './genresTools.ts';
+import { isTrackSortColumn, nextTrackSort } from '../../track/trackSort.ts';
 import { GENRE_GROUP_HEIGHT, GENRE_ROW_HEIGHT, type GenreGroup } from './genresGroups.ts';
 import { useGenresTable } from './useGenresTable.ts';
 import styles from './GenresDetail.module.css';
@@ -33,7 +36,6 @@ import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
 const useStyles = makeStyles({
   actions: { flexShrink: 0 },
-  group: { minWidth: '120px' },
   warning: { color: tokens.colorNeutralForeground3 },
 });
 export interface GenresDetailProps {
@@ -49,14 +51,18 @@ const numberText = (track: TableTrack) => String(track.trackNumber || '');
 export function GenresDetail(props: GenresDetailProps) {
   const controls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
+  const plural = useAtomValueRawSync(pluralAtom);
   const genres = useService(genresKey);
   const albumList = useService(albumListKey);
   const albums = useService(albumsKey);
   const classes = useStyles();
   const model = useGenresTable(props.closed);
+  const toolsPrefs = useAtomValueRawSync(genresToolsPrefsAtom);
   const { entry } = props;
   const name = genreName(entry.key, t);
   const keys = genreKeys(entry.key);
+  // 名称查不了的流派按目录里的整份显示，不套条件与排序，列头也不标排序
+  const supported = genresQuery(keys) !== null;
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [at, setAt] = useState<TablePoint | null>(null);
   const [albumAt, setAlbumAt] = useState<TablePoint | null>(null);
@@ -86,6 +92,18 @@ export function GenresDetail(props: GenresDetailProps) {
     if (playable && track && model.rows.fill)
       void genres.actions.play(keys, name, { row, handle: track.handle }, model.rows.fill);
   };
+  // 选中行的曲目菜单：表格右键与命令栏选区操作的 ⋯ 共用
+  const openTracks = (
+    tracks: readonly LibraryTrack[],
+    anchor: LibraryTrack | undefined,
+    point: TablePoint,
+  ) => {
+    if (tracks.length === 0) return;
+    setMenuRows(model.rows.tracks);
+    setMenuGroup(null);
+    void albumList.menu.prepare(tracks, anchor, model.rows.stamp);
+    setAt(point);
+  };
   return (
     <div ref={setScroll} className={styles.root}>
       <header className={styles.header}>
@@ -96,12 +114,23 @@ export function GenresDetail(props: GenresDetailProps) {
         </div>
         <div className={styles.summary}>
           <h2 className={styles.title}>{name}</h2>
-          <div className={styles.count}>
-            {t('genres.counts', { albums: entry.albumCount, tracks: entry.tracks.length })} ·{' '}
-            {Math.floor(entry.duration / 3600)}:
-            {String(Math.floor(entry.duration / 60) % 60).padStart(2, '0')}:
-            {String(Math.floor(entry.duration) % 60).padStart(2, '0')}
-          </div>
+          <Metadata className={styles.count}>
+            <MetadataItem icon={<RecordRegular />}>
+              {t(plural(entry.albumCount, 'album.countOne', 'album.count'), {
+                count: entry.albumCount,
+              })}
+            </MetadataItem>
+            <MetadataItem icon={<TextNumberListLtr16Regular />}>
+              {t(plural(entry.tracks.length, 'album.menuTracksOne', 'album.menuTracks'), {
+                count: entry.tracks.length,
+              })}
+            </MetadataItem>
+            <MetadataItem icon={<Clock16Regular />} label={t('table.duration')}>
+              {Math.floor(entry.duration / 3600)}:
+              {String(Math.floor(entry.duration / 60) % 60).padStart(2, '0')}:
+              {String(Math.floor(entry.duration) % 60).padStart(2, '0')}
+            </MetadataItem>
+          </Metadata>
           <div className={styles.artists} title={entry.artists.join(' · ')}>
             {entry.artists.join(' · ')}
           </div>
@@ -117,7 +146,8 @@ export function GenresDetail(props: GenresDetailProps) {
             {t('genres.play')}
           </Button>
           <Button
-            className={mergeClasses(classes.actions, controls.field)}
+            className={mergeClasses(classes.actions, controls.icon)}
+            appearance="subtle"
             icon={<ArrowShuffle20Regular />}
             disabled={!playable}
             onClick={() =>
@@ -126,62 +156,28 @@ export function GenresDetail(props: GenresDetailProps) {
           >
             {t('genres.shuffle')}
           </Button>
-          <GenresMenu keys={keys} />
+          <GenresMenu keys={keys} fill={ready ? model.rows.fill : null} />
         </div>
       </header>
-      {genresQuery(keys) === null && <p className={classes.warning}>{t('genres.unsupported')}</p>}
-      <div className={styles.tools}>
-        <Dropdown
-          className={mergeClasses(classes.group, controls.field)}
-          size="small"
-          value={t(`genres.group.${model.group}`)}
-          selectedOptions={[model.group]}
-          aria-label={t('genres.group')}
-          onOptionSelect={(_, data) => {
-            if (isGenreGrouping(data.optionValue)) {
-              props.setClosed(new Set());
-              genres.prefs.update({ group: data.optionValue });
-            }
-          }}
-        >
-          {GENRE_GROUPS.map((mode) => (
-            <Option key={mode} value={mode}>
-              {t(`genres.group.${mode}`)}
-            </Option>
-          ))}
-        </Dropdown>
-        <Button
-          className={controls.icon}
-          size="small"
-          appearance="subtle"
-          disabled={model.groups.length === 0}
-          onClick={() => props.setClosed(new Set())}
-        >
-          {t('genres.expand')}
-        </Button>
-        <Button
-          className={controls.icon}
-          size="small"
-          appearance="subtle"
-          disabled={model.groups.length === 0}
-          onClick={() => props.setClosed(new Set(model.groups.map((group) => group.key)))}
-        >
-          {t('genres.collapse')}
-        </Button>
-        <Button
-          className={controls.icon}
-          size="small"
-          appearance="subtle"
-          disabled={genresQuery(keys) === null}
-          onClick={() => genres.actions.openSongs(keys)}
-        >
-          {t('genres.openSongs')}
-        </Button>
-      </div>
+      {!supported && <p className={classes.warning}>{t('genres.unsupported')}</p>}
+      <GenresTools
+        model={model}
+        supported={supported}
+        setClosed={props.setClosed}
+        onSelectionMenu={(tracks, point) => openTracks(tracks, undefined, point)}
+      />
       {current && model.rows.status === 'failed' && (
         <div role="alert" className={styles.notice}>
-          {t('genres.rowsFailed')}
+          {t(model.rows.invalid ? 'query.modeInvalid' : 'genres.rowsFailed')}
           <Button className={controls.field} onClick={() => void genres.rows.retry()}>
+            {t('genres.retry')}
+          </Button>
+        </div>
+      )}
+      {current && model.statsFailed && (
+        <div role="alert" className={styles.notice}>
+          {t(model.statsFailed)}
+          <Button className={controls.field} onClick={model.retryStats}>
             {t('genres.retry')}
           </Button>
         </div>
@@ -193,6 +189,12 @@ export function GenresDetail(props: GenresDetailProps) {
         <TrackTable
           handle={props.handle}
           columns={model.columns}
+          sort={supported ? toolsPrefs.sort : null}
+          onSort={(column) => {
+            if (supported && isTrackSortColumn(column))
+              genres.tools.setSort(nextTrackSort(toolsPrefs.sort, column));
+          }}
+          empty={t('songs.noMatch')}
           items={model.items}
           selection={model.selection}
           label={t('genres.table')}
@@ -202,7 +204,7 @@ export function GenresDetail(props: GenresDetailProps) {
           animateGroupFold={() => true}
           ratingStamp={model.rows.stamp}
           numberText={numberText}
-          links={model.links}
+          artwork={albumArtwork}
           scrollParent={scroller}
           loading={model.rows.status === 'loading'}
           renderGroup={(item, state) => (
@@ -252,15 +254,12 @@ export function GenresDetail(props: GenresDetailProps) {
               return;
             }
             const tracks = rowsOf(target.rows).flatMap((index) => model.rows.tracks[index] ?? []);
-            if (tracks.length === 0) return;
             const item = model.items[target.index];
-            setMenuGroup(null);
-            void albumList.menu.prepare(
+            openTracks(
               tracks,
               item?.kind === 'row' ? model.rows.tracks[item.order] : undefined,
-              model.rows.stamp,
+              point,
             );
-            setAt(point);
           }}
         />
       )}

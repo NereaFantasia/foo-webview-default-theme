@@ -75,10 +75,14 @@ test('切到列表形态再切回来：滚动、焦点、筛选词都还在，�
   const top = await settledScrollTop(page);
   expect(top).toBeGreaterThan(0);
 
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-album-list]')).toBeVisible();
   await expect.poll(() => host.config.get('defaultTheme.browser.form')).toBe('list');
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
 
   await expect.poll(() => scrollTop(page)).toBe(top);
   await expect(filter(page)).toHaveValue('001');
@@ -97,13 +101,17 @@ async function returnBeyondContent(page: Page): Promise<{ host: PageHost; bottom
   const lowest = () =>
     grid(page).evaluate((element) => element.scrollHeight - element.clientHeight);
   await scrollTo(page, await lowest());
-  await page.locator('[data-album-form="list"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '列表', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-album-list]')).toBeVisible();
   // 离开封面墙期间库里少了大半专辑，记下的位置落不下了。
   host.answer('library.getAlbums', albumsAnswer(manyAlbums(60)));
-  await host.emit('library:itemsAdded', { count: 1, timestamp: 1 });
+  await host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
   await expect(page.locator('[data-album-subtitle]')).toContainText('60 张');
-  await page.locator('[data-album-form="wall"]').click();
+  await page.locator('[data-album-tool="view"]').click();
+  await page.getByRole('tab', { name: '封面墙', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(tiles(page).first()).toBeVisible();
   await expect.poll(async () => (await scrollTop(page)) === (await lowest())).toBe(true);
   return { host, bottom: await scrollTop(page) };
@@ -302,16 +310,42 @@ test('Esc 在筛选框里清空筛选词；框是空的时不认领', async ({ p
   expect(await claimed()).toBe('false');
 });
 
-test('筛选条：按流派勾选，数字是张数；勾中的值列成标签，去掉后恢复', async ({ page }) => {
+test('筛选浮层：按流派勾选，数字是张数；勾中的值列成标签，去掉后恢复', async ({ page }) => {
   await start(page, SAMPLE_ALBUMS);
-  await page.locator('[data-album-tool="page-menu"]').click();
-  await page.locator('[data-album-tool="facets"]').click();
-  await page.locator('[data-facet="genre"]').click();
-  const jazz = page.getByRole('menuitemcheckbox', { name: /Jazz/ });
-  await expect(jazz).toContainText('4');
-  await jazz.click();
+  await page.locator('[data-page="albums"] [data-filter-toggle]').click();
+  const jazz = page
+    .locator('[data-facet-column="genre"]')
+    .getByRole('checkbox', { name: 'Jazz', exact: true });
+  await expect(jazz.locator('..').locator('..')).toContainText('4');
+  await jazz.check();
   await page.keyboard.press('Escape');
   await expect(tiles(page)).toHaveCount(4);
-  await page.getByRole('button', { name: '去掉 Jazz' }).click();
+  await page.getByRole('button', { name: /移除 Jazz/ }).click();
   await expect(tiles(page)).toHaveCount(SAMPLE_ALBUMS.length);
+});
+
+test('专辑筛选复用三栏搜索与窄窗标签页，嵌入形态独立保存', async ({ page }) => {
+  await start(page, SAMPLE_ALBUMS);
+  const view = page.locator('[data-page="albums"]');
+  await view.locator('[data-filter-toggle]').click();
+  const panel = view.locator('[data-filter-surface]');
+  await expect(panel.locator('[data-facet-column]')).toHaveCount(3);
+  await panel.getByRole('textbox', { name: '筛选专辑艺人' }).fill('Coltrane');
+  await expect(
+    panel.locator('[data-facet-column="albumArtist"]').getByRole('checkbox'),
+  ).toHaveCount(1);
+  await panel.locator('[data-filter-dock]').click();
+  await expect(panel).toHaveAttribute('data-filter-surface', 'docked');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('default-theme.albums-filter.v1')))
+    .toBe('docked');
+  await panel.locator('[data-filter-undock]').click();
+  await expect(panel).toHaveAttribute('data-filter-surface', 'popover');
+  await page.setViewportSize({ width: 550, height: 800 });
+  await expect(panel).toHaveAttribute('data-narrow', 'true');
+  await expect(panel.locator('[data-filter-dock]')).toHaveCount(0);
+  await panel.getByRole('tab', { name: '年代', exact: true }).click();
+  await expect(panel.locator('[data-facet-column]')).toHaveCount(1);
+  await expect(panel.locator('[data-facet-column="decade"]')).toBeVisible();
+  expect(errors).toEqual([]);
 });

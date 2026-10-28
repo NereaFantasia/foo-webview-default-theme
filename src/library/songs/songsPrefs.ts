@@ -1,4 +1,4 @@
-import type { Atom } from 'jotai/vanilla';
+import { atom, type Atom } from 'jotai/vanilla';
 import {
   browserStorage,
   defineLocalPref,
@@ -9,11 +9,11 @@ import {
 import type { Store } from '../../kit/store.ts';
 import type { ColumnId } from '../../table/columns/columns.ts';
 import { isQueryScope, type QueryScope } from '../../track/trackQuery.ts';
-import { isSongsSortColumn } from './songsSort.ts';
+import { isTrackSortColumn, nextTrackSort } from '../../track/trackSort.ts';
 
 /**
  * 歌曲页在这台机器上的偏好：按哪一列排、过滤框的字段范围、分面条开没开、行的疏密。界面偏好，存 localStorage，
- * 不进宿主 config。读回逐项校验，坏了哪一项就用缺省补哪一项。
+ * 不进宿主 config。读回逐项校验，坏了哪一项就用缺省补哪一项
  */
 export const SONGS_STORAGE_KEY = 'default-theme.songs.v1';
 
@@ -22,7 +22,7 @@ export interface SongsSort {
   readonly descending: boolean;
 }
 
-/** 行的疏密，从密到疏。行高与缩略图边长随它走。 */
+/** 行的疏密，从密到疏。行高与缩略图边长随它走 */
 export const SONGS_DENSITIES = ['compact', 'standard', 'comfortable'] as const;
 export type SongsDensity = (typeof SONGS_DENSITIES)[number];
 
@@ -44,7 +44,7 @@ export const DEFAULT_SONGS_PREFS: SongsPrefs = {
   density: 'standard',
 };
 
-/** 校验一份存档；不是 JSON、不是对象都当没有存档。 */
+/** 校验一份存档；不是 JSON、不是对象都当没有存档 */
 export function parseSongsPrefs(raw: string | null): SongsPrefs {
   const source = storedRecord(raw);
   const sort = recordOf(source['sort']);
@@ -53,7 +53,7 @@ export function parseSongsPrefs(raw: string | null): SongsPrefs {
   const density = source['density'];
   return {
     sort: {
-      column: isSongsSortColumn(column) ? column : DEFAULT_SONGS_PREFS.sort.column,
+      column: isTrackSortColumn(column) ? column : DEFAULT_SONGS_PREFS.sort.column,
       descending: sort['descending'] === true,
     },
     scope: isQueryScope(scope) ? scope : DEFAULT_SONGS_PREFS.scope,
@@ -71,13 +71,33 @@ const PREF = defineLocalPref<SongsPrefs>({
 
 export const songsPrefsAtom: Atom<SongsPrefs> = PREF.atom;
 
+/**
+ * 筛选是嵌入页面还是弹出浮层，单独一个键：歌曲偏好的旧格式不变。没有存档时按旧的分面展开偏好定，
+ * 展开过的人仍看到嵌在页面里的分面
+ */
+export const SONGS_FILTER_STORAGE_KEY = 'default-theme.songs-filter.v1';
+
+const DOCK = defineLocalPref<boolean | null>({
+  key: SONGS_FILTER_STORAGE_KEY,
+  fallback: null,
+  parse: (raw) => (raw === 'docked' ? true : raw === 'popover' ? false : undefined),
+  format: (docked) => (docked ? 'docked' : 'popover'),
+});
+
+export const songsFilterDockedAtom: Atom<boolean> = atom(
+  (get) => get(DOCK.atom) ?? get(PREF.atom).facetsOpen,
+);
+
 export interface SongsPrefsService {
-  /** 点了这一列的列头：同一列再点换方向，换一列从升序起。能不能排由调用方先判断。 */
+  /** 点了这一列的列头：同一列再点换方向，换一列按它的缺省方向起。能不能排由调用方先判断 */
   sortBy(column: ColumnId): void;
+  /** 排序菜单选的字段与方向 */
+  setSort(sort: SongsSort): void;
   setScope(scope: QueryScope): void;
   setFacetsOpen(open: boolean): void;
+  setFilterDocked(docked: boolean): void;
   setDensity(density: SongsDensity): void;
-  /** 排序回到缺省（艺术家升序）。 */
+  /** 排序回到缺省（艺术家升序） */
   resetSort(): void;
 }
 
@@ -86,6 +106,7 @@ export function startSongsPrefs(
   storage: PrefStorage | null = browserStorage(),
 ): SongsPrefsService {
   PREF.load(store, storage);
+  DOCK.load(store, storage);
 
   function save(change: Partial<SongsPrefs>): void {
     PREF.set(store, { ...store.get(PREF.atom), ...change }, storage);
@@ -93,16 +114,19 @@ export function startSongsPrefs(
 
   return {
     sortBy(column) {
-      const { sort } = store.get(PREF.atom);
-      save({
-        sort: { column, descending: sort.column === column ? !sort.descending : false },
-      });
+      save({ sort: nextTrackSort(store.get(PREF.atom).sort, column) });
+    },
+    setSort(sort) {
+      save({ sort });
     },
     setScope(scope) {
       if (store.get(PREF.atom).scope !== scope) save({ scope });
     },
     setFacetsOpen(open) {
       if (store.get(PREF.atom).facetsOpen !== open) save({ facetsOpen: open });
+    },
+    setFilterDocked(docked) {
+      DOCK.set(store, docked, storage);
     },
     setDensity(density) {
       if (store.get(PREF.atom).density !== density) save({ density });

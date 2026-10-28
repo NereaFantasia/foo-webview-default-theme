@@ -3,19 +3,20 @@ import type { KeyChord } from '../nav/commandRegistry.ts';
 import { FULLSCREEN_KEYS } from '../nav/fullscreenCommand.ts';
 import { BACK_KEYS, FORWARD_KEYS } from '../nav/navCommands.ts';
 import { QUEUE_KEYS } from '../nav/queueKeys.ts';
+import { CLEAR_SELECTION_KEYS } from '../nav/selectionKeys.ts';
 
-/** 一种按法：键盘上的一个组合，或鼠标的一个键（`mouse` 是这个键的名字的文案键）。 */
+/** 一种按法：键盘上的一个组合，或鼠标的一个键（`mouse` 是这个键的名字的文案键） */
 export type ShortcutInput = { readonly chord: KeyChord } | { readonly mouse: MessageKey };
 
 export interface ShortcutEntry {
-  /** 这个操作的名字。 */
+  /** 这个操作的名字 */
   readonly label: MessageKey;
-  /** 几种按法任选其一。 */
+  /** 几种按法任选其一 */
   readonly inputs: readonly ShortcutInput[];
 }
 
 export interface ShortcutSection {
-  /** 这些按键在哪里起作用。 */
+  /** 这些按键在哪里起作用 */
   readonly title: MessageKey;
   readonly entries: readonly ShortcutEntry[];
 }
@@ -23,10 +24,10 @@ export interface ShortcutSection {
 const chords = (keys: readonly KeyChord[]): ShortcutInput[] => keys.map((chord) => ({ chord }));
 
 /**
- * 快捷键一览的内容，按起作用的地方分小节。
+ * 快捷键一览的内容，按起作用的地方分小节
  *
  * 这是一张静态清单：命令要等所在的页面或部件挂上才登记，设置页里问不到别处的命令。后退、前进与全屏取登记
- * 它们的模块给的按键，队列按键取共享声明；其余几条照实写在这里，改了那边的按键要跟着改这里。
+ * 它们的模块给的按键，队列按键取共享声明；其余几条照实写在这里，改了那边的按键要跟着改这里
  */
 export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
   {
@@ -63,9 +64,13 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
       { label: 'queue.more', inputs: chords(QUEUE_KEYS.menu) },
     ],
   },
+  {
+    title: 'query.selection',
+    entries: [{ label: 'query.clearSelection', inputs: chords(CLEAR_SELECTION_KEYS) }],
+  },
 ];
 
-/** `KeyboardEvent.key` 里写出来不像键帽上的字的那几个。 */
+/** `KeyboardEvent.key` 里写出来不像键帽上的字的那几个 */
 const KEY_NAMES: Readonly<Record<string, string>> = {
   ArrowLeft: '←',
   ArrowRight: '→',
@@ -75,7 +80,7 @@ const KEY_NAMES: Readonly<Record<string, string>> = {
   Escape: 'Esc',
 };
 
-/** 一个组合拆成几个键帽上的字，修饰键在前。按键名不翻译；单个字母写成大写。 */
+/** 一个组合拆成几个键帽上的字，修饰键在前。按键名不翻译；单个字母写成大写 */
 export function chordKeys(chord: KeyChord): string[] {
   const keys: string[] = [];
   if (chord.ctrl) keys.push('Ctrl');

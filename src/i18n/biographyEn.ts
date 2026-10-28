@@ -37,6 +37,9 @@ export const biographyEn = {
   'biography.loading': 'Loading biography',
   'biography.missing': 'No biography found',
   'biography.network': 'Could not connect to the source',
+  'biography.dns': 'Could not resolve the source address. Check DNS, hosts or proxy settings',
+  'biography.localRelay':
+    'The address resolves to this computer or a local network, so security settings refused the request. DNS rewrites or relay tools pointing it to 127.0.0.1 cannot be used',
   'biography.blocked': 'The source refused this request',
   'biography.rateLimited': 'Too many requests. Try again later',
   'biography.invalid': 'Could not read this source page',

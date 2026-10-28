@@ -7,20 +7,20 @@ import { useRightCard } from './rightCardContext.ts';
 import styles from './RightCardSplitter.module.css';
 import { SplitterHandle } from '../SplitterHandle.tsx';
 
-/** 内容卡与右侧卡之间的布局间隔，CSS 像素。 */
+/** 内容卡与右侧卡之间的布局间隔，CSS 像素 */
 export const GUTTER = 8;
 
-/** 方向键一下改多少宽，CSS 像素。 */
+/** 方向键一下改多少宽，CSS 像素 */
 const KEY_STEP = 16;
 
 export interface RightCardSplitterProps {
-  /** 内容卡与右侧卡所在的那一层，用它的右缘换算右侧卡宽度。 */
+  /** 内容卡与右侧卡所在的那一层，用它的右缘换算右侧卡宽度 */
   readonly dock: RefObject<HTMLElement | null>;
 }
 
 /**
  * 主内容卡右缘的分栏握柄。拖动中每一下都落盘，按 Esc 回到拖动之前的宽度；双击回到缺省宽度。焦点在它上面时
- * ← 加宽、→ 收窄。卡的宽度存的是用户拖到的值，内容卡不够宽时卡在版式里让宽，存的不变。
+ * ← 加宽、→ 收窄。卡的宽度存的是用户拖到的值，内容卡不够宽时卡在版式里让宽，存的不变
  */
 export function RightCardSplitter({ dock }: RightCardSplitterProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -40,7 +40,7 @@ export function RightCardSplitter({ dock }: RightCardSplitterProps) {
     const pointerId = event.pointerId;
     const right = dock.current?.getBoundingClientRect().right ?? 0;
     const bounds = element.getBoundingClientRect();
-    // 握柄中心就是主内容卡右缘；保留抓取偏移，右侧卡受布局压窄时仍从实际宽度起拖。
+    // 握柄中心就是主内容卡右缘；保留抓取偏移，右侧卡受布局压窄时仍从实际宽度起拖
     const offset = event.clientX - (bounds.left + bounds.width / 2);
     const rest = store.get(card.view).prefs.width;
     event.preventDefault();

@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openSettings, enterSettings } from '../fixtures/settingsPage.ts';
+import {
+  chooseOption,
+  openSettings,
+  enterSettings,
+  backgroundCard,
+  chooseBackground,
+  expectBackground,
+  backgroundSources,
+} from '../fixtures/settingsPage.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
@@ -65,9 +73,7 @@ for (const platformVersion of ['13.0.0', null]) {
       });
     }, platformVersion);
     const settings = await openSettings(page);
-    await expect(settings.select('窗口背景')).toHaveText(
-      platformVersion ? 'Acrylic' : '主题色背景',
-    );
+    await expectBackground(page, platformVersion ? 'Acrylic' : '主题色背景');
     await expect(page.locator('[data-window-background="solid"]')).toHaveCount(
       platformVersion ? 0 : 1,
     );
@@ -98,12 +104,10 @@ for (const scheme of ['light', 'dark'] as const) {
     });
     const settings = await openSettings(page);
     await expect(settings.card('窗口背景')).toContainText('Windows 10 使用主题色背景');
-    await expect(settings.select('窗口背景')).toHaveText('主题色背景');
-    await settings.select('窗口背景').click();
-    for (const name of ['Acrylic', 'Mica', 'Mica Alt']) {
-      await expect(page.getByRole('option', { name, exact: true })).toBeDisabled();
-    }
-    await page.keyboard.press('Escape');
+    await expectBackground(page, '主题色背景');
+    await expect(
+      backgroundSources(page).getByRole('radio', { name: '系统材质', exact: true }),
+    ).toBeDisabled();
     const background = page.locator('[data-window-background="solid"]');
     await expect(background).toBeVisible();
     const root = page.locator('#root > .fui-FluentProvider');
@@ -146,7 +150,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(background).toHaveCount(0);
     await settings.choose('窗口背景', '主题色背景');
     await expect(background).toBeVisible();
-    await expect(settings.select('窗口背景')).toHaveText('主题色背景');
+    await expectBackground(page, '主题色背景');
     expect(settings.errors).toEqual([]);
   });
 
@@ -193,13 +197,12 @@ for (const scheme of ['light', 'dark'] as const) {
     );
     await page.reload();
     await enterSettings(page);
-    await expect(settings.select('窗口背景')).toHaveText('正在播放的封面');
+    await expectBackground(page, '正在播放的封面');
     await settings.expand('窗口背景');
     await expect(shade).toHaveValue('1');
     await settings.choose('窗口背景', 'Mica');
     await expect(background).toHaveCount(0);
-    // 材质没有可调的项：没有箭头，也没有子行。
-    await expect(settings.expander('窗口背景').locator('[data-settings-toggle]')).toHaveCount(0);
+    // 材质没有可调的项：只有来源与材质两行，没有滑块。
     await expect(shade).toHaveCount(0);
   });
 }
@@ -282,10 +285,7 @@ test('封面背景换曲、缺图与停止回退不改来源；色场暂停缓�
   });
   const player = await openPlayer(page);
   await enterSettings(page);
-  const choose = async (option: string) => {
-    await page.getByRole('combobox', { name: '窗口背景', exact: true }).click();
-    await page.getByRole('option', { name: option, exact: true }).click();
-  };
+  const choose = (option: string) => chooseBackground(page, option);
   const url = await imageData(page, '#b52658');
   player.host.answer('artwork.getFb2kUrlByPath', (params) => ({
     success: true,
@@ -398,8 +398,7 @@ test('流动色场深色压暗高亮，浅色直接呈现明亮底并保护次�
   }
   expect(previous).toBeLessThan(2);
   const dark = await sample();
-  await page.getByRole('combobox', { name: '颜色模式', exact: true }).click();
-  await page.getByRole('option', { name: '浅色', exact: true }).click();
+  await chooseOption(page, '颜色模式', '浅色');
   await expect.poll(async () => Math.min(...(await sample()))).toBeGreaterThan(240);
   const background = page.locator('[data-window-background="palette"]');
   const shade = background.locator('[data-background-shade]');
@@ -429,8 +428,7 @@ test('流动色场深色压暗高亮，浅色直接呈现明亮底并保护次�
     await sample(),
   );
   expect(contrast).toBeGreaterThanOrEqual(4.5);
-  await page.getByRole('combobox', { name: '颜色模式', exact: true }).click();
-  await page.getByRole('option', { name: '深色', exact: true }).click();
+  await chooseOption(page, '颜色模式', '深色');
   await expect.poll(sample).toEqual(dark);
   expect(player.errors).toEqual([]);
 });
@@ -492,9 +490,7 @@ test('固定流动色场忽略旧背景参数，深浅同源，反复隐藏释�
   await expect(background.locator(':scope > div').first()).toHaveCSS('filter', 'none');
   await expect(background.locator('[data-background-shade]')).toHaveCSS('opacity', '0');
   await expect(background.locator('[data-background-inactive]')).toHaveCSS('display', 'none');
-  const expander = page
-    .locator('[data-settings-expander]')
-    .filter({ has: page.getByRole('combobox', { name: '窗口背景', exact: true }) });
+  const expander = backgroundCard(page);
   const toggle = expander.locator('[data-settings-toggle]');
   if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await expect(page.getByRole('slider', { name: '背景遮罩', exact: true })).toHaveCount(0);
@@ -502,8 +498,7 @@ test('固定流动色场忽略旧背景参数，深浅同源，反复隐藏释�
   await expect(page.getByRole('slider', { name: '内容区域不透明度', exact: true })).toBeVisible();
   await expect(page.getByRole('slider', { name: '背景饱和度', exact: true })).toHaveCount(0);
   await expect(page.getByRole('slider', { name: '背景亮度', exact: true })).toHaveCount(0);
-  await page.getByRole('combobox', { name: '颜色模式', exact: true }).click();
-  await page.getByRole('option', { name: '浅色', exact: true }).click();
+  await chooseOption(page, '颜色模式', '浅色');
   await expect(background.locator(':scope > div').first()).toHaveCSS('filter', 'none');
   await focusWindow(player.host, true, true);
   await expect(field).toHaveCount(0);
@@ -648,8 +643,10 @@ for (const scheme of ['light', 'dark'] as const) {
     }
 
     const choosePlayer = async (label: string) => {
-      await page.getByRole('combobox', { name: '播放栏位置', exact: true }).click();
-      await page.getByRole('option', { name: label, exact: true }).click();
+      await page
+        .getByRole('radiogroup', { name: '播放栏位置', exact: true })
+        .getByRole('radio', { name: label, exact: true })
+        .check();
     };
     for (const [style, selector] of [
       ['窗口底部', '[data-player-bar]'],
@@ -684,8 +681,7 @@ for (const scheme of ['light', 'dark'] as const) {
     );
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.getByRole('combobox', { name: '窗口背景', exact: true }).click();
-    await page.getByRole('option', { name: 'Mica', exact: true }).click();
+    await chooseBackground(page, 'Mica');
     await expect(background).toHaveCount(0);
     await expect(pane).toHaveCSS('backdrop-filter', 'none');
     await expect(edge).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
@@ -728,7 +724,7 @@ test('图片经 SDK 原子保存，刷新恢复；读取失败保留来源与不
   await page.reload();
   await expect(image).toHaveCount(1);
   await enterSettings(page);
-  await expect(settings.select('窗口背景')).toHaveText('图片');
+  await expectBackground(page, '图片');
   await settings.expand('窗口背景');
   settings.host.answer('file.read', hostFailure('NOT_FOUND'));
   await page.getByRole('button', { name: '重新读取背景图片', exact: true }).click();
@@ -737,7 +733,7 @@ test('图片经 SDK 原子保存，刷新恢复；读取失败保留来源与不
   await expect(settings.expander('窗口背景').locator(':scope > :first-child')).toContainText(
     '背景图片读取失败',
   );
-  await expect(settings.select('窗口背景')).toHaveText('图片');
+  await expectBackground(page, '图片');
   expect(
     await page
       .locator('[data-window-background]')
@@ -756,10 +752,7 @@ test('浅色保留封面染色，连续滑条按层调节，刷新和复位保�
   });
   const player = await openPlayer(page);
   await enterSettings(page);
-  const choose = async (name: string, option: string) => {
-    await page.getByRole('combobox', { name, exact: true }).click();
-    await page.getByRole('option', { name: option, exact: true }).click();
-  };
+  const choose = (name: string, option: string) => chooseOption(page, name, option);
   await choose('窗口背景', '流动色场');
   await choose('窗口背景', '正在播放的封面');
   const pane = page.locator('main [data-reading-fill]').first();
@@ -792,12 +785,9 @@ test('浅色保留封面染色，连续滑条按层调节，刷新和复位保�
   expect(
     Math.max(...colors[0].map((channel, index) => Math.abs(channel - colors[1][index]))),
   ).toBeGreaterThan(10);
-  const toggle = page
-    .locator('[data-settings-expander]')
-    .filter({ has: page.getByRole('combobox', { name: '窗口背景', exact: true }) })
-    .locator('[data-settings-toggle]');
+  const toggle = backgroundCard(page).locator('[data-settings-toggle]');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  const rails = page.locator('.fui-Slider__rail');
+  const rails = backgroundCard(page).locator('.fui-Slider__rail');
   await expect(rails).toHaveCount(9);
   expect(
     await rails.evaluateAll((elements) =>
@@ -841,18 +831,12 @@ test('浅色保留封面染色，连续滑条按层调节，刷新和复位保�
   await expect(page.getByRole('slider', { name: '背景饱和度', exact: true })).toHaveValue('1');
   await page.reload();
   await enterSettings(page);
-  await page
-    .locator('[data-settings-expander]')
-    .filter({ has: page.getByRole('combobox', { name: '窗口背景', exact: true }) })
-    .locator('[data-settings-toggle]')
-    .click();
+  await backgroundCard(page).locator('[data-settings-toggle]').click();
   await expect(page.getByRole('slider', { name: '磨砂模糊', exact: true })).toHaveValue('60');
   await page.getByRole('button', { name: '恢复当前模式默认值', exact: true }).click();
   await expect(page.getByRole('slider', { name: '背景饱和度', exact: true })).toHaveValue('130');
   await expect(page.getByRole('slider', { name: '磨砂模糊', exact: true })).toHaveValue('24');
-  await expect(page.getByRole('combobox', { name: '窗口背景', exact: true })).toHaveText(
-    '正在播放的封面',
-  );
+  await expectBackground(page, '正在播放的封面');
   await choose('颜色模式', '深色');
   await expect(page.getByRole('slider', { name: '背景饱和度', exact: true })).toHaveValue('200');
   expect(player.errors).toEqual([]);

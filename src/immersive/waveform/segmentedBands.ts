@@ -2,13 +2,13 @@ import { renderBands, type BandSignals, type WaveformBands } from './waveformBan
 
 /**
  * 整轨分频按段做：一段一段向来源要 PCM、分频、按窗求 RMS，拼成整首的结果。整首一次解完再分析，20 分钟的曲子
- * 单是四条链的输出就要四百多 MB，一小时的混音连宿主单块缓冲的上限（x64 256 MiB）都超；按段做，占用只跟段长有关。
+ * 单是四条链的输出就要四百多 MB，一小时的混音连宿主单块缓冲的上限（x64 256 MiB）都超；按段做，占用只跟段长有关
  *
  * 窗按时间划：整首 `duration` 秒等分成 `windows` 个窗，每段负责整数个窗。滤波器从静止起步，段首的输出要过一阵
- * 才可信，所以每段往前多要 `PREROLL_SECONDS`，这部分只让滤波器进入稳态、不计入任何窗。
+ * 才可信，所以每段往前多要 `PREROLL_SECONDS`，这部分只让滤波器进入稳态、不计入任何窗
  */
 export const SEGMENT_SECONDS = 120;
-/** 最低的一节是 A 计权 20.6 Hz 的双极点高通，时间常数约 8 ms；半秒远超它的稳定时间。 */
+/** 最低的一节是 A 计权 20.6 Hz 的双极点高通，时间常数约 8 ms；半秒远超它的稳定时间 */
 export const PREROLL_SECONDS = 0.5;
 
 const BAND_KEYS = ['low', 'mid', 'high', 'weighted'] as const;
@@ -16,29 +16,29 @@ const BAND_KEYS = ['low', 'mid', 'high', 'weighted'] as const;
 export interface BandSegment {
   firstWindow: number;
   windowCount: number;
-  /** 向来源要的区间（秒）：起点含预滚，终点是最后一个窗的右沿。 */
+  /** 向来源要的区间（秒）：起点含预滚，终点是最后一个窗的右沿 */
   start: number;
   end: number;
 }
 
 export interface PcmPiece {
   audio: AudioBuffer;
-  /** `audio` 第一个样本在曲目里的时刻（秒）；宿主按实际生效的起点报。 */
+  /** `audio` 第一个样本在曲目里的时刻（秒）；宿主按实际生效的起点报 */
   start: number;
 }
 
-/** 取曲目 `range` 这一段；取不了给 `null`，整首就此作废。 */
+/** 取曲目 `range` 这一段；取不了给 `null`，整首就此作废 */
 export type SegmentSource = (range: { start: number; end: number }) => Promise<PcmPiece | null>;
 
 export interface SegmentOptions {
   segmentSeconds?: number;
   prerollSeconds?: number;
-  /** 每段取回、分频之后各问一次；假就停下、给 `null`（换曲、销毁）。 */
+  /** 每段取回、分频之后各问一次；假就停下、给 `null`（换曲、销毁） */
   isCurrent?: () => boolean;
   render?: (audio: AudioBuffer) => Promise<BandSignals>;
   /**
-   * 每段分频之后、按窗求 RMS 之前交给调用方一次：节拍跟踪在同一份分频输出上取能量，不必再解一遍。
-   * `from` / `to` 是这一段负责的区间（秒，不含预滚）。
+   * 每段分频之后、按窗求 RMS 之前交给调用方一次：节拍跟踪在同一份分频输出上取能量，不必再解一遍
+   * `from` / `to` 是这一段负责的区间（秒，不含预滚）
    */
   onSegment?: (signals: BandSignals, piece: PcmPiece, from: number, to: number) => void;
 }
@@ -51,7 +51,7 @@ export function planSegments(
 ): BandSegment[] {
   if (!(duration > 0) || !(windows > 0)) return [];
   const windowSeconds = duration / windows;
-  // 先按段长上限定段数，再把窗平均分：只按上限塞满的话，尾巴可能剩一两个窗，为它单独开一次解码器。
+  // 先按段长上限定段数，再把窗平均分：只按上限塞满的话，尾巴可能剩一两个窗，为它单独开一次解码器
   const perSegmentMax = Math.max(1, Math.floor(segmentSeconds / windowSeconds));
   const perSegment = Math.ceil(windows / Math.ceil(windows / perSegmentMax));
   const segments: BandSegment[] = [];
@@ -69,7 +69,7 @@ export function planSegments(
 
 /**
  * 把第 `first` 起 `count` 个窗的 RMS 写进 `out`。`samples` 从曲目的 `sampleStart` 秒起、每秒 `sampleRate` 个；
- * 窗的边界按四舍五入落到样本上。样本没盖满的窗按有的那部分算，一个样本都没有的写 0（解出来比标称时长短）。
+ * 窗的边界按四舍五入落到样本上。样本没盖满的窗按有的那部分算，一个样本都没有的写 0（解出来比标称时长短）
  */
 export function windowRmsAt(
   samples: ArrayLike<number>,
@@ -94,7 +94,7 @@ export function windowRmsAt(
   }
 }
 
-/** 整首的分频结果；时长不可用、任何一段取不了或中途不再需要时给 `null`。 */
+/** 整首的分频结果；时长不可用、任何一段取不了或中途不再需要时给 `null` */
 export async function analyseSegments(
   source: SegmentSource,
   duration: number,

@@ -4,7 +4,7 @@ import type { Store } from '../kit/store.ts';
 import { settle } from './hostCall.ts';
 import { waitForHost, type HostReadyFace } from './waitForHost.ts';
 
-/** 读取窗口模式的等待上限，毫秒；SDK 的底层请求可能在超时后才答复。 */
+/** 读取窗口运行模式的等待超时上限（毫秒，默认 5000 ms） */
 export const WINDOW_MODE_TIMEOUT_MS = 5000;
 export type WindowModeState = 'checking' | 'standalone' | 'panel' | 'preview' | 'failed';
 export const windowModeAtom = atom<WindowModeState>('checking');
@@ -19,7 +19,7 @@ export interface WindowModeService {
   dispose(): void;
 }
 
-/** 只确认独立窗口才放行业务；允许预览时，等不到宿主才进入预览，读取失败不能据此放行。 */
+/** 启动窗口模式检测服务。仅当确认为独立窗口或面板模式时放行正常业务；在允许预览时未连上宿主进入预览模式，读取异常时不予放行 */
 export function startWindowMode(
   store: Store,
   host: WindowModeFace = fb,

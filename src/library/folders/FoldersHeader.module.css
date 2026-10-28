@@ -1,60 +1,82 @@
+/* 标题行：上级路径在目录名上方，集合操作在行尾；下面是命令栏 */
 .root {
   display: grid;
-  grid-template-areas: 'titles filter actions';
-  grid-template-columns: minmax(0, 1fr) minmax(192px, auto) auto;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}
+.identity {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.crumbs,
+.crumb {
+  display: flex;
   align-items: center;
-  gap: var(--spacingVerticalS) var(--spacingHorizontalS);
+  min-width: 0;
+}
+.crumbs {
+  /* 根目录同样保留路径行，进入子目录时不移动下方目录树的双击目标 */
+  min-height: calc(var(--lineHeightBase300) + 2 * var(--spacingVerticalXXS));
+  overflow: hidden;
+  color: var(--colorNeutralForeground3);
+}
+.crumb {
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.crumb > svg {
+  flex: none;
+}
+.crumb button {
+  overflow: hidden;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXS);
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground2);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fontSizeBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crumb button:hover {
+  color: var(--colorBrandForegroundLinkHover);
+}
+.crumb button:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
 }
 .titles {
-  grid-area: titles;
   display: flex;
+  flex-wrap: nowrap;
   align-items: baseline;
+  gap: var(--spacingVerticalXXS) var(--spacingHorizontalMNudge);
   min-width: 0;
-  gap: var(--spacingHorizontalMNudge);
 }
 .count {
+  overflow: hidden;
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase200);
-  white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-}
-.filter {
-  grid-area: filter;
-  display: flex;
-  align-items: center;
-  gap: var(--spacingHorizontalS);
-  min-width: 0;
-}
-.query {
-  width: 320px;
-  min-width: 160px;
-  flex: 1;
+  white-space: nowrap;
 }
 .actions {
-  grid-area: actions;
   display: flex;
-  gap: var(--spacingHorizontalS);
-}
-.root[data-tier='medium'] .query {
-  width: 220px;
-}
-.root[data-tier='narrow'] {
-  grid-template-areas: 'titles actions' 'filter filter';
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.root[data-tier='narrow'] .titles {
-  flex-direction: column;
-  gap: var(--spacingVerticalXXS);
-}
-.root[data-tier='narrow'] .query {
-  width: auto;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
 }
 .error {
-  grid-column: 1 / -1;
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacingHorizontalS);
   color: var(--colorPaletteRedForeground1);
 }

@@ -1,4 +1,4 @@
-/* 两种形态常态贴底，命中区与横向坐标不随显示层的轻抬和加粗改变。 */
+/* 两种形态常态贴底，命中区与横向坐标不随显示层的轻抬和加粗改变 */
 .root {
   position: absolute;
   z-index: 1;
@@ -39,7 +39,7 @@
   opacity: 0.35;
 }
 
-/* 时间覆盖在轨道上方，不参与宽度分配，也不阻断指针进入和离开命中区。 */
+/* 时间覆盖在轨道上方，不参与宽度分配，也不阻断指针进入和离开命中区 */
 .clocks {
   position: absolute;
   right: 0;
@@ -107,7 +107,7 @@
   opacity: 1;
 }
 
-/* 鼠标抓取时立即显示位置，反馈不等待悬停淡入。 */
+/* 鼠标抓取时立即显示位置，反馈不等待悬停淡入 */
 .hit[data-dragging] .marker {
   opacity: 1;
   transition: none;
@@ -120,7 +120,7 @@
   left: var(--spacingHorizontalM);
 }
 
-/* 胶囊按描边内侧定位，保留封面和圆角处的留白。 */
+/* 胶囊按描边内侧定位，保留封面和圆角处的留白 */
 .root[data-form='capsule'] {
   --scrub-scale: 0.333333;
 

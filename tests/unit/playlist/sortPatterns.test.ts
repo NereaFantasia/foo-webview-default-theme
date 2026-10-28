@@ -1,3 +1,5 @@
+import { makeRow } from '../../fixtures/fakePlaylists.ts';
+import { formatTitle } from '../../fixtures/fakeTitleFormat.ts';
 import { describe, expect, it } from 'vitest';
 import {
   COLUMN_SORT,
@@ -11,15 +13,15 @@ import {
 } from '../../../src/playlist/sortPatterns.ts';
 
 describe('sortPatterns', () => {
-  it('排序子菜单十三项、id 不重复，列头能排的列反查得回来', () => {
-    expect(SORT_CHOICES).toHaveLength(13);
-    expect(new Set(SORT_CHOICES.map((choice) => choice.id)).size).toBe(13);
+  it('排序子菜单包含所有可排序列、id 不重复，列头能排的列反查得回来', () => {
+    expect(SORT_CHOICES).toHaveLength(19);
+    expect(new Set(SORT_CHOICES.map((choice) => choice.id)).size).toBe(19);
     for (const [column, pattern] of Object.entries(COLUMN_SORT)) {
       expect(columnOfSortKey(pattern)).toBe(column);
     }
     expect(columnOfSortKey(SORT_ARTIST)).toBe('artist');
     expect(columnOfSortKey(SORT_DURATION)).toBe('duration');
-    expect(columnOfSortKey(SORT_PATH)).toBeNull();
+    expect(columnOfSortKey(SORT_PATH)).toBe('path');
   });
 
   it('缺省分组是「专辑 | 专辑艺术家」加碟号两级；每档都带切过去时的重排串', () => {
@@ -34,4 +36,15 @@ describe('sortPatterns', () => {
       expect(mode.sort).not.toBe('');
     }
   });
+});
+
+it('路径列升序比较完整文件名，不被标题的顺序覆盖', () => {
+  const rows = [
+    makeRow('Main', 0, { title: 'A', path: 'file://E:/Music/z.flac' }),
+    makeRow('Main', 1, { title: 'Z', path: 'file://E:/Music/a.flac' }),
+  ];
+  const sorted = [...rows].sort((a, b) =>
+    formatTitle(SORT_PATH, a).localeCompare(formatTitle(SORT_PATH, b)),
+  );
+  expect(sorted.map((row) => row.title)).toEqual(['Z', 'A']);
 });

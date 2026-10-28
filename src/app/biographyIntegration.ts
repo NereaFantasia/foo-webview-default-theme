@@ -2,7 +2,8 @@ import { atom } from 'jotai/vanilla';
 import { localeAtom } from '../i18n/locale.ts';
 import { historyAtom } from '../nav/navHistory.ts';
 import { albumsAtom } from '../library/albums.ts';
-import { probeCover, sameCoverPixels } from '../immersive/cover/coverIdentity.ts';
+import { probeCover } from '../covers/coverIdentity.ts';
+import { sameBiographyPhotoPixels } from '../library/biography/biographyPhotoSimilarity.ts';
 import { startBiographyPhotos } from '../library/biography/biographyPhotos.ts';
 import {
   biographyArtist,
@@ -41,7 +42,7 @@ export function startBiographyIntegration({
   const artist = atom((get) => {
     if (get(rightCard.deps.stopped)) return null;
     const track = get(rightCard.deps.current);
-    // 有多值标签时取第一位曲目艺人；不拆字符串署名，也不回落到专辑艺人。
+    // 有多值标签时取第一位曲目艺人；不拆字符串署名，也不回落到专辑艺人
     return track ? biographyArtist(track.artists?.[0] ?? track.artist ?? '') : null;
   });
   const manual = atom((get) => {
@@ -61,7 +62,7 @@ export function startBiographyIntegration({
     store,
     {
       artist,
-      // 只比专辑艺术家是他的专辑；客串的那张不是他的作品，比对会认错人。
+      // 只比专辑艺术家是他的专辑；客串的那张不是他的作品，比对会认错人
       albums: atom((get) => {
         const library = get(albumsAtom);
         const name = get(artist);
@@ -83,7 +84,7 @@ export function startBiographyIntegration({
     if (!name) return null;
     const chosen = get(manual);
     const found = get(identity.state);
-    // 手选刚删掉时状态还停在手选那位上，等身份服务重新认定，不能接着用它。
+    // 手选刚删掉时状态还停在手选那位上，等身份服务重新认定，不能接着用它
     const resolved =
       found.artist === name && found.status === 'resolved' && (chosen || !found.manual)
         ? found
@@ -140,7 +141,7 @@ export function startBiographyIntegration({
     active,
     albums: albumsAtom,
     probe: probeCover,
-    same: sameCoverPixels,
+    same: sameBiographyPhotoPixels,
     cache: resources.photos,
     online: onlinePhoto.state,
   });

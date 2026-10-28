@@ -5,6 +5,7 @@ import {
   openSettings,
   waitFrames,
   type SettingsPage,
+  expectBackground,
 } from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
@@ -70,7 +71,9 @@ test.describe('系统是浅色', () => {
     page,
   }) => {
     const settings = await openSettings(page);
-    await expect(settings.select('颜色模式')).toHaveText('跟随系统');
+    await expect(
+      settings.radios('颜色模式').getByRole('radio', { name: '跟随系统', exact: true }),
+    ).toBeChecked();
     await expect(settings.card('颜色模式')).toContainText('当前：浅色');
     await expect(themeRoot(page)).toHaveCSS('color-scheme', 'light');
 
@@ -90,7 +93,9 @@ test.describe('系统是浅色', () => {
     await page.reload();
     await expect(themeRoot(page)).toHaveCSS('color-scheme', 'dark');
     await enterSettings(page);
-    await expect(settings.select('颜色模式')).toHaveText('深色');
+    await expect(
+      settings.radios('颜色模式').getByRole('radio', { name: '深色', exact: true }),
+    ).toBeChecked();
 
     await settings.choose('颜色模式', '跟随系统');
     await expect(themeRoot(page)).toHaveCSS('color-scheme', 'light');
@@ -103,7 +108,7 @@ test('窗口材质：换档即下发；跟随首选项时写出宿主报的实�
   page,
 }) => {
   const settings = await openSettings(page);
-  await expect(settings.select('窗口背景')).toHaveText('跟随 foobar2000 首选项');
+  await expectBackground(page, '跟随 foobar2000 首选项');
   await expect(settings.card('窗口背景')).not.toContainText('当前：');
 
   await settings.host.waitForListener('window:backdropStateChanged');
@@ -118,14 +123,14 @@ test('窗口材质：换档即下发；跟随首选项时写出宿主报的实�
   expect(settings.host.callsTo('window.setBackdropPolicy')).toHaveLength(before);
 
   await settings.choose('窗口背景', 'Acrylic');
-  await expect(settings.select('窗口背景')).toHaveText('Acrylic');
+  await expectBackground(page, 'Acrylic');
   await expect.poll(() => lastPolicy(settings)['activeEffect']).toBe('acrylic');
   await expect(settings.card('窗口背景')).not.toContainText('当前：');
   expect(settings.host.callsTo('window.setBackdropPolicy')).toHaveLength(before + 1);
 
   await page.reload();
   await enterSettings(page);
-  await expect(settings.select('窗口背景')).toHaveText('Acrylic');
+  await expectBackground(page, 'Acrylic');
   expect(settings.errors).toEqual([]);
 });
 
@@ -135,7 +140,9 @@ test('播放栏位置：换到标题栏，底部通栏即时收掉并记住，�
   const key = 'default-theme.player-bar.v1';
   const settings = await openSettings(page, { answers: { playback: PLAYING } });
   const bar = page.locator('[data-player-bar]');
-  await expect(settings.select('播放栏位置')).toHaveText('窗口底部');
+  await expect(
+    settings.radios('播放栏位置').getByRole('radio', { name: '窗口底部', exact: true }),
+  ).toBeChecked();
   await expect(bar).toBeVisible();
 
   await settings.choose('播放栏位置', '标题栏');
@@ -144,7 +151,9 @@ test('播放栏位置：换到标题栏，底部通栏即时收掉并记住，�
 
   await page.reload();
   await enterSettings(page);
-  await expect(settings.select('播放栏位置')).toHaveText('标题栏');
+  await expect(
+    settings.radios('播放栏位置').getByRole('radio', { name: '标题栏', exact: true }),
+  ).toBeChecked();
   await expect(bar).toHaveCount(0);
 
   await settings.choose('播放栏位置', '窗口底部');

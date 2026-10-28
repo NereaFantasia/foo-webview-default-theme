@@ -1,0 +1,24 @@
+/* 列表整页按总数占高度，最近一首贴底。列、渐隐与滚动容器在 `scene/SideColumn`；虚拟列表自己管滚动位置，
+   不要浏览器的滚动锚定 */
+.list {
+  position: relative;
+  overflow-anchor: none;
+}
+
+.viewport {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+/* 行带不设 will-change：单独成合成层后按小数偏移摆放，125% 这类缩放下文字发虚 */
+.strip {
+  position: relative;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: var(--queue-row-height);
+}

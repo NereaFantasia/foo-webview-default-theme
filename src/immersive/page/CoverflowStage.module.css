@@ -1,0 +1,29 @@
+/* 舞台铺满外框。外框给元素的一组变量与分栏预设的一样：文字取前景色的 100%、72%、48%，描边 32%，
+   表面 8%（没有封面的占位底）；场景固定深色，前景色是白。--cf-cover 当前封面边长、--cf-top 封面上沿由舞台写进来 */
+.stage {
+  --text-primary: var(--colorNeutralForeground1);
+  --text-secondary: color-mix(in srgb, var(--colorNeutralForeground1) 72%, transparent);
+  --text-muted: color-mix(in srgb, var(--colorNeutralForeground1) 48%, transparent);
+  --line: color-mix(in srgb, var(--colorNeutralForeground1) 32%, transparent);
+  --state-hover: color-mix(in srgb, var(--colorNeutralForeground1) 10%, transparent);
+  --state-pressed: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
+  --bg-hover: var(--state-hover);
+  --bg-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+  --bg-surface: color-mix(in srgb, var(--colorNeutralForeground1) 8%, transparent);
+
+  position: absolute;
+  inset: 0;
+}
+
+/* 主副标题在封面下 24，行宽就是当前封面宽；盖在封面流上面，艺人与专辑的名字才点得到 */
+.info {
+  position: absolute;
+  top: calc(var(--cf-top) + var(--cf-cover) + 24px);
+  left: calc(50% - var(--cf-cover) / 2);
+  width: var(--cf-cover);
+}
+
+/* 退场时预设的主副标题已经回来，这一份当帧藏起 */
+.info[data-leaving] {
+  visibility: hidden;
+}

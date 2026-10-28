@@ -4,7 +4,7 @@ import { makeTrack } from '../fixtures/tracks.ts';
 import type { PageHost } from '../fixtures/pageHost.ts';
 
 // 正在播放这一首的星级：底部通栏跟在曲名后面，正在播放条在第二行右端，胶囊跟在曲名后面、≤ 640 不放。
-// 评过分的一直在，没评分的指针停在那一块上才出空星；点第 N 颗写 N 星，点当前那颗清零。网络流不画。
+// 评过分的一直在；没评分的，底部通栏常驻空星，正在播放条与胶囊要指针停在那一块上才出。点第 N 颗写 N 星，点当前那颗清零。网络流不画。
 
 const rating = (scope: Locator) => scope.locator('[data-now-playing-rating]');
 const star = (scope: Locator, value: string) => rating(scope).getByRole('radio', { name: value });
@@ -41,21 +41,13 @@ test('底部通栏：评过分的星一直在；点第 N 颗写 N 星，点当�
   expect(errors).toEqual([]);
 });
 
-test('没评分时空星只在指针停在那一块上、或焦点在里面时才露出来，位置一直占着', async ({ page }) => {
+test('底部通栏没评分的空星常驻：指针不在上面也看得见，位置占着', async ({ page }) => {
   const { errors } = await openPlayer(page);
   const stars = rating(bar(page));
-  const opacity = () => stars.evaluate((element) => getComputedStyle(element).opacity);
   await page.mouse.move(640, 300);
-  await expect.poll(opacity).toBe('0');
-  const width = await stars.evaluate((element) => element.getBoundingClientRect().width);
-  expect(width).toBeGreaterThan(0);
-  await bar(page).getByText(PLAYING_TRACK.title).first().hover();
-  await expect.poll(opacity).toBe('1');
-  await page.mouse.move(640, 300);
-  await expect.poll(opacity).toBe('0');
-  // 藏着的星照样能用键盘走到，焦点一进来就露出来。
-  await star(bar(page), '1').focus();
-  await expect.poll(opacity).toBe('1');
+  await expect(stars).toBeVisible();
+  await expect.poll(() => stars.evaluate((element) => getComputedStyle(element).opacity)).toBe('1');
+  expect((await stars.boundingBox())?.width ?? 0).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 
@@ -79,6 +71,26 @@ test('双击一颗星只写一次；之后用方向键照样能改', async ({ pa
 
 test.describe('放在标题栏', () => {
   test.beforeEach(({ page }) => choosePlayerBar(page, 'titlebar'));
+
+  test('没评分时空星只在指针停在那一块上、或焦点在里面时才露出来，位置一直占着', async ({
+    page,
+  }) => {
+    const { errors } = await openPlayer(page);
+    const lcd = page.locator('header [data-now-playing]');
+    const stars = rating(lcd);
+    const opacity = () => stars.evaluate((element) => getComputedStyle(element).opacity);
+    await page.mouse.move(640, 300);
+    await expect.poll(opacity).toBe('0');
+    expect((await stars.boundingBox())?.width ?? 0).toBeGreaterThan(0);
+    await lcd.getByText(PLAYING_TRACK.title).first().hover();
+    await expect.poll(opacity).toBe('1');
+    await page.mouse.move(640, 300);
+    await expect.poll(opacity).toBe('0');
+    // 藏着的星照样能用键盘走到，焦点一进来就露出来。
+    await star(lcd, '1').focus();
+    await expect.poll(opacity).toBe('1');
+    expect(errors).toEqual([]);
+  });
 
   test('正在播放条的星在第二行右端，胶囊的跟在曲名后面，≤ 640 的胶囊不放', async ({ page }) => {
     const { errors } = await openPlayer(page, {

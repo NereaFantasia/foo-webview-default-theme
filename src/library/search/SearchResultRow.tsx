@@ -5,12 +5,22 @@ import { durationText } from '../../table/cellText.ts';
 import type { TablePoint } from '../../table/tableItems.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { albumArtistOf, albumYearOf } from '../../host/libraryContract.ts';
-import { SongArt } from '../songs/SongArt.tsx';
+import { SongArt } from '../SongArt.tsx';
 import { searchHitKey, type SearchHit } from './searchQuery.ts';
 import styles from './SearchResultRow.module.css';
 import { useService } from '../../kit/useService.ts';
 import { albumDetailKey } from '../album-detail/albumDetail.ts';
 import type { Modifiers } from '../../kit/keyedSelection.ts';
+import {
+  RecordRegular,
+  CalendarLtr16Regular,
+  MicRegular,
+  Person48Regular,
+  TextNumberListLtr16Regular,
+} from '@fluentui/react-icons';
+import { pluralAtom } from '../../i18n/plural.ts';
+import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
+import { TrackMetadata } from '../../track/TrackMetadata.tsx';
 
 export interface SearchResultRowProps {
   readonly hit: SearchHit;
@@ -80,22 +90,81 @@ export const SearchResultRow = memo(function SearchResultRow({
   };
   const albumDetail = useService(albumDetailKey);
   const t = useAtomValueRawSync(translateAtom);
-  const album = hit.kind === 'album' ? hit.album : (albumDetail.findAlbum(hit.track) ?? undefined);
-  const title = hit.kind === 'album' ? hit.album.name : hit.track.title || hit.track.path || '';
-  const subtitle =
+  const plural = useAtomValueRawSync(pluralAtom);
+  const size = tile ? 128 : 40;
+  const album =
     hit.kind === 'album'
-      ? [albumArtistOf(hit.album), albumYearOf(hit.album)].filter(Boolean).join(' · ')
-      : [hit.track.artist, hit.track.album].filter(Boolean).join(' · ');
+      ? hit.album
+      : hit.kind === 'track'
+        ? (albumDetail.findAlbum(hit.track) ?? undefined)
+        : undefined;
+  const artistCounts =
+    hit.kind === 'artist'
+      ? [
+          t(plural(hit.artist.albumCount, 'album.countOne', 'album.count'), {
+            count: hit.artist.albumCount,
+          }),
+          t(plural(hit.artist.trackCount, 'album.menuTracksOne', 'album.menuTracks'), {
+            count: hit.artist.trackCount,
+          }),
+        ]
+      : [];
+  const title =
+    hit.kind === 'artist'
+      ? hit.artist.name
+      : hit.kind === 'album'
+        ? hit.album.name
+        : hit.track.title || hit.track.path || '';
+  const subtitle =
+    hit.kind === 'artist'
+      ? artistCounts.join(' · ')
+      : hit.kind === 'album'
+        ? [albumArtistOf(hit.album), albumYearOf(hit.album)].filter(Boolean).join(' · ')
+        : [hit.track.artist, hit.track.album].filter(Boolean).join(' · ');
   const content = (
     <>
-      <SongArt album={album} size={tile ? 128 : 40} />
+      {hit.kind === 'artist' ? (
+        <span className={styles.avatar} style={{ width: size, height: size }} aria-hidden>
+          <Person48Regular />
+        </span>
+      ) : (
+        <SongArt album={album} size={size} />
+      )}
       <span className={styles.labels}>
         <span className={styles.title}>{title}</span>
-        <span className={styles.subtitle}>{subtitle}</span>
+        {hit.kind === 'artist' ? (
+          <Metadata className={styles.subtitle}>
+            <MetadataItem icon={<RecordRegular />}>{artistCounts[0]}</MetadataItem>
+            <MetadataItem icon={<TextNumberListLtr16Regular />}>{artistCounts[1]}</MetadataItem>
+          </Metadata>
+        ) : hit.kind === 'album' ? (
+          <Metadata className={styles.subtitle}>
+            {albumArtistOf(hit.album) && (
+              <MetadataItem icon={<MicRegular />} label={t('trackInfo.albumArtist')}>
+                {albumArtistOf(hit.album)}
+              </MetadataItem>
+            )}
+            {albumYearOf(hit.album) && (
+              <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
+                {albumYearOf(hit.album)}
+              </MetadataItem>
+            )}
+          </Metadata>
+        ) : (
+          <TrackMetadata
+            className={styles.subtitle}
+            artist={hit.track.artist ?? ''}
+            album={hit.track.album ?? ''}
+          />
+        )}
       </span>
       {!tile && (
         <span className={styles.tail}>
-          {hit.kind === 'album' ? t('search.albums') : durationText(hit.track.duration ?? 0)}
+          {hit.kind === 'artist'
+            ? t('search.artists')
+            : hit.kind === 'album'
+              ? t('search.albums')
+              : durationText(hit.track.duration ?? 0)}
         </span>
       )}
     </>

@@ -8,7 +8,7 @@
   outline: none;
 }
 
-/* 命中区一直保留，显隐只改变覆盖在边线上的竖条，不推动两侧内容。 */
+/* 命中区一直保留，显隐只改变覆盖在边线上的竖条，不推动两侧内容 */
 .grip {
   width: 100%;
   height: 100%;
@@ -26,7 +26,7 @@
   transition-delay: var(--motion-slow), 0s;
 }
 
-/* 悬停等待只用于显示提示；抓取与键盘聚焦需要立即反馈。 */
+/* 悬停等待只用于显示提示；抓取与键盘聚焦需要立即反馈 */
 .handle:focus-visible .grip,
 .handle[data-dragging] .grip {
   opacity: 1;

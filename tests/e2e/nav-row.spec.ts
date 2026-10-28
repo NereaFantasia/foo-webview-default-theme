@@ -131,10 +131,13 @@ test('歌词键可聚焦并开合歌词页，保留当前地点', async ({ page 
   const key = navRow.locator('[data-nav="lyrics"]');
   await expect(key).toBeEnabled();
   await expect(key).toHaveAccessibleName('歌词');
+  // 悬停不出提示，卡关着时悬停是以浮层预览歌词页
   await key.hover();
-  await expect(page.getByRole('tooltip', { name: '歌词', exact: true })).toBeVisible();
-  await key.click();
   await expect(page.locator('[data-lyrics-panel]')).toBeVisible();
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await key.click();
+  // 预览的浮层交接给停靠的卡，交接的一瞬两份并存，等剩下一份
+  await expect(page.locator('[data-lyrics-panel]')).toHaveCount(1);
   await expect(key).toHaveAttribute('aria-pressed', 'true');
   await expect(albumsPage).toBeVisible();
   await key.focus();

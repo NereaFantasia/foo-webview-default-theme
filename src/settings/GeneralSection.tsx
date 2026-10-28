@@ -7,9 +7,13 @@ import {
   Options20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { flushSync } from 'react-dom';
 import { translateAtom } from '../i18n/locale.ts';
+import { SegmentedTabs } from '../kit/SegmentedTabs.tsx';
+import { useElementWidth } from '../kit/useElementWidth.ts';
 import { PLACE_LABELS } from '../nav/places.ts';
+import { SidebarIcon } from '../nav/sidebar/SidebarIcon.tsx';
 import {
   chooseStartPlace,
   START_PLACE_CHOICES,
@@ -23,11 +27,12 @@ import { openPreferences } from './hostActions.ts';
 import { LanguageCard } from './LanguageCard.tsx';
 import { SettingsActionCard } from './SettingsActionCard.tsx';
 import { SettingsCard, type SettingsCardIds } from './SettingsCard.tsx';
+import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import styles from './GeneralSection.module.css';
 import { SettingsRow } from './SettingsRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
-import { SettingsSelect } from './SettingsSelect.tsx';
+import { StartPlaceThumb } from './thumbnails/StartPlaceThumb.tsx';
 import { useService } from '../kit/useService.ts';
 
 interface TraySwitchState {
@@ -38,7 +43,7 @@ interface TraySwitchState {
 
 /**
  * 托盘的一只开关。确定没有宿主时禁用并写明原因；宿主没接受这只开关、或已生效但没存下时，说明行写出
- * 错误，开关仍显示用户拨到的那一边。设置页的子行与新人引导的卡共用这一份。
+ * 错误，开关仍显示用户拨到的那一边。设置页的子行与新人引导的卡共用这一份
  */
 function useTraySwitch(name: TraySwitch): TraySwitchState {
   const t = useAtomValueRawSync(translateAtom);
@@ -74,7 +79,7 @@ interface TraySwitchCardProps {
   readonly title: string;
 }
 
-/** 托盘的一只开关单独成卡，新人引导用。 */
+/** 托盘的一只开关单独成卡，新人引导用 */
 export function TraySwitchCard({ name, icon, title }: TraySwitchCardProps) {
   const state = useTraySwitch(name);
   return (
@@ -93,7 +98,7 @@ function TraySwitchRow({ name, title }: Omit<TraySwitchCardProps, 'icon'>) {
   );
 }
 
-/** 托盘的两只开关收在一张卡里；哪只出错，卡头写同一条错误，收起时也看得见。 */
+/** 托盘的两只开关收在一张卡里；哪只出错，卡头写同一条错误，收起时也看得见 */
 function TrayExpander() {
   const t = useAtomValueRawSync(translateAtom);
   const minimize = useTraySwitch('minimizeToTray');
@@ -113,32 +118,58 @@ function TrayExpander() {
   );
 }
 
-/** 打开窗口时落在哪个地点；换了下次打开窗口时生效。 */
+/** 六项带图标的分段至少要这么宽（控件那一格，CSS 像素）；窄于它换成两列的单选，每项一枚图标 */
+const SEGMENTED_MIN_WIDTH = 480;
+
+/** 打开窗口时落在哪个地点；换了下次打开窗口时生效 */
 function StartPlaceCard() {
   const t = useAtomValueRawSync(translateAtom);
   const place = useAtomValueRawSync(startPlaceAtom);
   const store = useStore();
+  // 还没量到时按放得下分段排，量到了当场换，不等下一帧
+  const [width, setWidth] = useState(Infinity);
+  const measure = useElementWidth<HTMLDivElement>((next) => flushSync(() => setWidth(next)));
   return (
     <SettingsCard
       icon={<DoorArrowRight20Regular />}
       title={t('settings.startPlace')}
       feedback={<LocalSaveNotice keys={[START_PLACE_STORAGE_KEY]} />}
-      field
+      block
     >
       {(ids) => (
-        <SettingsSelect
-          {...ids}
-          options={START_PLACE_CHOICES.map((value) => ({ value, label: t(PLACE_LABELS[value]) }))}
-          value={place}
-          onChange={(value) => chooseStartPlace(store, value)}
-        />
+        <div ref={measure}>
+          {width >= SEGMENTED_MIN_WIDTH ? (
+            <SegmentedTabs
+              label={t('settings.startPlace')}
+              value={place}
+              options={START_PLACE_CHOICES.map((value) => ({
+                value,
+                label: t(PLACE_LABELS[value]),
+                icon: <SidebarIcon id={value} />,
+              }))}
+              onChange={(value) => chooseStartPlace(store, value)}
+            />
+          ) : (
+            <SettingsChoice
+              {...ids}
+              columns={2}
+              options={START_PLACE_CHOICES.map((value) => ({
+                value,
+                label: t(PLACE_LABELS[value]),
+                preview: <StartPlaceThumb place={value} />,
+              }))}
+              value={place}
+              onChange={(value) => chooseStartPlace(store, value)}
+            />
+          )}
+        </div>
       )}
     </SettingsCard>
   );
 }
 
 /**
- * 「常规」一组：界面语言、启动时打开、托盘；末尾「相关设置」是去 foobar2000 自己的设置的两个入口。
+ * 「常规」一组：界面语言、启动时打开、托盘；末尾「相关设置」是去 foobar2000 自己的设置的两个入口
  */
 export function GeneralSection() {
   const t = useAtomValueRawSync(translateAtom);

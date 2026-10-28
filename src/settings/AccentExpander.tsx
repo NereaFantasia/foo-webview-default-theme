@@ -1,5 +1,6 @@
-import { Button, Switch, Tooltip } from '@fluentui/react-components';
+import { Button, Switch, Tooltip, tokens } from '@fluentui/react-components';
 import { ArrowClockwise20Regular, Color20Regular } from '@fluentui/react-icons';
+import { hexFromArgb, TonalPalette } from '@material/material-color-utilities';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
@@ -15,10 +16,13 @@ import {
   baseAccentModeAtom,
   baseAccentSourceAtom,
   chooseBaseAccent,
+  chooseCustomAccent,
+  customAccentAtom,
   refreshWindowsAccent,
   windowsAccentFailedAtom,
   type BaseAccentMode,
 } from '../theme/baseAccent.ts';
+import { tealBrand } from '../theme/brand.ts';
 import { PLAY_BUTTON_STYLES, type PlayButtonStyle } from '../theme/playButtonColors.ts';
 import {
   choosePlayButtonStyle,
@@ -26,11 +30,13 @@ import {
   playButtonStyleAtom,
 } from '../theme/playButtonStyle.ts';
 import styles from './AccentExpander.module.css';
-import { CustomAccentPicker } from './CustomAccentPicker.tsx';
+import { ColorPicker } from './ColorPicker.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
-import { SettingsSelect } from './SettingsSelect.tsx';
+import { SettingsChoice } from './SettingsChoice.tsx';
+import { SettingsSegmented } from './SettingsSegmented.tsx';
+import { PlayButtonThumb } from './thumbnails/PlayButtonThumb.tsx';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 
 export const BASE_ACCENT_LABELS: Readonly<Record<BaseAccentMode, MessageKey>> = {
@@ -38,6 +44,14 @@ export const BASE_ACCENT_LABELS: Readonly<Record<BaseAccentMode, MessageKey>> = 
   windows: 'settings.accentWindows',
   custom: 'settings.customAccent',
 };
+
+/** 自定义强调色的预设：品牌青绿加八个色相的中明度色 */
+const ACCENT_COLORS = [
+  tealBrand[100],
+  ...[20, 50, 90, 150, 200, 250, 290, 340].map((hue) =>
+    hexFromArgb(TonalPalette.fromHueAndChroma(hue, 48).tone(65)),
+  ),
+];
 
 const PLAY_BUTTON_LABELS: Readonly<Record<PlayButtonStyle, MessageKey>> = {
   brand: 'settings.playButtonBrand',
@@ -47,7 +61,7 @@ const PLAY_BUTTON_LABELS: Readonly<Record<PlayButtonStyle, MessageKey>> = {
   neutral: 'settings.playButtonNeutral',
 };
 
-/** 强调色此刻取自哪里：跟随封面且这张封面取得出颜色时是封面，否则是基础色的来源。 */
+/** 强调色此刻取自哪里：跟随封面且这张封面取得出颜色时是封面，否则是基础色的来源 */
 export function useAccentSourceName(): string {
   const t = useAtomValueRawSync(translateAtom);
   const enabled = useAtomValueRawSync(coverAccentEnabledAtom);
@@ -56,7 +70,7 @@ export function useAccentSourceName(): string {
   return t(enabled && profile?.accent ? 'settings.accentCover' : BASE_ACCENT_LABELS[base]);
 }
 
-/** Windows 强调色读不到时的错误文案；没选 Windows 强调色或读到了时是 undefined。 */
+/** Windows 强调色读不到时的错误文案；没选 Windows 强调色或读到了时是 undefined */
 function useWindowsAccentError(): string | undefined {
   const t = useAtomValueRawSync(translateAtom);
   const mode = useAtomValueRawSync(baseAccentModeAtom);
@@ -85,13 +99,20 @@ function CoverAccentRow() {
   );
 }
 
-/** 基础强调色：自定义时旁边是取色键，Windows 强调色时旁边是刷新键。 */
+/** 基础强调色：自定义时旁边是取色键，Windows 强调色时旁边是刷新键 */
 function BaseAccentRow() {
   const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const store = useStore();
   const mode = useAtomValueRawSync(baseAccentModeAtom);
+  const custom = useAtomValueRawSync(customAccentAtom);
   const failure = useWindowsAccentError();
+  // Windows 的强调色要等宿主答，色点先用它的缺省蓝
+  const dots: Readonly<Record<BaseAccentMode, string>> = {
+    teal: tealBrand[100],
+    windows: tokens.colorPaletteBlueBorderActive,
+    custom,
+  };
   return (
     <SettingsRow
       title={t('settings.baseAccent')}
@@ -100,18 +121,26 @@ function BaseAccentRow() {
       error={failure !== undefined}
       field
     >
-      {(ids) => (
+      {() => (
         <div className={styles.controls}>
-          <SettingsSelect
-            {...ids}
+          <SettingsSegmented
+            label={t('settings.baseAccent')}
             options={BASE_ACCENT_MODES.map((value) => ({
               value,
               label: t(BASE_ACCENT_LABELS[value]),
+              icon: <span className={styles.dot} style={{ backgroundColor: dots[value] }} />,
             }))}
             value={mode}
             onChange={(value) => chooseBaseAccent(store, value)}
           />
-          {mode === 'custom' && <CustomAccentPicker />}
+          {mode === 'custom' && (
+            <ColorPicker
+              value={custom}
+              label={t('settings.customAccent')}
+              colors={ACCENT_COLORS}
+              onChange={(color) => chooseCustomAccent(store, color)}
+            />
+          )}
           {mode === 'windows' && (
             <Tooltip content={t('settings.refreshWindowsAccent')} relationship="label">
               <Button
@@ -137,14 +166,15 @@ function PlayButtonRow() {
     <SettingsRow
       title={t('settings.playButtonStyle')}
       feedback={<LocalSaveNotice keys={[PLAY_BUTTON_STYLE_KEY]} />}
-      field
+      block
     >
       {(ids) => (
-        <SettingsSelect
+        <SettingsChoice
           {...ids}
           options={PLAY_BUTTON_STYLES.map((value) => ({
             value,
             label: t(PLAY_BUTTON_LABELS[value]),
+            preview: <PlayButtonThumb style={value} />,
           }))}
           value={style}
           onChange={(value) => choosePlayButtonStyle(store, value)}
@@ -156,7 +186,7 @@ function PlayButtonRow() {
 
 /**
  * 强调色：卡头写此刻取自哪里，箭头前的色块是此刻的强调色。子行是跟随封面、基础色与主播放按钮的配色；
- * Windows 强调色读不到时，卡头与基础色那一行写同一条错误。
+ * Windows 强调色读不到时，卡头与基础色那一行写同一条错误
  */
 export function AccentExpander() {
   const t = useAtomValueRawSync(translateAtom);

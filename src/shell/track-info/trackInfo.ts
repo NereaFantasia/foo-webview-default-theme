@@ -7,18 +7,20 @@ import { waitForHost } from '../../host/waitForHost.ts';
 import type { Translate } from '../../i18n/translate.ts';
 import type { Store } from '../../kit/store.ts';
 import { copyInfoFields } from './trackInfoRows.ts';
+import { onlineUnblockedAtom } from '../../playback/onlineFailures.ts';
+import { onlineSourceOf } from '../../playback/onlineTracks.ts';
 import {
   copyInfoTags,
   emptyTrackInfo,
   infoFilePath,
-  infoMediaKind,
   infoTags,
   INITIAL_INFO_SECTIONS,
-  INFO_SECTIONS,
+  infoSections,
   type InfoRead,
   type InfoSection,
   type TrackInfoState,
 } from './trackInfoModel.ts';
+import { trackAbilities } from '../../host/trackOrigin.ts';
 
 export interface TrackInfoDeps {
   readonly track: Atom<Track | null>;
@@ -169,7 +171,8 @@ export function startTrackInfo(
   }
 
   function loadSections(requested = store.get(sections)) {
-    if (!connected || !active || !track || disposed || infoMediaKind(track) === 'stream') return;
+    if (!connected || !active || !track || disposed || !trackAbilities(track.path).opensLocally)
+      return;
     const target = track;
     const id = generation;
     const loaders = { file: loadFile, statistics: loadStatistics, replayGain: loadReplayGain };
@@ -186,8 +189,8 @@ export function startTrackInfo(
     const id = generation;
     store.set(state, emptyTrackInfo(track));
     if (!connected || !active || !track || disposed) return;
-    // 网络流不能交给同步打开文件的端点，否则网络超时会阻塞宿主主线程。
-    if (infoMediaKind(track) === 'stream') {
+    // 网络流不能交给同步打开文件的端点，否则网络超时会阻塞宿主主线程
+    if (!trackAbilities(track.path).opensLocally) {
       const skipped = { status: 'notApplicable' } as const;
       update(id, {
         metadata: skipped,
@@ -286,10 +289,11 @@ export function startTrackInfo(
       const id = generation;
       if (!valid(id) || !connected || !track || store.get(state).action === 'copying') return false;
       update(id, { action: 'copying' });
-      loadSections(INFO_SECTIONS);
+      loadSections(infoSections(track));
       await Promise.all(reads);
       if (!valid(id)) return false;
-      return copy(copyInfoFields(store.get(state), t, locale));
+      const source = onlineSourceOf(track.path, store.get(onlineUnblockedAtom));
+      return copy(copyInfoFields(store.get(state), t, locale, source));
     },
     async openFolder() {
       const path = track && infoFilePath(track);

@@ -2,13 +2,12 @@ import { atom, type Atom, type PrimitiveAtom } from 'jotai/vanilla';
 import { browserStorage, type PrefStorage } from '../../kit/localPref.ts';
 import type { Store } from '../../kit/store.ts';
 import {
-  columnDef,
   DEFAULT_ORDER,
   DEFAULT_WIDTHS,
   insertColumn,
   isColumnId,
   REQUIRED_COLUMN,
-  resizePair,
+  MIN_WIDTH,
   widthOf,
   withWidth,
   type ColumnId,
@@ -16,74 +15,96 @@ import {
 } from './columns.ts';
 import {
   columnsLayout,
-  resizePartner,
-  type ColumnsCompact,
+  canResizeColumn,
   type ColumnsLayout,
   type ColumnsState,
 } from './columnsLayout.ts';
-import { loadColumns, saveColumns, type StoredColumns } from './columnsStorage.ts';
+import {
+  loadColumns,
+  saveColumns,
+  type StoredColumns,
+  type IntroducedColumns,
+} from './columnsStorage.ts';
 
-/** 一次分隔条拖动。`update` 收的是从按下起算的总位移，不累加。 */
+/** 一次分隔条拖动。`update` 收的是从按下起算的总位移，不累加 */
 export interface ColumnResize {
   update(dx: number): void;
-  /** 松手：落盘。 */
+  /** 松手：落盘 */
   commit(): void;
-  /** 取消：回到按下时的列宽，不落盘。 */
+  /** 取消：回到按下时的列宽，不落盘 */
   cancel(): void;
 }
 
 export interface ColumnsOptions {
-  /** localStorage 的键，一张表一个。 */
+  /** localStorage 的键，一张表一个 */
   readonly key: string;
-  /** 这张表有哪几列；列头菜单只列这几列，存档里别的列原样留着。 */
+  /** 可信存储不可用时仍可读取旧值供本次显示；正常迁移由启动装配完成 */
+  readonly previousKey?: string;
+  /** 这张表有哪几列；列头菜单只列这几列，存档里别的列原样留着 */
   readonly offered: readonly ColumnId[];
-  /** 没有存档时藏哪几列。 */
+  /** 没有存档时藏哪几列 */
   readonly hidden?: readonly ColumnId[];
-  /** 没有存档时与缺省不同的列宽。 */
+  readonly introduced?: IntroducedColumns;
+  /** 没有存档时与缺省不同的列宽 */
   readonly widths?: Partial<Record<ColumnId, number>>;
-  /** 缺省是页面的 localStorage。 */
+  /** 缺省是页面的 localStorage */
   readonly storage?: PrefStorage | null;
-  /** 容器不够宽时先收起的几列，见 `ColumnsCompact`。 */
-  readonly compact?: ColumnsCompact;
 }
 
 export interface ColumnsModel {
   readonly offered: readonly ColumnId[];
   readonly state: Atom<ColumnsState>;
   readonly layout: Atom<ColumnsLayout>;
-  /** 摆放表格的那一层量到容器宽度就报过来；窄档与封面列的上限跟着它走。 */
+  /** 容器宽度用于换算旧比例列，以及限制封面宽度 */
   setContainerWidth(width: number): void;
   /**
-   * 按下 `left` 右缘的分隔条。`measured` 是按下这一刻各列的实测像素宽。没有分隔条的列答 null。
-   * fr 列在这里换成实测像素当新权重，之后的位移与像素同一单位；比例随窗口缩放不变。
+   * 按下 `left` 右缘的分隔条。`measured` 是按下这一刻各列的实测像素宽。没有分隔条的列答 null
+   * 位移只作用于当前列，其他列保持各自宽度
    */
   beginResize(left: ColumnId, measured: ReadonlyMap<ColumnId, number>): ColumnResize | null;
   setHidden(id: ColumnId, hidden: boolean): void;
   moveColumn(source: ColumnId, target: ColumnId, after: boolean): void;
   /**
-   * 挪到看得见的相邻列另一侧（键盘换位），到头了答 false。只挪这一列，藏着的列（勾掉的、窄档收起的）相对顺序
-   * 不动：窄档里换过位，放宽之后别的列还在原处。
+   * 挪到相邻的已显示列另一侧，到头了答 false；勾掉的列相对顺序不动
    */
   moveAdjacent(source: ColumnId, direction: -1 | 1): boolean;
-  /** 列宽、显隐与列序都回到建模型时的缺省，并落盘。 */
+  /** 列宽、显隐与列序都回到建模型时的缺省，并落盘 */
   reset(): void;
 }
 
-/** fr 列按实测像素重新定权重；看不见的 fr 列按同一比例换算，回来时仍是原来的比例。 */
-function measuredWidths(
+/** 旧比例列在首个有效容器尺寸下换成像素；最小宽度与旧栅格一致，隐藏列沿用同一比例 */
+function resolveLegacyWidths(
   state: ColumnsState,
   layout: ColumnsLayout,
   measured: ReadonlyMap<ColumnId, number>,
 ): ColumnWidths {
-  const flexible = layout.cells.filter((id) => columnDef(id).flexible && measured.has(id));
-  const weight = flexible.reduce((sum, id) => sum + widthOf(state.widths, id), 0);
-  const pixels = flexible.reduce((sum, id) => sum + (measured.get(id) ?? 0), 0);
-  const scale = weight > 0 && pixels > 0 ? pixels / weight : 1;
+  const weights = state.legacyWeights ?? {};
+  const flexible = layout.cells.filter((id) => weights[id] !== undefined);
+  let pixels = Math.max(
+    0,
+    state.containerWidth -
+      layout.coverWidth -
+      layout.cells
+        .filter((id) => weights[id] === undefined)
+        .reduce((sum, id) => sum + (measured.get(id) ?? widthOf(state.widths, id)), 0),
+  );
+  let remaining = [...flexible];
+  const resolved = new Map<ColumnId, number>();
+  let scale = 1;
+  while (remaining.length) {
+    const weight = remaining.reduce((sum, id) => sum + (weights[id] ?? 0), 0);
+    scale = weight > 0 ? pixels / weight : 0;
+    const minimum = remaining.filter((id) => (weights[id] ?? 0) * scale < MIN_WIDTH);
+    if (!minimum.length) break;
+    for (const id of minimum) resolved.set(id, MIN_WIDTH);
+    pixels = Math.max(0, pixels - minimum.length * MIN_WIDTH);
+    remaining = remaining.filter((id) => !resolved.has(id));
+  }
   let widths = state.widths;
   for (const id of DEFAULT_ORDER) {
-    if (!columnDef(id).flexible) continue;
-    const px = flexible.includes(id) ? measured.get(id) : undefined;
-    widths = withWidth(widths, id, px ?? widthOf(state.widths, id) * scale);
+    const weight = weights[id];
+    if (weight === undefined) continue;
+    widths = withWidth(widths, id, resolved.get(id) ?? Math.max(MIN_WIDTH, weight * scale));
   }
   return widths;
 }
@@ -92,7 +113,7 @@ type Saved = Omit<ColumnsState, 'containerWidth'>;
 
 /**
  * 同一个 store 里同一个存档键只有一份列宽、显隐与列序：两张表用同一个键时改一边另一边跟着变，落盘也不会
- * 拿各自的旧状态互相覆盖。缺省显隐与列宽取第一个建出来的那一份的。容器宽度各表自己量，不共用。
+ * 拿各自的旧状态互相覆盖。缺省显隐与列宽取第一个建出来的那一份的。容器宽度各表自己量，不共用
  */
 const shared = new WeakMap<Store, Map<string, PrimitiveAtom<Saved>>>();
 
@@ -109,13 +130,14 @@ function savedAtomFor(store: Store, key: string, load: () => StoredColumns): Pri
       widths: stored.widths,
       hidden: new Set(stored.hidden),
       order: stored.order,
+      ...(stored.legacyWeights ? { legacyWeights: stored.legacyWeights } : {}),
     });
     byKey.set(key, saved);
   }
   return saved;
 }
 
-/** 建一张表的列模型：读回存档，状态写进 `store`。没有订阅与定时器，不用释放。 */
+/** 建一张表的列模型：读回存档，状态写进 `store`。没有订阅与定时器，不用释放 */
 export function createColumnsModel(store: Store, options: ColumnsOptions): ColumnsModel {
   const storage = options.storage === undefined ? browserStorage() : options.storage;
   let defaults = DEFAULT_WIDTHS;
@@ -127,20 +149,32 @@ export function createColumnsModel(store: Store, options: ColumnsOptions): Colum
     hidden: options.hidden ?? [],
     order: DEFAULT_ORDER,
   };
-  const savedAtom = savedAtomFor(store, options.key, () =>
-    loadColumns(storage, options.key, fallback),
-  );
+  const savedAtom = savedAtomFor(store, options.key, () => {
+    const key =
+      options.previousKey &&
+      storage &&
+      'available' in storage &&
+      storage.available === false &&
+      storage.getItem(options.key) === null
+        ? options.previousKey
+        : options.key;
+    return loadColumns(storage, key, fallback, options.introduced);
+  });
   const widthAtom = atom(0);
   const stateAtom = atom((get) => ({ ...get(savedAtom), containerWidth: get(widthAtom) }));
   const offered = [...options.offered];
-  const { compact } = options;
-  const layoutAtom = atom((get) => columnsLayout(get(stateAtom), offered, compact));
+  const layoutAtom = atom((get) => columnsLayout(get(stateAtom), offered));
   const read = () => store.get(stateAtom);
   const write = (patch: Partial<Saved>) =>
     store.set(savedAtom, { ...store.get(savedAtom), ...patch });
   const persist = () => {
-    const { widths, hidden, order } = read();
-    saveColumns(storage, options.key, { widths, hidden: [...hidden], order });
+    const { widths, hidden, order, legacyWeights } = read();
+    saveColumns(storage, options.key, {
+      widths,
+      hidden: [...hidden],
+      order,
+      ...(legacyWeights ? { legacyWeights } : {}),
+    });
   };
 
   return {
@@ -150,24 +184,30 @@ export function createColumnsModel(store: Store, options: ColumnsOptions): Colum
     setContainerWidth(width) {
       if (Number.isFinite(width) && width >= 0 && width !== store.get(widthAtom)) {
         store.set(widthAtom, width);
+        const state = read();
+        if (width > 0 && state.legacyWeights) {
+          const widths = resolveLegacyWidths(state, store.get(layoutAtom), new Map());
+          store.set(savedAtom, { widths, hidden: state.hidden, order: state.order });
+          persist();
+        }
       }
     },
     beginResize(left, measured) {
       const layout = store.get(layoutAtom);
-      const partner = resizePartner(layout, left);
-      if (!partner) return null;
+      if (!canResizeColumn(layout, left)) return null;
       const before = read();
-      const start = partner === 'self' ? before.widths : measuredWidths(before, layout, measured);
+      const start = before.widths;
       return {
         update(dx) {
-          if (partner === 'self') {
+          if (!Number.isFinite(dx)) return;
+          if (left === 'cover') {
             const max = read().containerWidth / 3;
             const cover = Math.min(Math.max(layout.coverWidth + dx, 0), max);
             write({ widths: withWidth(start, 'cover', cover) });
             return;
           }
-          const [a, b] = resizePair(widthOf(start, left), widthOf(start, partner), dx);
-          write({ widths: withWidth(withWidth(start, left, a), partner, b) });
+          const width = measured.get(left) ?? widthOf(start, left);
+          write({ widths: withWidth(start, left, Math.max(MIN_WIDTH, width + dx)) });
         },
         commit: persist,
         cancel() {
@@ -201,7 +241,7 @@ export function createColumnsModel(store: Store, options: ColumnsOptions): Colum
       return true;
     },
     reset() {
-      write({
+      store.set(savedAtom, {
         widths: fallback.widths,
         hidden: new Set(fallback.hidden),
         order: fallback.order,

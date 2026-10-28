@@ -28,7 +28,7 @@ const stateAtom = atom<NavHistoryState>({
 
 export const historyAtom: Atom<NavHistoryState> = atom((get) => get(stateAtom));
 
-/** 主视图历史不落盘；页面、主体与快照属于本次打开窗口的导航。 */
+/** 启动主视图路由历史服务（状态仅在内存中维护不持久化落盘，生命周期绑定当前窗口实例） */
 export function startNavHistory(
   store: Store,
   start: Place = START_PLACE,
