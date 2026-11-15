@@ -18,8 +18,8 @@ export interface QueueSpot {
 
 export interface QueueEntry {
   /**
-   * 行的身份：句柄加上它是队列里第几次出现这一首（从 0 起）。主题入队会去重，同一首排两次只发生在
-   * 别处加进来的队列里；按位置认行的话，队首一被取走所有行都换了身份，选中与焦点就跟丢了
+   * 行的身份：句柄加上它是队列里第几次出现这一首（从 0 起）。主题入队会去重，同一首排两次只发生在别处加进来的队列里。
+   * 若按位置认行，队首一被取走，所有行的身份都会改变，选中与焦点就会丢失
    */
   readonly key: string;
   readonly track: Track;
@@ -60,7 +60,7 @@ export function entriesOf(items: readonly QueueItemLike[]): QueueEntry[] {
   });
 }
 
-/** 去掉队首，剩下的重新编号：被摘掉的那首后面若还排着一份，它成了第 0 次出现 */
+/** 去掉队首，剩下的重新编号。被去掉的那首后面若还排着一份，它就成了第 0 次出现 */
 function dropHead(entries: readonly QueueEntry[]): QueueEntry[] {
   return entriesOf(
     entries.slice(1).map((entry) => ({
@@ -72,29 +72,33 @@ function dropHead(entries: readonly QueueEntry[]): QueueEntry[] {
 }
 
 export interface QueueStateService {
-  /** 宿主就绪、订阅好、初读答完时兑现，不会拒绝 */
+  /** 宿主就绪、订阅完成、初读完成时兑现，不会被拒绝 */
   readonly ready: Promise<void>;
   /**
-   * 现读一次整份队列，命令按它把行的身份换成下标。读失败、应答过期，或读回仍含已播放的队首时答 null，
-   * 调用方不能据此修改队列。只有最后发出的那次读会写进原子；显示时仍提前摘掉已播放的队首
+   * 现读一次整份队列，命令据此把行的身份换成下标。读取失败、应答过期，或读回的队列仍含已播放的队首时返回 null，
+   * 调用方不能据此修改队列。只有最后发出的那次读取会写进原子，显示时仍会提前去掉已播放的队首
    */
   refresh(): Promise<readonly QueueEntry[] | null>;
   dispose(): void;
 }
 
 /**
- * 播放队列的内容。先订 `playback:queueChanged` 与 `playback:trackChanged` 再初读 `queue.get`；队列变了就整份
- * 重读（事件只带长度，长度为 0 时不必读），几次读同时在路上时只有最后发出的那次写进原子
+ * 播放队列的内容。先订阅 `playback:queueChanged` 与 `playback:trackChanged`，再初读 `queue.get`。
+ * 队列变化时整份重读（事件只带长度，长度为 0 时不必读）。几次读取同时在途时，只有最后发出的那次写进原子
  *
- * 核心在曲目结束前约 0.6 秒就定下下一首，队首被取走的通知要在换曲后几十毫秒才到。所以换曲事件里的新曲目
- * 正是队首时先把它摘掉，并记下它：通知到之前读回的队列，队首还是它的也照样摘掉；`playback_advance` 的通知
- * 一到就不再摘，之后读回的队首若还是它，那是同一首排了两次
+ * 核心在曲目结束前约 0.6 秒就定下下一首，队首被取走的通知要在换曲后几十毫秒才到。
+ * 因此换曲事件里的新曲目正是队首时，先把它从显示中去掉并记下它：通知到达之前读回的队列，队首还是它的，同样去掉。
+ * `playback_advance` 的通知一到就不再去掉，之后读回的队首若还是它，那是同一首排了两次
+ *
+ * 点选与「下一首」起播时，宿主先把目标排进队首，等曲目打开、换曲之后才取走。在线曲目打开得慢，这一首会在队列里多停留一段时间。
+ * 因此 `playback:starting`（`next`、`play`）一到就读回队列，读回的队首就是正在打开的这一首，先去掉并记下。
+ * 换到的不是它（被跳过）时恢复显示，并重读队列
  */
 export function startQueueState(store: Store, host: QueueStateFace = fb): QueueStateService {
   store.set(viewAtom, INITIAL);
   let disposed = false;
   let generation = 0;
-  // 换曲时摘掉的队首句柄，等宿主报出取走了它为止
+  // 换曲时去掉的队首句柄，等宿主报出取走了它为止
   let consumed: string | null = null;
   const offs: (() => void)[] = [];
   const waiter = waitForHost(host);
@@ -102,6 +106,11 @@ export function startQueueState(store: Store, host: QueueStateFace = fb): QueueS
   const write = (patch: Partial<QueueView>) => {
     if (!disposed) store.set(viewAtom, { ...store.get(viewAtom), ...patch });
   };
+
+  // 正在打开的队首：起播事件之后读回的那份队列的队首，到换曲事件为止
+  let opening: QueueEntry | undefined;
+  // 起播事件已到、队列还没读回：读回的队首就是正在打开的这一首
+  let arming = false;
 
   const settled = (entries: QueueEntry[]): QueueEntry[] =>
     consumed !== null && entries[0]?.track.handle === consumed ? dropHead(entries) : entries;
@@ -117,9 +126,14 @@ export function startQueueState(store: Store, host: QueueStateFace = fb): QueueS
       return null;
     }
     const snapshot = entriesOf(answer.items);
+    if (arming) {
+      arming = false;
+      opening = snapshot[0];
+      if (opening) consumed = opening.track.handle;
+    }
     const entries = settled(snapshot);
     if (mine === generation) write({ status: 'ready', entries });
-    // 提前摘掉队首只用于显示；宿主下标尚未同步时，本次命令须停止
+    // 提前去掉队首只用于显示。宿主下标尚未同步时，本次命令须停止
     return mine === generation && entries === snapshot ? entries : null;
   }
 
@@ -140,11 +154,30 @@ export function startQueueState(store: Store, host: QueueStateFace = fb): QueueS
         generation++;
         write({ status: 'ready', entries: [] });
       }),
+      // 已有一首在打开时，后来的起播事件不再处理
+      host.on('playback:starting', ({ command }) => {
+        if ((command !== 'next' && command !== 'play') || opening || arming) return;
+        arming = true;
+        void read();
+      }),
       host.on('playback:trackChanged', (track) => {
         const { entries } = store.get(viewAtom);
-        if (entries[0]?.track.handle !== track.handle) return;
-        consumed = track.handle;
-        write({ entries: dropHead(entries) });
+        const was = opening;
+        opening = undefined;
+        arming = false;
+        const isHead = entries[0]?.track.handle === track.handle;
+        // 换到的不是正在打开的那一首（被跳过）：不再去掉队首，重读队列以恢复显示
+        const skipped = was !== undefined && was.track.handle !== track.handle;
+        if (isHead) consumed = track.handle;
+        else if (skipped) consumed = null;
+        if (isHead) write({ entries: dropHead(entries) });
+        if (skipped) void read();
+      }),
+      // 换曲途中的过渡性停止不算。真正停止了，就不再等这次起播
+      host.on('playback:stopped', ({ reason }) => {
+        if (reason === 'starting_another') return;
+        opening = undefined;
+        arming = false;
       }),
     );
     await read();

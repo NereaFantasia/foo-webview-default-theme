@@ -2,22 +2,19 @@ import type { MessageKey } from '../i18n/en.ts';
 import type { PlaylistGroupsService, PlaylistGroupsState } from './groups/playlistGroups.ts';
 import type { GroupsPrefs } from './groups/playlistGroupsPrefs.ts';
 import type { PlaylistTrackActions } from './playlistTrackActions.ts';
-import { GROUP_MODES, SORT_CHOICES, type GroupModeId, type SortChoiceId } from './sortPatterns.ts';
+import { GROUP_MODES, type GroupModeId } from './sortPatterns.ts';
 
-/** 一档排序依据或分组依据 */
+/** 一档分组依据 */
 export interface ListMenuChoice {
   readonly id: string;
   readonly label: MessageKey;
 }
 
-/** 排序：点一档就按它排一次。列表不记着当前按哪一档排，菜单里也不标 */
-export interface ListMenuSort {
-  readonly choices: readonly ListMenuChoice[];
+/** 随机与反向：重排宿主列表本身。按字段排序只在列头，这里没有 */
+export interface ListMenuReorder {
   readonly disabled?: boolean;
-  pick(id: string, descending?: boolean): void;
-  /** 打乱、反转；不给就不画 */
-  readonly shuffle?: () => void;
-  readonly reverse?: () => void;
+  shuffle(): void;
+  reverse(): void;
 }
 
 /** 分组：开关、依据与全部折叠、全部展开 */
@@ -34,33 +31,11 @@ export interface ListMenuGroups {
   expandAll(): void;
 }
 
-/** 播放列表的列表排序与分组：排序在命令行的「⋯」里，分组在视图面板里，各自只画自己那一段 */
+/** 播放列表页的重排（页头「⋯」里）与分组（视图面板里）两段，各自只画自己那一段 */
 export interface ListMenu {
-  readonly sort?: ListMenuSort;
+  readonly reorder?: ListMenuReorder;
   readonly groups?: ListMenuGroups;
 }
-
-const SORT_LABELS: Record<SortChoiceId, MessageKey> = {
-  albumArtist: 'playlistPage.sortAlbumArtist',
-  artist: 'playlistPage.sortArtist',
-  album: 'playlistPage.sortAlbum',
-  trackNumber: 'playlistPage.sortTrackNumber',
-  title: 'playlistPage.sortTitle',
-  path: 'playlistPage.sortPath',
-  date: 'playlistPage.sortDate',
-  genre: 'playlistPage.sortGenre',
-  rating: 'playlistPage.sortRating',
-  bitrate: 'playlistPage.sortBitrate',
-  modified: 'playlistPage.sortModified',
-  playCount: 'playlistPage.sortPlayCount',
-  codec: 'playlistPage.sortCodec',
-  duration: 'table.duration',
-  sampleRate: 'table.sampleRate',
-  channels: 'table.channels',
-  fileSize: 'table.fileSize',
-  added: 'table.added',
-  lastPlayed: 'table.lastPlayed',
-};
 
 const GROUP_LABELS: Record<GroupModeId, MessageKey> = {
   albumSimple: 'playlistPage.groupAlbumSimple',
@@ -70,11 +45,6 @@ const GROUP_LABELS: Record<GroupModeId, MessageKey> = {
   genre: 'playlistPage.groupGenre',
   directory: 'playlistPage.groupDirectory',
 };
-
-const SORT_MENU: readonly ListMenuChoice[] = SORT_CHOICES.map((choice) => ({
-  id: choice.id,
-  label: SORT_LABELS[choice.id],
-}));
 
 const GROUP_MENU: readonly ListMenuChoice[] = GROUP_MODES.map((mode) => ({
   id: mode.id,
@@ -89,32 +59,26 @@ export interface PlaylistListMenuDeps {
     PlaylistGroupsService,
     'setEnabled' | 'setMode' | 'collapseAll' | 'expandAll'
   >;
-  readonly tracks: Pick<PlaylistTrackActions, 'sort' | 'shuffle' | 'reverse'>;
-  /** 按菜单里的一档排过了：列头的排序记号不再对应任何一列 */
+  readonly tracks: Pick<PlaylistTrackActions, 'shuffle' | 'reverse'>;
+  /** 列表锁着（自动播放列表也算）：宿主不重排 */
   readonly locked?: boolean;
-  readonly onSorted: (pattern?: string, descending?: boolean) => void;
+  /** 宿主办成了随机或反向：列头的排序记号不再对应任何一列 */
+  readonly onReordered: () => void;
 }
 
 /**
- * 播放列表页的列表排序（页头「⋯」里）与分组（视图面板里）两段：排序字段与方向加随机、反向，分组开关、六档依据与全部折叠、展开
- * 排序改的是宿主列表本身，锁定的列表宿主不排
+ * 播放列表页的重排（页头「⋯」里）与分组（视图面板里）两段：随机、反向，分组开关、六档依据与全部折叠、展开
+ * 重排改的是宿主列表本身，锁定的列表宿主不排
  */
 export function playlistListMenu(deps: PlaylistListMenuDeps): ListMenu {
   const { guid, prefs, groups, tracks } = deps;
-  const settle = (done: Promise<boolean>, pattern?: string, descending?: boolean) =>
+  const settle = (done: Promise<boolean>) =>
     void done.then((ok) => {
-      if (ok) deps.onSorted(pattern, descending);
+      if (ok) deps.onReordered();
     });
   return {
-    sort: {
-      choices: SORT_MENU,
+    reorder: {
       disabled: deps.locked,
-      pick(id, descending = false) {
-        if (deps.locked) return;
-        const choice = SORT_CHOICES.find((candidate) => candidate.id === id);
-        if (choice)
-          settle(tracks.sort(guid, choice.pattern, descending), choice.pattern, descending);
-      },
       shuffle: () => {
         if (!deps.locked) settle(tracks.shuffle(guid));
       },

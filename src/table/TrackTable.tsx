@@ -32,6 +32,8 @@ import styles from './TrackTable.module.css';
 import { TrackTableGroup } from './TrackTableGroup.tsx';
 import { TrackTableHeader, type TableSort } from './TrackTableHeader.tsx';
 import { TrackTableRow, type PlayingState } from './TrackTableRow.tsx';
+import { atom } from 'jotai/vanilla';
+import { isTrackFieldId, type TrackFieldValues } from '../track/trackFields.ts';
 import { ratingsVersionAtom } from '../track/trackRatings.ts';
 import { useScrollFrame } from './useScrollFrame.ts';
 import { useStickyViewport } from './useStickyViewport.ts';
@@ -41,113 +43,116 @@ import { useTrackTableStyles } from './useTrackTableStyles.ts';
 import { useTableGroupFold } from './useTableGroupFold.ts';
 import { useTableHorizontalScroll } from './useTableHorizontalScroll.ts';
 
-/** 表格交给调用方的句柄：离开页面时记下焦点行、回来时交还，从外面定位到一行 */
+/** 表格交给调用方的句柄：离开页面时保存焦点行，回到页面时恢复，也供外部定位到某一行 */
 export interface TrackTableHandle {
-  /** 焦点所在那一条的键；没有焦点时为 null */
+  /** 焦点所在条目的键。没有焦点时为 null */
   focusedKey(): string | null;
   /**
-   * 焦点落到这个键的条目上，不改选中、不滚动。表格还没见过焦点时，那一条不在条目流里也照样记着，
-   * 等它出现才生效：数据晚到时先交还焦点不会落空
+   * 将焦点置于指定键的条目上，不改变选中状态，也不滚动。
+   * 表格尚未出现过焦点时，该条目即使不在条目流中也会被记录，待它出现后生效，因此数据晚到时先恢复焦点不会落空
    */
   setFocusKey(key: string | null): void;
   /**
-   * 焦点落到这一位并滚到视口中间，`select` 为真且是曲目行时只选它；给定位正在播放、打字即跳这类从外面来的
-   * 定位用。下标按最近一次提交的条目流算，调用方在条目流换过之后的 effect 里调；那一位不是曲目行或分组头时
-   * 什么都不动，答假
+   * 将焦点移到指定显示位，并滚动到视口中央。`select` 为真且该位是曲目行时，只选中该行。
+   * 供定位正在播放的曲目、键入跳转等来自表格外部的定位使用。
+   * 显示位按最近一次提交的条目流计算，调用方应在条目流更新后的 effect 中调用。
+   * 该位既不是曲目行也不是分组头时不执行任何操作，并返回 false
    */
   reveal(index: number, select: boolean): boolean;
-  /** 把 DOM 焦点交给表格，不滚动 */
+  /** 将 DOM 焦点转移到表格根元素，不滚动 */
   focus(): void;
-  /** 行跟着滚的元素：表格自己的滚动区，或调用方给的页面滚动元素。还没挂上时为 null */
+  /** 行随之滚动的元素：表格自己的滚动区，或调用方传入的页面滚动元素。尚未挂载时为 null */
   scrollElement(): HTMLElement | null;
   horizontalScrollElement(): HTMLElement | null;
-  /** 按条目键开合单个分组，沿用组头的锚点与动效；条目已不在表内时不操作，答假 */
+  /** 按条目键展开或折叠单个分组，沿用分组头的锚点与动效。条目已不在表内时不执行操作，并返回 false */
   toggleGroup(key: string): boolean;
 }
 
 /**
- * 表格行的评分戳，见 `TrackRatingsService.stamp`：整张表一个，或按行给（分页取的表各页取回的时刻不同，戳
- * 按页各有一个）。按行给时要是稳定的函数，与条目流一起换：它一变就整张表重新登记一次
+ * 表格行的评分戳，见 `TrackRatingsService.stamp`。可以整张表共用一个，也可以按行提供。
+ * 分页取行的表，各页取回的时刻不同，因此戳按页各有一个。
+ * 按行提供时必须是稳定的函数，并与条目流同时更换，它一变就会使整张表重新登记一次
  */
 export type TableRatingStamp = number | ((item: TableRowItem) => number);
 
-/** 调用方画分组头时拿到的状态 */
+/** 调用方绘制分组头时收到的状态 */
 export interface TableGroupState {
   readonly focused: boolean;
-  /** 开合这一组：交给 `onToggleGroup`，开合前后这个分组头在视口里的位置不变 */
+  /** 展开或折叠这一组，交由 `onToggleGroup` 处理。展开或折叠前后，该分组头在视口中的位置不变 */
   toggle(): void;
 }
 
 export interface TrackTableProps<G> extends TableCallbacks<G> {
-  /** 列模型，建在摆放表格的那一层，一张表一个存档键 */
+  /** 列模型，创建在摆放表格的那一层，每张表使用独立的存档键 */
   readonly columns: ColumnsModel;
   /**
-   * 条目流，按显示顺序。分组、折叠与垫位由调用方排好。要记忆化：每换一份就整份重算行位置，并重新登记整条流的
-   * 评分
+   * 条目流，按显示顺序排列。分组、折叠与垫位由调用方排好。
+   * 必须记忆化：每更换一份，就会整份重新计算行位置，并重新登记整条流的评分
    */
   readonly items: readonly TableItem<G>[];
-  /** 本地多选，按行序号记；换了一批行或重新排序时由调用方清空 */
+  /** 本地多选，按行序号记录。换了一批行或重新排序时由调用方清空 */
   readonly selection: RowSelection;
-  /** 读屏念的表名 */
+  /** 供读屏朗读的表名 */
   readonly label: string;
-  /** 曲目行与空位的高，CSS 像素 */
+  /** 曲目行与空位的高度，CSS 像素 */
   readonly rowHeight: number;
-  /** 分组头的高；要给稳定的函数。不给时与曲目行同高 */
+  /** 分组头的高度，必须是稳定的函数。未提供时与曲目行同高 */
   readonly groupHeight?: (item: TableGroupItem<G>) => number;
   /**
-   * 分组头里画什么；表格只管它的位置、焦点与开合。里面的按钮设 `tabIndex={-1}`：鼠标点它时焦点交还表格，
-   * 键盘接得上
+   * 分组头里绘制的内容。表格只管理它的位置、焦点与展开折叠。
+   * 其中的按钮应设置 `tabIndex={-1}`：鼠标点击按钮时焦点会交还表格，键盘操作可以接续
    */
   readonly renderGroup?: (item: TableGroupItem<G>, state: TableGroupState) => ReactNode;
-  /** 上下键停不停在分组头上 */
+  /** 上下方向键是否停留在分组头上 */
   readonly groupFocus?: boolean;
-  /** 允许播放单个分组的开合动画；批量和数据刷新仍直接到位 */
+  /** 是否允许播放单个分组的展开折叠动画。批量操作与数据刷新仍直接到位 */
   readonly animateGroupFold?: (item: TableGroupItem<G>) => boolean;
   /**
-   * 取这批行的请求发出之前从评分服务拿的戳，见 `TrackRatingsService.stamp`；应答回来后才拿的话，请求途中来的
-   * 评分事件会被行里的旧值盖掉。整张表一个，或按行给，见 `TableRatingStamp`
+   * 发出取这批行的请求之前，从评分服务取得的评分戳，见 `TrackRatingsService.stamp`。
+   * 若等应答返回后才取，请求途中到达的评分事件会被行里的旧值覆盖。
+   * 可以整张表共用一个，也可以按行提供，见 `TableRatingStamp`
    */
   readonly ratingStamp: TableRatingStamp;
   /**
-   * 画出来的显示位区间 [start, end) 变了（含视口上下多画的几条），或条目流换了一份。分页取行的调用方据此
-   * 取缺的页
+   * 绘制出来的显示位区间 [start, end) 变化（含视口上下多绘制的几条），或条目流更换了一份时触发。
+   * 分页取行的调用方据此取回缺失的页
    */
   readonly onRange?: (start: number, end: number) => void;
-  /** 序号格的写法。曲目行按属性跳过重渲染，要给稳定的函数 */
+  /** 序号格的文字写法。曲目行按属性判断是否跳过重新渲染，因此必须是稳定的函数 */
   readonly numberText: (track: TableTrack) => string;
-  /** 缩略图列里画什么，`size` 是缩略图边长（CSS 像素，随行高）；不给时这一列空着。同样要给稳定的函数 */
+  /** 缩略图列里绘制的内容，`size` 是缩略图边长（CSS 像素，随行高变化）。未提供时这一列留空。同样必须是稳定的函数 */
   readonly artwork?: TableArtwork;
   readonly sort?: TableSort | null;
-  /** 单击列头排序；不给时列头不能点着排序 */
+  /** 单击列头时按该列排序。未提供时，列头不能通过点击排序 */
   readonly onSort?: (column: ColumnId) => void;
-  /** 行还在取，读屏据此报「忙」 */
+  /** 行仍在取回中，读屏据此报告「忙」 */
   readonly loading?: boolean;
-  /** 条目流为空时画在行的位置上；还在取与取到空由调用方分开画 */
+  /** 条目流为空时绘制在行的位置上。仍在取回与取回结果为空两种情形，由调用方分别绘制 */
   readonly empty?: ReactNode;
   /**
-   * 行跟着这个元素滚：表格按内容高摆在页面的滚动内容里，上方可以有别的内容，列头滚到顶时吸住。它要是定位
-   * 元素，表格与它之间不能再有滚动容器。挂上之前给 null；不给（undefined）时表格撑满父容器、自己滚
+   * 行随之滚动的元素。指定后，表格按内容高度放在页面的滚动内容里，上方可以有其他内容，列头滚到顶部时吸附。
+   * 若它是定位元素，表格与它之间不能再有滚动容器。尚未挂载时传入 null，不传（undefined）时表格撑满父容器并自行滚动
    */
   readonly scrollParent?: HTMLElement | null;
-  /** 读写焦点行的句柄，页面离开时记下、回来时交还 */
+  /** 读写焦点行的句柄，离开页面时保存，回到页面时恢复 */
   readonly handle?: Ref<TrackTableHandle>;
 }
 
 type TableVariables = CSSProperties & Record<`--${string}`, string>;
 
-/** 缩略图上下各让出的 CSS 像素，相邻两行的缩略图不贴在一起 */
+/** 缩略图上下各留出的空白，CSS 像素，使相邻两行的缩略图不贴在一起 */
 const ART_INSET = 4;
 
 /**
- * 曲目表格：Fluent 的 `Table*` 画列头与单元格，虚拟滚动、分组头、换列与粘性视口在它上面补。条目流、选中与
- * 列模型归调用方；表格管焦点、键盘、滚动、播放记号与评分。所有位置都是显示位（条目流的下标）
+ * 曲目表格：由 Fluent 的 `Table*` 绘制列头与单元格，在其上补充虚拟滚动、分组头、拖动换列与粘性视口。
+ * 条目流、选中与列模型归调用方，表格管理焦点、键盘、滚动、播放标记与评分。所有位置都是显示位，即条目流的下标。
  *
- * 焦点只在表格根元素上，行不拿焦点，焦点行靠 `aria-activedescendant` 告诉读屏。滚动区、以及行带里不在 Tab
- * 次序上的元素（调用方画在分组头里、`tabIndex` 为 -1 的按钮）被鼠标点到时也会拿到焦点，这时交还给根元素，
- * 键盘照样接得上
+ * 焦点只在表格根元素上，行不持有焦点，焦点行通过 `aria-activedescendant` 告知读屏。
+ * 滚动区，以及行带里不在 Tab 次序上的元素（调用方绘制在分组头里、`tabIndex` 为 -1 的按钮）被鼠标点击时也会获得焦点。
+ * 此时焦点交还给根元素，键盘仍可继续操作。
  *
- * 给了 `scrollParent` 时表格不自己滚：按内容高摆在页面里，列头吸在页面滚动元素的顶上，行的可见区从列头下面
- * 开始，行不会从列头底下透出来，列头因此不用铺底
+ * 给定 `scrollParent` 时表格不自行滚动：按内容高度放在页面里，列头吸附在页面滚动元素的顶部。
+ * 行的可见区从列头下方开始，行不会从列头底下透出，因此列头不需要铺底
  */
 export function TrackTable<G>(props: TrackTableProps<G>) {
   const { columns, items, selection, rowHeight, renderGroup, scrollParent } = props;
@@ -180,6 +185,7 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
     coverWidth: layout.coverWidth,
     frame,
   });
+  const fieldsOf = useTableFields(rows.visible, items, layout.cells, services.fields);
   const fold = useTableGroupFold({
     root,
     scroller: scrolling,
@@ -225,8 +231,8 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
     if (playingKey === '' || services.trackKey(track) !== playingKey) return 'none';
     return audible ? 'active' : 'paused';
   };
-  // 焦点按行走，读屏整行念：照 ARIA 的模式只有 treegrid 的行能拿焦点，所以平铺表也是一棵只有一层的树
-  // 调用方接了开合才报展开态
+  // 焦点以行为单位移动，读屏整行朗读。按 ARIA 的模式只有 treegrid 的行能获得焦点，所以平铺表也是只有一层的树。
+  // 调用方接入了展开折叠，才向读屏报告展开状态
   const expandable = props.onToggleGroup !== undefined;
   const aria = useMemo(() => ariaRowsOf(items), [items]);
   const focusShown = rows.visible.some((virtual) => virtual.index === input.focus);
@@ -341,6 +347,7 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
                       PlayingMark={services.PlayingMark}
                       rating={ratings.ratingOf(item)}
                       ratable={ratings.canRate(item)}
+                      fields={track ? fieldsOf(track) : undefined}
                       numberText={props.numberText}
                       artwork={props.artwork}
                       artSize={artSize}
@@ -363,19 +370,19 @@ export function TrackTable<G>(props: TrackTableProps<G>) {
 
 interface TableHandleSource<G> {
   readonly items: readonly TableItem<G>[];
-  /** 焦点所在的显示位，-1 是没有 */
+  /** 焦点所在的显示位，没有焦点时为 -1 */
   readonly focus: number;
   readonly setFocusKey: (key: string | null) => void;
-  /** 见 `TrackTableHandle.reveal`；要是稳定的函数 */
+  /** 见 `TrackTableHandle.reveal`，必须是稳定的函数 */
   readonly reveal: (index: number, select: boolean) => boolean;
   readonly toggleGroup: (index: number) => void;
-  /** 表格根元素：焦点只在它上面 */
+  /** 表格根元素，焦点只在它上面 */
   readonly root: RefObject<HTMLElement | null>;
   readonly scroller: RefObject<HTMLElement | null>;
   readonly horizontal: RefObject<HTMLElement | null>;
 }
 
-/** 把表格的焦点行交给调用方读写；读的是调用那一刻最近一次提交的条目流与焦点 */
+/** 把表格的焦点行交给调用方读写，读到的是调用时最近一次提交的条目流与焦点 */
 function useTableHandle<G>(
   handle: Ref<TrackTableHandle> | undefined,
   source: TableHandleSource<G>,
@@ -408,14 +415,15 @@ function useTableHandle<G>(
 }
 
 interface TableRatings {
-  /** 这一行此刻几星；曲目还没取到时是 0 */
+  /** 这一行当前的星级。曲目尚未取到时为 0 */
   ratingOf(item: TableRowItem): number;
   canRate(item: TableRowItem): boolean;
 }
 
 /**
- * 表格的评分：评分的已知偏离一变就重画，并登记条目流里取到了的曲目。一个文件里有好几首时，评分事件分不出
- * 是哪一首，登记着的逐首补读；整张表一次登记，同一个文件落在两页里也认得出它不止一首
+ * 表格的评分：评分的已知偏离一变就重新绘制，并登记条目流里已取到的曲目。
+ * 一个文件里有多首曲目时，评分事件无法区分是哪一首，因此对登记着的曲目逐首补读。
+ * 整张表一次登记，所以同一个文件落在两页里时，也能认出它不止一首
  */
 function useTableRatings<G>(
   items: readonly TableItem<G>[],
@@ -440,8 +448,37 @@ function useTableRatings<G>(
   };
 }
 
+const NO_FIELDS_VERSION = atom(0);
+
 /**
- * 把表格容器的内容宽报给列模型，供旧比例列换算与封面上限使用；列头与曲目行按同一个盒对齐
+ * 按标签现算的列：屏幕上绘制的行缺少这些列的值时，由服务去取。
+ * 值取回后服务的版本加一，表格重新绘制，行按新值显示。
+ * 没有这些列显示，或装配层没有提供服务时，什么都不取
+ */
+function useTableFields<G>(
+  visible: readonly VirtualItem[],
+  items: readonly TableItem<G>[],
+  cells: readonly ColumnId[],
+  service: TableServices['fields'],
+): (track: TableTrack) => TrackFieldValues | undefined {
+  const version = useAtomValueRawSync(service?.version ?? NO_FIELDS_VERSION);
+  const wanted = useMemo(() => cells.filter(isTrackFieldId), [cells]);
+  useEffect(() => {
+    if (!service || wanted.length === 0) return;
+    service.ensure(
+      visible.flatMap((virtual) => {
+        const item = items[virtual.index];
+        return item?.kind === 'row' && item.track ? [item.track] : [];
+      }),
+      wanted,
+    );
+  }, [service, visible, items, wanted, version]);
+  return (track) => service?.valuesOf(track);
+}
+
+/**
+ * 把表格容器的内容宽度报给列模型，供旧比例列的换算与封面上限使用。
+ * 列头与曲目行按同一个盒对齐
  */
 function useColumnsContainer(element: RefObject<HTMLElement | null>, columns: ColumnsModel): void {
   useLayoutEffect(() => {
@@ -456,8 +493,8 @@ function useColumnsContainer(element: RefObject<HTMLElement | null>, columns: Co
 }
 
 /**
- * 把此刻画出来的显示位区间 [start, end) 报给调用方，含视口上下多画的那几条；分页取行的调用方据此取缺的页
- * 区间变了、或条目流换了一份才报：分组开合之后，同一段显示位对应的已是另一批行。什么都没画时不报
+ * 把此刻绘制出来的显示位区间 [start, end) 报给调用方，含视口上下多绘制的几条，分页取行的调用方据此取回缺失的页。
+ * 区间变化，或条目流更换了一份时才报告：分组展开或折叠之后，同一段显示位对应的已是另一批行。什么都没绘制时不报告
  */
 function useVisibleRange(
   visible: readonly VirtualItem[],

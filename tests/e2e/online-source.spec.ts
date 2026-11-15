@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { onlineLog, openOnlineHarness } from '../fixtures/onlinePage.ts';
 import { collectPageErrors } from '../fixtures/pageHost.ts';
 
-// 在线音乐范围的来源下拉：试验页里 `lx=hosted` 时 lxserver 装好，可选来源有 QQ 音乐、酷我、酷狗、咪咕。
+// 在线音乐范围的来源下拉：试验页里 `lx=hosted` 时 lxserver 装好，可选来源有 QQ 音乐、酷我、酷狗、咪咕
 
 test.use({ screenshot: 'off' });
 
@@ -32,7 +32,7 @@ async function choose(page: Page, name: string) {
 test('只有网易云时分类行没有来源下拉', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page);
-  await expect(page.getByRole('tab', { name: '曲目 45' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '曲目', exact: true })).toBeVisible();
   await expect(sourceButton(page)).toHaveCount(0);
 });
 
@@ -102,7 +102,10 @@ test('选酷我：只按曲目搜它，艺人、专辑、歌单页签置灰并�
 test('当前是专辑分类时换到酷我，落到「曲目」', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { ...HOSTED, category: 'albums' });
-  await expect(page.getByRole('tab', { name: '专辑 12' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: '专辑', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await choose(page, '酷我');
   await expect(page.getByRole('tab', { name: '曲目' })).toHaveAttribute('aria-selected', 'true');
   await expect(rows(page).first()).toContainText('KW Track 01');
@@ -115,30 +118,35 @@ test('当前是专辑分类时换到酷我，落到「曲目」', async ({ page 
 test('切回网易云不重搜，结果还在', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { ...HOSTED, category: 'tracks' });
-  await expect(page.getByRole('tab', { name: '曲目 45' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: '曲目', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(rows(page).first()).toContainText('Track 01');
   const before = (await searches(page)).filter((entry) => entry.platform === 'wy').length;
   await choose(page, '酷我');
   await expect(rows(page).first()).toContainText('KW Track 01');
   await choose(page, '网易云');
   await expect(sourceButton(page)).toHaveText('网易云');
-  await expect(page.getByRole('tab', { name: '曲目 45' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '曲目', exact: true })).toBeVisible();
   await expect(rows(page).first()).toContainText('Track 01');
   expect((await searches(page)).filter((entry) => entry.platform === 'wy')).toHaveLength(before);
 });
 
-test('其他平台的曲目可续页：平台不给总数，页签不写个数', async ({ page }) => {
+test('其他平台的曲目可续页：平台不给总数也照样续页', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { ...HOSTED, category: 'tracks' });
   await choose(page, '酷我');
   await expect(page.getByRole('tab', { name: '曲目', exact: true })).toBeVisible();
   const cursors = async () =>
     (await searches(page)).filter((entry) => entry.platform === 'kw').map((entry) => entry.cursor);
-  for (let round = 0; round < 6 && (await cursors()).length < 2; round += 1) {
-    await results(page).evaluate((element) => element.scrollTo(0, element.scrollHeight));
-    await page.waitForTimeout(150);
-  }
-  await expect.poll(cursors).toEqual([null, '20']);
+  await expect
+    .poll(async () => {
+      const seen = await cursors();
+      if (seen.length < 2) await results(page).evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      return seen;
+    })
+    .toEqual([null, '20']);
   await results(page).evaluate((element) => element.scrollTo(0, element.scrollHeight));
   await expect(rows(page).last()).toContainText('KW Track 25');
 });
@@ -194,6 +202,6 @@ test('酷我搜索失败时整页写「酷我搜索失败」并给重试，网�
   await empty.getByRole('button', { name: '重试' }).click();
   await expect(empty).toContainText('酷我搜索失败');
   await choose(page, '网易云');
-  await expect(page.getByRole('tab', { name: '曲目 45' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '曲目', exact: true })).toBeVisible();
   await expect(empty).toHaveCount(0);
 });

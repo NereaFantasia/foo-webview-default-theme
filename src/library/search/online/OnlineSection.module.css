@@ -1,0 +1,29 @@
+/* 与媒体库一区之间一条分隔线；区标题比各节标题高一级，右端是来源下拉 */
+.root {
+  margin-top: var(--spacingVerticalXXXL);
+  padding-top: var(--spacingVerticalXL);
+  border-top: var(--strokeWidthThin) solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  padding: 0 var(--spacingHorizontalS);
+}
+.head h2 {
+  margin: 0;
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
+  font-weight: var(--fontWeightSemibold);
+}
+.table {
+  display: flex;
+  flex-direction: column;
+}
+.notice {
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+}

@@ -16,14 +16,8 @@ import type {
 import { TrackMetadata } from '../../../track/TrackMetadata.tsx';
 import { searchNameRank } from '../searchQuery.ts';
 import { artistNames, OnlineBestRow } from './OnlineItems.tsx';
-import {
-  OnlineAlbumTile,
-  OnlineArtistTile,
-  OnlinePlaylistTile,
-  ONLINE_ARTIST_SHAPE,
-  refKey,
-  type OnlineTileActions,
-} from './OnlineTiles.tsx';
+import { OnlineAlbumTile, OnlineArtistTile, OnlinePlaylistTile, refKey } from './OnlineTiles.tsx';
+import { ARTIST_GRID_SHAPE, type ObjectTileActions } from '../../cover-tile/ObjectTile.tsx';
 import { CoverGrid, STANDARD_GRID_SHAPE } from '../../cover-tile/CoverGrid.tsx';
 import type { OnlineCategory } from './onlineSearch.ts';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
@@ -88,9 +82,11 @@ export interface OnlineOverviewProps {
   onChoose(category: Exclude<OnlineCategory, 'all'>): void;
   onPlay(track: MusicTrack): void;
   /** 专辑、艺人、歌单的单击与右键，最佳匹配里的艺人与专辑同样 */
-  tileActions(item: MusicAlbum | MusicArtist | MusicPlaylist): OnlineTileActions;
+  tileActions(item: MusicAlbum | MusicArtist | MusicPlaylist): ObjectTileActions;
   /** 曲目节的表由结果页画，与「曲目」分类同一套行、选区与菜单 */
   renderTracks(tracks: readonly MusicTrack[]): ReactNode;
+  /** 出不出最佳匹配；与媒体库合在一页时最佳匹配只出在媒体库那一区 */
+  readonly withBest?: boolean;
 }
 
 /** 「全部」：最佳匹配，再依次是艺人、专辑、曲目、歌单各一节；排进最佳匹配的那一项不在下面重复 */
@@ -105,12 +101,13 @@ export function OnlineOverview({
   onPlay,
   tileActions,
   renderTracks,
+  withBest = true,
 }: OnlineOverviewProps) {
   const t = useAtomValueRawSync(translateAtom);
   const viewControls = useViewControlStyles();
   const plural = useAtomValueRawSync(pluralAtom);
   const settled = pending.every((kind) => kind === 'playlist');
-  const best = settled ? bestOf(text, artists, albums, tracks) : null;
+  const best = settled && withBest ? bestOf(text, artists, albums, tracks) : null;
   const preview = <T extends { readonly ref: { readonly id: string } }>(
     items: readonly T[],
     kind: MusicSearchKind,
@@ -206,7 +203,7 @@ export function OnlineOverview({
         'artist',
         shownArtists,
         <CoverGrid
-          shape={ONLINE_ARTIST_SHAPE}
+          shape={ARTIST_GRID_SHAPE}
           keyOf={refKey}
           previewRows={GRID_PREVIEW_ROWS}
           items={shownArtists}

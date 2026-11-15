@@ -6,16 +6,16 @@ import {
   startGenreValues,
 } from '../../../src/library/genreValues.ts';
 import { startLibraryTracks } from '../../../src/library/libraryTracks.ts';
-import { genreTracksAnswer } from '../../fixtures/genresLibrary.ts';
 import { trackRow } from '../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
+import { wholeLibrary } from '../../fixtures/wholeLibrary.ts';
 
 const track = trackRow('One', 'Multi', { genre: 'Rock, Soul' });
 const plain = trackRow('Two', 'Plain', { genre: 'Jazz' });
 
 it('显示串带逗号的曲目补读真实值，其余照显示串；释放时在途的补读晚到也不落盘', async () => {
   const host = installFakeHost();
-  host.answer('library.getAll', genreTracksAnswer([track, plain]));
+  host.answer('library.search', wholeLibrary([track, plain]));
   const store = createStore();
   const library = startLibraryTracks(store, () => 7, host.fb);
   const values = startGenreValues(store, library, host.fb);

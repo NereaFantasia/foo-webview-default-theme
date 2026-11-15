@@ -6,6 +6,8 @@ import { startCommandRegistry, type CommandRegistry, commandsKey } from '../nav/
 import { registerFullscreenCommand } from '../nav/fullscreenCommand.ts';
 import { registerNavCommands } from '../nav/navCommands.ts';
 import { startNavHistory, type NavHistoryService, historyKey } from '../nav/navHistory.ts';
+import { browserPanelKey } from '../nav/browserPanel.ts';
+import { startBrowserIntegration } from './browserIntegration.ts';
 import { EMPTY_GENRE } from '../nav/places.ts';
 import { loadStartPlace } from '../nav/startPlace.ts';
 import { startSidebarPrefs, sidebarPrefsKey } from '../nav/sidebar/sidebarPrefs.ts';
@@ -22,18 +24,26 @@ import { libraryNotConfiguredAtom } from '../library/albums.ts';
 import { playcountMissingAtom } from '../library/playStats.ts';
 import { trackPathOf } from '../host/libraryContract.ts';
 import { startSongs, type SongsServices, songsKey } from '../library/songs/songsServices.ts';
+import { autoplaylistEditKey, startAutoplaylistEdit } from '../playlist/autoplaylistEdit.ts';
+import {
+  autoplaylistPreviewKey,
+  startAutoplaylistPreview,
+} from '../track/autoplaylist/autoplaylistPreview.ts';
 import { startGenres, genresKey } from '../library/genres/genresServices.ts';
 import { startGenreValues, genreValuesKey } from '../library/genreValues.ts';
 import { startFolders, foldersKey } from '../library/folders/foldersServices.ts';
 import { genresQuery } from '../library/genres/genresModel.ts';
 import { genresSubject } from '../library/genres/genresSubject.ts';
 import { startMainMenu, mainMenuKey } from '../shell/mainMenu.ts';
+import { libraryMirrorKey, startLibraryMirror } from '../library/mirror/libraryMirror.ts';
 import { loadMotionChoice, watchReducedMotion } from '../motion/reducedMotion.ts';
 import { startNowPlaying } from '../playback/now-playing/nowPlaying.ts';
 import { startNowPlayingMenu, nowPlayingMenuKey } from '../playback/now-playing/nowPlayingMenu.ts';
-import { startOutputDevices, outputDevicesKey } from '../shell/player/volume/outputDevices.ts';
+import { audioSettingsKey, startAudioSettings } from '../playback/audioSettings.ts';
+import { startOutputDevices, outputDevicesKey } from '../playback/outputDevices.ts';
 import { startPlayback } from '../playback/playback.ts';
 import type { PlaybackService } from '../playback/playbackContract.ts';
+import { registerPlayPauseCommand } from '../playback/playPauseCommand.ts';
 import { positionClockKey, startPositionClock } from '../playback/positionClock.ts';
 import {
   startPlaybackSource,
@@ -59,6 +69,7 @@ import {
   type TrackRatingsService,
   ratingsKey,
 } from '../track/trackRatings.ts';
+import { startTrackFields, trackFieldsKey, type TrackFieldsService } from '../track/trackFields.ts';
 import { watchColorScheme } from '../theme/colorScheme.ts';
 import { browserMatchMedia } from '../theme/mediaQuery.ts';
 import {
@@ -95,30 +106,33 @@ import {
   type LoaderConfirmationService,
 } from '../update/loaderConfirmation.ts';
 import { startUpdater, updaterKey } from '../update/updater.ts';
-import { backendStateKey, startBackendConnection } from '../server/backendConnection.ts';
+import {
+  backendStateKey,
+  startBackendConnection,
+  type BackendConnection,
+} from '../server/backendConnection.ts';
 import { connectDevBackend } from '../server/devBackend.ts';
 import { musicClientKey, startMusicClient } from '../playback/musicClient.ts';
 import { musicStatusKey, startMusicStatus } from '../playback/musicStatus.ts';
 import { ONLINE_QUALITY, onlineQualityKey, startOnlineQuality } from '../playback/onlineQuality.ts';
+import { searchOnlinePrefKey, startSearchOnlinePref } from '../playback/searchOnlinePref.ts';
 import { onlineTracksKey, startOnlineTracks } from '../playback/onlineTracks.ts';
-import { onlineListsKey, startOnlineLists } from '../playback/onlineLists.ts';
+import { startAnimatedCover } from '../covers/animatedCover.ts';
 import { createTrackArtwork, trackArtworkKey, type TrackArtwork } from '../covers/trackArtwork.ts';
 import { onlinePlaybackKey, startOnlinePlayback } from '../playback/onlinePlayback.ts';
 import { onlineFailuresKey, startOnlineFailures } from '../playback/onlineFailures.ts';
-import {
-  artistAlbumSearchKey,
-  startArtistAlbumSearch,
-} from '../library/online/artistAlbumSearch.ts';
-import { artistAlbumsKey, startArtistAlbums } from '../library/online/artistAlbums.ts';
 import { ncmSetupKey, startNcmSetup } from '../library/search/online/ncmSetup.ts';
 import { createOnlinePlay, onlinePlayKey } from '../library/search/online/onlinePlay.ts';
 import { startBackendBootstrap, backendBootstrapKey } from '../update/backendBootstrap.ts';
 import { startPluginUpdater, pluginUpdaterKey } from '../update/pluginUpdater.ts';
 import { startChangelogView, changelogViewKey } from '../update/changelogView.ts';
+import { startRuntimeLogIntegration } from './runtimeLogIntegration.ts';
 import { updateNotice } from './updateIntegration.ts';
 import { startObjectOpeners } from './objectOpeners.ts';
+import { startOnlineListServices } from './onlineListServices.ts';
 import { startQueueAndCard } from './queueServices.ts';
 import { startOnboarding, onboardingKey } from '../settings/onboarding/onboarding.ts';
+import { settingsNavKey, startSettingsNav } from '../settings/settingsNav.ts';
 import { startupOverlay } from './startupOverlay.ts';
 import { immersiveIntegrationKey, startImmersiveIntegration } from './immersiveIntegration.ts';
 import {
@@ -148,6 +162,8 @@ export interface AppServices {
   readonly playlistPlaces: PlaylistPlaces;
   /** 曲目评分：各张表与面板共用一份 */
   readonly ratings: TrackRatingsService;
+  /** 表格里按标签现算的列（作曲、注释等）：各张表共用一份缓存 */
+  readonly trackFields: TrackFieldsService;
   /** 专辑页的列表形态：整库曲目、排序、两层折叠、多选与曲目菜单 */
   readonly albumList: AlbumListServices;
   /** 正在播的从哪来：主题起播时记下，宿主那边换了表时跟着改，跨重启保留 */
@@ -160,6 +176,8 @@ export interface AppServices {
   readonly rightCard: RightCardServices;
   /** 取曲目封面，在线曲目也认得；页面外的取图服务（窗口取色）用 */
   readonly artwork: TrackArtwork;
+  /** 本地服务的请求入口，只给服务层（歌词缓存）用；组件经各自的服务键取，不碰它 */
+  readonly backend: Pick<BackendConnection, 'request' | 'port'>;
   /** 全部服务与它们的键 */
   readonly bindings: readonly ServiceBinding[];
   /** 释放全部订阅、监听与定时器，按启动的逆序 */
@@ -230,6 +248,7 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
     startUpdater(store, { writer: configWriter, storageAvailable: prefs.available }),
   );
   scope.add(pluginUpdaterKey, startPluginUpdater(store, updater, backend, connection));
+  scope.stop(startRuntimeLogIntegration(store, { backend, updater }));
   const changelog = scope.add(changelogViewKey, startChangelogView(store, updater, configWriter));
   const media = browserMatchMedia();
   scope.stop(watchColorScheme(store, media));
@@ -238,7 +257,10 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   scope.add(localeKey, startLocale(store, fb, undefined, dataWriter));
   scope.add(backdropKey, startBackdrop(store));
   scope.add(windowZoomKey, startWindowZoom(store));
-  const history = scope.bind(historyKey, startNavHistory(store, loadStartPlace(store)));
+  const mainHistory = startNavHistory(store, loadStartPlace(store));
+  const browser = scope.add(browserPanelKey, startBrowserIntegration(store, { main: mainHistory }));
+  const history = scope.bind(historyKey, browser.history);
+  scope.bind(settingsNavKey, startSettingsNav(store, { history }));
   const commands = scope.add(commandsKey, startCommandRegistry(window));
   scope.stop(registerNavCommands(commands, history));
   scope.stop(registerFullscreenCommand(commands));
@@ -246,15 +268,23 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   const onlineTracks = scope.add(onlineTracksKey, startOnlineTracks(store, music, connection.port));
   const artwork = scope.bind(trackArtworkKey, createTrackArtwork(store, onlineTracks));
   const playback = scope.add(playbackKey, startPlayback(store, fb, onlineTracks));
+  scope.stop(registerPlayPauseCommand(commands, playback));
   scope.add(positionClockKey, startPositionClock());
   loadVolumeScale(store);
   scope.own(startNowPlaying(store, artwork));
+  scope.own(startAnimatedCover(store, { artwork }));
   const windowShell = scope.add(windowShellKey, startWindowShell(store));
   scope.own(startWindowActivity(store, windowShell));
   scope.add(miniWindowKey, startMiniWindow(store, prefs, windowShell));
   scope.add(
     immersiveIntegrationKey,
-    startImmersiveIntegration(store, { history, commands, playback, windowShell }),
+    startImmersiveIntegration(store, {
+      history: { back: browser.leave, navigate: mainHistory.navigate },
+      browser,
+      commands,
+      playback,
+      windowShell,
+    }),
   );
   scope.own(startWindowTitle(store));
   scope.add(mainMenuKey, startMainMenu(store));
@@ -286,10 +316,9 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
     startOnlineSources(store, { status: musicStatus, client: music }),
   );
   scope.add(ncmSetupKey, startNcmSetup(store, music));
-  scope.add(onlineListsKey, startOnlineLists(store, music, connection.port));
-  scope.add(artistAlbumsKey, startArtistAlbums(store, music, connection.port));
-  scope.add(artistAlbumSearchKey, startArtistAlbumSearch(store, music));
+  startOnlineListServices(store, scope, music, connection.port);
   scope.add(onlineQualityKey, startOnlineQuality(store, configWriter));
+  scope.add(searchOnlinePrefKey, startSearchOnlinePref(store, configWriter));
   scope.bind(
     onlinePlayKey,
     createOnlinePlay(store, {
@@ -302,9 +331,13 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   );
   scope.add(onlinePlaybackKey, startOnlinePlayback(store, connection.port, playback));
   scope.add(onlineFailuresKey, startOnlineFailures(store, music));
+  const mirror = scope.add(
+    libraryMirrorKey,
+    startLibraryMirror(store, connection, fb, configWriter),
+  );
   const albums = scope.add(
     albumsKey,
-    startAlbumServices(store, dragOut, trackActions, fb, configWriter),
+    startAlbumServices(store, dragOut, trackActions, fb, configWriter, mirror),
   );
   scope.bind(sidebarPrefsKey, startSidebarPrefs(store));
   loadPlayerBarStyle(store);
@@ -312,6 +345,7 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   scope.add(queueCountKey, startQueueCount(store));
   const playlists = scope.add(playlistsKey, startPlaylists(store));
   const ratings = scope.add(ratingsKey, startTrackRatings(store));
+  const trackFields = scope.add(trackFieldsKey, startTrackFields(store));
   const { albumDetail, objects } = startObjectOpeners(store, scope, {
     history,
     ratings,
@@ -334,6 +368,7 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
         stamp: () => ratings.stamp(),
         updateCollapsed: (change) => albums.browse.updateCollapsed(change),
         play: trackActions,
+        mirror,
       },
       fb,
       configWriter,
@@ -355,6 +390,7 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
     }),
   );
   scope.add(outputDevicesKey, startOutputDevices(store));
+  scope.add(audioSettingsKey, startAudioSettings(store));
   const infoCenter = scope.add(
     infoCenterKey,
     startInfoCenter(
@@ -394,13 +430,16 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
   const genreValues = scope.add(genreValuesKey, startGenreValues(store, albumList.tracks));
   const songs = scope.add(
     songsKey,
-    startSongs(store, { history, record: (source) => playbackSource.record(source) }),
+    startSongs(store, { history, record: (source) => playbackSource.record(source), mirror }),
   );
+  scope.add(autoplaylistPreviewKey, startAutoplaylistPreview(store, fb));
+  scope.add(autoplaylistEditKey, startAutoplaylistEdit(store, fb));
   scope.add(
     genresKey,
     startGenres(store, {
       history,
       genreValues,
+      configWriter,
       record: (keys, name) =>
         playbackSource.record({ kind: 'genre', subject: genresSubject(keys), name }),
       openSongs: (keys, fill) => {
@@ -451,12 +490,14 @@ export function startServices(dataWriter: BrowserDataWriter, prefs: PagePrefStor
     albums,
     playlistPlaces,
     ratings,
+    trackFields,
     albumList,
     playbackSource,
     albumDetail,
     songs,
     rightCard,
     artwork,
+    backend: connection,
     bindings: scope.bindings,
     dispose: () => scope.dispose(),
   };

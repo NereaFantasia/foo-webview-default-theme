@@ -62,7 +62,8 @@ export function SearchInput({ mode = 'sidebar' }: { readonly mode?: 'sidebar' | 
     id: `${id}.escape`,
     layer: 'input',
     keys: [{ key: 'Escape' }],
-    enabled,
+    // 下拉关着、框也空着时没有可做的事，不认领：Esc 留给外层，比如浏览面板在框获焦时的收起
+    enabled: () => enabled() && (session.open || session.draft !== ''),
     run: () => {
       if (session.open) session.close(true);
       else {
@@ -73,7 +74,18 @@ export function SearchInput({ mode = 'sidebar' }: { readonly mode?: 'sidebar' | 
   });
   return (
     <Input
-      root={{ ...(session.open ? SEARCH_TAB_KEYS : {}), className: classes.root }}
+      root={{
+        ...(session.open ? SEARCH_TAB_KEYS : {}),
+        ...{ 'data-search-box': mode },
+        className: classes.root,
+        // 框里不是 <input> 的部分（内边距、搜索图标）按下去不该让输入框失焦
+        onMouseDown: (event) => {
+          if (event.target === input.current) return;
+          if (event.target instanceof Element && event.target.closest('button')) return;
+          event.preventDefault();
+          input.current?.focus();
+        },
+      }}
       value={session.draft}
       placeholder={t('sidebar.search')}
       contentBefore={<Search16Regular />}

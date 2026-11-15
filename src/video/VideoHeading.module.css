@@ -1,0 +1,36 @@
+/* 两侧的内边距是导航胶囊占的宽度（外壳在卡片上给出，没有导航行时回到普通内边距）；
+   高度随导航行的占位再加一份上间距，胶囊上下各留同样的空 */
+.root {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  min-height: max(48px, calc(var(--nav-inset, 0px) + var(--spacingVerticalM)));
+  padding-inline: var(--nav-start-reserve, var(--spacingHorizontalL))
+    var(--nav-end-reserve, var(--spacingHorizontalS));
+  color: var(--text-primary);
+}
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+}
+/* 放不下一排时：第一行是导航胶囊，标题与操作键在它下面，用满整行 */
+.root[data-tier='stacked'] {
+  min-height: calc(var(--nav-inset, 0px) + 48px);
+  padding-top: var(--nav-inset, 0px);
+  padding-inline: var(--spacingHorizontalL) var(--spacingHorizontalS);
+}

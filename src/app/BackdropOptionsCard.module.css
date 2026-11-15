@@ -1,0 +1,7 @@
+/* 恢复默认：与子行的文字左对齐，与上一行之间一条分隔线 */
+.footer {
+  display: flex;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalS)
+    calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
+  border-top: var(--strokeWidthThin) solid var(--line);
+}

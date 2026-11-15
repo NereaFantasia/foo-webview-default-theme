@@ -1,6 +1,7 @@
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useRef, useState } from 'react';
 import { useService } from '../kit/useService.ts';
+import { lyricsCacheKey } from './lyricsCache.ts';
 import { lyricsKey } from './lyricsService.ts';
 import { lyricsCandidateId } from './lyricsSearchSession.ts';
 import type { LyricsCandidate } from './online/lyricsSource.ts';
@@ -27,6 +28,7 @@ export function useLyricsSearchQuery({
   onUsed,
 }: LyricsSearchQueryOptions) {
   const service = useService(lyricsKey);
+  const { remember } = useAtomValueRawSync(useService(lyricsCacheKey).pref);
   const result = useAtomValueRawSync(service.choices);
   const subject = useAtomValueRawSync(service.subject);
   const [keywords, setKeywords] = useState(result.keywords || fallbackKeywords);
@@ -72,7 +74,7 @@ export function useLyricsSearchQuery({
     },
     use(candidate: LyricsCandidate) {
       setUsing(lyricsCandidateId(candidate));
-      void service.choose(candidate, false, subject).then((used) => {
+      void service.choose(candidate, remember, subject).then((used) => {
         if (!mounted.current) return;
         setUsing('');
         if (used) onUsed();

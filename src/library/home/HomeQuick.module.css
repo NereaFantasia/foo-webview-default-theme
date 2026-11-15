@@ -1,0 +1,242 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--quick-columns), minmax(0, 1fr));
+  gap: var(--spacingHorizontalS);
+}
+
+/*
+ * 悬停与按下的状态层叠在格子自己的底上：两者浓度接近，直接换底看不出变化。状态层的颜色注册为可插值的属性，
+ * 换色时做 83 ms 的线性过渡，与按钮底色一致
+ */
+@property --quick-layer {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  padding-inline-end: var(--spacingHorizontalMNudge);
+  background-color: var(--bg-view-control);
+  background-image: linear-gradient(var(--quick-layer), var(--quick-layer));
+  transition: --quick-layer var(--motion-faster) var(--curveLinear);
+}
+
+.cell:hover {
+  --quick-layer: var(--state-hover);
+}
+
+.cell:has(.open:active) {
+  --quick-layer: var(--state-pressed);
+}
+
+/* 格子裁掉了溢出，焦点环画在格子里面 */
+.cell:has(.open:focus-visible) {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+
+.open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+
+.open:disabled {
+  color: var(--colorNeutralForegroundDisabled);
+  cursor: default;
+}
+
+.open [data-song-art] {
+  border-radius: 0;
+}
+
+.glyph {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: var(--bg-view-control);
+  color: var(--text-secondary);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+}
+
+.detail {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.open:disabled .detail {
+  color: inherit;
+}
+
+/*
+ * 格子末尾的键。固定标记与取消固定键叠在同一格里，悬停或聚焦时互换，不挤动文字。播放键悬停时才占位。
+ * 都是 83 ms 线性淡变：藏起来的一方淡完才变为不可见、不占位，出现的一方立即占位，再淡入。
+ * 与文字的间距挂在第一个键上，没有键露出时文字一直排到格子末尾
+ */
+.keys {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+}
+
+.keys > :first-child {
+  margin-inline-start: var(--spacingHorizontalS);
+}
+
+.pin {
+  display: grid;
+  place-items: center;
+}
+
+.pin > * {
+  grid-area: 1 / 1;
+}
+
+.mark {
+  color: var(--text-secondary);
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.unpin {
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    visibility 0s linear var(--motion-faster);
+}
+
+.play {
+  display: none;
+  opacity: 0;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    display var(--motion-faster) allow-discrete;
+}
+
+.cell:hover .mark,
+.cell:focus-within .mark {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    visibility 0s linear var(--motion-faster);
+}
+
+.cell:hover .unpin,
+.cell:focus-within .unpin {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.cell:hover .play,
+.cell:focus-within .play {
+  display: flex;
+  opacity: 1;
+}
+
+/* 播放键从不占位变为占位的那一刻，从透明开始过渡。选择器与上面同样具体，才能压过悬停时的不透明 */
+@starting-style {
+  .cell:hover .play,
+  .cell:focus-within .play {
+    opacity: 0;
+  }
+}
+
+.manage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalSNudge);
+  min-width: 0;
+  height: 56px;
+  border: var(--strokeWidthThin) dashed var(--line);
+  border-radius: var(--borderRadiusMedium);
+  padding: 0 var(--spacingHorizontalMNudge);
+  background: transparent;
+  color: var(--colorNeutralForeground2);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+
+.manage span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage svg {
+  flex: none;
+}
+
+.manage:hover {
+  background: var(--state-hover);
+  color: var(--colorNeutralForeground1);
+}
+
+.manage:active {
+  background: var(--state-pressed);
+}
+
+.manage:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+@media (hover: none) {
+  .unpin {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .play {
+    display: flex;
+    opacity: 1;
+  }
+
+  .mark {
+    visibility: hidden;
+  }
+}

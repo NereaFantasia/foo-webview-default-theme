@@ -11,6 +11,7 @@ import { useUpNextSource } from './useUpNextSource.ts';
 import type { QueueList, QueueListRow } from './useQueueList.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { useQueueRowHeight } from './queueRowHeight.ts';
+import { rowOffset } from './rowOffset.ts';
 import type { useQueueViewport } from './useQueueViewport.ts';
 import styles from './QueueList.module.css';
 
@@ -35,7 +36,7 @@ export function QueueUpcoming({ list, viewport, rowOf }: QueueUpcomingProps) {
     <>
       {upNext.total > 0 && (
         <section className={styles.section} data-queue-section="upnext">
-          <div className={styles.head} data-lead>
+          <div className={styles.head} data-lead data-queue-head="upnext">
             <span className={styles.label}>
               {t('queue.upNext')}
               <span className={styles.count}>
@@ -66,59 +67,53 @@ export function QueueUpcoming({ list, viewport, rowOf }: QueueUpcomingProps) {
             aria-busy={upNext.refreshing}
             data-queue-virtual-list
           >
-            <div ref={viewport.viewport} className={styles.viewport} data-queue-viewport>
-              <div ref={viewport.strip} className={styles.strip}>
-                {viewport.visible.map((item) => {
-                  const row = shownRows.find(
-                    (entry) => entry.number === list.queued.length + item.index + 1,
-                  );
-                  const failed = upNext.failedPages.has(Math.floor(item.index / UP_NEXT_PAGE_SIZE));
-                  return (
+            {/* 行直接画在列表里，随滚动内容原生滚动；不套粘性视口与行带（见 `useQueueVirtualRows` 的 `sticky`） */}
+            {viewport.visible.map((item) => {
+              const row = shownRows.find(
+                (entry) => entry.number === list.queued.length + item.index + 1,
+              );
+              const failed = upNext.failedPages.has(Math.floor(item.index / UP_NEXT_PAGE_SIZE));
+              return (
+                <div
+                  key={row?.key ?? `pending:${upNext.version}:${item.index}`}
+                  className={styles.virtualRow}
+                  data-queue-slot={item.index}
+                  style={{ height: rowHeight, ...rowOffset(item.start - viewport.margin) }}
+                >
+                  {row ? (
+                    rowOf(row)
+                  ) : (
                     <div
-                      key={row?.key ?? `pending:${upNext.version}:${item.index}`}
-                      className={styles.virtualRow}
-                      data-queue-slot={item.index}
-                      style={{
-                        height: rowHeight,
-                        transform: `translateY(${item.start - viewport.margin}px)`,
-                      }}
+                      className={styles.placeholder}
+                      role="option"
+                      aria-disabled
+                      aria-selected={false}
+                      aria-label={t('queue.loadingRows')}
                     >
-                      {row ? (
-                        rowOf(row)
-                      ) : (
-                        <div
-                          className={styles.placeholder}
-                          role="option"
-                          aria-disabled
-                          aria-selected={false}
-                          aria-label={t('queue.loadingRows')}
+                      <span>{upNextNumberAt(upNext, item.index)}</span>
+                      <span className={styles.placeholderCover} aria-hidden />
+                      {failed ? (
+                        <Button
+                          className={viewControls.icon}
+                          appearance="subtle"
+                          size="small"
+                          onClick={() =>
+                            void services.upNext.readRange(item.index, item.index, true)
+                          }
                         >
-                          <span>{upNextNumberAt(upNext, item.index)}</span>
-                          <span className={styles.placeholderCover} aria-hidden />
-                          {failed ? (
-                            <Button
-                              className={viewControls.icon}
-                              appearance="subtle"
-                              size="small"
-                              onClick={() =>
-                                void services.upNext.readRange(item.index, item.index, true)
-                              }
-                            >
-                              {t('queue.retryRows')}
-                            </Button>
-                          ) : (
-                            <span className={styles.placeholderText} aria-hidden>
-                              <span />
-                              <span />
-                            </span>
-                          )}
-                        </div>
+                          {t('queue.retryRows')}
+                        </Button>
+                      ) : (
+                        <span className={styles.placeholderText} aria-hidden>
+                          <span />
+                          <span />
+                        </span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

@@ -12,10 +12,16 @@ export interface MusicRef {
   readonly id: string;
 }
 
+/** 别名与译名（英文名、中文译名之类）最多留这么多条、每条最长这么多字，只用于查找，不显示 */
+export const MUSIC_ALIAS_LIMIT = 8;
+export const MUSIC_ALIAS_LENGTH = 128;
+
 /** `ref` 为 null 时只有名字可显示，不能跳转 */
 export interface MusicArtistCredit {
   readonly ref: MusicRef | null;
   readonly name: string;
+  /** 别名与译名；没有时省略 */
+  readonly aliases?: readonly string[];
 }
 
 export interface MusicAlbumCredit {
@@ -28,6 +34,8 @@ export interface MusicTrack {
   readonly title: string;
   /** 别名或译名 */
   readonly subtitle: string | null;
+  /** 全部别名与译名（`subtitle` 只取第一项）；没有时省略 */
+  readonly aliases?: readonly string[];
   /** 保持上游顺序 */
   readonly artists: readonly MusicArtistCredit[];
   readonly album: MusicAlbumCredit | null;
@@ -66,6 +74,8 @@ export interface MusicArtist {
   readonly ref: MusicRef;
   readonly name: string;
   readonly avatar: string | null;
+  /** 别名与译名；没有时省略 */
+  readonly aliases?: readonly string[];
   /** 平台自报，同一位艺人在不同平台的数目不同，不跨平台比较 */
   readonly albumCount: number | null;
   readonly trackCount: number | null;
@@ -126,14 +136,31 @@ function creditRef(value: unknown): MusicRef | null | undefined {
   return value === null ? null : (readMusicRef(value) ?? undefined);
 }
 
+/** 省略时答空数组；不是文本数组、超条数或超长时答 null */
+function readAliases(value: unknown): readonly string[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MUSIC_ALIAS_LIMIT) return null;
+  const aliases: string[] = [];
+  for (const item of value) {
+    if (!isText(item, MUSIC_ALIAS_LENGTH)) return null;
+    aliases.push(item);
+  }
+  return aliases;
+}
+
 function readArtists(value: unknown): MusicArtistCredit[] | null {
   if (!Array.isArray(value) || value.length > 100) return null;
   const artists: MusicArtistCredit[] = [];
   for (const item of value) {
     if (!isRecord(item) || !isText(item.name)) return null;
     const reference = creditRef(item.ref);
-    if (reference === undefined) return null;
-    artists.push({ ref: reference, name: item.name });
+    const aliases = readAliases(item.aliases);
+    if (reference === undefined || !aliases) return null;
+    artists.push({
+      ref: reference,
+      name: item.name,
+      ...(aliases.length ? { aliases } : {}),
+    });
   }
   return artists;
 }
@@ -168,8 +195,10 @@ export function readMusicTrack(value: unknown): MusicTrack | null {
   );
   const access = value.access === null ? null : MUSIC_ACCESS.find((item) => item === value.access);
   const sizes = readSizes(value.sizes);
+  const aliases = readAliases(value.aliases);
   if (
     !reference ||
+    !aliases ||
     !isText(value.title) ||
     !isNullableText(value.subtitle) ||
     !artists ||
@@ -186,6 +215,7 @@ export function readMusicTrack(value: unknown): MusicTrack | null {
     ref: reference,
     title: value.title,
     subtitle: value.subtitle,
+    ...(aliases.length ? { aliases } : {}),
     artists,
     album,
     durationMs: value.durationMs,
@@ -236,8 +266,10 @@ export function readMusicAlbum(value: unknown): MusicAlbum | null {
 export function readMusicArtist(value: unknown): MusicArtist | null {
   if (!isRecord(value)) return null;
   const reference = readMusicRef(value.ref);
+  const aliases = readAliases(value.aliases);
   if (
     !reference ||
+    !aliases ||
     !isText(value.name) ||
     !(value.avatar === null || isHttpUrl(value.avatar)) ||
     !count(value.albumCount) ||
@@ -248,6 +280,7 @@ export function readMusicArtist(value: unknown): MusicArtist | null {
     ref: reference,
     name: value.name,
     avatar: value.avatar,
+    ...(aliases.length ? { aliases } : {}),
     albumCount: value.albumCount,
     trackCount: value.trackCount,
   };

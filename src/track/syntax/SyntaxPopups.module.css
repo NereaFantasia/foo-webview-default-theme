@@ -1,0 +1,123 @@
+/* 十行封顶，再多就滚；浮层被压矮时它先缩（min-height 为 0），详情不缩 */
+.list {
+  display: grid;
+  flex: 0 1 auto;
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+  column-gap: var(--spacingHorizontalM);
+  min-height: 0;
+  max-height: calc(10 * 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--spacingHorizontalMNudge);
+  border-radius: var(--borderRadiusMedium);
+}
+.row[data-on] {
+  background: var(--bg-selected);
+}
+.row:hover:not([data-on]) {
+  background: var(--state-hover);
+}
+.name {
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase300);
+  white-space: nowrap;
+}
+/* 说明格：一句说明在前、放不下时省略，组件名标签贴在格尾；列表行与参考面板的行共用 */
+.descCell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  min-width: 0;
+}
+.desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  padding: 0 var(--spacingHorizontalXS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusSmall);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase100);
+  line-height: var(--lineHeightBase100);
+  white-space: nowrap;
+}
+/* 组件没装：警示色加图标，颜色之外还有形状 */
+.tag[data-missing] {
+  border-color: var(--colorPaletteMarigoldBorder2);
+  color: var(--colorPaletteMarigoldForeground2);
+}
+.kind {
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXS);
+  border-radius: var(--borderRadiusSmall);
+  background: var(--bg-view-control);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase100);
+}
+
+/* 选中项的签名、说明与示例，写在列表底部 */
+.detail {
+  display: grid;
+  flex: none;
+  gap: var(--spacingVerticalXXS);
+  margin: var(--spacingVerticalXS) var(--spacingHorizontalXS) var(--spacingVerticalXXS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalMNudge) var(--spacingVerticalXS);
+  border-top: var(--strokeWidthThin) solid var(--line);
+  font-size: var(--fontSizeBase200);
+}
+.signature {
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase300);
+}
+.body {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.example {
+  margin: 0;
+  color: var(--colorNeutralForeground2);
+  font-family: var(--fontFamilyMonospace);
+}
+.note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* 说明行：一小条，图标加签名加一句话 */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+  font-size: var(--fontSizeBase200);
+}
+.hint[data-level='error'] {
+  color: var(--colorPaletteRedForeground1);
+}
+.hint[data-level='warn'] {
+  color: var(--colorPaletteMarigoldForeground2);
+}
+.hintText {
+  min-width: 0;
+  color: var(--text-secondary);
+}
+.hint[data-level='error'] .hintText,
+.hint[data-level='warn'] .hintText {
+  color: inherit;
+}

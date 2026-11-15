@@ -5,7 +5,7 @@ import { makeTrack } from './tracks.ts';
 
 export const QUEUE_LIST_GUID = '{11111111-1111-1111-1111-111111111111}';
 
-/** 让宿主答出一张在播的大列表：只按被读页生成曲目，避免替身自己先为几十万首分配对象。`name` 是那张表的名字。 */
+/** 让宿主答出一张在播的大列表：只按被读页生成曲目，避免替身自己先为几十万首分配对象。`name` 是那张表的名字 */
 export function answerLargeQueue(
   host: PageHost,
   total: number,
@@ -86,3 +86,28 @@ export async function openLargeQueue(
 }
 
 export const queueScroller = (page: Page) => page.locator('[data-queue-page]').locator('..');
+
+export type RightCardPageName = 'queue' | 'lyrics' | 'info' | 'bio';
+
+const PAGE_LABELS: Readonly<Record<RightCardPageName, string>> = {
+  queue: '队列',
+  lyrics: '歌词',
+  info: '信息',
+  bio: '简介',
+};
+
+/**
+ * 开到右侧卡的某一页：有这一页的键就点它；窄到歌词、信息、简介收进菜单键时，从它的菜单里选
+ * 卡已开在这一页时点键会收起，调用前先确认不在那一页
+ */
+export async function openRightCardPage(page: Page, name: RightCardPageName): Promise<void> {
+  // 页面刚打开时键还没画出来，等任意一枚出现再认是哪种排法
+  await page.locator('[data-right-card-key]').first().waitFor();
+  const key = page.locator(`[data-right-card-key="${name}"]`);
+  if (await key.count()) {
+    await key.click();
+    return;
+  }
+  await page.locator('[data-right-card-key="pages"]').click();
+  await page.getByRole('menuitemradio', { name: PAGE_LABELS[name], exact: true }).click();
+}

@@ -5,10 +5,11 @@ import { artworkRequestSize } from '../../host/artworkSize.ts';
 import { settle } from '../../host/hostCall.ts';
 import type { Store } from '../../kit/store.ts';
 import { trackDisplayTitle } from '../../track/trackDisplayTitle.ts';
-import { currentTrackAtom } from '../playback.ts';
+import { currentTrackAtom, playbackAtom } from '../playback.ts';
 import type { TrackArtwork } from '../../covers/trackArtwork.ts';
 import { trackKeyOf } from '../playbackContract.ts';
 import { FORMAT_PATTERN, parseFormatDetail, type FormatReading } from '../../track/trackFormat.ts';
+import { createSwapNeighbors } from './swapNeighbors.ts';
 import { startTrackSwap } from './trackSwap.ts';
 
 /** 播放栏里画封面的最大边长，CSS 像素：胶囊的圆形封面 48，标题栏的 44 也够用 */
@@ -116,7 +117,12 @@ export function startNowPlaying(
 
   const off = store.sub(currentTrackAtom, follow);
   follow();
-  const swaps = startTrackSwap(store);
+  const neighbors = createSwapNeighbors(store);
+  const swaps = startTrackSwap(store, {
+    track: currentTrackAtom,
+    progress: playbackAtom,
+    neighbors,
+  });
 
   return {
     dispose() {
@@ -124,6 +130,7 @@ export function startNowPlaying(
       generation += 1;
       off();
       swaps.dispose();
+      neighbors.dispose();
     },
   };
 }

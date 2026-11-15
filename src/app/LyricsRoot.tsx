@@ -1,14 +1,5 @@
 import { useAtomValueRawSync } from 'jotai/react';
-import {
-  lazy,
-  Suspense,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { makeStyles, Spinner } from '@fluentui/react-components';
 import { translateAtom } from '../i18n/locale.ts';
 import { bindService } from '../kit/serviceKey.ts';
@@ -19,6 +10,7 @@ import { lyricsSettingsKey } from '../lyrics/lyricsSettings.ts';
 import { desktopLyricsKey } from '../lyrics/desktop/desktopLyrics.ts';
 import { lyricsPrefsKey, LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY } from '../lyrics/lyricsPrefs.ts';
 import { lyricsMotionKey, LYRICS_MOTION_KEY } from '../lyrics/lyricsMotion.ts';
+import { lyricsCacheKey, LYRICS_CACHE_PREF_KEY } from '../lyrics/lyricsCache.ts';
 import {
   lyricsDisplayKey,
   LYRICS_ALIGN_KEY,
@@ -30,10 +22,8 @@ import { playbackCanSeekAtom, playbackConnectedAtom } from '../playback/playerAt
 import { RightCardLyricsContext } from '../shell/right-card/rightCardContext.ts';
 import { SettingsSaveNotice } from '../settings/SettingsSaveNotice.tsx';
 import { LyricsSection } from '../settings/LyricsSection.tsx';
-import {
-  LyricsSettingsContext,
-  LyricsSettingsNavigationContext,
-} from '../settings/lyricsSettingsContext.ts';
+import { LyricsSettingsContext } from '../settings/lyricsSettingsContext.ts';
+import { settingsNavKey } from '../settings/settingsNav.ts';
 import { lyricsIntegrationKey, type LyricsIntegration } from './lyricsIntegration.ts';
 import type { AppServices } from './services.ts';
 
@@ -46,8 +36,6 @@ const LyricsPage = lazy(() =>
 const useStyles = makeStyles({
   loading: {
     height: '100%',
-    boxSizing: 'border-box',
-    paddingTop: 'var(--lyrics-preview-top, 0px)',
   },
 });
 
@@ -114,22 +102,8 @@ function LyricsContent({
   );
 }
 
-function LyricsSettingsContent({
-  integration,
-  requested,
-  onFocused,
-}: {
-  readonly integration: LyricsIntegration;
-  readonly requested: boolean;
-  onFocused(): void;
-}) {
+function LyricsSettingsContent({ integration }: { readonly integration: LyricsIntegration }) {
   const connected = useAtomValueRawSync(playbackConnectedAtom);
-  const select = useContext(LyricsSettingsNavigationContext);
-  useEffect(() => {
-    if (!requested || !select) return;
-    select();
-    onFocused();
-  }, [requested, select, onFocused]);
   return (
     <LyricsSection
       disabled={!connected}
@@ -142,6 +116,10 @@ function LyricsSettingsContent({
           <SettingsSaveNotice
             persistence={integration.motion.persistence}
             keys={[LYRICS_MOTION_KEY]}
+          />
+          <SettingsSaveNotice
+            persistence={integration.cache.persistence}
+            keys={[LYRICS_CACHE_PREF_KEY]}
           />
           <SettingsSaveNotice
             persistence={integration.display.persistence}
@@ -162,12 +140,11 @@ export function LyricsRoot({
 }) {
   const parent = useContext(ServicesContext);
   const integration = useService(lyricsIntegrationKey);
-  const [settingsRequested, setSettingsRequested] = useState(false);
+  const settingsNav = useService(settingsNavKey);
   const { store, rightCard } = services;
   const openSettings = () => {
-    setSettingsRequested(true);
     if (store.get(rightCard.card.view).form !== 'docked') rightCard.card.close();
-    services.history.navigate({ id: 'settings' });
+    settingsNav.open('lyrics');
   };
   // 桌面歌词的设置键与菜单项经服务要求打开设置，同样跳到「歌词」组
   const desktopRequests = useAtomValueRawSync(useService(desktopLyricsKey).settingsRequests);
@@ -186,6 +163,7 @@ export function LyricsRoot({
         bindService(lyricsKey, integration.service),
         bindService(lyricsClockKey, { clock: integration.clock, seek: integration.seek }),
         bindService(lyricsPrefsKey, integration.prefs),
+        bindService(lyricsCacheKey, integration.cache),
         bindService(lyricsMotionKey, integration.motion),
         bindService(lyricsDisplayKey, integration.display),
         bindService(lyricsSettingsKey, { open: () => openSettingsRef.current() }),
@@ -197,15 +175,7 @@ export function LyricsRoot({
   return (
     <ServicesContext value={bindings}>
       <LyricsSettingsContext
-        value={
-          integration ? (
-            <LyricsSettingsContent
-              integration={integration}
-              requested={settingsRequested}
-              onFocused={() => setSettingsRequested(false)}
-            />
-          ) : null
-        }
+        value={integration ? <LyricsSettingsContent integration={integration} /> : null}
       >
         <RightCardLyricsContext
           value={

@@ -2,6 +2,78 @@
 
 foo-webview-default-theme 每个版本的变化。主题里显示的更新日志和发行页正文都由这份文件生成，写法见 `src/update/changelogSource.ts` 开头的说明。
 
+## 0.4.0 - 2026-11-15
+
+### zh-CN
+
+#### 首页、艺人页与沉浸视图的新样式
+
+首页改成门户，艺人页重做并接入 Apple Music 简介。沉浸视图新增满幅封面与流动色场，自动播放列表可以创建和编辑。
+
+- [library] **门户式首页** 首页集中快捷入口、本地统计与推荐，以及网易云的横幅、新歌、榜单、歌单和新碟。进入编辑模式后，可以调整各行的次序和显示。
+- [library] **重做的艺人页** 艺人页改成圆形头像的封面墙，点开进入整页详情，有宽幅头图、热门曲目和专辑。简介默认来自 Apple Music，也可以在设置里改用 Last.fm。
+- [player] **沉浸视图的新样式** 新增「满幅封面」样式和「流动色场」背景，钛金属与网格渐变背景可以随音乐律动。版式直接在画面上编辑，沉浸视图里按 Ctrl+B 打开浏览面板。
+- [library] **自动播放列表** 在歌曲页按当前条件创建自动播放列表，在播放列表页或侧边栏右键菜单里编辑。查询框带语法着色、补全和语法参考，专辑页与播放列表页的搜索框也支持高级查询。
+- [search] **在线曲目收藏** 网易云的曲目可以收藏到本地，在「收藏」页查看。在线曲目表、播放栏、页头和菜单里都有收藏键。
+- [library] **媒体库缓存与歌词缓存** 歌曲、专辑和整库曲目优先从本地缓存读取，缓存读不到时仍向 foobar2000 取。可以在「常规」的「数据」里关闭缓存、查看占用和重建。歌词的查询结果也会缓存在本地。
+- [palette] **设置与外观** 设置页改成一次显示一个分区。界面字体、中日韩字体和歌词字体可以自定义，字重也可调。曲目表新增碟号、文件名、文件夹、作曲等十个可选列。
+- [log] **运行日志** 「关于」页新增运行日志，可以复制版本、窗口状态和最近的记录，用于反馈问题。启动失败页也能复制，记录在写入时已脱敏。
+
+##### 改进与修复
+
+- 新人引导的第 4 步加入在线歌词开关，并显示本地服务的准备状态，失败时可以重试。
+- 启动时缺省打开首页。
+- 播放设置里可以调整 ReplayGain、DSP 预设与输出缓冲。
+- 在线曲目播放时预取下一首，切歌时更快接上。在线曲目也支持整轨分析，可选预载整首、按需分段或关闭。
+- 桌面歌词新增自定义字号、译文字号和多行自定义动效。
+- 本地动图封面可以在信息页的展开封面和沉浸大封面里播放。
+- 右侧卡的页面入口改成队列、歌词、信息、简介四个键，去掉卡内的分页栏。
+- 文本框的右键菜单提供剪切、复制、粘贴和全选。
+- 快捷键一览新增沉浸视图一节。
+- 主题与 foobar2000 绑定了相同的快捷键时，以主题为准。桌面歌词的全局快捷键只接受带 Ctrl、Alt 或 Win 的组合。
+- 空格在普通页面也能播放或暂停。
+- 键盘焦点环不再被滚动区、截断行和列头裁切。
+- 修正 125% 缩放下滚动后曲目表文字发虚的问题。
+- 修正署名放不下时艺人与专辑的显示：两者均分宽度，各自截断，名字仍可点击。
+- 修正下拉与菜单被标题栏遮住的问题，长下拉固定在触发控件下方。
+- 英文界面下，认定与搜索艺人时使用英文曲风名，英文简介里不再带 `<i>` 标记。
+- 流派整理时，单个流派（如 R&B）不再被判成多个。
+
+### en
+
+#### New home, artist pages and immersive styles
+
+The home page becomes a portal, and artist pages are rebuilt with Apple Music biographies. The immersive view adds a full-bleed cover style and a flowing color field, and autoplaylists can be created and edited.
+
+- [library] **Portal home page** Home gathers quick entries, local statistics and recommendations, plus NetEase banners, new songs, charts, playlists and new albums. Enter edit mode to reorder rows or hide them.
+- [library] **Rebuilt artist pages** Artists now appear as a wall of round portraits that opens a full page with a wide header image, top tracks and albums. Biographies come from Apple Music by default and can be switched to Last.fm in Settings.
+- [player] **New immersive styles** Adds a Full-bleed cover style and a Flowing color field background; the titanium and mesh gradient backgrounds can follow the music. Edit the layout directly on screen, and press Ctrl+B in the immersive view to open the browse panel.
+- [library] **Autoplaylists** Create an autoplaylist from the current conditions on the Songs page, and edit it on the playlist page or from the sidebar context menu. The query box offers syntax coloring, completion and a syntax reference, and the Albums and playlist page search boxes accept advanced queries too.
+- [search] **Online track favorites** Save NetEase tracks to a local Favorites page. Favorite buttons appear in online track tables, the player bar, page headers and menus.
+- [library] **Library cache and lyrics cache** Songs, albums and the whole-library track list are read from a local cache first, and fall back to foobar2000 when the cache cannot answer. Under General > Data you can turn the cache off, see its size and rebuild it. Lyrics lookups are cached locally as well.
+- [palette] **Settings and appearance** Settings shows one section at a time. The interface font, the CJK font and the lyrics fonts can be customized, including font weight. The track table adds ten optional columns, such as disc number, file name, folder and composer.
+- [log] **Runtime log** About gains a runtime log that copies the version, window state and recent entries for bug reports. The startup failure page can copy it too, and entries are redacted when written.
+
+##### Improvements and fixes
+
+- Step 4 of the first-run guide adds an online lyrics switch and shows the local service status, with retry on failure.
+- The app opens on Home at startup by default.
+- Playback settings can adjust ReplayGain, DSP presets and the output buffer.
+- Online tracks prefetch the next track, so switching connects faster. Online tracks also support whole-track analysis, with preload, on-demand segments or off.
+- Desktop lyrics add a custom font size, a translation font size and custom multi-line animations.
+- Local animated covers play in the expanded cover on the info page and in the large immersive cover.
+- The right card's page entries become four buttons for Queue, Lyrics, Info and Biography, and the in-card tab bar is gone.
+- Text boxes offer a context menu with Cut, Copy, Paste and Select All.
+- The shortcut list gains an immersive view section.
+- When the theme and foobar2000 bind the same shortcut, the theme takes priority. Desktop lyrics global shortcuts accept only combinations with Ctrl, Alt or Win.
+- Space plays or pauses on ordinary pages too.
+- The keyboard focus ring is no longer clipped by scroll areas, truncated rows and column headers.
+- Fixed blurry text in the track table after scrolling at 125% scaling.
+- Fixed artist and album bylines that do not fit: they now share the width, truncate separately and stay clickable.
+- Fixed dropdowns and menus hidden behind the title bar, and long dropdowns now stay under their trigger.
+- In the English interface, artists are identified and searched with English genre names, and English biographies no longer contain `<i>` markup.
+- Genre tidy-up no longer splits a single genre such as R&B into several.
+
 ## 0.3.0 - 2026-10-28
 
 ### zh-CN

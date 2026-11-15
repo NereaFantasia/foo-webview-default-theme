@@ -2,7 +2,11 @@ import { fb } from 'foo-webview-sdk/bridge';
 import { createStore } from 'jotai/vanilla';
 import { afterEach, expect, it, vi } from 'vitest';
 import { initializeImmersivePrefs } from '../../../src/app/immersivePrefs.ts';
-import { backdropChoiceAtom } from '../../../src/immersive/backdrop/backdropState.ts';
+import { backdropFlowSpeed } from '../../../src/immersive/backdrop/backdropOptions.ts';
+import {
+  backdropChoiceAtom,
+  backdropOptionsAtom,
+} from '../../../src/immersive/backdrop/backdropState.ts';
 import { paintFpsCap, setPaintFpsCap } from '../../../src/immersive/frame/frameScheduler.ts';
 import {
   chooseImmersiveFpsCap,
@@ -32,12 +36,15 @@ const saved = {
   'default-theme.immersive.fpsCap.v1': '60',
   'default-theme.immersive.waveformMode.v1': 'lanes',
   'default-theme.immersive.scene.v1': 'paper',
+  'default-theme.immersive.onlineAnalysis.v1': 'segments',
   'default-theme.immersive.perfOverlay.v1': 'on',
   'default-theme.immersive.backdrop.v1': 'titanium',
+  'default-theme.immersive.backdropOptions.v1': '{"flowSpeed":130}',
   'default-theme.immersive.startPage.v1': 'queue',
   'default-theme.immersive.presetOptions.v1': '{}',
   'default-theme.immersive.presetLandscape.v1': 'split',
   'default-theme.immersive.presetPortrait.v1': 'split',
+  'default-theme.immersive.collapseWithoutLyrics.v1': 'on',
   'default-theme.immersive.lyricsToolbarCollapsed.v1': 'on',
 };
 
@@ -51,6 +58,7 @@ function prefs(store: Store) {
     scene: store.get(immersiveSceneAtom),
     perf: store.get(perfOverlayEnabledAtom),
     backdrop: store.get(backdropChoiceAtom),
+    flowSpeed: backdropFlowSpeed(store.get(backdropOptionsAtom)),
     toolbarCollapsed: store.get(toolbarCollapsedPref.atom),
   };
 }
@@ -62,7 +70,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('沿用十三个存储键，按 store 初始化一次，新 store 独立加载', () => {
+it('沿用十六个存储键，按 store 初始化一次，新 store 独立加载', () => {
   const map = new Map(Object.entries(saved));
   const getItem = vi.fn((key: string) => map.get(key) ?? null);
   const setItem = vi.fn();
@@ -78,18 +86,19 @@ it('沿用十三个存储键，按 store 初始化一次，新 store 独立加�
     scene: 'paper',
     perf: true,
     backdrop: 'titanium',
+    flowSpeed: 130,
     toolbarCollapsed: true,
   });
   expect(new Set(getItem.mock.calls.map(([key]) => key))).toEqual(new Set(Object.keys(saved)));
-  expect(getItem).toHaveBeenCalledTimes(13);
+  expect(getItem).toHaveBeenCalledTimes(16);
   expect(setItem).not.toHaveBeenCalled();
   expect(paintFpsCap()).toBe(60);
   initializeImmersivePrefs(store);
-  expect(getItem).toHaveBeenCalledTimes(13);
+  expect(getItem).toHaveBeenCalledTimes(16);
   const another = createStore();
   initializeImmersivePrefs(another);
   expect(prefs(another)).toEqual(prefs(store));
-  expect(getItem).toHaveBeenCalledTimes(26);
+  expect(getItem).toHaveBeenCalledTimes(32);
 });
 
 it('先改设置但存储写入失败，再初始化不能用旧存档覆盖当前值', () => {
@@ -119,9 +128,10 @@ it('先改设置但存储写入失败，再初始化不能用旧存档覆盖当�
     scene: 'paper',
     perf: false,
     backdrop: 'titanium',
+    flowSpeed: 130,
     toolbarCollapsed: true,
   });
-  expect(getItem).toHaveBeenCalledTimes(13);
+  expect(getItem).toHaveBeenCalledTimes(16);
   expect(paintFpsCap()).toBe(144);
 });
 

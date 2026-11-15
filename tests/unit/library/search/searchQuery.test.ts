@@ -10,6 +10,9 @@ import {
 } from '../../../../src/library/search/searchQuery.ts';
 import { albumRow, trackRow } from '../../../fixtures/libraryRows.ts';
 
+const ARTIST = '$if($meta_num(artist),$lower($meta_sep(artist,$char(31))),)';
+const ALBUM_ARTIST = '$if($meta_num(album artist),$lower($meta_sep(album artist,$char(31))),)';
+
 describe('全局搜索的普通文字查询', () => {
   it('空白不生成查询，首尾空白不进入已提交词', () => {
     expect(searchQuery(' \t\n ')).toBeNull();
@@ -33,18 +36,26 @@ describe('全局搜索的普通文字查询', () => {
     const rank = searchQuery('Nujabes soul')?.sort.split('|')[0] ?? '';
     const at = (part: string) => rank.indexOf(part);
     expect(at("$strstr($lower($meta(title)),'nujabes')")).toBeLessThan(
-      at("$strstr($lower($meta(artist)),'nujabes')"),
+      at(`$strstr(${ARTIST},'nujabes')`),
     );
-    expect(at("$strstr($lower($meta(album artist)),'nujabes')")).toBeLessThan(
+    expect(at(`$strstr(${ALBUM_ARTIST},'nujabes')`)).toBeLessThan(
       at("$strstr($lower($meta(album)),'nujabes')"),
     );
     expect(rank).toContain(
-      "$or($strstr($lower($meta(title)),'soul'),$strstr($lower($meta(artist)),'soul')," +
-        "$strstr($lower($meta(album artist)),'soul'),$strstr($lower($meta(album)),'soul'))",
+      `$or($strstr($lower($meta(title)),'soul'),$strstr(${ARTIST},'soul'),` +
+        `$strstr(${ALBUM_ARTIST},'soul'),$strstr($lower($meta(album)),'soul'))`,
     );
     expect(rank.endsWith(',5,6))))))')).toBe(true);
     // 只有一个词时不套 $and
     expect(searchQuery('feather')?.sort).not.toContain('$and(');
+  });
+
+  it('艺人与专辑艺术家按全部值比，不只取第一个值', () => {
+    const rank = searchQuery('beta')?.sort.split('|')[0] ?? '';
+    expect(rank).toContain(ARTIST);
+    expect(rank).toContain(ALBUM_ARTIST);
+    expect(rank).not.toContain('$meta(artist)');
+    expect(rank).not.toContain('$meta(album artist)');
   });
 
   it('格式串、操作符和问号留在引号里作字面文字，双引号当作分隔', () => {

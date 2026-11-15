@@ -15,4 +15,7 @@ export const startupZhCN = {
   'startup.startFailedDetail': '若重新加载后仍无法启动，请重新安装完整主题包。',
   'startup.retry': '重新检查',
   'startup.reload': '重新加载',
+  'startup.copy': '复制运行日志',
+  'startup.copied': '已复制',
+  'startup.copyFailed': '复制失败',
 } as const;

@@ -4,6 +4,7 @@ import {
   ArrowDownload20Regular,
   ArrowSync16Regular,
   Open16Regular,
+  Server20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -84,6 +85,7 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
   const links = useExternalLinks();
   const status = useAtomValueRawSync(updater.status);
   const block = useAtomValueRawSync(startupBlockAtom);
+  const controls = useViewControlStyles();
   const [restartFailed, setRestartFailed] = useState(false);
   // 卸载后丢弃迟到的重启响应，避免组件销毁后更新状态
   const alive = useRef(false);
@@ -104,6 +106,7 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
     ['off', 'checking', 'downloading', 'installing', 'shared', 'maintenance'].includes(
       status.phase,
     );
+  const emphasized = (ready || available || manual) && !quiet;
   const line =
     restartFailed && ready
       ? { text: t('update.restartFailed'), error: true }
@@ -119,7 +122,9 @@ function useUpdateStatus({ quiet = false, beforeRestart }: UpdateStatusCardProps
     control: ({ labelId, descriptionId }: SettingsCardIds) => (
       <Button
         id={buttonId}
-        appearance={(ready || available || manual) && !quiet ? 'primary' : 'secondary'}
+        appearance={emphasized ? 'primary' : 'secondary'}
+        // 主操作保留品牌实底，其余的是主阅读面里的文字按钮，用半透明的控件底
+        className={emphasized ? undefined : controls.field}
         icon={
           ready ? <ArrowClockwise16Regular /> : manual ? <Open16Regular /> : <ArrowSync16Regular />
         }
@@ -174,6 +179,7 @@ function UpdateStatusCard(props: UpdateStatusCardProps) {
 
 function ChangelogRow() {
   const t = useAtomValueRawSync(translateAtom);
+  const controls = useViewControlStyles();
   const updater = useService(updaterKey);
   const view = useService(changelogViewKey);
   const mode = useAtomValueRawSync(updater.mode);
@@ -182,7 +188,11 @@ function ChangelogRow() {
       title={t('update.logTitle')}
       description={mode === 'off' ? t('update.logNetwork') : undefined}
     >
-      {() => <Button onClick={view.show}>{t('update.logOpen')}</Button>}
+      {() => (
+        <Button className={controls.field} onClick={view.show}>
+          {t('update.logOpen')}
+        </Button>
+      )}
     </SettingsRow>
   );
 }
@@ -210,7 +220,8 @@ function UpdateSettingsExpander() {
   );
 }
 
-function BackendStatusRow() {
+/** 本地服务的准备状态，设置页的行与引导的卡共用。前端没有携带本地服务描述时为 null，整项不显示 */
+function useBackendStatus() {
   const t = useAtomValueRawSync(translateAtom);
   const backend = useService(backendBootstrapKey);
   const status = useAtomValueRawSync(backend.status);
@@ -229,32 +240,64 @@ function BackendStatusRow() {
       : status.phase === 'ready'
         ? t('update.backendReady', { version: status.version })
         : t(keys[status.phase]);
+  return {
+    description,
+    error: status.phase === 'failed',
+    feedback:
+      status.phase === 'failed' ? (
+        <details>
+          <summary>{t('update.backendDetails')}</summary>
+          <div>{status.detail}</div>
+        </details>
+      ) : undefined,
+    control: ({ descriptionId }: SettingsCardIds) =>
+      status.phase === 'failed' ? (
+        <Button
+          className={controls.field}
+          aria-describedby={descriptionId}
+          onClick={() => void backend.retry()}
+        >
+          {t('update.backendRetry')}
+        </Button>
+      ) : null,
+  };
+}
+
+function BackendStatusRow() {
+  const t = useAtomValueRawSync(translateAtom);
+  const status = useBackendStatus();
+  if (!status) return null;
   return (
     <SettingsRow
       title={t('update.backendTitle')}
-      description={description}
-      error={status.phase === 'failed'}
-      feedback={
-        status.phase === 'failed' ? (
-          <details>
-            <summary>{t('update.backendDetails')}</summary>
-            <div>{status.detail}</div>
-          </details>
-        ) : undefined
-      }
+      description={status.description}
+      error={status.error}
+      feedback={status.feedback}
     >
-      {({ descriptionId }) =>
-        status.phase === 'failed' ? (
-          <Button
-            className={controls.field}
-            aria-describedby={descriptionId}
-            onClick={() => void backend.retry()}
-          >
-            {t('update.backendRetry')}
-          </Button>
-        ) : null
-      }
+      {status.control}
     </SettingsRow>
+  );
+}
+
+/** 引导里的本地服务状态卡。随第 4 步一起出现的不播放动效，后来才开始准备的，按列表增加的方式播放进场动效 */
+function BackendStatusCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const status = useBackendStatus();
+  const shownWithStep = useRef(status !== null);
+  const insert = useInsertMotion<HTMLDivElement>(!shownWithStep.current);
+  if (!status) return null;
+  return (
+    <div ref={insert}>
+      <SettingsCard
+        icon={<Server20Regular />}
+        title={t('update.backendTitle')}
+        description={status.description}
+        error={status.error}
+        feedback={status.feedback}
+      >
+        {status.control}
+      </SettingsCard>
+    </div>
   );
 }
 
@@ -268,8 +311,9 @@ const useOnboardingStyles = makeStyles({
 });
 
 /**
- * 引导向导更新配置步：变更策略即时持久化，选择定时提醒或自动下载时触发即时检查
- * 触发首次检查后挂载更新状态卡片，后续切回手动检查仍持续保留
+ * 引导向导更新配置步：变更策略即时持久化，选择定时提醒或自动下载时触发即时检查。
+ * 触发首次检查后挂载更新状态卡片，后续切回手动检查仍持续保留。最后是本地服务的准备状态，与更新方式无关，
+ * 前端带着本地服务描述时才显示
  */
 function OnboardingUpdate() {
   const t = useAtomValueRawSync(translateAtom);
@@ -321,6 +365,7 @@ function OnboardingUpdate() {
           <UpdateStatusCard quiet beforeRestart={() => onboarding.save('completed')} />
         </div>
       )}
+      <BackendStatusCard />
     </>
   );
 }

@@ -28,7 +28,7 @@ export async function loadHostInfo(host: HostInfoFace = fb): Promise<HostInfo> {
 }
 
 /** 主题声明要求的最低组件版本号（与 package.json 的 hostRequirements 一致） */
-export const REQUIRED_HOST_VERSION = '2.1.0';
+export const REQUIRED_HOST_VERSION = '2.2.0';
 
 function versionParts(version: string): number[] | null {
   const match = /^\d+(?:\.\d+)*/.exec(version.trim());
@@ -78,9 +78,11 @@ export function diagnosticText(diagnostics: Diagnostics): string {
   const build = [diagnostics.is64bit ? '64-bit' : '32-bit'];
   if (diagnostics.isPortable) build.push('portable');
   const plugin = `${diagnostics.pluginName} ${diagnostics.pluginVersion}`;
+  // 达标时不写下限：写了会让读报告的人以为版本不够
+  const tooOld = !versionAtLeast(diagnostics.pluginVersion, REQUIRED_HOST_VERSION);
   return [
     `${diagnostics.foobar2000} (${build.join(', ')})`,
-    `${plugin} (requires ${REQUIRED_HOST_VERSION} or later)`,
+    tooOld ? `${plugin} (requires ${REQUIRED_HOST_VERSION} or later)` : plugin,
     ...(diagnostics.windowEffects ? [diagnostics.windowEffects] : []),
   ].join('\n');
 }

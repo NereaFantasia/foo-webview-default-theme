@@ -22,7 +22,7 @@ import { startLyricsDriver, type LyricsClockFace, type LyricsDriver } from './ly
 import type { LyricsMotion } from './lyricsMotion.ts';
 import {
   alignLyricLines,
-  lyricsFontFamily,
+  lyricsFontStyle,
   lyricsProcessConfig,
   type LyricsDisplay,
 } from './lyricsDisplay.ts';
@@ -241,6 +241,7 @@ function AnimatedLyrics({
     player,
     fontSize,
     display?.fontFamily,
+    display?.fontWeight,
     display?.translationFontSize,
     display?.showTranslation,
     display?.showRomanization,
@@ -248,7 +249,7 @@ function AnimatedLyrics({
   ]);
 
   const style: CSSProperties & Record<`--${string}`, string> = {
-    fontFamily: lyricsFontFamily(display?.fontFamily ?? ''),
+    ...lyricsFontStyle(display?.fontFamily ?? '', display?.fontWeight ?? null),
     '--amll-lp-font-size': `${fontSize}px`,
     '--lyrics-transition-duration': `${reduced ? 0 : motion.transitionMs}ms`,
     '--lyrics-transition-curve': curve(motion.transitionCurve),

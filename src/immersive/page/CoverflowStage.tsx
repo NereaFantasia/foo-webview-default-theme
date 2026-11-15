@@ -1,16 +1,11 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { Coverflow } from '../coverflow/Coverflow.tsx';
 import { coverflowLayout } from '../coverflow/slots.ts';
+import { heightTierOf } from '../scene/heightTier.ts';
 import { useSceneFrame } from '../scene/sceneContext.ts';
+import { SurfaceFrame } from '../scene/SurfaceFrame.tsx';
 import { TrackInfo } from '../track-info/TrackInfo.tsx';
-import type { InfoSize } from '../track-info/trackInfoLayout.ts';
 import styles from './CoverflowStage.module.css';
-
-/** 根据窗口高度映射曲目信息字号档位，阈值与分栏预设对齐 */
-function infoSizeOf(height: number): InfoSize {
-  if (height >= 700) return 'large';
-  return height >= 466 ? 'medium' : 'small';
-}
 
 export interface CoverflowStageProps {
   /** 模式关闭淡出状态；等待动效过渡结束后卸载舞台 */
@@ -36,7 +31,7 @@ export function CoverflowStage({ leaving }: CoverflowStageProps) {
     '--cf-top': `${top}px`,
   };
   return (
-    <div ref={root} className={styles.stage} style={style} data-stage="coverflow">
+    <SurfaceFrame ref={root} className={styles.stage} style={style} data-stage="coverflow">
       <Coverflow leaving={leaving} />
       {/* 共享视图过渡标识在退场时交还给预设曲目信息，避免命名冲突 */}
       <div
@@ -44,8 +39,8 @@ export function CoverflowStage({ leaving }: CoverflowStageProps) {
         data-leaving={leaving || undefined}
         style={leaving ? undefined : { viewTransitionName: 'scene-info' }}
       >
-        <TrackInfo size={infoSizeOf(frame.height)} align="center" />
+        <TrackInfo size={heightTierOf(frame.height)} />
       </div>
-    </div>
+    </SurfaceFrame>
   );
 }

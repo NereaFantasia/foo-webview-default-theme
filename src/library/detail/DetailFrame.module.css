@@ -1,5 +1,7 @@
-/* 整页一个滚动区：头部与曲目表一起滚，列头吸在它的顶上。它是定位元素，表格按 offsetTop 量自己在滚动内容里的
-   位置；底部给窄窗的播放栏胶囊让位。 */
+/*
+ * 全页统一滚动容器：头部与曲目列表同步滚动，列头粘性吸顶；
+ * 容器作为定位参考，表格通过 offsetTop 计算自身在滚动内容中的偏移量，底部为窄屏播放栏预留安全间距
+ */
 .root {
   --bg-chip: color-mix(in oklab, var(--colorNeutralForeground1) 6%, transparent);
   display: grid;
@@ -42,7 +44,49 @@
   display: flow-root;
 }
 
-/* 背景随页头和工具行的高度收尾，在列头之前完全透明 */
+/*
+ * 背景全幅图与光晕处于同一层：覆盖滚动条预留区域，高度跟随页头
+ * 背景图随内容同步滚动，不应用 --header-background-scroll（该系数仅控制光晕，悬浮导航形态下外壳设为 0 以固定光晕）；
+ * 环境不支持滚动时间线时，背景图回退至随内容 1:1 同步平移
+ */
+.root > .backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  overflow: clip;
+  pointer-events: none;
+  translate: 0 var(--detail-scroll-y, 0px);
+}
+
+/*
+ * 视差淡出：向下滚动时背景图以半速平移营造景深，透明度线性递减，完成一个页头高度的滚动后完全隐去
+ * 下方光晕取样自同一图像，在图淡出后持续承接页面基调色；仅涉及合成线程处理的位移与透明度变化，避免重绘与模糊重算
+ * 由滚动时间线驱动；开启减弱动态效果时退回常规平移；淡出区间取页头高与总滚动范围较小值，避免页面偏短时停留于半透明状态
+ */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .root {
+      timeline-scope: --detail-scroll;
+    }
+    .scroller {
+      scroll-timeline: --detail-scroll block;
+    }
+    .root > .backdrop {
+      translate: none;
+      animation: recede linear both;
+      animation-timeline: --detail-scroll;
+      animation-range: 0px min(var(--detail-intro-height, 520px), 100%);
+    }
+  }
+}
+@keyframes recede {
+  to {
+    translate: 0 calc(var(--detail-intro-height, 520px) * -0.5);
+    opacity: 0;
+  }
+}
+
+/* 光晕背景跟随页头与工具栏高度收尾，在曲目表列头前过渡至完全透明 */
 .root > .glow {
   translate: 0 calc(var(--detail-scroll-y, 0px) * var(--header-background-scroll, 1));
   overflow: clip;
@@ -53,4 +97,29 @@
     color-mix(in srgb, var(--colorNeutralForeground1) 20%, transparent) 80%,
     transparent
   );
+}
+
+/*
+ * 存在整幅头图时，顶部区域被头图覆盖；色块改为贴紧光晕层底部，承接头图下方的渐隐过渡（参考 `GLOW_REACH` 延伸量）
+ * 遮罩上下两端透明、中间不透明，消除顶部硬边缘并平滑淡出底部
+ */
+.root[data-backdrop] > .glow {
+  /*
+   * 滚动平移至色块顶边接触视口顶部后保持吸附（由 --detail-glow-stick 指定距离），后续内容在上方滑过
+   * 此处不应用 --header-background-scroll，确保光晕与头图平移同步并在吸附后贴合于顶部导航栏下方
+   */
+  translate: 0 max(var(--detail-scroll-y, 0px), -1 * var(--detail-glow-stick, 0px));
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--colorNeutralForeground1) 30%,
+    var(--colorNeutralForeground1) 80%,
+    transparent
+  );
+}
+
+.root[data-backdrop] > .glow > :first-child {
+  position: absolute;
+  inset: auto 0 0;
+  height: min(var(--detail-glow-bloom, 400px), 100%);
 }

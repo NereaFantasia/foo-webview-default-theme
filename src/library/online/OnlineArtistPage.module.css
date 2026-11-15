@@ -1,0 +1,73 @@
+/* 头部以下的几块：外框给左右与底部留白，这里只管块与块的间距；热门歌曲按整行的宽度定栏数，容器设在这一层 */
+.sections {
+  container: artist-detail / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXL);
+  min-width: 0;
+}
+.sections > * {
+  flex-shrink: 0;
+}
+
+/* 节标题与右侧的「显示全部」同一行 */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  margin-bottom: var(--spacingVerticalM);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+
+/* 标题就是按钮：悬停与按下只在标题范围出状态层；左边的内边距用负外边距抵掉，文字仍与网格左缘对齐 */
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  margin: 0 0 0 calc(-1 * var(--spacingHorizontalS));
+  padding: 0 var(--spacingHorizontalXS) 0 var(--spacingHorizontalS);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+.open:hover {
+  background: var(--state-hover);
+}
+.open:active {
+  background: var(--state-pressed);
+}
+.open:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+.arrow {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* 读取中只有一个转圈，不画骨架、不写字 */
+.spinner {
+  padding: var(--spacingVerticalXXXL) 0;
+}
+
+/* 简介块与平台统计一行 */
+.about {
+  display: grid;
+  gap: var(--spacingVerticalM);
+  min-width: 0;
+}
+.facts {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}

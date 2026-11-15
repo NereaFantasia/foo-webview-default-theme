@@ -18,6 +18,7 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { SurfacePresence } from './SurfacePresence.tsx';
 import { CURVE, durationVar } from './timing.ts';
 import { MENU_SURFACE_MOTION } from './MenuMotion.tsx';
+import { useBlockPage } from './useBlockPage.ts';
 import { MENU_OVERLAP } from '../theme/menuStyles.ts';
 
 /**
@@ -61,11 +62,14 @@ export function Menu(props: ComponentProps<typeof FluentMenu>) {
   useEffect(() => {
     if (parentId && !parentOpen) setOpen(false);
   }, [parentId, parentOpen]);
+  const shown = parentId && !parentOpen ? false : (props.open ?? open);
+  // 子菜单随上一级：页面由最外一级挡
+  useBlockPage(shown && !parentId);
   return (
     <FluentMenu
       hoverDelay={400}
       {...props}
-      open={parentId && !parentOpen ? false : (props.open ?? open)}
+      open={shown}
       onOpenChange={(event, data) => {
         setOpen(data.open);
         props.onOpenChange?.(event, data);
@@ -81,7 +85,18 @@ export function Menu(props: ComponentProps<typeof FluentMenu>) {
 }
 
 export function Popover(props: ComponentProps<typeof FluentPopover>) {
-  return <FluentPopover surfaceMotion={FLYOUT_MOTION} {...props} />;
+  const [open, setOpen] = useState(props.defaultOpen ?? false);
+  useBlockPage(props.open ?? open);
+  return (
+    <FluentPopover
+      surfaceMotion={FLYOUT_MOTION}
+      {...props}
+      onOpenChange={(event, data) => {
+        setOpen(data.open);
+        props.onOpenChange?.(event, data);
+      }}
+    />
+  );
 }
 
 export function Dialog(props: ComponentProps<typeof FluentDialog>) {

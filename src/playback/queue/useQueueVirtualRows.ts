@@ -14,13 +14,30 @@ function layoutTop(element: HTMLElement): number {
   return top;
 }
 
-/** 与表格共用粘性视口，合成线程先滚动时保留上一帧，脚本补齐行带后再对齐 */
+/** 平常在视口上下各多挂载的行数；原生滚动时没有粘性视口兜底，缓冲要大得多（见 `useQueueVirtualRows`） */
+const OVERSCAN_STICKY = 8;
+const OVERSCAN_NATIVE = 20;
+
+export interface QueueVirtualRowsOptions {
+  /**
+   * 缺省开：与表格共用粘性视口，合成线程先滚动时保留上一帧，脚本补齐行带后再对齐，快速拖滚动条也不露空白
+   * 关掉时行直接画在列表里，随滚动内容由浏览器原生滚动，不再有每个滚动事件都改一次的行带平移
+   * 行带下面垫着别的合成层（窗口背景、阅读面的毛玻璃）时会因重叠被单独合成，平移落在小数设备像素上，
+   * 非整数缩放下滚动停下后文字发糊，要等某次重绘才变清；原生滚动没有这一层。代价是快速拖滚动条时补画不及，
+   * 会短暂露出空白
+   */
+  readonly sticky?: boolean;
+}
+
 export function useQueueVirtualRows(
   root: RefObject<HTMLElement | null>,
   count: number,
   scrollRoot?: RefObject<HTMLElement | null>,
+  { sticky = true }: QueueVirtualRowsOptions = {},
 ) {
   const rowHeight = useQueueRowHeight();
+  // 不用粘性视口时交给它一个永远是空的滚动容器引用，它的监听就挂不上
+  const unused = useRef<HTMLElement | null>(null);
   const element = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLElement | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
@@ -61,11 +78,13 @@ export function useQueueVirtualRows(
       element.current?.closest('[data-queue-page]')?.parentElement ??
       null,
     estimateSize: () => rowHeight,
-    overscan: 8,
+    // 粘性视口在合成线程先滚动时会留着上一帧，脚本补齐行带之前不露空白；原生滚动没有这层兜底，拖得比挂载快就会露出
+    // 没挂行的空白，只能靠更大的预渲染缓冲：快速拖动时合成线程在已挂载的行上多滚一阵，脚本来得及补上
+    overscan: sticky ? OVERSCAN_STICKY : OVERSCAN_NATIVE,
     scrollMargin: margin,
   });
   const totalSize = virtualizer.getTotalSize();
-  useStickyViewport(scroller, viewport, strip, {
+  useStickyViewport(sticky ? scroller : unused, viewport, strip, {
     margin,
     header: 0,
     stickyTop: 0,

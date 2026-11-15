@@ -1,6 +1,7 @@
 import { sameTrackFilter, type TrackFilter } from '../../track/trackFilter.ts';
+import { useCopied } from '../../track/syntax/syntaxCopy.ts';
 import { Body1, Button, Subtitle2 } from '@fluentui/react-components';
-import { Search32Regular } from '@fluentui/react-icons';
+import { Checkmark16Regular, Copy16Regular, Search32Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useCallback, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -59,6 +60,7 @@ export function SongsPage() {
   const { status: albumsStatus, enabled } = useAtomValueRawSync(albumsAtom);
   const model = useSongsPage();
   const { rows, library, filter, query, view, albumOf } = model;
+  const [queryCopied, copyQuery] = useCopied();
   const { ranges } = useAtomValueRawSync(model.selection.state);
   const handle = useRef<TrackTableHandle>(null);
   const [menuAt, setMenuAt] = useState<TablePoint | null>(null);
@@ -112,7 +114,14 @@ export function SongsPage() {
     menuCurrent.current = () =>
       sameRanges(selection, store.get(model.selection.state).ranges) &&
       store.get(songsRowsAtom).generation === generation;
-    void albumList.menu.prepare(tracks, view.trackAt(target.index), library.stamp);
+    const anchor = view.trackAt(target.index);
+    void albumList.menu.prepare(
+      tracks,
+      anchor,
+      library.stamp,
+      anchor &&
+        (() => void songs.actions.play(model.run, { row: target.index, handle: anchor.handle })),
+    );
     setMenuAt(at);
   };
 
@@ -195,6 +204,16 @@ export function SongsPage() {
                       count: numbers.format(rows.handles.length),
                       total: numbers.format(library.byHandle.size),
                     })}
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    className={controls.icon}
+                    icon={queryCopied ? <Checkmark16Regular /> : <Copy16Regular />}
+                    onClick={() => copyQuery(query.query)}
+                    data-filter-copy-query
+                  >
+                    {t('songs.copyQuery')}
+                  </Button>
                   <Button
                     size="small"
                     appearance="subtle"

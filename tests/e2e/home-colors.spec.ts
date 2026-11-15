@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openHome } from '../fixtures/homePage.ts';
-import { albumsAnswer, allTracksAnswer, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
+import { albumsAnswer, albumsTracks, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { stringParam } from '../fixtures/hostAnswers.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 async function openColoredHome(
   page: Page,
@@ -42,7 +43,7 @@ async function openColoredHome(
   const home = await openHome(page, {
     configure(host) {
       host.answer('library.getAlbums', albumsAnswer(albums));
-      host.answer('library.getAll', allTracksAnswer(albums));
+      host.answer('library.search', wholeLibrary(albumsTracks(albums)));
       host.answer('artwork.getFb2kUrlByPath', (params) => {
         const path = stringParam(params, 'path');
         const index = albums.findIndex((album) => album.firstTrackPath === path);
@@ -56,13 +57,21 @@ async function openColoredHome(
       });
     },
   });
-  const section = (name: string) => home.view.getByRole('region', { name, exact: true });
-  const card = (name: string, index: number) =>
-    section(name).locator('[data-home-album]').nth(index);
+  // 带专辑取色的卡片只在最近添加一行；三张依次是红、蓝、灰
+  const card = (index: number) =>
+    home.view
+      .getByRole('region', { name: '最近添加', exact: true })
+      .locator('[data-home-album]')
+      .nth(index);
   return { ...home, analysis, card, releaseRed };
 }
 
 // 键没有被悬停、聚焦时淡出后隐藏，按名字取不到，所以按属性取
+// 全局取色的播放键：快捷入口里最近播放的专辑那一格上的，不在带取色的卡片里；淡出时按名字取不到，按属性取
+function globalPlay(view: Locator) {
+  return view.locator('[data-home-section="quick"] button[aria-label^="播放 "]').first();
+}
+
 function playOf(card: Locator) {
   return card.locator('[data-tile-play]');
 }
@@ -82,39 +91,37 @@ function brandColor(button: Locator) {
 }
 
 for (const scheme of ['light', 'dark'] as const) {
-  test(`首页三个专辑区的局部取色与全局隔离 ${scheme}`, async ({ page }) => {
+  test(`最近添加的局部取色与全局隔离 ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     const { view, card, analysis, errors } = await openColoredHome(page);
-    const shuffle = view.getByRole('button', { name: '全库随机', exact: true });
+    const shuffle = globalPlay(view);
     const basePlay = await playColor(shuffle);
     const baseBrand = await brandColor(shuffle);
     expect(analysis).toEqual([]);
-    for (const section of ['探索音乐', '最近添加', '最近听过']) {
-      const red = card(section, 0);
-      const blue = card(section, 1);
-      await red.hover();
-      await expect.poll(() => playColor(playOf(red))).not.toBe(basePlay);
-      await expect.poll(() => brandColor(moreOf(red))).not.toBe(baseBrand);
-      const redPlay = await playColor(playOf(red));
-      const redBrand = await brandColor(moreOf(red));
-      expect(await playColor(playOf(blue))).toBe(basePlay);
-      await blue.hover();
-      await expect.poll(() => playColor(playOf(blue))).not.toBe(basePlay);
-      expect(await playColor(playOf(blue))).not.toBe(redPlay);
-      expect(await brandColor(moreOf(blue))).not.toBe(redBrand);
-      await expect.poll(() => playColor(playOf(red))).toBe(basePlay);
-      expect(await playColor(shuffle)).toBe(basePlay);
-      expect(await brandColor(shuffle)).toBe(baseBrand);
-    }
+    const red = card(0);
+    const blue = card(1);
+    await red.hover();
+    await expect.poll(() => playColor(playOf(red))).not.toBe(basePlay);
+    await expect.poll(() => brandColor(moreOf(red))).not.toBe(baseBrand);
+    const redPlay = await playColor(playOf(red));
+    const redBrand = await brandColor(moreOf(red));
+    expect(await playColor(playOf(blue))).toBe(basePlay);
+    await blue.hover();
+    await expect.poll(() => playColor(playOf(blue))).not.toBe(basePlay);
+    expect(await playColor(playOf(blue))).not.toBe(redPlay);
+    expect(await brandColor(moreOf(blue))).not.toBe(redBrand);
+    await expect.poll(() => playColor(playOf(red))).toBe(basePlay);
+    expect(await playColor(shuffle)).toBe(basePlay);
+    expect(await brandColor(shuffle)).toBe(baseBrand);
     expect(errors).toEqual([]);
   });
 }
 
 test('键盘焦点与菜单保持当前卡片取色，关闭后正确释放', async ({ page }) => {
   const { view, card } = await openColoredHome(page);
-  const red = card('探索音乐', 0);
-  const duplicate = card('最近添加', 0);
-  const shuffle = view.getByRole('button', { name: '全库随机', exact: true });
+  const red = card(0);
+  const blue = card(1);
+  const shuffle = globalPlay(view);
   const base = await playColor(shuffle);
   await page.mouse.move(0, 0);
   await red.getByRole('button', { name: 'Abbey Road', exact: true }).first().focus();
@@ -131,22 +138,22 @@ test('键盘焦点与菜单保持当前卡片取色，关闭后正确释放', as
   await expect(menu).toBeVisible();
   await expect.poll(() => brandColor(menu)).toBe(brand);
   expect(await playColor(playOf(red))).toBe(color);
-  expect(await playColor(playOf(duplicate))).toBe(base);
+  expect(await playColor(playOf(blue))).toBe(base);
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(moreOf(red)).toBeFocused();
   expect(await playColor(playOf(red))).toBe(color);
-  await shuffle.focus();
+  await view.getByRole('button', { name: '编辑首页', exact: true }).focus();
   await expect.poll(() => playColor(playOf(red))).toBe(base);
 });
 
 for (const mode of ['gray', 'missing', 'unreadable'] as const) {
   test(`灰图、缺图与分析失败不借用上一张的颜色 ${mode}`, async ({ page }) => {
     const { view, card, analysis } = await openColoredHome(page, mode);
-    const base = await playColor(view.getByRole('button', { name: '全库随机', exact: true }));
-    await card('探索音乐', 0).hover();
-    await expect.poll(() => playColor(playOf(card('探索音乐', 0)))).not.toBe(base);
-    const fallback = card('探索音乐', 2);
+    const base = await playColor(globalPlay(view));
+    await card(0).hover();
+    await expect.poll(() => playColor(playOf(card(0)))).not.toBe(base);
+    const fallback = card(2);
     await fallback.hover();
     if (mode !== 'missing') {
       await expect.poll(() => analysis.includes(2)).toBe(true);
@@ -159,16 +166,16 @@ for (const mode of ['gray', 'missing', 'unreadable'] as const) {
       });
     }
     await expect.poll(() => playColor(playOf(fallback))).toBe(base);
-    await expect.poll(() => playColor(playOf(card('探索音乐', 0)))).toBe(base);
-    await expect(view.getByRole('button', { name: '全库随机', exact: true })).toBeEnabled();
+    await expect.poll(() => playColor(playOf(card(0)))).toBe(base);
+    await expect(view.getByRole('button', { name: /全库随机/ })).toBeEnabled();
   });
 }
 
 test('快速划过时迟到分析不染回旧卡片，也不覆盖新卡片', async ({ page }) => {
   const { view, card, analysis, releaseRed } = await openColoredHome(page, 'delayed');
-  const base = await playColor(view.getByRole('button', { name: '全库随机', exact: true }));
-  const red = card('探索音乐', 0);
-  const blue = card('探索音乐', 1);
+  const base = await playColor(globalPlay(view));
+  const red = card(0);
+  const blue = card(1);
   try {
     await red.hover();
     await expect.poll(() => analysis.includes(0)).toBe(true);

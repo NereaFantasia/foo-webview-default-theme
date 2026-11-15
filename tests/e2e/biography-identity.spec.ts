@@ -13,17 +13,18 @@ import {
   releaseGroupsSample,
   searchSample,
 } from '../fixtures/musicbrainzSamples.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
 import { enterSettings } from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { expandBiographyArticle } from '../fixtures/biographyActions.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 const QUEEN = '0383dadf-2a4e-4d10-a46a-e9e041da8eb3';
 const OTHER_QUEEN = '5b0c3d4e-1f2a-4b3c-8d4e-5f6a7b8c9d0e';
 const KEY = '0123456789abcdef0123456789abcdef';
 
 const panel = (page: Page) => page.locator('[data-biography]');
-const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true });
 
 function json(body: unknown) {
   return {
@@ -75,6 +76,7 @@ function musicbrainz(url: URL, matching: string | null) {
 async function start(page: Page, matching: string | null): Promise<PlayerPage> {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const player = await openPlayer(page, {
+    config: LASTFM_SOURCE_CONFIG,
     state: { track: makeTrack({ artist: 'Queen', title: 'Bohemian Rhapsody' }) },
   });
   player.host.answer(
@@ -109,8 +111,7 @@ async function enableOnline(page: Page) {
 }
 
 async function openBiography(page: Page) {
-  await page.locator('[data-right-card-key="queue"]').click();
-  await tab(page, '简介').click();
+  await openRightCardPage(page, 'bio');
   await expect(panel(page)).toBeVisible();
 }
 

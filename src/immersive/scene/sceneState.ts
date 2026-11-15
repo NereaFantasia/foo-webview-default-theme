@@ -35,6 +35,8 @@ export interface SceneEnv {
   readonly sidebarFits: boolean;
   /** 歌词搜索展开态：展开时歌词页禁用自动居中以保留操作面板 */
   readonly searching: boolean;
+  /** 没有歌词时自动收起侧栏。不给时按开启处理（纯函数的缺省），由宿主按偏好给出，偏好缺省是关闭 */
+  readonly autoCollapse?: boolean;
 }
 
 export interface SceneView {
@@ -120,8 +122,8 @@ export function settleView(
 /**
  * 依据场景交互状态与环境事实推导瞬时视图结构
  *
- * 歌词请求期间沿用前序自动居中状态，避免切歌时短暂闪烁；
- * 队列与历史页常驻展示侧栏；搜索面板开启时不触发自动居中
+ * 歌词请求期间沿用前序自动居中状态以避免切歌闪烁。
+ * 播放队列与历史页常驻展开侧栏。歌词搜索面板展开时不触发自动居中。`autoCollapse` 为假时，无歌词亦不执行自动居中收起
  */
 export function deriveSceneView(
   state: SceneState,
@@ -130,6 +132,7 @@ export function deriveSceneView(
 ): SceneView {
   const onLyrics = state.page === 'lyrics';
   const autoCentered =
+    env.autoCollapse !== false &&
     onLyrics &&
     !env.searching &&
     (env.lyrics === 'absent' || (env.lyrics === 'pending' && !!previous?.autoCentered));

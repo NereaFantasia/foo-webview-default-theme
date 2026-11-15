@@ -30,8 +30,9 @@ export const genresEn = {
   'genres.openSongs': 'Open in Songs',
   'genres.copy': 'Copy genre names',
   'genres.multiple': '{count} genres',
-  'genres.duplicate': 'Similar genre names',
-  'genres.combined': 'Multiple genres in one tag value',
+  'genres.duplicate': 'Possible duplicate of {name}',
+  'genres.combined': 'Multiple genres in one tag value: {parts}',
+  'genres.ignore': 'Ignore this suggestion',
   'genres.tidyHint': 'Genre tags can be edited in track properties',
   'genres.unsupported':
     'This name contains a quote or wildcard and cannot be used as an exact query.',

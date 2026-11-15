@@ -1,10 +1,13 @@
 import { atom } from 'jotai/vanilla';
 import { defineConfigPref } from '../../host/configPref.ts';
+import { fontWeightOf } from '../../kit/variableFont.ts';
+import { LYRICS_MOTION_PRESET_VALUES } from '../lyricsMotion.ts';
+import { fontNameOf } from '../../theme/fontStack.ts';
 
 export const DESKTOP_LYRICS_ALIGNS = ['left', 'center', 'right'] as const;
 export type DesktopLyricsAlign = (typeof DESKTOP_LYRICS_ALIGNS)[number];
 
-export const DESKTOP_LYRICS_MOTION_PRESETS = ['amll', 'winui'] as const;
+export const DESKTOP_LYRICS_MOTION_PRESETS = ['amll', 'winui', 'custom'] as const;
 export type DesktopLyricsMotionPreset = (typeof DESKTOP_LYRICS_MOTION_PRESETS)[number];
 export const DESKTOP_LYRICS_MODES = ['multi', 'single'] as const;
 export type DesktopLyricsMode = (typeof DESKTOP_LYRICS_MODES)[number];
@@ -15,11 +18,17 @@ export interface DesktopLyricsSizeMemory {
   readonly height: number;
 }
 
-export const DESKTOP_LYRICS_SIZES = ['small', 'medium', 'large', 'xlarge'] as const;
+export const DESKTOP_LYRICS_SIZES = ['small', 'medium', 'large', 'xlarge', 'custom'] as const;
 export type DesktopLyricsSize = (typeof DESKTOP_LYRICS_SIZES)[number];
 
-/** 当前行的字号，CSS 像素 */
-export const DESKTOP_LYRICS_FONT_SIZES: Readonly<Record<DesktopLyricsSize, number>> = {
+/** 自定义字号与自定义译文字号的取值范围，CSS 像素 */
+export const DESKTOP_LYRICS_SIZE_RANGE = { min: 12, max: 96 } as const;
+export const DESKTOP_LYRICS_TRANSLATION_RANGE = { min: 10, max: 96 } as const;
+
+/** 前四档的当前行字号，CSS 像素；`custom` 取偏好里的 `customSize` */
+export const DESKTOP_LYRICS_FONT_SIZES: Readonly<
+  Record<Exclude<DesktopLyricsSize, 'custom'>, number>
+> = {
   small: 28,
   medium: 34,
   large: 42,
@@ -44,15 +53,34 @@ export interface DesktopLyricsBounds {
 export const DESKTOP_LYRICS_HOTKEYS = ['toggle', 'lock'] as const;
 export type DesktopLyricsHotkey = (typeof DESKTOP_LYRICS_HOTKEYS)[number];
 
+/** 自定义动效的四项，只对多行窗口生效；单行的动效不读它们（见 `desktopMotion`） */
+export interface DesktopMotionCustom {
+  readonly blur: boolean;
+  readonly scale: boolean;
+  readonly hidePassedLines: boolean;
+  /** 当前行对齐到窗口的位置，从上往下的比例，0 到 1 */
+  readonly alignPosition: number;
+}
+
 export interface DesktopLyricsPref {
   /** 上次退出时开着，下次启动照样打开 */
   readonly open: boolean;
   readonly locked: boolean;
   readonly align: DesktopLyricsAlign;
   readonly motionPreset: DesktopLyricsMotionPreset;
+  /** 动效选「自定义」时的四项；null 是还没自定义过，第一次切到自定义时以当时的预设为起点 */
+  readonly motionCustom: DesktopMotionCustom | null;
   readonly mode: DesktopLyricsMode;
   readonly multilineSize: DesktopLyricsSizeMemory | null;
   readonly size: DesktopLyricsSize;
+  /** `size` 为 `custom` 时的当前行字号，CSS 像素 */
+  readonly customSize: number;
+  /** 译文字号，CSS 像素；null 是随正文缩放（正文的 0.6 倍） */
+  readonly translationSize: number | null;
+  /** 桌面歌词的字体；空串沿用界面字体 */
+  readonly fontFamily: string;
+  /** 字重，只对可变字体有意义；null 沿用继承的字重 */
+  readonly fontWeight: number | null;
   readonly palette: DesktopLyricsPalette;
   readonly background: DesktopLyricsBackground;
   /** 底板的不透明度，0.1 到 1 */
@@ -78,9 +106,14 @@ export const DEFAULT_DESKTOP_LYRICS: DesktopLyricsPref = {
   locked: false,
   align: 'center',
   motionPreset: 'amll',
+  motionCustom: null,
   mode: 'multi',
   multilineSize: null,
   size: 'medium',
+  customSize: 40,
+  translationSize: null,
+  fontFamily: '',
+  fontWeight: null,
   palette: 'follow',
   background: 'plate',
   plateOpacity: 0.7,
@@ -95,12 +128,34 @@ export const DEFAULT_DESKTOP_LYRICS: DesktopLyricsPref = {
   hotkeys: { toggle: '', lock: '' },
 };
 
+/** 自定义动效缺项时的底：AMLL 档的这四项，当前行位置照桌面固定的居中 */
+const AMLL_CUSTOM: DesktopMotionCustom = {
+  blur: LYRICS_MOTION_PRESET_VALUES.amll.blur,
+  scale: LYRICS_MOTION_PRESET_VALUES.amll.scale,
+  hidePassedLines: LYRICS_MOTION_PRESET_VALUES.amll.hidePassedLines,
+  alignPosition: 0.5,
+};
+
 const HEX = /^#[0-9a-f]{6}$/i;
 /**
- * 修饰键至少一个，末尾一个不是修饰键的键名；单独的功能键也收。键名本身由宿主认，这里只挡明显不成样子的值
+ * 至少一个修饰键，末尾是一个非修饰键的键名。键名本身由宿主校验，这里只拦截明显不合格式的值
  */
 const CHORD =
-  /^(?:(?:Ctrl|Alt|Shift|Win)\+){1,4}(?!(?:Ctrl|Alt|Shift|Win)$)(?:[A-Za-z0-9]{1,9}|[-=[\];',./\\])$|^F(?:[1-9]|1[0-2])$/;
+  /^((?:(?:Ctrl|Alt|Shift|Win)\+){1,4})((?!(?:Ctrl|Alt|Shift|Win)$)(?:[A-Za-z0-9]{1,9}|[-=[\];',./\\]))$/;
+
+/** 宿主的系统热键拒收的组合：文本编辑与窗口切换的常用键。修饰键按 Ctrl、Alt、Shift、Win 的次序书写，键名大写 */
+const REFUSED_CHORDS: ReadonlySet<string> = new Set([
+  'CTRL+A',
+  'CTRL+C',
+  'CTRL+V',
+  'CTRL+X',
+  'CTRL+Y',
+  'CTRL+Z',
+  'CTRL+SHIFT+Z',
+  'ALT+F4',
+  'ALT+TAB',
+  'ALT+SPACE',
+]);
 
 function field(raw: unknown, key: string): unknown {
   return typeof raw === 'object' && raw !== null && !Array.isArray(raw)
@@ -120,8 +175,15 @@ function color(raw: unknown): string {
   return typeof raw === 'string' && HEX.test(raw) ? raw.toLowerCase() : '';
 }
 
+/** 宿主接受的系统热键：要带 Ctrl、Alt 或 Win（只有 Shift 不行，单独的功能键也不行），且不在拒收的组合里 */
 export function isHotkeyChord(raw: unknown): raw is string {
-  return typeof raw === 'string' && CHORD.test(raw);
+  const match = typeof raw === 'string' ? CHORD.exec(raw) : null;
+  if (!match) return false;
+  const [, prefix = '', key = ''] = match;
+  const held = new Set(prefix.toUpperCase().split('+').filter(Boolean));
+  if (!held.has('CTRL') && !held.has('ALT') && !held.has('WIN')) return false;
+  const ordered = ['CTRL', 'ALT', 'SHIFT', 'WIN'].filter((name) => held.has(name));
+  return !REFUSED_CHORDS.has([...ordered, key.toUpperCase()].join('+'));
 }
 
 /** 换算按键要用到的几项；浏览器的 `KeyboardEvent` 满足它 */
@@ -191,6 +253,25 @@ function integer(raw: unknown, min: number, max: number): number | null {
     : null;
 }
 
+/** 逐项校验；缺项或不合法的项取 AMLL 档的值 */
+export function parseMotionCustom(raw: unknown, base: DesktopMotionCustom): DesktopMotionCustom {
+  const position = field(raw, 'alignPosition');
+  return {
+    blur: flag(field(raw, 'blur'), base.blur),
+    scale: flag(field(raw, 'scale'), base.scale),
+    hidePassedLines: flag(field(raw, 'hidePassedLines'), base.hidePassedLines),
+    alignPosition:
+      typeof position === 'number' && Number.isFinite(position)
+        ? Math.round(Math.min(1, Math.max(0, position)) * 100) / 100
+        : base.alignPosition,
+  };
+}
+
+/** 当前行的字号，CSS 像素 */
+export function desktopFontSizeOf(pref: Pick<DesktopLyricsPref, 'size' | 'customSize'>): number {
+  return pref.size === 'custom' ? pref.customSize : DESKTOP_LYRICS_FONT_SIZES[pref.size];
+}
+
 /** 屏幕坐标可以是负的（主屏左边、上边的屏）；尺寸太小或离谱时当没记过 */
 export function parseDesktopLyricsBounds(raw: unknown): DesktopLyricsBounds | null {
   const x = integer(field(raw, 'x'), -100_000, 100_000);
@@ -222,9 +303,26 @@ export function parseDesktopLyricsPref(raw: unknown): DesktopLyricsPref {
     locked: flag(field(raw, 'locked'), d.locked),
     align: choice(DESKTOP_LYRICS_ALIGNS, field(raw, 'align'), d.align),
     motionPreset: choice(DESKTOP_LYRICS_MOTION_PRESETS, field(raw, 'motionPreset'), d.motionPreset),
+    motionCustom:
+      field(raw, 'motionCustom') === undefined || field(raw, 'motionCustom') === null
+        ? null
+        : parseMotionCustom(field(raw, 'motionCustom'), AMLL_CUSTOM),
     mode: choice(DESKTOP_LYRICS_MODES, field(raw, 'mode'), d.mode),
     multilineSize: parseDesktopLyricsSizeMemory(field(raw, 'multilineSize')),
     size: choice(DESKTOP_LYRICS_SIZES, field(raw, 'size'), d.size),
+    customSize:
+      integer(
+        field(raw, 'customSize'),
+        DESKTOP_LYRICS_SIZE_RANGE.min,
+        DESKTOP_LYRICS_SIZE_RANGE.max,
+      ) ?? d.customSize,
+    translationSize: integer(
+      field(raw, 'translationSize'),
+      DESKTOP_LYRICS_TRANSLATION_RANGE.min,
+      DESKTOP_LYRICS_TRANSLATION_RANGE.max,
+    ),
+    fontFamily: fontNameOf(field(raw, 'fontFamily')),
+    fontWeight: fontWeightOf(field(raw, 'fontWeight')),
     palette: choice(DESKTOP_LYRICS_PALETTES, field(raw, 'palette'), d.palette),
     background: choice(DESKTOP_LYRICS_BACKGROUNDS, field(raw, 'background'), d.background),
     plateOpacity:
@@ -249,6 +347,7 @@ function toConfig(pref: DesktopLyricsPref) {
     bounds: pref.bounds && { ...pref.bounds },
     multilineSize: pref.multilineSize && { ...pref.multilineSize },
     hotkeys: { ...pref.hotkeys },
+    motionCustom: pref.motionCustom && { ...pref.motionCustom },
   };
 }
 

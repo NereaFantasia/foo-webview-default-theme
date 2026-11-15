@@ -3,6 +3,8 @@ import { atom, type Atom } from 'jotai/vanilla';
 import type { Store } from '../../kit/store.ts';
 import { currentTrackAtom, playbackAtom } from '../playback.ts';
 import { trackKeyOf, type PlaybackState } from '../playbackContract.ts';
+import { isFresh, skipIntentAtom, type SkipIntent } from '../skipIntent.ts';
+import type { SwapNeighbors } from './swapNeighbors.ts';
 
 /**
  * 换曲的过渡要知道的事：这一次换的是什么、往哪翻、封面要不要换。播放栏三种形态读同一份记录，各自按它放
@@ -26,38 +28,13 @@ export interface TrackSwap {
   readonly at: number;
 }
 
-/** 按了上一首或下一首键之后这么久内换的曲，按键的方向算，毫秒 */
-export const SKIP_INTENT_MS = 2000;
 /** 上一首播到离结尾这么近才换曲，算自然接下一首，秒 */
 export const NATURAL_END_S = 2;
 
-/** 按键留下的方向：连按几下同一个方向，`pending` 就是几，每换一首用掉一下 */
-export interface SkipIntent {
-  readonly direction: 'next' | 'previous';
-  readonly at: number;
-  readonly pending: number;
-}
-
 const INITIAL: TrackSwap = { serial: 0, kind: 'track', direction: 'none', sameCover: false, at: 0 };
 const swapAtom = atom<TrackSwap>(INITIAL);
-const intentAtom = atom<SkipIntent | null>(null);
 
 export const trackSwapAtom: Atom<TrackSwap> = atom((get) => get(swapAtom));
-
-/** 播放栏的上一首、下一首键按下时记一下方向，随后到的换曲按它翻 */
-export function noteSkip(
-  store: Store,
-  direction: SkipIntent['direction'],
-  now: number = performance.now(),
-): void {
-  const last = store.get(intentAtom);
-  const pending = last && last.direction === direction && fresh(last, now) ? last.pending + 1 : 1;
-  store.set(intentAtom, { direction, at: now, pending });
-}
-
-function fresh(intent: SkipIntent, now: number): boolean {
-  return intent.pending > 0 && now - intent.at <= SKIP_INTENT_MS;
-}
 
 /** 流媒体没有文件：电台换曲时只有曲名变，路径不变 */
 function isStream(track: Pick<Track, 'path'>): boolean {
@@ -81,6 +58,8 @@ export function sameAlbum(a: Track, b: Track): boolean {
 
 export interface SwapContext {
   readonly intent: SkipIntent | null;
+  /** 宿主自己执行的换曲（全局快捷键、媒体键、托盘），新一首正是事先料到的下一首或上一首；料不到为 null */
+  readonly neighbor?: 'next' | 'previous' | null;
   readonly now: number;
   /** 上一首最后报的进度与总长，秒 */
   readonly position: number;
@@ -91,8 +70,8 @@ export type SwapPlan = Pick<TrackSwap, 'kind' | 'direction' | 'sameCover'>;
 
 /**
  * 从 `from` 换到 `to` 算不算一次换曲、怎么翻；不算的答 null。同一首的标签被编辑不算；同一路流报了新
- * 曲名或艺人算电台换曲。方向：按键留下的方向还新鲜就用它；否则上一首播到了结尾附近算下一首；
- * 别的来源（列表双击、媒体键、托盘、随机）认不出方向
+ * 曲名或艺人算电台换曲。方向：按键留下的方向还新鲜就用它；否则新一首正是事先料到的下一首、上一首（宿主执行的
+ * 上一首、下一首，与点键同一个方向）；再否则上一首播到了结尾附近算下一首；别的来源（列表双击、随机）认不出方向
  */
 export function swapOf(
   from: Track | null,
@@ -106,19 +85,18 @@ export function swapOf(
   }
   if (!from) return { kind: 'enter', direction: 'none', sameCover: false };
   if (!to) return { kind: 'leave', direction: 'none', sameCover: false };
-  const { intent, now, position, duration } = context;
-  const direction =
-    intent && fresh(intent, now)
-      ? intent.direction
-      : duration > 0 && position >= duration - NATURAL_END_S
-        ? 'next'
-        : 'none';
+  const { intent, now, position, duration, neighbor } = context;
+  const direction = isFresh(intent, now)
+    ? intent.direction
+    : (neighbor ?? (duration > 0 && position >= duration - NATURAL_END_S ? 'next' : 'none'));
   return { kind: 'track', direction, sameCover: sameAlbum(from, to) };
 }
 
 export interface TrackSwapSources {
   readonly track: Atom<Track | null>;
   readonly progress: Atom<Pick<PlaybackState, 'track' | 'position' | 'duration'>>;
+  /** 宿主自己换曲时认方向用；没有就只认按键与自然接下一首 */
+  readonly neighbors?: SwapNeighbors;
 }
 
 export interface TrackSwapService {
@@ -135,8 +113,9 @@ export function startTrackSwap(
   now: () => number = () => performance.now(),
 ): TrackSwapService {
   store.set(swapAtom, INITIAL);
-  store.set(intentAtom, null);
+  store.set(skipIntentAtom, null);
   let shown = store.get(sources.track);
+  sources.neighbors?.advance(shown);
   let position = 0;
   let duration = 0;
 
@@ -149,24 +128,21 @@ export function startTrackSwap(
 
   const follow = () => {
     const next = store.get(sources.track);
-    const intent = store.get(intentAtom);
+    const intent = store.get(skipIntentAtom);
     const at = now();
-    const plan = swapOf(shown, next, { intent, now: at, position, duration });
+    const neighbor = next && sources.neighbors ? sources.neighbors.guess(next.handle) : null;
+    const plan = swapOf(shown, next, { intent, neighbor, now: at, position, duration });
     const moved = trackKeyOf(shown) !== trackKeyOf(next);
     shown = next;
     if (moved) {
       position = 0;
       duration = 0;
       record();
+      sources.neighbors?.advance(next);
     }
     if (!plan) return;
-    if (
-      plan.kind === 'track' &&
-      intent &&
-      fresh(intent, at) &&
-      plan.direction === intent.direction
-    ) {
-      store.set(intentAtom, { ...intent, pending: intent.pending - 1 });
+    if (plan.kind === 'track' && isFresh(intent, at) && plan.direction === intent.direction) {
+      store.set(skipIntentAtom, { ...intent, pending: intent.pending - 1 });
     }
     store.set(swapAtom, { ...plan, serial: store.get(swapAtom).serial + 1, at });
   };

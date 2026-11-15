@@ -39,8 +39,8 @@ export interface CommandSpec {
   readonly keys?: readonly KeyChord[];
   /** `MouseEvent.button` 的值：3 是鼠标后退键，4 是前进键 */
   readonly buttons?: readonly number[];
-  /** 此刻能不能用；不能用的命令不认领输入。缺省恒可用 */
-  enabled?(): boolean;
+  /** 此刻能不能用；不能用的命令不认领输入。缺省恒可用。按键分派时带上这次按键，鼠标键分派时没有 */
+  enabled?(input?: KeyInput): boolean;
   /**
    * 在捕获阶段先接手键盘，赶在挂于 document 捕获阶段的 Fluent 提示之前：打开着的提示会吃掉第一下 Esc
    * 并拦下缺省，冒泡阶段的分派就此跳过。拖动进行中的取消用它，只许 gesture 层
@@ -58,6 +58,8 @@ export interface KeyInput {
   readonly metaKey: boolean;
   /** 输入法正在组字：这时的 Esc、方向键归输入法，不当命令 */
   readonly isComposing: boolean;
+  /** 按住不放时的自动重复；缺省按不是重复算 */
+  readonly repeat?: boolean;
   readonly defaultPrevented: boolean;
   preventDefault(): void;
 }
@@ -104,6 +106,8 @@ export interface CommandRegistry {
    * 拿它列全部快捷键会漏掉别处的
    */
   list(): readonly CommandSpec[];
+  /** 命令登记或注销之后通知一次，不带内容。要知道现在有哪些命令，用 `list()` */
+  subscribe(listener: () => void): () => void;
   /** 摘掉挂在目标上的监听。已登记的命令留着，不再有输入进来 */
   dispose(): void;
 }
@@ -125,13 +129,15 @@ function sameChord(chord: KeyChord, input: KeyInput): boolean {
  */
 export function startCommandRegistry(target: InputTarget | null): CommandRegistry {
   let commands: CommandSpec[] = [];
+  const listeners = new Set<() => void>();
+  const changed = () => listeners.forEach((listener) => listener());
 
-  function pick(claims: (spec: CommandSpec) => boolean): CommandSpec | null {
+  function pick(claims: (spec: CommandSpec) => boolean, key?: KeyInput): CommandSpec | null {
     for (const layer of COMMAND_LAYERS) {
       for (let i = commands.length - 1; i >= 0; i -= 1) {
         const spec = commands[i];
         if (!spec || spec.layer !== layer || !claims(spec)) continue;
-        if (spec.enabled && !spec.enabled()) continue;
+        if (spec.enabled && !spec.enabled(key)) continue;
         return spec;
       }
     }
@@ -157,14 +163,16 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
         throw new Error(`命令 ${spec.id}：early 只给拖动进行中的 gesture 层`);
       }
       commands = [...commands.filter((existing) => existing.id !== spec.id), spec];
+      changed();
       return () => {
         commands = commands.filter((existing) => existing !== spec);
+        changed();
       };
     },
     dispatchKey(input) {
       if (input.defaultPrevented || input.isComposing) return null;
       return runPicked(
-        pick((spec) => spec.keys?.some((chord) => sameChord(chord, input)) ?? false),
+        pick((spec) => spec.keys?.some((chord) => sameChord(chord, input)) ?? false, input),
       );
     },
     dispatchButton(input) {
@@ -172,6 +180,10 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
       return runPicked(pick((spec) => spec.buttons?.includes(input.button) ?? false));
     },
     list: () => commands,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
     dispose() {
       if (!target) return;
       target.removeEventListener('keydown', onKeydown);
@@ -191,6 +203,7 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
       (candidate) =>
         (candidate.early ?? false) &&
         (candidate.keys?.some((chord) => sameChord(chord, event)) ?? false),
+      event,
     );
     if (runPicked(spec)) event.preventDefault();
   }

@@ -34,28 +34,28 @@ describe('流派归属与排序', () => {
   });
   it('升降序都把未填写放最后，按曲数排再按名字打破平局', () => {
     const keys = (desc: boolean) =>
-      filterGenres(entries, '', false, 'tracks', desc, 'en').map((entry) => entry.key);
+      filterGenres(entries, '', undefined, 'tracks', desc, 'en').map((entry) => entry.key);
     expect(keys(false)).toEqual(['Jazz', 'Rock', EMPTY_GENRE]);
     expect(keys(true)).toEqual(['Rock', 'Jazz', EMPTY_GENRE]);
     expect(
-      filterGenres(entries, 'jAz', false, 'name', false, 'en').map((entry) => entry.key),
+      filterGenres(entries, 'jAz', undefined, 'name', false, 'en').map((entry) => entry.key),
     ).toEqual(['Jazz']);
   });
-  it('整理只提示疑似问题，不把逗号或斜线自动拆成多值', () => {
+  it('给出整理提示时只留有提示的流派；逗号与斜线不自动拆成多值', () => {
     const result = buildGenres(
       [one, two, loose],
       new Map([
-        [one.handle, ['Hip-Hop']],
-        [two.handle, ['hip hop']],
+        [one.handle, ['Rock']],
+        [two.handle, ['R&B/Soul']],
         [loose.handle, ['Rock, Soul']],
       ]),
       [],
     );
-    expect(result.map((entry) => [entry.key, entry.issue])).toEqual([
-      ['Hip-Hop', 'duplicate'],
-      ['hip hop', 'duplicate'],
-      ['Rock, Soul', 'combined'],
-    ]);
+    expect(result.map((entry) => entry.key)).toEqual(['Rock', 'R&B/Soul', 'Rock, Soul']);
+    const issues = new Map([['Rock, Soul', []]]);
+    expect(filterGenres(result, '', issues, 'name', false, 'en').map((entry) => entry.key)).toEqual(
+      ['Rock, Soul'],
+    );
   });
 });
 

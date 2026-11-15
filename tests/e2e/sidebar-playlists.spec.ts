@@ -4,7 +4,7 @@ import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { DEFAULT_LISTS, openSidebar, type SidebarPage } from '../fixtures/sidebarPage.ts';
 
 // 播放列表节里的各行：右键菜单（鼠标、⋯、Menu 键与 Shift+F10）、按 GUID 执行、删除确认、内联改名、
-// 新建、筛选与拖动重排。拖放悬停的观感只能实机看。
+// 新建、筛选与拖动重排。拖放悬停的观感只能实机看
 
 const menuOf = (page: Page) => page.getByRole('menu', { name: '播放列表菜单' });
 
@@ -61,7 +61,7 @@ test('右键菜单针对右键的那一张、不切换；菜单里改名，回�
   await menuOf(page).getByRole('menuitem', { name: '重命名' }).click();
   const input = nav.getByRole('textbox', { name: '重命名「Road Trip」' });
   await expect(input).toBeFocused();
-  // 改名框里的方向键、Home、End 移光标，不被侧边栏的方向键导航带走。
+  // 改名框里的方向键、Home、End 移光标，不被侧边栏的方向键导航带走
   for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) await page.keyboard.press(key);
   await expect(input).toBeFocused();
   await page.keyboard.press('Control+A');
@@ -73,7 +73,7 @@ test('右键菜单针对右键的那一张、不切换；菜单里改名，回�
   await expect(row).toContainText('Weekend');
   await expect(row).toBeFocused();
 
-  // F2 同样进改名；Esc 取消，不发命令。
+  // F2 同样进改名；Esc 取消，不发命令
   await page.keyboard.press('F2');
   await expect(nav.getByRole('textbox', { name: '重命名「Weekend」' })).toBeFocused();
   await page.keyboard.press('Escape');
@@ -101,6 +101,41 @@ test('改名框失焦就提交；改名途中那张被删了，就退出编辑',
   expect(errors).toEqual([]);
 });
 
+test('关闭菜单：退场动画里菜单仍在原处，不先跳到左上角', async ({ page }) => {
+  const { entry, errors } = await openSidebar(page);
+  await entry('Chill').click({ button: 'right' });
+  await expect(menuOf(page).getByRole('menuitem', { name: '清空' })).toBeVisible();
+  const before = await menuOf(page).boundingBox();
+  expect(before).not.toBeNull();
+  // 几何本身就是被测行为：按 Esc 之后逐帧记下菜单的左上角，直到它从页面上消失；跟按之前的位置比
+  const sampling = page.evaluate(
+    () =>
+      new Promise<{ x: number; y: number }[]>((resolve) => {
+        const points: { x: number; y: number }[] = [];
+        let absent = 0;
+        const frame = () => {
+          const menu = document.querySelector('[role="menu"][aria-label="播放列表菜单"]');
+          const rect = menu?.getBoundingClientRect();
+          if (rect) {
+            absent = 0;
+            points.push({ x: rect.x, y: rect.y });
+          } else absent += 1;
+          if (absent < 5 && points.length < 600) requestAnimationFrame(frame);
+          else resolve(points);
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+  await page.keyboard.press('Escape');
+  const points = await sampling;
+  expect(points.length).toBeGreaterThan(0);
+  const drift = Math.max(
+    ...points.map((p) => Math.hypot(p.x - (before?.x ?? 0), p.y - (before?.y ?? 0))),
+  );
+  expect(drift).toBeLessThan(40);
+  expect(errors).toEqual([]);
+});
+
 test('行尾的 ⋯、Menu 键与 Shift+F10 开同一份菜单；转为普通列表按 GUID 发', async ({ page }) => {
   const { host, lists, entry, nav, errors } = await openSidebar(page);
   await entry('Smart').hover();
@@ -109,7 +144,7 @@ test('行尾的 ⋯、Menu 键与 Shift+F10 开同一份菜单；转为普通列
   await expect
     .poll(() => host.callsTo('playlist.removeAutoplaylist'))
     .toEqual([{ playlistGuid: lists.guid('Smart') }]);
-  // 转好之后清单读回，它成了普通列表，菜单里不再有这一项。
+  // 转好之后清单读回，它成了普通列表，菜单里不再有这一项
   await entry('Smart').click({ button: 'right' });
   await expect(menuOf(page).getByRole('menuitem', { name: '清空' })).toBeEnabled();
   await expect(menuOf(page).getByRole('menuitem', { name: '转为普通播放列表' })).toHaveCount(0);
@@ -200,7 +235,7 @@ test('新建先在节末出一行名字框、缺省名全选；Esc 什么都不�
   expect(
     await input.evaluate((box: HTMLInputElement) => [box.selectionStart, box.selectionEnd]),
   ).toEqual([0, 6]);
-  // 在节末：清单里最后一张的下面。
+  // 在节末：清单里最后一张的下面
   const last = await nav.locator(`[data-playlist-entry="${lists.guid('Smart')}"]`).boundingBox();
   const row = await input.boundingBox();
   expect(row && last && row.y > last.y).toBe(true);
@@ -238,7 +273,7 @@ test('新建时改了名再点别处：按框里的名字建成，去它的地�
   await nav.getByRole('button', { name: '新建', exact: true }).click();
   await expect(nav.getByRole('textbox', { name: '播放列表名称' })).toBeFocused();
   await page.keyboard.type('Morning');
-  // 点标题栏右半的空处（输出面板与窗口三键之间）：不是可聚焦的元素，名字框只是失焦。
+  // 点标题栏右半的空处（输出面板与窗口三键之间）：不是可聚焦的元素，名字框只是失焦
   await page.mouse.click(1040, 24);
   await expect(playlistPage('Morning')).toBeVisible();
   expect(host.callsTo('playlist.create')).toEqual([{ name: 'Morning' }]);
@@ -271,7 +306,7 @@ test('删除非空列表先确认；确认时按 GUID 删，清单跟着少一�
   expect(errors).toEqual([]);
 });
 
-test('新建后回车：按缺省名建成，去它的地点并切成活动列表，焦点落在新的那一行；双击只出一行', async ({
+test('新建后回车：按缺省名建成，去它的地点并切成活动列表，焦点落在新的那一行；双击只出一行 @smoke', async ({
   page,
 }) => {
   const { host, lists, nav, playlistPage, errors } = await openSidebar(page);
@@ -311,10 +346,10 @@ test('人手的双击：第二下隔了一会儿才到，也只出一行，不�
   const input = nav.getByRole('textbox', { name: '播放列表名称' });
   await page.mouse.click(at.x, at.y);
   await expect(input).toBeFocused();
-  // 只补第二下：按下与松开都带 clickCount 2，浏览器据此把 click 的 detail 记成 2。
+  // 只补第二下：按下与松开都带 clickCount 2，浏览器据此把 click 的 detail 记成 2
   await page.mouse.down({ clickCount: 2 });
   await page.mouse.up({ clickCount: 2 });
-  // 第二下不抢名字框的焦点，接着打字就是在起名。
+  // 第二下不抢名字框的焦点，接着打字就是在起名
   await expect(input).toBeFocused();
   await expect(input).toHaveCount(1);
   await page.keyboard.type('Morning');
@@ -336,7 +371,7 @@ test('节头放大镜的筛选：按词收窄、框尾是命中张数，Esc 收�
   await expect(filter).toBeFocused();
   await expect(search).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.type('r');
-  // 筛选框里的方向键、Home、End、翻页移光标，不被侧边栏的方向键导航带走。
+  // 筛选框里的方向键、Home、End、翻页移光标，不被侧边栏的方向键导航带走
   for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp']) {
     await page.keyboard.press(key);
   }
@@ -464,7 +499,7 @@ test('拖动中 Esc、窗口失焦、pointercancel、丢了捕获、清单变了
     await expect(entry('Default'), label).toHaveAttribute('data-dragging', 'true');
     await cancel();
     // 这两种不是当场生效：清单的签名在下一次移动（或边缘滚动的定时器）时核对，丢了捕获的事件在下一次
-    // 指针事件之前才补发。
+    // 指针事件之前才补发
     if (label === '清单变了' || label === '丢了捕获') await page.mouse.move(40, 600);
     await expect(entry('Default'), label).not.toHaveAttribute('data-dragging', 'true');
     await page.mouse.up();
@@ -552,7 +587,7 @@ test('Alt+↓ 把可见区最下面一行挪出去：它跟着滚进来，焦点
   const sidebar = await openSidebar(page, many);
   const { lists, entry, errors } = sidebar;
   const scroller = entry('List 00').locator('xpath=ancestor::div[contains(@class,"scroller")][1]');
-  // 列表多到这一节自己滚动；取可见区里最下面那张完整露出来的列表。
+  // 列表多到这一节自己滚动；取可见区里最下面那张完整露出来的列表
   const last = await scroller.evaluate((element) => {
     const bottom = element.getBoundingClientRect().bottom;
     const rows = [...element.querySelectorAll<HTMLElement>('[data-playlist-entry]')];
@@ -582,7 +617,7 @@ test('Alt+↓ 把可见区最下面一行挪出去：它跟着滚进来，焦点
 });
 
 test('清单下方的空白处右键：出新建、载入、保存全部，不针对哪一张', async ({ page }) => {
-  // 窗口高一些，清单下面才留得出空白。
+  // 窗口高一些，清单下面才留得出空白
   await page.setViewportSize({ width: 1280, height: 1000 });
   const { host, entry, errors } = await openSidebar(page);
   const last = await entry('Smart').boundingBox();

@@ -10,9 +10,16 @@ import {
   type OnlineResume,
 } from '../../src/library/search/online/OnlineResults.tsx';
 import { onlinePlayKey, type OnlinePlay } from '../../src/library/search/online/onlinePlay.ts';
+import { useSearchSession } from '../../src/library/search/searchContext.ts';
+import { SearchCategoryTabs } from '../../src/library/search/SearchCategoryTabs.tsx';
+import { SearchPage } from '../../src/library/search/SearchPage.tsx';
+import { unavailableCategories } from '../../src/library/search/online/OnlineControls.tsx';
+import { SearchRoot } from '../../src/library/search/SearchRoot.tsx';
+import { searchKey, startSearchServices } from '../../src/library/search/searchServices.ts';
 import {
   startOnlineSearch,
   type OnlineCategory,
+  type OnlineSearch,
 } from '../../src/library/search/online/onlineSearch.ts';
 import {
   artistAlbumSearchKey,
@@ -25,7 +32,15 @@ import { historyAtom } from '../../src/nav/navHistory.ts';
 import { onlineListSubject } from '../../src/nav/places.ts';
 import { CommandsContext } from '../../src/nav/useCommand.ts';
 import { PageEntryContext } from '../../src/nav/usePageSnapshot.ts';
+import { onlineFavoritesKey, startOnlineFavorites } from '../../src/playback/onlineFavorites.ts';
 import { onlineListsKey, startOnlineLists } from '../../src/playback/onlineLists.ts';
+import {
+  favoriteKeyOf,
+  type FavoriteEntry,
+  type FavoriteKeyRow,
+  type FavoriteKind,
+  type FavoriteWriteRequest,
+} from '../../src/server/musicFavorites.ts';
 import { OnlineMusicSection } from '../../src/settings/OnlineMusicSection.tsx';
 import {
   MusicClientError,
@@ -48,30 +63,39 @@ import {
   startOnlineSources,
 } from '../../src/library/search/online/onlineSources.ts';
 import type { NcmComponentState } from '../../src/server/ncmComponent.ts';
+import { EditContextMenu } from '../../src/kit/edit-menu/EditContextMenu.tsx';
 import { ThemeRoot } from '../../src/theme/ThemeRoot.tsx';
+import { translateAtom } from '../../src/i18n/locale.ts';
 import { artistAlbumCatalog } from './artistAlbums.ts';
 import { musicAlbum, musicArtist, musicPlaylist, musicTrack } from './music.ts';
 
-// 浏览器测试用的在线结果试验页：搜索结果页的在线音乐范围单独挂出来，音乐客户端换成页面里的替身。
-// 地址栏参数：`ncm=missing` 时组件未装，搜索答 not-installed，开始安装后每问一次进度涨一截，涨满即装好；
-// `results=empty` 时各类都没有结果；`results=fail` 时每一类的第一次搜索答超时，重试就好；`category` 是起始分类。
-// `view=settings` 时挂设置里「在线音乐」一组：`account=signed-in` 起始已登录，扫码后第二次查状态即登录成功；
-// `status=pending` 时服务状态一直不答；`unblock=fail` 时改解灰答超时。
-// 单击结果里的专辑、艺人、歌单图块进在线列表页；`list=<种类>:<ID>` 时直接从那张列表起，`window.__onlineBack()` 后退，`window.__onlineGo()` 离开列表页（试验页显示结果）。
-// 在线列表：ID 404 答不存在；`lists=fail` 时每张的第一次答限流，重试就好；歌单每页 20 首，其余一次给完。
-// 艺人专辑：ID 404 答不存在；每页 20 张，一位艺人 30 张，各种类、版本类别都有；`albums=empty` 时没有专辑，
-// `albums=bare` 时上游不给种类与曲数，`albums=fail` 时每位艺人的第一次答限流，重试就好，`albums=failmore` 时第二页的第一次答限流，
-// `albums=hang` 时第二页一直不答（专辑取不完），`albums=many` 时有 1500 张，每页 200 张。搜索词是「Nujabes 关键词」的专辑搜索答这位艺人的专辑加一张别人的同名专辑，
-// 记进 `window.__onlineLog` 的 `artist-album-search`。
-// `list=album:5100` 的专辑署名有 12 位艺术家，`list=playlist:6100` 的歌单简介有六段。
-// `lx=hosted` 时 lxserver 装好，可选来源有其他平台；`lxsources=none` 时托管的 lxserver 里没有音源，`lxsources=checked`
-// 时启用着的音源已有检测结果；`lxcheck=hold` 时检测一直不答，`lxcheck=fail` 时检测请求失败；
-// `platformfail=<平台>` 时那个平台的搜索一律答上游不可用。其他平台的搜索只答曲目，别的类别答不支持。
-// 起播、入队、取列表、取艺人专辑、登录与设置的请求记进 `window.__onlineLog`。
+// 浏览器测试用的在线结果试验页：搜索结果页的在线音乐范围单独挂出来，音乐客户端换成页面里的替身
+//
+// 地址栏参数：
+// - `ncm=missing`：组件未装，搜索答 not-installed；安装开始后，每查询一次进度就增加一截，增满即装好
+// - `results=empty`：各类都没有结果；`results=fail`：每一类的第一次搜索答超时，重试即成功；`category` 是起始分类
+// - `view=settings`：挂设置里「在线音乐」一组。`account=signed-in` 起始已登录，扫码后第二次查状态即登录成功；
+//   `status=pending` 时服务状态一直不答；`unblock=fail` 时改解灰答超时
+// - 单击结果里的专辑、艺人、歌单图块进入在线列表页。`list=<种类>:<ID>` 直接从那张列表开始，
+//   `window.__onlineBack()` 后退，`window.__onlineGo()` 离开列表页（试验页显示结果）
+// - 在线列表：ID 404 答不存在；`lists=fail` 时每张的第一次答限流，重试即成功；歌单每页 20 首，其余一次给完；
+//   艺人的热门歌曲 12 首，`tops=many` 时 50 首
+// - 艺人专辑：ID 404 答不存在。每页 20 张，一位艺人 30 张，涵盖各类型与版本分类。
+//   `albums=empty` 没有专辑；`albums=bare` 上游不给种类与曲数；`albums=fail` 每位艺人的第一次答限流，重试即成功；
+//   `albums=failmore` 第二页的第一次答限流；`albums=hang` 第二页一直不答（专辑取不完）；
+//   `albums=many` 有 1500 张，每页 200 张。搜索词是「Nujabes 关键词」的专辑搜索，答这位艺人的专辑，加一张别人的同名专辑，
+//   并记进 `window.__onlineLog` 的 `artist-album-search`
+// - `list=album:5100` 的专辑署名有 12 位艺术家，`list=playlist:6100` 的歌单简介有六段
+// - `lx=hosted`：lxserver 装好，可选来源有其他平台。`lxsources=none` 时托管的 lxserver 里没有音源，
+//   `lxsources=checked` 时启用着的音源已有检测结果。`lxcheck=hold` 时检测一直不答，`lxcheck=fail` 时检测请求失败
+// - `platformfail=<平台>`：那个平台的搜索一律答上游不可用。其他平台的搜索只答曲目，别的类别答不支持
+// - 起播、入队、取列表、取艺人专辑、登录与设置的请求记进 `window.__onlineLog`
+// - `view=flyout`：只挂搜索下拉，点「搜索」打开；在线结果用同一个替身，单击在线艺人、专辑进入在线列表页
+// - `view=page`：挂整个搜索结果页（查询词 Nujabes），媒体库一侧是宿主替身的空库
 
 const PAGE = 20;
 const ALBUM_PAGE = 20;
-/** 1×1 的透明 PNG，当二维码。 */
+/** 1×1 的透明 PNG，当二维码 */
 const QR_IMAGE =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 const SIZE = 17_465_672;
@@ -176,9 +200,9 @@ const OWNERS: { readonly [K in MusicListKind]: (id: string) => MusicSearchItems[
   artist: (id) =>
     DATA.artist.find((item) => item.ref.id === id) ?? musicArtist(id, { name: 'Nujabes' }),
 };
-/** 第 6 首无版权；时长各不相同，好核对排序。 */
-const listTracks = (kind: MusicListKind, id: string) =>
-  Array.from({ length: LIST_SIZES[kind] }, (_, index) =>
+/** 第 6 首无版权；时长各不相同，好核对排序 */
+const listTracks = (kind: MusicListKind, id: string, size = LIST_SIZES[kind]) =>
+  Array.from({ length: size }, (_, index) =>
     // 专辑署名里的艺人 ID 可以不是数字（如 `a1`）：只取其中的数字，免得整张列表的曲目 ID 都成了 NaN
     musicTrack(String(Number(id.replace(/\D/g, '') || 0) * 100 + index + 1), {
       title: `${kind} ${String(index + 1).padStart(2, '0')}`,
@@ -187,7 +211,7 @@ const listTracks = (kind: MusicListKind, id: string) =>
     }),
   );
 
-/** 检测各平台得到的结果：酷我可用、酷狗地址打不开、咪咕脚本没给地址、QQ 音乐没有可检测的曲目。 */
+/** 检测各平台得到的结果：酷我可用、酷狗地址打不开、咪咕脚本没给地址、QQ 音乐没有可检测的曲目 */
 const LX_CHECKS: Record<MusicPlatform, MusicLxHealth> = {
   wy: { status: 'unknown', reason: 'no-sample', message: null, ms: 0, at: 0 },
   tx: { status: 'unknown', reason: 'no-sample', message: null, ms: 0, at: 0 },
@@ -196,7 +220,7 @@ const LX_CHECKS: Record<MusicPlatform, MusicLxHealth> = {
   mg: { status: 'failed', reason: 'script', message: '咪咕找不到', ms: 3100, at: 0 },
 };
 
-/** 托管 lxserver 里先有的两份音源：一份启用着，一份加载失败、停用着。 */
+/** 托管 lxserver 里先有的两份音源：一份启用着，一份加载失败、停用着 */
 const LX_SOURCES: readonly MusicLxSource[] = [
   {
     id: '星海音乐源.js',
@@ -245,7 +269,7 @@ function fakeClient(params: URLSearchParams): MusicClient {
     params.get('account') === 'signed-in' ? { nickname: 'Tester' } : null;
   let unblock = false;
   let checks = 0;
-  // lx：missing 是组件可下载、还没装；hosted 是装好了、由后端托管；缺省是后端没登记组件。
+  // lx：missing 是组件可下载、还没装；hosted 是装好了、由后端托管；缺省是后端没登记组件
   let lx: NcmComponentState = {
     package:
       params.get('lx') === null
@@ -255,6 +279,9 @@ function fakeClient(params: URLSearchParams): MusicClient {
     received: 0,
     failure: null,
   };
+  const favorites = new Map<string, FavoriteEntry>();
+  let favoriteClock = 1000;
+  const favoriteEntries = () => [...favorites.values()].sort((a, b) => b.addedAt - a.addedAt);
   // `lxsources=checked`：启用着的那份已经有十分钟前检测的结果（后端记着的）
   const earlier = Date.now() - 10 * 60_000;
   let sources =
@@ -315,13 +342,14 @@ function fakeClient(params: URLSearchParams): MusicClient {
     },
     resolve: unsupported,
     tracks: unsupported,
+    discover: unsupported,
     failures: unsupported,
     configureLx: unsupported,
     testLx: unsupported,
     async lxComponent() {
       return lx;
     },
-    // 答下载到一半，下一次读就装好了。
+    // 答下载到一半，下一次读就装好了
     async installLx() {
       log({ kind: 'lx-install' });
       const half = { ...lx, phase: 'downloading' as const, received: 3_000_000 };
@@ -350,6 +378,44 @@ function fakeClient(params: URLSearchParams): MusicClient {
       listed('lx-order', ids, () =>
         ids.flatMap((id) => sources.find((source) => source.id === id) ?? []),
       ),
+    // 本地收藏：存在页面里，`favorites=<种类>:<ID>,…` 预置几项，操作记进日志
+    favoriteKeys: async () => {
+      const keys: { [K in FavoriteKind]: FavoriteKeyRow[] } = {
+        track: [],
+        album: [],
+        artist: [],
+        playlist: [],
+      };
+      for (const entry of favoriteEntries())
+        keys[entry.kind].push([entry.item.ref.platform, entry.item.ref.id, entry.addedAt]);
+      return keys;
+    },
+    async favoriteList<K extends FavoriteKind>(input: { readonly kind: K }) {
+      const items = favoriteEntries().filter(
+        (entry): entry is FavoriteEntry<K> => entry.kind === input.kind,
+      );
+      return { items, nextCursor: null, total: items.length };
+    },
+    async addFavorites<K extends FavoriteKind>(input: FavoriteWriteRequest<K>) {
+      log({
+        kind: 'favorite-add',
+        detail: { kind: input.kind, ids: input.items.map((item) => item.ref.id) },
+      });
+      return input.items.map((item) => {
+        const key = favoriteKeyOf(input.kind, item.ref);
+        const had = favorites.get(key);
+        favorites.set(key, { kind: input.kind, item, addedAt: had?.addedAt ?? ++favoriteClock });
+        return { ref: item.ref, addedAt: favorites.get(key)?.addedAt ?? 0 };
+      });
+    },
+    refreshFavorites: async () => [],
+    async removeFavorites(input) {
+      log({
+        kind: 'favorite-remove',
+        detail: { kind: input.kind, ids: input.refs.map((ref) => ref.id) },
+      });
+      return input.refs.filter((ref) => favorites.delete(favoriteKeyOf(input.kind, ref))).length;
+    },
     async checkLxSource(id, platform) {
       log({ kind: 'lx-check', detail: { id, platform } });
       const mode = params.get('lxcheck');
@@ -370,7 +436,11 @@ function fakeClient(params: URLSearchParams): MusicClient {
         listFailed.add(key);
         return fail('rate-limited');
       }
-      const all = listTracks(input.kind, input.ref.id);
+      const all = listTracks(
+        input.kind,
+        input.ref.id,
+        input.kind === 'artist' && params.get('tops') === 'many' ? 50 : undefined,
+      );
       const start = Number(input.cursor ?? 0);
       const end = input.kind === 'playlist' ? start + PAGE : all.length;
       return Promise.resolve({
@@ -493,6 +563,48 @@ const recorder: OnlinePlay = {
 
 const CATEGORIES: readonly OnlineCategory[] = ['all', 'artists', 'albums', 'tracks', 'playlists'];
 
+/** 在线音乐范围单独挂出来：分类与页签照结果页的写法由这里持有 */
+function HarnessResults({
+  search,
+  initial,
+  resume,
+}: {
+  readonly search: OnlineSearch;
+  readonly initial: OnlineCategory;
+  readonly resume: { current: OnlineResume | null };
+}) {
+  const t = useAtomValue(translateAtom);
+  const platform = useAtomValue(search.platform);
+  const [category, setCategory] = useState(initial);
+  return (
+    <OnlineResults
+      text="Nujabes"
+      search={search}
+      category={category}
+      onCategory={setCategory}
+      renderTabs={(narrow) => (
+        <SearchCategoryTabs
+          category={category}
+          narrow={narrow}
+          unavailable={unavailableCategories(t, platform)}
+          onChoose={setCategory}
+        />
+      )}
+      resume={resume}
+    />
+  );
+}
+
+/** 试验页没有侧栏搜索框：下拉以浮层形态打开，定位在这个键上 */
+function SearchTrigger() {
+  const session = useSearchSession();
+  return (
+    <button type="button" data-search-trigger onClick={() => session.show()}>
+      搜索
+    </button>
+  );
+}
+
 export function OnlineHarness({ services }: { readonly services: AppServices }) {
   const params = useMemo(() => new URLSearchParams(location.search), []);
   const resume = useRef<OnlineResume | null>(null);
@@ -512,6 +624,8 @@ export function OnlineHarness({ services }: { readonly services: AppServices }) 
         subject: onlineListSubject({ kind: start, ref, title }),
       });
     }
+    if (params.get('view') === 'page')
+      services.history.navigate({ id: 'search', subject: 'Nujabes' });
     Reflect.set(window, '__onlineBack', () => services.history.back());
     Reflect.set(window, '__onlineGo', () => services.history.navigate({ id: 'home' }));
     return {
@@ -519,10 +633,20 @@ export function OnlineHarness({ services }: { readonly services: AppServices }) 
       search,
       sources,
       lists: startOnlineLists(services.store, client),
+      favorites: startOnlineFavorites(services.store, client),
       albums: startArtistAlbums(services.store, client),
       albumSearch: startArtistAlbumSearch(services.store, client),
       status,
       setup: startNcmSetup(services.store, client),
+      searchServices: startSearchServices(services.store, {
+        catalog: services.albums.browse,
+        actions: services.trackActions,
+        configWriter: services.configWriter,
+        music: client,
+        sources,
+        findAlbum: (track) => services.albumDetail.findAlbum(track),
+        stamp: () => services.ratings.stamp(),
+      }),
     };
   });
   useEffect(() => startupOverlay.dismiss(), []);
@@ -535,9 +659,11 @@ export function OnlineHarness({ services }: { readonly services: AppServices }) 
         bindService(onlineSourcesKey, parts.sources),
         bindService(ncmSetupKey, parts.setup),
         bindService(onlineListsKey, parts.lists),
+        bindService(onlineFavoritesKey, parts.favorites),
         bindService(artistAlbumsKey, parts.albums),
         bindService(artistAlbumSearchKey, parts.albumSearch),
         bindService(onlinePlayKey, recorder),
+        bindService(searchKey, parts.searchServices),
       ]),
     [services, parts],
   );
@@ -562,15 +688,21 @@ export function OnlineHarness({ services }: { readonly services: AppServices }) 
                 <PageEntryContext value={entry}>
                   <OnlineAlbumsPage key={place.subject} place={place} />
                 </PageEntryContext>
+              ) : place.id === 'search' ? (
+                <SearchRoot>
+                  <PageEntryContext value={entry}>
+                    <SearchPage place={place} />
+                  </PageEntryContext>
+                </SearchRoot>
+              ) : params.get('view') === 'flyout' ? (
+                <SearchRoot>
+                  <SearchTrigger />
+                </SearchRoot>
               ) : (
-                <OnlineResults
-                  text="Nujabes"
-                  search={parts.search}
-                  initial={initial}
-                  resume={resume}
-                />
+                <HarnessResults search={parts.search} initial={initial} resume={resume} />
               )}
             </div>
+            <EditContextMenu />
           </ThemeRoot>
         </CommandsContext>
       </ServicesContext>

@@ -5,6 +5,7 @@ import { stringParam } from '../fixtures/hostAnswers.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
 import { openBiographyLink } from '../fixtures/biographyActions.ts';
 import { biographyHtml, biographyOverviewHtml } from '../fixtures/biographySamples.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 const DISPLAY =
   'http://compllege.com/post/163636653001/cocd-0011-phant-2-2017年コミックマーケット92-1日目-金曜日-東7';
@@ -28,8 +29,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     });
     await view.row('Feather').locator('[data-column-id="title"]').click();
     await page.setViewportSize({ width: 390, height: 900 });
-    await page.locator('[data-right-card-key="queue"]').click();
-    await page.locator('[data-right-card-page="info"]').click();
+    await openRightCardPage(page, 'info');
     const info = page.locator('[data-track-info]');
     await info.getByRole('button', { name: '参与者与发行', exact: true }).click();
     const link = info.getByRole('link', { name: DISPLAY, exact: true });

@@ -1,0 +1,52 @@
+/* 设置面板里的参数行：左边标签，右边控件；滑块行是标签、滑块、读数三段。取色走场景外框给的那一组表面变量 */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  padding-bottom: var(--spacingVerticalM);
+}
+
+.title {
+  padding-block: var(--spacingVerticalS);
+  color: var(--text-muted);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  min-height: 32px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}
+
+.label {
+  flex: none;
+  min-width: 0;
+}
+
+/* 滑块行：标签占固定的一截，滑块吃满余下的宽，读数右对齐 */
+.sliderRow .label {
+  width: 96px;
+}
+
+.slider {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.value {
+  flex: none;
+  min-width: 5ch;
+  color: var(--text-primary);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  flex: none;
+  min-width: 160px;
+}

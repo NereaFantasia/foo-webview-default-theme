@@ -1,5 +1,6 @@
 import { Button, Switch } from '@fluentui/react-components';
 import {
+  ArrowDownload20Regular,
   ArrowRight16Regular,
   CommentText20Regular,
   FullScreenMaximize20Regular,
@@ -7,15 +8,17 @@ import {
   History20Regular,
   Image20Regular,
   MusicNote2Play20Regular,
+  PanelLeftContract20Regular,
   SoundWaveCircle20Regular,
   Tab20Regular,
   TextFontSize20Regular,
   WindowApps20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useContext, useId, useLayoutEffect, useState, type ReactElement } from 'react';
+import { useId, useLayoutEffect, useState, type ReactElement } from 'react';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
+import { ONLINE_ANALYSIS_CHOICES, type OnlineAnalysis } from '../host/onlineAnalysis.ts';
 import {
   BACKDROP_PREF_KEY,
   backdropChoiceAtom,
@@ -28,6 +31,7 @@ import {
   chooseImmersiveScene,
   chooseImmersiveTerrain,
   chooseImmersiveWash,
+  chooseOnlineAnalysis,
   chooseWaveformMode,
   FPS_CAPS,
   IMMERSIVE_SCENES,
@@ -37,6 +41,7 @@ import {
   immersiveTerrainAtom,
   immersiveWashAtom,
   IMMERSIVE_PREF_KEYS,
+  onlineAnalysisAtom,
   WASH_CHOICES,
   waveformModeAtom,
   type ImmersiveScene,
@@ -47,21 +52,28 @@ import {
   perfOverlayEnabledAtom,
   PERF_OVERLAY_STORAGE_KEY,
 } from '../immersive/perf/perfOverlay.ts';
-import { SCENE_PREF_KEYS, startPagePref } from '../immersive/scene/scenePrefs.ts';
+import {
+  SCENE_PREF_KEYS,
+  collapseWithoutLyricsPref,
+  startPagePref,
+} from '../immersive/scene/scenePrefs.ts';
 import { SIDEBAR_PAGES, type SidebarPage } from '../immersive/scene/sceneState.ts';
 import { BackdropThumb, SceneThumb } from '../immersive/thumbnails/ViewThumbs.tsx';
 import { WaveformThumb } from '../immersive/thumbnails/WaveformThumb.tsx';
 import { WAVEFORM_MODES, type WaveformMode } from '../immersive/waveform/waveformModes.ts';
-import { LyricsSettingsNavigationContext } from '../settings/lyricsSettingsContext.ts';
+import { settingsNavKey } from '../settings/settingsNav.ts';
+import { useService } from '../kit/useService.ts';
 import { SettingsCard } from '../settings/SettingsCard.tsx';
 import { SettingsChoice } from '../settings/SettingsChoice.tsx';
 import { SettingsExpander } from '../settings/SettingsExpander.tsx';
 import { SettingsRow } from '../settings/SettingsRow.tsx';
 import { SettingsSegmented } from '../settings/SettingsSegmented.tsx';
 import { SettingsSelect } from '../settings/SettingsSelect.tsx';
+import { SettingsSubheading } from '../settings/SettingsSubheading.tsx';
 import { LocalSaveNotice } from '../settings/SettingsSaveNotice.tsx';
 import { colorSchemeAtom } from '../theme/colorScheme.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
+import { BackdropOptionsCard } from './BackdropOptionsCard.tsx';
 import { initializeImmersivePrefs } from './immersivePrefs.ts';
 
 const WASH_LABELS: Readonly<Record<WashChoice, MessageKey>> = {
@@ -72,6 +84,11 @@ const WASH_LABELS: Readonly<Record<WashChoice, MessageKey>> = {
 const SCENE_LABELS: Readonly<Record<ImmersiveScene, MessageKey>> = {
   paper: 'settings.immersiveScenePaper',
   presets: 'settings.immersiveScenePresets',
+};
+const ONLINE_ANALYSIS_LABELS: Readonly<Record<OnlineAnalysis, MessageKey>> = {
+  hold: 'settings.immersiveOnlineAnalysisHold',
+  segments: 'settings.immersiveOnlineAnalysisSegments',
+  off: 'settings.immersiveOnlineAnalysisOff',
 };
 const WAVEFORM_LABELS: Readonly<Record<WaveformMode, MessageKey>> = {
   rms: 'immersive.waveformRms',
@@ -84,10 +101,11 @@ const BACKDROP_LABELS: Readonly<Record<BackdropChoice, MessageKey>> = {
   mesh: 'settings.immersiveBackdropMesh',
   titanium: 'settings.immersiveBackdropTitanium',
   isolation: 'settings.immersiveBackdropIsolation',
+  flow: 'settings.backgroundPalette',
   off: 'settings.immersiveBackdropOff',
 };
 /** 下拉框里的先后：缺省的网格渐变排第一，纯色排最后 */
-const BACKDROP_ORDER: readonly BackdropChoice[] = ['mesh', 'titanium', 'isolation', 'off'];
+const BACKDROP_ORDER: readonly BackdropChoice[] = ['mesh', 'flow', 'titanium', 'isolation', 'off'];
 const START_PAGE_LABELS: Readonly<Record<SidebarPage, MessageKey>> = {
   lyrics: 'rightCard.page.lyrics',
   queue: 'rightCard.page.queue',
@@ -104,7 +122,7 @@ const START_PAGE_ICONS: Readonly<Record<SidebarPage, ReactElement>> = {
 function LyricsLookCard() {
   const t = useAtomValueRawSync(translateAtom);
   const viewControls = useViewControlStyles();
-  const select = useContext(LyricsSettingsNavigationContext);
+  const settingsNav = useService(settingsNavKey);
   const buttonId = useId();
   return (
     <SettingsCard icon={<TextFontSize20Regular />} title={t('settings.immersiveLyricsLook')}>
@@ -114,9 +132,8 @@ function LyricsLookCard() {
           id={buttonId}
           icon={<ArrowRight16Regular />}
           iconPosition="after"
-          disabled={!select}
           aria-labelledby={`${buttonId} ${labelId}`}
-          onClick={() => select?.()}
+          onClick={() => settingsNav.open('lyrics')}
         >
           {t('settings.immersiveLyricsLookGo')}
         </Button>
@@ -141,9 +158,11 @@ export function ImmersiveSettings() {
   const backdrop = useAtomValueRawSync(backdropChoiceAtom);
   const scheme = useAtomValueRawSync(colorSchemeAtom);
   const startPage = useAtomValueRawSync(startPagePref.atom);
+  const collapse = useAtomValueRawSync(collapseWithoutLyricsPref.atom);
   const wash = useAtomValueRawSync(immersiveWashAtom);
   const terrain = useAtomValueRawSync(immersiveTerrainAtom);
   const waveform = useAtomValueRawSync(waveformModeAtom);
+  const onlineAnalysis = useAtomValueRawSync(onlineAnalysisAtom);
   const fps = useAtomValueRawSync(immersiveFpsCapAtom);
   const overlay = useAtomValueRawSync(perfOverlayEnabledAtom);
   useLayoutEffect(() => {
@@ -153,6 +172,7 @@ export function ImmersiveSettings() {
   if (!ready) return null;
   return (
     <>
+      <SettingsSubheading>{t('settings.subImmersiveView')}</SettingsSubheading>
       <SettingsCard
         icon={<WindowApps20Regular />}
         title={t('settings.immersiveScene')}
@@ -189,25 +209,6 @@ export function ImmersiveSettings() {
       {scene === 'presets' ? (
         <>
           <SettingsCard
-            icon={<Image20Regular />}
-            title={t('settings.immersiveBackground')}
-            block
-            feedback={<LocalSaveNotice keys={[BACKDROP_PREF_KEY]} />}
-          >
-            {(ids) => (
-              <SettingsChoice
-                {...ids}
-                value={backdrop}
-                options={BACKDROP_ORDER.map((value) => ({
-                  value,
-                  label: t(BACKDROP_LABELS[value]),
-                  preview: <BackdropThumb choice={value} />,
-                }))}
-                onChange={(value) => chooseBackdrop(store, value)}
-              />
-            )}
-          </SettingsCard>
-          <SettingsCard
             icon={<Tab20Regular />}
             title={t('settings.immersiveStartPage')}
             field
@@ -226,7 +227,89 @@ export function ImmersiveSettings() {
               />
             )}
           </SettingsCard>
+          <SettingsCard
+            icon={<PanelLeftContract20Regular />}
+            title={t('immersive.collapseWithoutLyrics')}
+            feedback={<LocalSaveNotice keys={[SCENE_PREF_KEYS.collapseWithoutLyrics]} />}
+          >
+            {({ labelId, descriptionId }) => (
+              <Switch
+                checked={collapse}
+                aria-labelledby={labelId}
+                aria-describedby={descriptionId}
+                onChange={(_, data) => collapseWithoutLyricsPref.set(store, data.checked)}
+              />
+            )}
+          </SettingsCard>
           <LyricsLookCard />
+        </>
+      ) : (
+        <>
+          <SettingsCard
+            icon={<SoundWaveCircle20Regular />}
+            title={t('immersive.waveformMode')}
+            block
+            feedback={<LocalSaveNotice keys={[IMMERSIVE_PREF_KEYS.waveformMode]} />}
+          >
+            {(ids) => (
+              <SettingsChoice
+                {...ids}
+                value={waveform}
+                options={WAVEFORM_MODES.map((value) => ({
+                  value,
+                  label: t(WAVEFORM_LABELS[value]),
+                  preview: <WaveformThumb mode={value} />,
+                }))}
+                onChange={(value) => chooseWaveformMode(store, value)}
+              />
+            )}
+          </SettingsCard>
+          <SettingsCard
+            icon={<ArrowDownload20Regular />}
+            title={t('settings.immersiveOnlineAnalysis')}
+            field
+            feedback={<LocalSaveNotice keys={[IMMERSIVE_PREF_KEYS.onlineAnalysis]} />}
+          >
+            {(ids) => (
+              <SettingsSelect
+                {...ids}
+                value={onlineAnalysis}
+                options={ONLINE_ANALYSIS_CHOICES.map((value) => ({
+                  value,
+                  label: t(ONLINE_ANALYSIS_LABELS[value]),
+                }))}
+                onChange={(value) => {
+                  const chosen = ONLINE_ANALYSIS_CHOICES.find((choice) => choice === value);
+                  if (chosen) chooseOnlineAnalysis(store, chosen);
+                }}
+              />
+            )}
+          </SettingsCard>
+        </>
+      )}
+      <SettingsSubheading>{t('settings.subImmersiveBackdrop')}</SettingsSubheading>
+      {scene === 'presets' ? (
+        <>
+          <SettingsCard
+            icon={<Image20Regular />}
+            title={t('settings.immersiveBackground')}
+            block
+            feedback={<LocalSaveNotice keys={[BACKDROP_PREF_KEY]} />}
+          >
+            {(ids) => (
+              <SettingsChoice
+                {...ids}
+                value={backdrop}
+                options={BACKDROP_ORDER.map((value) => ({
+                  value,
+                  label: t(BACKDROP_LABELS[value]),
+                  preview: <BackdropThumb choice={value} />,
+                }))}
+                onChange={(value) => chooseBackdrop(store, value)}
+              />
+            )}
+          </SettingsCard>
+          <BackdropOptionsCard />
         </>
       ) : (
         <>
@@ -259,25 +342,6 @@ export function ImmersiveSettings() {
               )}
             </SettingsRow>
           </SettingsExpander>
-          <SettingsCard
-            icon={<SoundWaveCircle20Regular />}
-            title={t('immersive.waveformMode')}
-            block
-            feedback={<LocalSaveNotice keys={[IMMERSIVE_PREF_KEYS.waveformMode]} />}
-          >
-            {(ids) => (
-              <SettingsChoice
-                {...ids}
-                value={waveform}
-                options={WAVEFORM_MODES.map((value) => ({
-                  value,
-                  label: t(WAVEFORM_LABELS[value]),
-                  preview: <WaveformThumb mode={value} />,
-                }))}
-                onChange={(value) => chooseWaveformMode(store, value)}
-              />
-            )}
-          </SettingsCard>
         </>
       )}
       <SettingsExpander

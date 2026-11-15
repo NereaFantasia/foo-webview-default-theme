@@ -5,8 +5,11 @@ import {
   DEFAULT_LYRICS_DISPLAY,
   LYRICS_ALIGN_KEY,
   LYRICS_DISPLAY_KEY,
+  LYRICS_FONTS_KEY,
   LYRICS_TYPOGRAPHY_KEY,
   alignLyricLines,
+  immersiveFont,
+  lyricsFontStyle,
   lyricsProcessConfig,
   parseLyricsDisplay,
   startLyricsDisplay,
@@ -72,15 +75,28 @@ describe('歌词显示设置', () => {
     };
     expect(await service.update(next)).toBe(true);
     const saved = host.config.get(LYRICS_DISPLAY_KEY);
-    const { fontFamily, translationFontSize, showTranslation, showRomanization, align, ...base } =
-      next;
+    const {
+      fontFamily,
+      fontWeight,
+      immersiveFontFamily,
+      immersiveFontWeight,
+      translationFontSize,
+      showTranslation,
+      showRomanization,
+      align,
+      ...base
+    } = next;
     expect(saved).toEqual(base);
     expect(host.config.get(LYRICS_ALIGN_KEY)).toBe(align);
     expect(host.config.get(LYRICS_TYPOGRAPHY_KEY)).toEqual({
       fontFamily,
+      fontWeight,
       translationFontSize,
       showTranslation,
       showRomanization,
+    });
+    expect(host.config.get(LYRICS_FONTS_KEY)).toEqual({
+      immersive: { family: immersiveFontFamily, weight: immersiveFontWeight },
     });
     expect(lyricsProcessConfig(parseLyricsDisplay(saved))).toEqual({
       optimizeOptions: next.optimize,
@@ -125,6 +141,84 @@ describe('歌词显示设置', () => {
     expect(host.callsTo('config.set').at(-1)).toMatchObject({
       key: LYRICS_DISPLAY_KEY,
       value: { fontSize: 30 },
+    });
+  });
+});
+
+describe('歌词字体', () => {
+  it('字体名与字重逐项校验：不合格的回到缺省，字体名去首尾空白', () => {
+    expect(
+      parseLyricsDisplay({
+        fontFamily: ' Georgia ',
+        fontWeight: 450,
+        immersiveFontFamily: 'Inter',
+        immersiveFontWeight: 700,
+      }),
+    ).toMatchObject({
+      fontFamily: 'Georgia',
+      fontWeight: 450,
+      immersiveFontFamily: 'Inter',
+      immersiveFontWeight: 700,
+    });
+    expect(
+      parseLyricsDisplay({
+        fontFamily: 'a\nb',
+        fontWeight: 0,
+        immersiveFontFamily: 5,
+        immersiveFontWeight: 'bold',
+      }),
+    ).toMatchObject({
+      fontFamily: '',
+      fontWeight: null,
+      immersiveFontFamily: '',
+      immersiveFontWeight: null,
+    });
+  });
+
+  it('没选字体或没选字重时只给家族名；选了字重就走别名，字重取所选', () => {
+    expect(lyricsFontStyle('', 450)).toEqual({ fontFamily: 'var(--fontFamilyBase)' });
+    expect(lyricsFontStyle('Inter', null)).toEqual({
+      fontFamily: '"Inter", var(--fontFamilyBase)',
+    });
+    const weighted = lyricsFontStyle('Inter', 450);
+    expect(weighted.fontWeight).toBe(450);
+    expect(weighted.fontFamily).toMatch(/^"theme-vf-[0-9a-z]+", "Inter", var\(--fontFamilyBase\)$/);
+    expect(lyricsFontStyle('Inter', 700).fontFamily).toBe(weighted.fontFamily);
+  });
+
+  it('沉浸视图自己没选字体时整个跟随正在播放面板，选了就用自己的字体与字重', () => {
+    const panel = { ...DEFAULT_LYRICS_DISPLAY, fontFamily: 'Georgia', fontWeight: 450 };
+    expect(immersiveFont(panel)).toEqual({ family: 'Georgia', weight: 450 });
+    expect(
+      immersiveFont({ ...panel, immersiveFontFamily: 'Inter', immersiveFontWeight: null }),
+    ).toEqual({ family: 'Inter', weight: null });
+  });
+
+  it('沉浸视图的字体另存一项，不动面板的排版存档；面板的字重进排版存档', async () => {
+    const host = installFakeHost();
+    const store = createStore();
+    const service = startLyricsDisplay(store, host.fb, createMemoryConfigWriter(host.fb));
+    onTestFinished(service.dispose);
+    await service.ready;
+    host.config.set(LYRICS_DISPLAY_KEY, { fontSize: 30 });
+    expect(await service.update({ immersiveFontFamily: 'Inter', immersiveFontWeight: 600 })).toBe(
+      true,
+    );
+    expect(host.config.get(LYRICS_FONTS_KEY)).toEqual({
+      immersive: { family: 'Inter', weight: 600 },
+    });
+    expect(host.config.has(LYRICS_TYPOGRAPHY_KEY)).toBe(false);
+    expect(host.config.get(LYRICS_DISPLAY_KEY)).toEqual({ fontSize: 30 });
+    expect(await service.update({ fontFamily: 'Georgia', fontWeight: 450 })).toBe(true);
+    expect(host.config.get(LYRICS_TYPOGRAPHY_KEY)).toMatchObject({
+      fontFamily: 'Georgia',
+      fontWeight: 450,
+    });
+    expect(store.get(service.display)).toMatchObject({
+      fontFamily: 'Georgia',
+      fontWeight: 450,
+      immersiveFontFamily: 'Inter',
+      immersiveFontWeight: 600,
     });
   });
 });

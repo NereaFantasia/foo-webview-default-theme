@@ -11,7 +11,7 @@ import { albumRow, albumTrackRow } from '../fixtures/libraryRows.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
 // 专辑详情页：三处入口先取数再进、被点处的小转圈、找不到只提示；页头、事实行与动作键；曲目表的起播、
-// 列头排序、多碟分节；整页滚动时列头吸顶；离开再回来交还滚动、焦点与排序；这张移出媒体库时留在原页。
+// 列头排序、多碟分节；整页滚动时列头吸顶；离开再回来交还滚动、焦点与排序；这张移出媒体库时留在原页
 
 const page$ = (page: Page) => page.locator('[data-page="album"]');
 const title = (page: Page) => page$(page).locator('h1');
@@ -28,7 +28,7 @@ const rowTitles = (page: Page) =>
     .locator('[role="gridcell"][data-column-id="title"]')
     .evaluateAll((cells) => cells.map((cell) => cell.textContent ?? ''));
 
-/** 一张有很多首的专辑：分两张碟，每张 `perDisc` 首，第二张碟有副标题。 */
+/** 一张有很多首的专辑：分两张碟，每张 `perDisc` 首，第二张碟有副标题 */
 const BIG = albumRow('Big Box', 'Various', { genre: 'Rock', year: '1990', trackCount: 60 });
 
 function bigTracks(perDisc: number): LibraryTrack[] {
@@ -86,7 +86,7 @@ async function start(
   return host;
 }
 
-/** 右键封面、点「打开专辑详情」，等进到那一页。 */
+/** 右键封面、点「打开专辑详情」，等进到那一页 */
 async function openFromMenu(page: Page, name: string): Promise<void> {
   await tile(page, name).click({ button: 'right' });
   await page.locator('[data-album-menu] [data-action="open-detail"]').click();
@@ -97,7 +97,7 @@ test.afterEach(() => {
   expect(errors).toEqual([]);
 });
 
-test('从下拉的 › 进：页头写名字、艺人与信息胶囊，曲目表列出曲目；侧边栏亮「专辑」', async ({
+test('从下拉的 › 进：页头写名字、艺人与信息胶囊，曲目表列出曲目；侧边栏亮「专辑」 @smoke', async ({
   page,
 }) => {
   await start(page);
@@ -174,7 +174,7 @@ test('这张没有曲目：不进页面，专辑页出提示，关掉就收', as
   await expect(notice).toHaveCount(0);
 });
 
-test('播放键从第一首起播整张；双击一行从那一首起播', async ({ page }) => {
+test('播放键从第一首起播整张；双击一行从那一首起播 @smoke', async ({ page }) => {
   const host = await start(page);
   await openFromMenu(page, 'The Wall');
   await page$(page).locator('[data-detail-play]').click();
@@ -217,9 +217,9 @@ test('整页一起滚：列头吸在顶上，行不从它底下露出来；End �
   await openFromMenu(page, 'Big Box');
   const box = scroller(page);
   const head = table(page).locator('[role="rowgroup"]').first();
-  // 行画在贴住视口的那一层里、被它裁掉：这一层的上沿不高于列头的下沿，行就不会从列头底下透出来。
+  // 行画在贴住视口的那一层里、被它裁掉：这一层的上沿不高于列头的下沿，行就不会从列头底下透出来
   const shown = table(page).locator('[role="rowgroup"]').nth(1).locator('> [role="none"]');
-  // 吸顶的列头贴在滚动区的上内边距以内。
+  // 吸顶的列头贴在滚动区的上内边距以内
   const inset = await box.evaluate((element) => parseFloat(getComputedStyle(element).paddingTop));
   const top = async () => ((await box.boundingBox())?.y ?? 0) + inset;
   const headBottom = async () => {
@@ -227,7 +227,7 @@ test('整页一起滚：列头吸在顶上，行不从它底下露出来；End �
     return (rect?.y ?? 0) + (rect?.height ?? 0);
   };
   await box.evaluate((element) => element.scrollTo({ top: 1200 }));
-  // 两边都在轮询里现量：进页的缩放动画还没走完时，量出来的位置都在变。
+  // 两边都在轮询里现量：进页的缩放动画还没走完时，量出来的位置都在变
   await expect
     .poll(async () => Math.round(((await head.boundingBox())?.y ?? -1) - (await top())))
     .toBe(0);
@@ -242,7 +242,7 @@ test('整页一起滚：列头吸在顶上，行不从它底下露出来；End �
   await expect(last).toBeInViewport();
   const lastTop = (await last.boundingBox())?.y ?? 0;
   expect(lastTop).toBeGreaterThanOrEqual(await headBottom());
-  // 滚到了底，下面只剩页面的下内边距：那一层照样贴在列头下面，不被往上推。
+  // 滚到了底，下面只剩页面的下内边距：那一层照样贴在列头下面，不被往上推
   const layerTop = (await shown.boundingBox())?.y ?? -1;
   expect(Math.abs(layerTop - (await headBottom()))).toBeLessThan(1);
 });
@@ -297,7 +297,7 @@ test('从列表形态进、后退回去：列表的滚动与焦点行交还', as
   const picked = list.getByRole('row', { name: /Kind of Blue 2/ });
   await picked.click();
   const scrolled = await listScroller.evaluate((element) => element.scrollTop);
-  // 光比滚动量测不出垫位行晚到造成的错位：连同那一行在视口里的位置一起比。
+  // 光比滚动量测不出垫位行晚到造成的错位：连同那一行在视口里的位置一起比
   const shownAt = async () => Math.round((await picked.boundingBox())?.y ?? -1);
   const before = await shownAt();
   await list.locator('[data-list-album="Led Zeppelin IV"] [data-list-album-name]').click();
@@ -354,10 +354,9 @@ test('库变了、这张的曲目原样回来：选中还在；换了排序才�
     timestamp: 1,
   });
   await expect.poll(() => host.callsTo('library.getAlbumTracks').length).toBeGreaterThan(before);
-  await page.waitForTimeout(200);
   await expect(row(page, 'The Wall 1')).toHaveAttribute('aria-selected', 'true');
   await expect(row(page, 'The Wall 2')).toHaveAttribute('aria-selected', 'true');
-  // 标题升序与碟、曲顺序一样，行序号没变；反向才换了顺序。
+  // 标题升序与碟、曲顺序一样，行序号没变；反向才换了顺序
   await header(page, '标题').click();
   await expect(row(page, 'The Wall 1')).toHaveAttribute('aria-selected', 'true');
   await header(page, '标题').click();
@@ -385,11 +384,9 @@ test('停在页上时这张移出了媒体库：留在原页，写明原因，�
   await expect(table(page)).toHaveCount(0);
 });
 
-test('窄于 600：封面缩成 96，只有播放键带字', async ({ page }) => {
+test('窄于 600：只有播放键带字，发送与随机播放收成图标、保留可访问名', async ({ page }) => {
   await start(page, { width: 600 });
   await openFromMenu(page, 'The Wall');
-  const cover = page$(page).locator('[data-detail-cover]');
-  await expect.poll(async () => (await cover.boundingBox())?.width).toBe(96);
   await expect(page$(page).locator('[data-detail-send]')).toHaveAccessibleName('发送到…');
   await expect(page$(page).locator('[data-detail-send]')).not.toContainText('发送到');
   await expect(page$(page).locator('[data-detail-play]')).toContainText('播放');

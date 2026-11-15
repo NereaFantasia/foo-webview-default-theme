@@ -12,13 +12,14 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { translateAtom } from '../../i18n/locale.ts';
+import { localeAtom, translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom } from '../../i18n/plural.ts';
 import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
 import type { KeyedSelection } from '../../kit/keyedSelection.ts';
 import { EMPTY_GENRE } from '../../nav/places.ts';
 import { genresQuery, type GenreEntry } from './genresModel.ts';
 import { genresPrefsAtom } from './genresPrefs.ts';
+import type { GenreIssue } from './genresTidy.ts';
 import { GenresMenu } from './GenresMenu.tsx';
 import { useGenresList } from './useGenresList.ts';
 import styles from './GenresList.module.css';
@@ -35,6 +36,7 @@ const useStyles = makeStyles({
 });
 export interface GenresListProps {
   readonly entries: readonly GenreEntry[];
+  readonly issues: ReadonlyMap<string, readonly GenreIssue[]>;
   readonly selected: string | null;
   readonly focus: string | null;
   readonly onFocus: (key: string | null) => void;
@@ -53,9 +55,19 @@ export function GenresList(props: GenresListProps) {
   const controls = useViewControlStyles();
   const genres = useService(genresKey);
   const t = useAtomValueRawSync(translateAtom);
+  const locale = useAtomValueRawSync(localeAtom);
   const plural = useAtomValueRawSync(pluralAtom);
   const prefs = useAtomValueRawSync(genresPrefsAtom);
   const classes = useStyles();
+  const issueText = (issue: GenreIssue) =>
+    issue.kind === 'duplicate'
+      ? t('genres.duplicate', { name: issue.others[0] ?? '' })
+      : t('genres.combined', {
+          parts: new Intl.ListFormat(locale.active, {
+            type: 'conjunction',
+            style: 'narrow',
+          }).format(issue.parts),
+        });
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
   const [menu, setMenu] = useState<{ keys: readonly string[]; x: number; y: number } | null>(null);
@@ -166,6 +178,7 @@ export function GenresList(props: GenresListProps) {
             if (!entry) return null;
             const name = entry.key === EMPTY_GENRE ? t('genres.unknown') : entry.key;
             const disabled = genresQuery([entry.key]) === null;
+            const issue = props.tidy ? props.issues.get(entry.key)?.[0] : undefined;
             return (
               <div
                 key={item.key}
@@ -189,8 +202,8 @@ export function GenresList(props: GenresListProps) {
                     {name}
                   </span>
                   <Metadata className={styles.count}>
-                    {entry.issue && props.tidy ? (
-                      t(`genres.${entry.issue}`)
+                    {issue ? (
+                      issueText(issue)
                     ) : (
                       <>
                         <MetadataItem icon={<RecordRegular />}>

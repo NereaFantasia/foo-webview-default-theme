@@ -22,6 +22,7 @@ import {
 import { createStopTransit } from './stopTransit.ts';
 import { withStreamTrack, type StreamTrack } from './streamTrack.ts';
 import { amplitudeOf, clamp, MUTE_DB } from './volumeScale.ts';
+import { noteSkip } from './skipIntent.ts';
 
 /** 跳回原位置后等待宿主进度推进的超时上限（毫秒，实测约 0.6 秒起步） */
 const SETTLE_MS = 3000;
@@ -257,9 +258,9 @@ export function startPlayback(
       const opening = transit.phase() !== 'switching';
       transit.starting();
       bump('position');
-      // 手动切歌时宿主先报 starting，解码器打开新曲目后才报 trackChanged；位置时钟在 starting 带来的 stateChanged
-      // 里就归零了，等 trackChanged 才开新一轮，进度条早被时钟拽到 0，归零缓动没了起点。所以新一轮从这里起算。
-      // 换地址续播（暂留）期间的 starting 是同一首换了地址，进度要停在原位，不算
+      // 手动切歌时宿主先派发 starting，位置时钟在随后的 stateChanged 中归零，解码器就绪后才派发 trackChanged；
+      // 若等待 trackChanged 才开启新轮次，进度已被重置为 0 会导致归零缓动失去起点，因此新轮次自 starting 起算
+      // 换地址续播（暂留）期间的 starting 属于同曲目换源，进度保持原位，不计入新轮次
       if (opening && !hold && store.get(stateAtom).track)
         update({ trackGeneration: store.get(stateAtom).trackGeneration + 1 });
     };
@@ -387,8 +388,14 @@ export function startPlayback(
     ready: start(),
     playOrPause: () => command(() => host.player.toggle(), refreshTransport),
     stop: () => command(() => host.player.stop(), refreshTransport),
-    next: () => command(() => host.player.next(), refreshTransport),
-    previous: () => command(() => host.player.prev(), refreshTransport),
+    next() {
+      if (connected()) noteSkip(store, 'next');
+      return command(() => host.player.next(), refreshTransport);
+    },
+    previous() {
+      if (connected()) noteSkip(store, 'previous');
+      return command(() => host.player.prev(), refreshTransport);
+    },
     seek: async (seconds) => {
       if (!connected()) return;
       await command(() => host.player.seek(clamp(seconds, 0, store.get(stateAtom).duration)));

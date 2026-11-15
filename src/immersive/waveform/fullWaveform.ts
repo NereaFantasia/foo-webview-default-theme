@@ -4,7 +4,12 @@ import { currentTrackAtom } from '../../playback/playback.ts';
 import { trackKeyOf } from '../../playback/playbackContract.ts';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
 import type { Store } from '../../kit/store.ts';
-import { trackAbilities } from '../../host/trackOrigin.ts';
+import {
+  analysisPlan,
+  DEFAULT_ONLINE_ANALYSIS,
+  type OnlineAnalysis,
+} from '../../host/onlineAnalysis.ts';
+import { holdOnlineTrack, type HoldTrack } from '../../server/holdTrack.ts';
 
 /**
  * 整轨波形：换曲问一次 `audio.generateFullWaveform`（method `rms`），画波形用。宿主把点按本组最大值归一化到
@@ -16,7 +21,9 @@ import { trackAbilities } from '../../host/trackOrigin.ts';
  * 失败仍在换曲或重新连接后重试
  *
  * 路径交 `track.handle`：CUE 与多轨文件的分轨自带 `|subsong:N`，端点按后缀取那一轨。宿主没连上时不问；
- * 网络流也不问：端点先在 fb2k 主线程同步读文件状态，对 URL 是网络超时
+ * 电台流也不问：端点先在 fb2k 主线程同步读文件状态，对远端的 URL 是网络超时；在线曲目的地址在本地后端，
+ * 按用户的选择（`analysisPlan`）：问之前先通知后端把整首留在内存里（`holdOnlineTrack`），免得几次分析各自
+ * 向上游下一遍，或直接问，或不问
  */
 export type FullWaveformStatus = 'idle' | 'pending' | 'ready' | 'failed';
 
@@ -52,9 +59,18 @@ export const fullWaveformAtom: Atom<FullWaveform> = atom((get) => get(stateAtom)
 /** 跟着 `currentTrackAtom` 取整轨波形；编辑标签不重取。`pendingDelay` 是毫秒，缺省 `PENDING_DELAY_MS` */
 export function startFullWaveform(
   store: Store,
-  options: { host?: FullWaveformHost; pendingDelay?: number; active?: Atom<boolean> } = {},
+  options: {
+    host?: FullWaveformHost;
+    pendingDelay?: number;
+    active?: Atom<boolean>;
+    hold?: HoldTrack;
+    /** 读当时在线曲目的整轨分析选择；缺省 `DEFAULT_ONLINE_ANALYSIS` */
+    mode?: () => OnlineAnalysis;
+  } = {},
 ): FullWaveformService {
   const host = options.host ?? fb;
+  const hold = options.hold ?? holdOnlineTrack;
+  const mode = options.mode ?? (() => DEFAULT_ONLINE_ANALYSIS);
   const pendingDelay = options.pendingDelay ?? PENDING_DELAY_MS;
   store.set(stateAtom, INITIAL);
   let token = 0;
@@ -70,8 +86,13 @@ export function startFullWaveform(
   }
 
   /** 问一次；拿不到点（任一条失败路径）给 `null` */
-  async function request(path: string, signal: AbortSignal): Promise<readonly number[] | null> {
+  async function request(
+    path: string,
+    held: boolean,
+    signal: AbortSignal,
+  ): Promise<readonly number[] | null> {
     try {
+      if (held) await hold(path, signal);
       const result = await host.audio.generateFullWaveform(path, {
         resolution: WAVEFORM_RESOLUTION,
         method: 'rms',
@@ -84,7 +105,7 @@ export function startFullWaveform(
     }
   }
 
-  async function load(path: string, key: string, id: number): Promise<void> {
+  async function load(path: string, held: boolean, key: string, id: number): Promise<void> {
     const controller = new AbortController();
     inflight = controller;
     pendingTimer = setTimeout(() => {
@@ -93,7 +114,7 @@ export function startFullWaveform(
         store.set(stateAtom, { status: 'pending', rms: [] });
       }
     }, pendingDelay);
-    const points = await request(path, controller.signal);
+    const points = await request(path, held, controller.signal);
     if (id !== token) return;
     inflight = null;
     clearPending();
@@ -121,13 +142,14 @@ export function startFullWaveform(
     }
     store.set(stateAtom, INITIAL);
     if (!want || !key || !track) return;
-    // 流没有「整轨」，按不可用报，免得波形区一直空着没个说法
-    if (!trackAbilities(track.path).opensLocally) {
+    // 电台流没有「整轨」、在线曲目选了关闭：按不可用报，免得波形区一直空着没个说法
+    const plan = analysisPlan(track.path, mode());
+    if (plan === 'skip') {
       last = { key, value: FAILED };
       store.set(stateAtom, last.value);
       return;
     }
-    void load(track.handle, key, token);
+    void load(track.handle, plan === 'hold', key, token);
   }
 
   // 先订阅再初读

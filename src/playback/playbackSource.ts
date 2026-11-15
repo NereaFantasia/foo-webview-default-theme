@@ -52,6 +52,8 @@ export const SOURCE_KINDS = [
   'onlineAlbum',
   'onlinePlaylist',
   'onlineArtist',
+  'onlineFavorites',
+  'home',
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 
@@ -60,9 +62,10 @@ export type RecordedSource = {
   readonly kind: SourceKind;
   /**
    * 记录来源主体标识：专辑对应专辑键，列表对应 GUID，歌曲页对应查询（整库为 ALL），
-   * 流派对应流派标识，在线搜索对应关键词，在线专辑/歌单/热门曲目对应列表地点主体
+   * 流派对应流派标识，在线搜索对应关键词，在线专辑/歌单/热门曲目对应列表地点主体，在线收藏固定写 `track`，
+   * 首页对应它的一行（如 `new-tracks`）
    */
-  // 艺人主体保留原名与大小写；空字符串表示未设置艺术家
+  // 艺人主体保留原名与大小写；空字符串表示未设置艺人
   readonly subject: string;
   /**
    * 记录发起播放时刻的快照名称（专辑名、列表名或歌曲筛选条件说明）；后续源对象改名不联动更新
@@ -89,6 +92,8 @@ const SOURCE_LABELS = {
   onlineAlbum: 'player.source.onlineAlbum',
   onlinePlaylist: 'player.source.onlinePlaylist',
   onlineArtist: 'player.source.onlineArtist',
+  onlineFavorites: 'player.source.onlineFavorites',
+  home: 'player.source.home',
   library: 'player.source.library',
 } as const;
 
@@ -149,6 +154,8 @@ export function refOfSource(source: PlaybackSource): ObjectRef | null {
     case 'songs':
     case 'folder':
     case 'online':
+    case 'onlineFavorites':
+    case 'home':
     case 'library':
       return null;
   }
@@ -178,6 +185,10 @@ export function sourceHome(source: PlaybackSource): Place {
     case 'onlinePlaylist':
     case 'onlineArtist':
       return { id: 'onlineList', subject: source.subject };
+    case 'onlineFavorites':
+      return { id: 'favorites' };
+    case 'home':
+      return { id: 'home' };
     case 'library':
       return { id: 'albums' };
   }

@@ -1,7 +1,10 @@
 import { startLyricsArchive } from '../../../src/lyrics/lyricsArchive.ts';
+import type { LyricsCacheService } from '../../../src/lyrics/lyricsCache.ts';
+import { lyricsCandidateId } from '../../../src/lyrics/lyricsSearchSession.ts';
+import type { FoundLyrics } from '../../../src/lyrics/online/lyricsSearch.ts';
 import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
 import { atom, createStore } from 'jotai/vanilla';
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { startLocalLyrics } from '../../../src/lyrics/lyricsLocal.ts';
 import type { LyricsPrefs } from '../../../src/lyrics/lyricsPrefs.ts';
 import { startLyrics, type LyricsTarget } from '../../../src/lyrics/lyricsService.ts';
@@ -37,7 +40,11 @@ const httpLyrics = (
   ]),
 });
 
-function setup(enabled = false, withArchive = false) {
+function setup(
+  enabled = false,
+  withArchive = false,
+  cache?: Pick<LyricsCacheService, 'lookup' | 'store'>,
+) {
   const host = installFakeHost();
   host.answer('lyrics.get', { success: true, available: false, path: '' });
   host.answer('http.get', (params) => {
@@ -61,6 +68,7 @@ function setup(enabled = false, withArchive = false) {
     local,
     prefs: { pref },
     archive,
+    cache,
   });
   onTestFinished(() => {
     service.dispose();
@@ -450,5 +458,95 @@ describe('当前曲目歌词', () => {
     env.service.dispose();
     env.service.refresh();
     expect(env.host.callsTo('lyrics.get')).toHaveLength(2);
+  });
+});
+
+const CACHED: FoundLyrics = {
+  source: 'netease',
+  content: { kind: 'plain', lines: ['缓存里的词'] },
+  candidate: {
+    source: 'netease',
+    ref: 'cached',
+    title: 'a',
+    artists: ['艺人'],
+    album: '专辑',
+    durationMs: 120_000,
+  },
+  match: { level: 'high', points: 20 },
+};
+
+function fakeCache(first?: FoundLyrics | 'missing') {
+  return {
+    lookup: vi.fn<LyricsCacheService['lookup']>(() => Promise.resolve(first)),
+    store: vi.fn<LyricsCacheService['store']>(),
+  };
+}
+
+describe('自动取词的缓存', () => {
+  it('命中时直接用缓存里的歌词，不联网也不再写回', async () => {
+    const cache = fakeCache(CACHED);
+    const env = setup(true, false, cache);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({
+      status: 'ready',
+      source: 'netease',
+      candidate: { ref: 'cached' },
+      content: { kind: 'plain' },
+    });
+    expect(cache.lookup).toHaveBeenCalledOnce();
+    expect(cache.lookup.mock.calls[0]?.[0]).toMatchObject({ title: 'a', artists: ['艺人'] });
+    expect(env.host.callsTo('http.get')).toHaveLength(0);
+    expect(cache.store).not.toHaveBeenCalled();
+  });
+
+  it('缓存里记的是「没有」时按没有找到处理，同样不联网', async () => {
+    const cache = fakeCache('missing');
+    const env = setup(true, false, cache);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ status: 'missing', reason: 'online' });
+    expect(env.host.callsTo('http.get')).toHaveLength(0);
+    expect(cache.store).not.toHaveBeenCalled();
+  });
+
+  it('没命中就联网，取到的歌词写回缓存；联网失败不写', async () => {
+    const cache = fakeCache();
+    const env = setup(true, false, cache);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ status: 'ready', source: 'lrclib' });
+    expect(cache.store).toHaveBeenCalledOnce();
+    expect(cache.store.mock.calls[0]?.[2]).toMatchObject({ source: 'lrclib' });
+    const failing = fakeCache();
+    const other = setup(true, false, failing);
+    other.host.answer('http.get', hostFailure('OPERATION_FAILED'));
+    other.play(target('b'));
+    await expect.poll(other.state).toMatchObject({ status: 'failed', stage: 'online' });
+    expect(failing.store).not.toHaveBeenCalled();
+  });
+
+  it('重新读取绕过缓存并覆盖写；只绕过这一次', async () => {
+    const cache = fakeCache(CACHED);
+    const env = setup(true, false, cache);
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ source: 'netease' });
+    env.service.refresh();
+    await expect.poll(env.state).toMatchObject({ status: 'ready', source: 'lrclib' });
+    expect(cache.lookup).toHaveBeenCalledOnce();
+    expect(cache.store).toHaveBeenCalledOnce();
+    env.play(target('b'));
+    await expect.poll(env.state).toMatchObject({ key: 'b', source: 'netease' });
+    expect(cache.lookup).toHaveBeenCalledTimes(2);
+  });
+
+  it('自动取到的歌词登记进手动搜索的会话，预览它不再发请求', async () => {
+    const env = setup(true, false, fakeCache());
+    env.play(target());
+    await expect.poll(env.state).toMatchObject({ status: 'ready', source: 'lrclib' });
+    const ready = env.state();
+    if (ready.status !== 'ready' || !ready.candidate) throw new Error('缺少候选');
+    const id = lyricsCandidateId(ready.candidate);
+    expect(env.service.candidate(id)).toBeDefined();
+    const before = env.host.callsTo('http.get').length;
+    expect(await env.service.previewCandidate(ready.candidate)).toEqual(ready.content);
+    expect(env.host.callsTo('http.get')).toHaveLength(before);
   });
 });

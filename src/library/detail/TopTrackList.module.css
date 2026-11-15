@@ -1,0 +1,135 @@
+/* 一栏时只露前 5 首；区宽够两栏时按栏排，第一栏放前一半，露前 10 首；够三栏时露前 12 首，每栏 4 首 */
+.list {
+  display: grid;
+  gap: 0 var(--spacingHorizontalXL);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+/* 行与行之间一条细线，⋯ 键在行外，跟行并排；悬停与按下的状态层画在整条 item 上，把 ⋯ 键也盖住 */
+.item {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  border-top: var(--strokeWidthThin) solid var(--line-subtle);
+}
+/* 状态层垫在内容之下，从细线下沿铺到条的四边，半透明而不是实底 */
+.item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--borderRadiusMedium);
+  pointer-events: none;
+}
+.item:hover::before {
+  background-image: linear-gradient(var(--state-hover), var(--state-hover));
+}
+.item:has(.row:active)::before {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+/* ⋯ 键与状态层右缘留出和行内左缘一样的间距 */
+.row + button {
+  margin-inline-end: var(--spacingHorizontalS);
+}
+.list > li:nth-child(n + 6) {
+  display: none;
+}
+@container artist-detail (min-width: 720px) {
+  .list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(var(--top-rows-2), auto);
+    grid-auto-flow: column;
+  }
+  .list > li:nth-child(n + 6) {
+    display: grid;
+  }
+  .list > li:nth-child(n + 11) {
+    display: none;
+  }
+}
+@container artist-detail (min-width: 1080px) {
+  .list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(var(--top-rows-3), auto);
+  }
+  .list > li:nth-child(n + 11) {
+    display: grid;
+  }
+  .list > li:nth-child(n + 13) {
+    display: none;
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  width: 100%;
+  height: 52px;
+  padding: 0 var(--spacingHorizontalS);
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+  outline: none;
+}
+/* 行间的线取半透明的 line-subtle，不取不透明的 Stroke */
+.row:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+}
+.title,
+.album {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.album {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 放不了的曲目整行变灰；正在播的曲名用品牌色，两者同时成立时仍写品牌色 */
+.row[data-dimmed] {
+  color: var(--colorNeutralForegroundDisabled);
+}
+.row[data-playing] .title {
+  color: var(--colorBrandForeground1);
+}
+@media (forced-colors: active) {
+  .row[data-dimmed] {
+    color: GrayText;
+  }
+  .row[data-playing] .title {
+    color: Highlight;
+  }
+}
+
+/* 展开后各栏都露全部：放在容器查询之后并抬高一级，盖过上面按栏数藏行的规则 */
+.list[data-expanded] > li:nth-child(n) {
+  display: grid;
+}

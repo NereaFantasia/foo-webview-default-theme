@@ -98,11 +98,42 @@ describe('歌曲页的起播', () => {
 });
 
 describe('成批命令', () => {
-  it('建自动列表与发送到新列表都按查询，失败挂命令失败', async () => {
+  it('建自动播放列表照对话框交来的名称、查询、排序与保持排序，建成后切为活动列表', async () => {
+    const { host, actions, notice } = setup();
+    host.answer('playlist.createAutoplaylist', {
+      success: true,
+      index: 3,
+      playlist: 3,
+      guid: '{G}',
+      name: '歌曲 · 无损',
+      query: 'genre IS Jazz',
+    });
+    host.answer('playlist.setActive', { success: true });
+    const request = {
+      name: '歌曲 · 无损',
+      query: 'genre IS Jazz',
+      sort: '%year%',
+      keepSorted: true,
+    };
+    expect(await actions.createAutoplaylist(request)).toBe(true);
+    expect(host.callsTo('playlist.createAutoplaylist')).toEqual([
+      { name: '歌曲 · 无损', query: 'genre IS Jazz', sort: '%year%', keepSorted: true },
+    ]);
+    expect(host.callsTo('playlist.setActive')).toHaveLength(1);
+    expect(notice()).toBeNull();
+  });
+
+  it('建自动播放列表失败只答假，不挂页面的提示横幅：对话框自己写没创建成', async () => {
     const { host, actions, notice } = setup();
     host.answer('playlist.createAutoplaylist', hostFailure('OPERATION_FAILED'));
-    expect(await actions.createAutoplaylist(RUN, '歌曲 · 无损')).toBe(false);
-    expect(notice()).toBe('songs.commandFailed');
+    const request = { name: '歌曲', query: 'ALL', sort: '', keepSorted: false };
+    expect(await actions.createAutoplaylist(request)).toBe(false);
+    expect(notice()).toBeNull();
+    expect(host.callsTo('playlist.setActive')).toEqual([]);
+  });
+
+  it('发送到新列表按查询', async () => {
+    const { host, actions, notice } = setup();
     expect(await actions.sendToNew(RUN, '歌曲 · 无损')).toBe(true);
     expect(host.callsTo('playlist.create')).toEqual([{ name: '歌曲 · 无损' }]);
     expect(notice()).toBeNull();

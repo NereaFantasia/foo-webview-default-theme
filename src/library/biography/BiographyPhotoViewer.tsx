@@ -244,7 +244,12 @@ export function BiographyPhotoViewer({
             <footer className={styles.footer}>
               <div>
                 {photo?.sourceUrl ? (
-                  <BiographyPhotoSource key={photo.sourceUrl} url={photo.sourceUrl} t={t} />
+                  <BiographyPhotoSource
+                    key={photo.sourceUrl}
+                    url={photo.sourceUrl}
+                    name={photo.album}
+                    t={t}
+                  />
                 ) : (
                   <>
                     {t('biography.localPhoto')} · {photo?.album}

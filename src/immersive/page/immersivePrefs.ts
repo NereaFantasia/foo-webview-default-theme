@@ -8,11 +8,16 @@ import {
   type PrefStorage,
 } from '../../kit/localPref.ts';
 import type { Store } from '../../kit/store.ts';
+import {
+  DEFAULT_ONLINE_ANALYSIS,
+  ONLINE_ANALYSIS_CHOICES,
+  type OnlineAnalysis,
+} from '../../host/onlineAnalysis.ts';
 import { setPaintFpsCap } from '../frame/frameScheduler.ts';
 import { isWaveformMode, type WaveformMode } from '../waveform/waveformModes.ts';
 
 /**
- * 沉浸视图的几项偏好：背景山脊图、封面底色、进视图时宿主全屏、重画帧率上限、整轨波形画法与场景
+ * 沉浸视图的几项偏好：背景山脊图、封面底色、进视图时宿主全屏、重画帧率上限、整轨波形画法、场景与在线曲目的整轨分析
  * 整页一份，设置页与沉浸视图读写同一组 atom。存 localStorage、不进宿主 config：进视图之前同步读得到，
  * 不等宿主。性能小窗的开关另在 `perfOverlay.ts`
  *
@@ -44,6 +49,7 @@ export const IMMERSIVE_PREF_KEYS = {
   fpsCap: 'default-theme.immersive.fpsCap.v1',
   waveformMode: 'default-theme.immersive.waveformMode.v1',
   scene: 'default-theme.immersive.scene.v1',
+  onlineAnalysis: 'default-theme.immersive.onlineAnalysis.v1',
 } as const;
 const WAVEFORM_MODE: PrefCodec<WaveformMode> = {
   parse: (raw) => (isWaveformMode(raw) ? raw : undefined),
@@ -75,6 +81,12 @@ const scene = defineLocalPref<ImmersiveScene>({
   key: IMMERSIVE_PREF_KEYS.scene,
   fallback: DEFAULT_SCENE,
   ...choiceCodec(IMMERSIVE_SCENES),
+});
+
+const onlineAnalysis = defineLocalPref<OnlineAnalysis>({
+  key: IMMERSIVE_PREF_KEYS.onlineAnalysis,
+  fallback: DEFAULT_ONLINE_ANALYSIS,
+  ...choiceCodec(ONLINE_ANALYSIS_CHOICES),
 });
 
 /**
@@ -122,6 +134,14 @@ export const readImmersiveScene = scene.read;
 export const chooseImmersiveScene = scene.set;
 
 /**
+ * 在线曲目的整轨分析怎么取，缺省 `hold`（见 `host/onlineAnalysis.ts`）；沉浸视图每次进入时按当时的值取，
+ * 看着的时候改了要到下一次进入才生效
+ */
+export const onlineAnalysisAtom: Atom<OnlineAnalysis> = onlineAnalysis.atom;
+export const readOnlineAnalysis = onlineAnalysis.read;
+export const chooseOnlineAnalysis = onlineAnalysis.set;
+
+/**
  * 把全部存档读进 `store`，帧率上限随之交给重画调度。整页在首帧之前或头一次进沉浸视图之前调一次：
  * 再调会拿存档盖掉 store 里的值，存储被禁时这次启动里改过的几项就丢了
  */
@@ -135,4 +155,5 @@ export function loadImmersivePrefs(
   applyFpsCap(fpsCap.load(store, storage));
   waveformMode.load(store, storage);
   scene.load(store, storage);
+  onlineAnalysis.load(store, storage);
 }

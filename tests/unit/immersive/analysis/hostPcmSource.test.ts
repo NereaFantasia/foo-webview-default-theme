@@ -12,7 +12,7 @@ import { makeTrack } from '../../../fixtures/tracks.ts';
 
 /**
  * 两种 PCM 来源用注入的 `decodePcm` 替身测：替身记下每次的路径与选项，按用例答一块假的 PCM 或抛错；
- * 假 PCM 记下拷贝与释放。SDK 自己的中止、超时与 `cancelDecodePcm` 不在这里，替身只核对 `signal` 原样交过去。
+ * 假 PCM 记下拷贝与释放。SDK 自己的中止、超时与 `cancelDecodePcm` 不在这里，替身只核对 `signal` 原样交过去
  */
 interface Call {
   path: string;
@@ -66,6 +66,8 @@ const STREAM = makeTrack({
   path: 'http://radio.example/live',
   handle: 'http://radio.example/live',
 });
+const ONLINE_PATH = 'http://127.0.0.1:51234/music/stream/wy/3347766479.flac?q=flac';
+const ONLINE = makeTrack({ path: ONLINE_PATH, handle: ONLINE_PATH });
 const RANGE = { start: 30, end: 60 };
 
 describe('hostPcmSource', () => {
@@ -94,12 +96,50 @@ describe('hostPcmSource', () => {
     expect(piece.log).toStrictEqual(['copy', 'release']);
   });
 
-  test('网络流不取：给 null，一次都不问宿主', async () => {
+  test('电台流不取：给 null，一次都不问宿主', async () => {
     const { host, calls } = fakeHost(async () => fakePcm().pcm);
     const signal = new AbortController().signal;
     expect(await createHostPcmSource(host)(STREAM, RANGE, signal)).toBeNull();
     expect(await createHostFullRatePcm(host)(STREAM, RANGE, signal)).toBeNull();
     expect(calls).toStrictEqual([]);
+  });
+
+  test.each([
+    ['hold', true, true],
+    ['segments', false, true],
+    ['off', false, false],
+  ] as const)(
+    '在线曲目选 %s：通知后端留这首 %s，向宿主解码 %s',
+    async (mode, notified, decoded) => {
+      const { host, calls } = fakeHost(async () => fakePcm().pcm);
+      const held: string[] = [];
+      const access = {
+        mode: () => mode,
+        hold: async (path: string) => {
+          held.push(`${path}@${calls.length}`);
+        },
+      };
+      const signal = new AbortController().signal;
+      const bands = await createHostPcmSource(host, access)(ONLINE, RANGE, signal);
+      const planes = await createHostFullRatePcm(host, access)(ONLINE, RANGE, signal);
+      expect([bands === null, planes === null]).toStrictEqual([!decoded, !decoded]);
+      expect(calls.map((call) => call.path)).toStrictEqual(
+        decoded ? [ONLINE_PATH, ONLINE_PATH] : [],
+      );
+      expect(held).toStrictEqual(notified ? [`${ONLINE_PATH}@0`, `${ONLINE_PATH}@1`] : []);
+    },
+  );
+
+  test('没给选择时按缺省预载；本地曲目不通知后端', async () => {
+    const { host } = fakeHost(async () => fakePcm().pcm);
+    const held: string[] = [];
+    const hold = async (path: string) => {
+      held.push(path);
+    };
+    const signal = new AbortController().signal;
+    await createHostPcmSource(host, { hold })(ONLINE, RANGE, signal);
+    await createHostPcmSource(host, { hold })(CUE, RANGE, signal);
+    expect(held).toStrictEqual([ONLINE_PATH]);
   });
 
   test('宿主答 NOT_SUPPORTED 转成 PcmUnavailableError；别的失败与中止原样抛出', async () => {

@@ -1,6 +1,6 @@
 import type { LyricLine } from '@applemusic-like-lyrics/core';
 import { useEffect, useState, type RefObject } from 'react';
-import { canvasMeasure, singleExtraHeight, translationFontSizeOf } from './desktopLyricsHeight.ts';
+import { canvasMeasure, singleExtraHeight } from './desktopLyricsHeight.ts';
 import type { DesktopLyricsView } from './desktopLyricsLink.ts';
 import type { DesktopLyricsPopup } from './desktopLyricsPopup.ts';
 
@@ -11,9 +11,9 @@ const AREA_PADDING = 16;
 const MIN_WIDTH = 416;
 
 /** 计算单行歌词及其副行所需的区块高度，包含上下内边距，单位 CSS 像素 */
-function lineBlock(fontSize: number, subLines: number): number {
+function lineBlock(fontSize: number, translationFontSize: number, subLines: number): number {
   const main = fontSize * 1.25;
-  const translation = subLines * (fontSize * 0.6 * 1.5 + fontSize * 0.3);
+  const translation = subLines * (translationFontSize * 1.5 + fontSize * 0.3);
   return Math.ceil(main + translation + AREA_PADDING * 2);
 }
 
@@ -25,8 +25,13 @@ export interface DesktopLayoutInput {
   /** 实时测得的歌词渲染区域宽度，单位 CSS 像素；尚未完成首次测量时为 0 */
   readonly lyricsWidth: number;
   readonly fontSize: number;
+  /** 译文字号，CSS 像素 */
+  readonly translationFontSize: number;
   readonly showTranslation: boolean;
   readonly showRomanization: boolean;
+  /** 桌面歌词的字体与字重；换了要重新量折行 */
+  readonly font: string;
+  readonly fontWeight: number | null;
 }
 
 /**
@@ -39,7 +44,7 @@ export function useDesktopLayout(
   input: DesktopLayoutInput,
 ): void {
   const { single, locked, multilineSize, lines, lyricsWidth, fontSize } = input;
-  const { showTranslation, showRomanization } = input;
+  const { translationFontSize, showTranslation, showRomanization, font, fontWeight } = input;
   const [fontsEpoch, setFontsEpoch] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +56,11 @@ export function useDesktopLayout(
     };
   }, []);
   useEffect(() => {
-    const block = lineBlock(fontSize, Number(showTranslation) + Number(showRomanization));
+    const block = lineBlock(
+      fontSize,
+      translationFontSize,
+      Number(showTranslation) + Number(showRomanization),
+    );
     const singleWidth = Math.max(1000, fontSize * 32);
     const player = lyricsBox.current?.querySelector('.amll-lyric-player');
     let extra = 0;
@@ -61,11 +70,14 @@ export function useDesktopLayout(
       extra = singleExtraHeight({
         lines,
         fontSize,
-        translationFontSize: translationFontSizeOf(fontSize),
+        translationFontSize,
         showTranslation,
         showRomanization,
         width,
-        measure: canvasMeasure(getComputedStyle(player).fontFamily),
+        measure: canvasMeasure(
+          getComputedStyle(player).fontFamily,
+          getComputedStyle(player).fontWeight,
+        ),
       });
     }
     popup.setLayout(MIN_WIDTH, TOOLBAR + block + extra, singleWidth);
@@ -79,8 +91,11 @@ export function useDesktopLayout(
     lines,
     lyricsWidth,
     fontSize,
+    translationFontSize,
     showTranslation,
     showRomanization,
+    font,
+    fontWeight,
     fontsEpoch,
   ]);
 }

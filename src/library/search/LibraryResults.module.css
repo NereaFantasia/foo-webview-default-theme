@@ -1,0 +1,61 @@
+.scroller {
+  padding-inline: var(--search-inset);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-top: var(--spacingVerticalM);
+  padding-bottom: calc(var(--player-inset, 0px) + var(--spacingVerticalXXL));
+}
+.controls {
+  padding-inline: var(--search-inset);
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+/* 分类页签兼作命令栏：页签之后隔一条竖线是命令栏，命令栏占满余下的宽 */
+.controls > :last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.divider {
+  flex: none;
+  width: var(--strokeWidthThin);
+  height: 20px;
+  background: var(--line);
+}
+/* 与在线音乐合在一页时「媒体库」一区的区标题，比各节标题高一级；在线那一区的写法在 OnlineSection.module.css */
+.section {
+  margin: 0 0 var(--spacingVerticalS);
+  padding: 0 var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
+  font-weight: var(--fontWeightSemibold);
+}
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXL);
+}
+.overview h2 {
+  margin: 0;
+  padding: var(--spacingVerticalS) var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+.group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+}
+.albums {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+  gap: var(--spacingHorizontalS);
+}
+.notice {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalS);
+}

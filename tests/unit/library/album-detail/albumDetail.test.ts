@@ -23,7 +23,7 @@ const changed = { count: 1, handles: [], truncated: false, fromHook: false, time
 async function setup(albums: readonly AlbumInfo[] = [BLUE, HEJIRA], host?: UnitHost) {
   const fake = host ?? installFakeHost({ answers: libraryAnswers(albums) });
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const list = startAlbums(store, fake.fb);
   let stamps = 0;
   const refetch = atom(0);
@@ -83,7 +83,7 @@ describe('页面要一张专辑', () => {
     const host = installFakeHost({ answers: libraryAnswers([BLUE]) });
     const held = host.hold('library.getAlbums');
     const store = createStore();
-    const history = startNavHistory(store);
+    const history = startNavHistory(store, { id: 'albums' });
     const list = startAlbums(store, host.fb);
     const detail = startAlbumDetail(
       store,

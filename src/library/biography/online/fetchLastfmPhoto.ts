@@ -23,10 +23,22 @@ export async function fetchLastfmPhoto(
 ): Promise<LastfmPhotoResult> {
   if (!lastfmPhotoId(source.url))
     return { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000, detail: null };
+  return requestBiographyPhoto(source.url, host);
+}
+
+/**
+ * 经宿主取一张在线照片并归类失败；地址由调用方校验过主机，这里不再判断来源。Last.fm 与
+ * Apple 的图都走这里：二进制经桥，大小上限、类型白名单与退避一致
+ */
+export async function requestBiographyPhoto(
+  url: string,
+  host: Pick<typeof fb, 'http'> = fb,
+  timeout = 12_000,
+): Promise<LastfmPhotoResult> {
   const called = await settleDetailed(() =>
-    host.http.request(source.url, {
+    host.http.request(url, {
       responseType: 'arraybuffer',
-      timeout: 12_000,
+      timeout,
       redirect: 'error',
       headers: {
         'User-Agent': 'foo-webview-default-theme/0.1 (+https://github.com/NereaFantasia)',

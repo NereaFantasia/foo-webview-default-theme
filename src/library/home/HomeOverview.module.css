@@ -1,0 +1,118 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--overview-columns), minmax(0, 1fr));
+  gap: var(--spacingHorizontalM);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+  border: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  background-color: var(--bg-view-control);
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  text-align: start;
+}
+
+/*
+ * 悬停与按下的状态层叠在卡片自己的底上：两者浓度接近，直接换底看不出变化。状态层的颜色注册为可插值的属性，
+ * 换色时做 83 ms 的线性过渡，与按钮底色一致
+ */
+@property --overview-layer {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+button.card {
+  background-image: linear-gradient(var(--overview-layer), var(--overview-layer));
+  cursor: pointer;
+  transition: --overview-layer var(--motion-faster) var(--curveLinear);
+}
+
+button.card:hover {
+  --overview-layer: var(--state-hover);
+}
+
+button.card:active {
+  --overview-layer: var(--state-pressed);
+}
+
+button.card:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+  min-height: 22px;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.icon {
+  display: flex;
+  font-size: var(--fontSizeBase400);
+}
+
+.value {
+  font-size: var(--fontSizeBase600);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lineHeightBase600);
+  white-space: nowrap;
+}
+
+.note {
+  min-height: var(--lineHeightBase200);
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacingHorizontalXXS);
+  height: 20px;
+  margin-inline-start: auto;
+}
+
+.bars i {
+  display: block;
+  width: 3px;
+  min-height: 2px;
+  border-radius: var(--borderRadiusSmall);
+  background: var(--line);
+}
+
+.bars i:last-child {
+  background: var(--colorBrandForeground1);
+}
+
+.ring {
+  width: 22px;
+  height: 22px;
+  margin-inline-start: auto;
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 3;
+}
+
+.ring circle + circle {
+  stroke: var(--colorBrandForeground1);
+}

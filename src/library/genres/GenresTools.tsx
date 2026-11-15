@@ -103,6 +103,7 @@ export function GenresTools({ model, supported, setClosed, onSelectionMenu }: Ge
                     menuOpen={queryOpen}
                     placeholder={t('songs.filterShort')}
                     label={t('genres.filterTracks')}
+                    playcountMissing={available === false}
                     onChange={genres.tools.filter.setQuery}
                     onEnter={() => void genres.rows.retry()}
                     onScope={genres.tools.setScope}

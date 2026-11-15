@@ -14,8 +14,9 @@ import { togglePerfOverlay } from '../immersive/perf/perfOverlay.ts';
 import type { ViewServices } from '../immersive/page/viewServices.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 import type { Store } from '../kit/store.ts';
+import type { BrowserPanelService } from '../nav/browserPanel.ts';
 import type { CommandRegistry } from '../nav/commandRegistry.ts';
-import { historyAtom, type HistoryEntry, type NavHistoryService } from '../nav/navHistory.ts';
+import { mainHistoryAtom, type HistoryEntry, type NavHistoryService } from '../nav/navHistory.ts';
 import type { PlaybackService } from '../playback/playbackContract.ts';
 import { initializeImmersivePrefs } from './immersivePrefs.ts';
 
@@ -27,7 +28,9 @@ interface ImmersiveResources {
 export function startImmersiveIntegration(
   store: Store,
   deps: {
+    /** 离开沉浸时的后退经面板服务交接落点，没有可后退的记录时由壳去 `START_PLACE`；传入的既不是外观历史服务，也不是主栈本身 */
     readonly history: Pick<NavHistoryService, 'back' | 'navigate'>;
+    readonly browser: Pick<BrowserPanelService, 'toggle' | 'open' | 'available'>;
     readonly commands: CommandRegistry;
     readonly playback: Pick<PlaybackService, 'playOrPause' | 'seek' | 'stepVolume'>;
     /** 视图盖住标题栏的这段时间不向宿主报最大化键的矩形，右上角悬停才不会弹出贴靠布局 */
@@ -66,6 +69,7 @@ export function startImmersiveIntegration(
       playback: deps.playback,
       shell: session.shell,
       togglePerfOverlay: () => togglePerfOverlay(store),
+      browser: deps.browser,
     });
   }
 
@@ -86,8 +90,8 @@ export function startImmersiveIntegration(
     }
   }
 
-  const offHistory = store.sub(historyAtom, () => {
-    if (session && session.entry !== store.get(historyAtom).entry) endSession();
+  const offHistory = store.sub(mainHistoryAtom, () => {
+    if (session && session.entry !== store.get(mainHistoryAtom).entry) endSession();
   });
   const offActive = store.sub(visible, syncCommands);
 
@@ -98,7 +102,7 @@ export function startImmersiveIntegration(
       entry: HistoryEntry,
       startResources?: ((active: Atom<boolean>) => ImmersiveResources) | null,
     ) {
-      const current = store.get(historyAtom);
+      const current = store.get(mainHistoryAtom);
       if (disposed || entry !== current.entry || current.place.id !== 'nowPlaying') return null;
       if (session?.entry === entry) {
         if (startResources === null) {
@@ -110,10 +114,13 @@ export function startImmersiveIntegration(
       }
       initializeImmersivePrefs(store);
       const alive = atom(true);
-      const active = atom((get) => get(alive) && get(visible) && get(historyAtom).entry === entry);
+      const active = atom(
+        (get) => get(alive) && get(visible) && get(mainHistoryAtom).entry === entry,
+      );
       const shell = startImmersiveShell(store, {
         host,
         history: deps.history,
+        hold: deps.browser.open,
         fullscreenOnEnter: () => store.get(immersiveHostFullscreenAtom),
         fullscreenManaged: () => {
           const mini = store.get(miniWindowAtom);

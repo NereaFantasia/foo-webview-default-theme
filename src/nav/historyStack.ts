@@ -11,6 +11,8 @@ interface HistoryOptions<P, K> {
   readonly same: (left: P, right: P) => boolean;
   readonly transition: (place: P) => K;
   readonly limit?: number;
+  /** 起始记录沿用这个身份：页面按记录存的快照随之共用，地点与来时的过渡仍各自独立 */
+  readonly first?: HistoryEntry;
 }
 
 /** 历史里的一条记录，对外只当身份用：页面按它登记快照钩子，中央区域按它区分新旧两层 */
@@ -18,7 +20,16 @@ export interface HistoryEntry {
   readonly key: number;
 }
 
-interface Entry<P, K> extends HistoryEntry {
+let lastKey = 0;
+
+// 键全站一个计数：两个栈共用一条记录的身份时，各自新建的记录不会与它撞键，中央区域的层按键区分
+function newIdentity(): HistoryEntry {
+  return { key: ++lastKey };
+}
+
+interface Entry<P, K> {
+  /** 对外的身份；两个栈可以共用同一个，`place` 与 `arrivedBy` 各管各的 */
+  readonly id: HistoryEntry;
   place: P;
   /** 从上一条走到这一条用的过渡；从这一条后退时反着播 */
   readonly arrivedBy: K;
@@ -32,7 +43,7 @@ export interface HistoryArrival<K> {
 export interface HistoryState<P, K> {
   readonly entry: HistoryEntry;
   readonly place: P;
-  /** 此刻后退会去的地点，已跳过主体不在的记录；后退键的悬停提示写它的名字。退不回去时为 null */
+  /** 此刻后退会去的地点，已跳过主体不存在的记录，后退键的悬停提示显示它的名字。没有可后退的记录时为 null */
   readonly previous: P | null;
   readonly next: P | null;
   /** 怎么到的当前这条；打开窗口时的第一条为 null，不播过渡 */
@@ -64,11 +75,27 @@ export interface SnapshotHooks<S extends object> {
   restore(snapshot: S): void;
 }
 
+export interface ReplaceOptions {
+  /** 新的这条沿用这个身份：把另一个栈里的记录交过来接着用，它的页面快照随之跟过来 */
+  readonly entry?: HistoryEntry;
+  /** 按离开原来这条记录来播过渡，与从它后退一样；缺省不播 */
+  readonly leave?: boolean;
+}
+
 export interface HistoryService<P extends HistoryPlace, K extends string> {
   /** 去一个地点：与当前相同就不记；否则丢掉前进的部分再记一条。过渡缺省按地点层级定 */
   navigate(place: P, kind?: K): void;
-  /** 改写当前页面，不新增记录；用于当前对象失效后的回退 */
-  replace(place: P): void;
+  /** 改写当前页面，不新增记录；用于当前对象失效后的回退，或把另一个栈的记录交过来 */
+  replace(place: P, options?: ReplaceOptions): void;
+  /** 此刻后退或前进会去的那一条，已跳过主体不在的记录；去不了为 null。不动历史 */
+  peek(direction: NavDirection): { readonly entry: HistoryEntry; readonly place: P } | null;
+  /** 取一次当前记录的页面快照，不离开它；把这条记录交给别的栈之前调 */
+  captureCurrent(): void;
+  /**
+   * 对当前记录的主体再调一次 `enter`。一个栈从停着变成在用时调：停着的这段时间，主体的主人侧的状态
+   * （例如宿主里激活的那张列表）可能被别处改走
+   */
+  reenter(): void;
   /** 退到上一条还在的记录，跳过主体已经不在的；一条都没有时返回 false，哪儿也不去 */
   back(): boolean;
   forward(): boolean;
@@ -104,8 +131,9 @@ export function startHistory<P extends HistoryPlace, K extends string>(
   options: HistoryOptions<P, K>,
 ): HistoryService<P, K> {
   const { same, transition, limit = 50 } = options;
-  let serial = 0;
-  let entries: Entry<P, K>[] = [{ key: ++serial, place: start, arrivedBy: transition(start) }];
+  let entries: Entry<P, K>[] = [
+    { id: options.first ?? newIdentity(), place: start, arrivedBy: transition(start) },
+  ];
   let index = 0;
   const subjects = new Map<P['id'], SubjectHooks>();
   const bindings = new Map<HistoryEntry, Set<Binding>>();
@@ -142,7 +170,7 @@ export function startHistory<P extends HistoryPlace, K extends string>(
   function publish(arrival: HistoryArrival<K> | null): void {
     const entry = at(index);
     const next: HistoryState<P, K> = {
-      entry,
+      entry: entry.id,
       place: entry.place,
       previous: placeAt(targetOf('back')),
       next: placeAt(targetOf('forward')),
@@ -195,7 +223,7 @@ export function startHistory<P extends HistoryPlace, K extends string>(
   }
 
   function capture(entry: Entry<P, K>): void {
-    for (const binding of bindings.get(entry) ?? []) binding.capture();
+    for (const binding of bindings.get(entry.id) ?? []) binding.capture();
   }
 
   function restoreOnce(binding: Binding): void {
@@ -208,8 +236,27 @@ export function startHistory<P extends HistoryPlace, K extends string>(
     index = target;
     restored = new WeakSet();
     const entry = at(index);
-    for (const binding of bindings.get(entry) ?? []) restoreOnce(binding);
+    for (const binding of bindings.get(entry.id) ?? []) restoreOnce(binding);
     publish(arrival);
+  }
+
+  function enterSubject(place: P): void {
+    const { id, subject } = place;
+    if (subject === undefined) return;
+    stepping = true;
+    try {
+      subjects.get(id)?.enter?.(subject);
+    } finally {
+      stepping = false;
+    }
+  }
+
+  // `enter` 进行中记下的那一笔，到达之后再按新的当前记录同步
+  function settlePending(): void {
+    if (!syncPending) return;
+    syncPending = false;
+    syncSubject();
+    publish(store.get(stateAtom).arrival);
   }
 
   function step(direction: NavDirection): boolean {
@@ -219,19 +266,9 @@ export function startHistory<P extends HistoryPlace, K extends string>(
     const leaving = at(index);
     capture(leaving);
     const kind = direction === 'back' ? leaving.arrivedBy : at(target).arrivedBy;
-    const { id, subject } = at(target).place;
-    stepping = true;
-    try {
-      if (subject !== undefined) subjects.get(id)?.enter?.(subject);
-    } finally {
-      stepping = false;
-    }
+    enterSubject(at(target).place);
     arrive(target, { kind, direction });
-    if (syncPending) {
-      syncPending = false;
-      syncSubject();
-      publish(store.get(stateAtom).arrival);
-    }
+    settlePending();
     return true;
   }
 
@@ -247,15 +284,31 @@ export function startHistory<P extends HistoryPlace, K extends string>(
         return;
       }
       capture(leaving);
-      const kept = [...entries.slice(0, index + 1), { key: ++serial, place, arrivedBy: kind }];
+      const kept = [...entries.slice(0, index + 1), { id: newIdentity(), place, arrivedBy: kind }];
       entries = kept.slice(Math.max(0, kept.length - limit));
       arrive(entries.length - 1, { kind, direction: 'forward' });
     },
-    replace(place) {
-      capture(at(index));
-      entries[index] = { key: ++serial, place, arrivedBy: at(index).arrivedBy };
+    replace(place, replaceOptions) {
+      const leaving = at(index);
+      capture(leaving);
+      entries[index] = {
+        id: replaceOptions?.entry ?? newIdentity(),
+        place,
+        arrivedBy: leaving.arrivedBy,
+      };
       coalesce();
-      arrive(index, null);
+      arrive(index, replaceOptions?.leave ? { kind: leaving.arrivedBy, direction: 'back' } : null);
+    },
+    peek(direction) {
+      const target = targetOf(direction);
+      if (target === null) return null;
+      const entry = at(target);
+      return { entry: entry.id, place: entry.place };
+    },
+    captureCurrent: () => capture(at(index)),
+    reenter() {
+      enterSubject(at(index).place);
+      settlePending();
     },
     back: () => step('back'),
     forward: () => step('forward'),
@@ -286,7 +339,7 @@ export function startHistory<P extends HistoryPlace, K extends string>(
       let set = bindings.get(entry);
       if (!set) bindings.set(entry, (set = new Set()));
       set.add(binding);
-      if (entry === at(index)) restoreOnce(binding);
+      if (entry === at(index).id) restoreOnce(binding);
       return () => {
         set.delete(binding);
         if (set.size === 0 && bindings.get(entry) === set) bindings.delete(entry);

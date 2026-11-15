@@ -12,16 +12,10 @@ import {
   Timer16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { miniWindowAtom, miniWindowKey } from '../../host/miniWindow.ts';
 import { translateAtom } from '../../i18n/locale.ts';
+import { moveRowFocus } from '../../kit/rowFocus.ts';
 import { useService } from '../../kit/useService.ts';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import { stepEnter } from '../../motion/stepTransition.ts';
@@ -39,7 +33,7 @@ import {
 } from '../../playback/now-playing/nowPlayingMenu.ts';
 import { ORDER_KEY_ICONS } from '../../playback/playerIcons.ts';
 import { OutputDeviceList } from '../player/volume/OutputDeviceList.tsx';
-import { outputDevicesAtom } from '../player/volume/outputDevices.ts';
+import { outputDevicesAtom } from '../../playback/outputDevices.ts';
 import styles from './MiniPlayerMenu.module.css';
 
 const useStyles = makeStyles({
@@ -55,22 +49,6 @@ const useStyles = makeStyles({
 type Page = 'main' | 'order' | 'devices';
 
 const ROW = '[data-mini-row]';
-
-/** 上下键、Home、End 在可用的行之间挪焦点；到头停住 */
-function moveFocus(event: KeyboardEvent<HTMLDivElement>): void {
-  const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>(ROW)].filter(
-    (row) => !row.disabled,
-  );
-  const at = rows.findIndex((row) => row === document.activeElement);
-  let next = -1;
-  if (event.key === 'ArrowDown') next = Math.min(rows.length - 1, at + 1);
-  else if (event.key === 'ArrowUp') next = Math.max(0, at - 1);
-  else if (event.key === 'Home') next = 0;
-  else if (event.key === 'End') next = rows.length - 1;
-  if (next < 0 || at < 0) return;
-  event.preventDefault();
-  rows[next]?.focus();
-}
 
 function Row({
   icon,
@@ -185,7 +163,7 @@ export function MiniPlayerMenu({ onClose }: { readonly onClose: () => void }) {
         />
         <span>{title}</span>
       </div>
-      <div ref={list} className={styles.list} onKeyDown={moveFocus}>
+      <div ref={list} className={styles.list} onKeyDown={(event) => moveRowFocus(event, ROW)}>
         {page.at === 'devices' ? (
           <OutputDeviceList onPicked={onClose} />
         ) : page.at === 'order' ? (

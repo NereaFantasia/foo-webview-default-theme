@@ -1,0 +1,91 @@
+.row {
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  /* 与翻页胶囊同高：有没有胶囊，标题行都一样高 */
+  min-height: 36px;
+  margin-bottom: var(--spacingVerticalM);
+}
+
+.head h2 {
+  min-width: 0;
+  margin: 0;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  max-width: 100%;
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.title svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.title:hover svg {
+  color: var(--colorNeutralForeground1);
+}
+
+.title:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+.source {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  white-space: nowrap;
+}
+
+.tail {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  margin-inline-start: auto;
+}
+
+/*
+ * 标题行右端的翻页胶囊：尺寸同导航行的胶囊（高 36，键离内侧四周 2），两键之间一道 1 × 16 的半透明竖线。
+ * 它在阅读面上，底用轻量控件底，不加悬浮胶囊的阴影与背景模糊；前面有这一行自己的操作时隔开一点
+ */
+.pager {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  height: 36px;
+  margin-inline-start: auto;
+  border-radius: var(--borderRadiusCircular);
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalXXS);
+  background: var(--bg-view-control);
+}
+
+.divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+
+.tail + .pager {
+  margin-inline-start: var(--spacingHorizontalM);
+}

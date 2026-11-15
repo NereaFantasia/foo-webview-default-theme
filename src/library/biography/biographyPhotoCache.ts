@@ -1,13 +1,10 @@
 import type { AlbumsState } from '../albums.ts';
 import type { BiographyPhotosState } from './biographyPhotos.ts';
+import type { BiographyPhoto as SourcePhoto } from './biographyModel.ts';
 import { createBiographyRequestPool } from './biographyRequestPool.ts';
 import { fetchLastfmGallery, type LastfmGalleryResult } from './online/lastfmGallery.ts';
-import {
-  fetchLastfmPhoto,
-  type BiographyPhotoProblem,
-  type LastfmPhotoResult,
-} from './online/fetchLastfmPhoto.ts';
-import type { LastfmPhoto } from './online/lastfmPhoto.ts';
+import { applePhotoUrl } from './online/fetchApplePhoto.ts';
+import type { BiographyPhotoProblem, LastfmPhotoResult } from './online/fetchLastfmPhoto.ts';
 
 interface CachedLocalPhotos {
   readonly library: AlbumsState;
@@ -18,6 +15,11 @@ export type DecodedBiographyPhoto =
   | Extract<LastfmPhotoResult, { ok: false }>;
 
 const PHOTO_CACHE_BYTES = 64 * 1024 * 1024;
+
+/** 图片缓存的键：Last.fm 是图片地址，Apple 是带尺寸与裁切的请求地址 */
+export function photoKey(photo: SourcePhoto): string {
+  return photo.source === 'apple' ? applePhotoUrl(photo) : photo.url;
+}
 /** 主动刷新可以放行的失败：网络环境或出口可能刚改过，不让他等退避。限流照样等到期 */
 const FRESH_RETRYABLE: ReadonlySet<BiographyPhotoProblem> = new Set([
   'network',
@@ -119,37 +121,39 @@ export function createBiographyPhotoCache() {
         return result;
       });
     },
+    /** 缓存键见 `photoKey`；`peekImage` 也按它查 */
     image(
-      source: LastfmPhoto,
+      source: SourcePhoto,
       fresh: boolean,
       probe: (url: string) => Promise<Uint8ClampedArray | null>,
-      fetch = fetchLastfmPhoto,
+      fetch: (photo: SourcePhoto) => Promise<LastfmPhotoResult>,
       alive = () => true,
     ) {
-      const failure = imageFailures.get(source.url);
+      const key = photoKey(source);
+      const failure = imageFailures.get(key);
       if (
         failure &&
         failure.retryAt > Date.now() &&
         !(fresh && FRESH_RETRYABLE.has(failure.problem))
       )
         return Promise.resolve(failure);
-      const known = binaries.get(source.url);
+      const known = binaries.get(key);
       if (
         known &&
         (known.ok
           ? !fresh && known.expiresAt > Date.now()
           : known.retryAt > Date.now() && !(fresh && FRESH_RETRYABLE.has(known.problem)))
       ) {
-        binaries.delete(source.url);
-        binaries.set(source.url, known);
+        binaries.delete(key);
+        binaries.set(key, known);
         return Promise.resolve(known);
       }
-      return imageRequests.run(source.url, async () => {
+      return imageRequests.run(key, async () => {
         const mine = revision;
         const result = await fetch(source);
         if (!result.ok) {
           if (mine === revision) {
-            imageFailures.set(source.url, result);
+            imageFailures.set(key, result);
             if (imageFailures.size > 96) {
               const oldest = imageFailures.keys().next().value;
               if (oldest !== undefined) imageFailures.delete(oldest);
@@ -166,10 +170,10 @@ export function createBiographyPhotoCache() {
           ? { ...result, pixels }
           : { ok: false, problem: 'invalid', retryAt: Date.now() + 300_000, detail: null };
         if (mine === revision) {
-          imageFailures.delete(source.url);
-          binaries.delete(source.url);
-          if (!decoded.ok) imageFailures.set(source.url, decoded);
-          else if (decoded.store) binaries.set(source.url, decoded);
+          imageFailures.delete(key);
+          binaries.delete(key);
+          if (!decoded.ok) imageFailures.set(key, decoded);
+          else if (decoded.store) binaries.set(key, decoded);
           trim();
         }
         return decoded;

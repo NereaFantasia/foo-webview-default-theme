@@ -25,8 +25,8 @@ async function listen(handler: (request: IncomingMessage, response: ServerRespon
 }
 
 /**
- * 按 Range 交出固定的字节，记下收到的请求。给了 `cut` 时，不带 Range 的整首读取只送出这么多字节就断开；
- * `ignoreRange` 时一律答整首。
+ * 按 Range 返回固定的字节，并记录收到的请求。给了 `cut` 时，不带 Range 的整首读取只送出这么多字节就断开。
+ * `ignoreRange` 时一律返回整首
  */
 async function upstream(cut?: number, ignoreRange = false) {
   const requests: IncomingMessage['headers'][] = [];
@@ -34,14 +34,14 @@ async function upstream(cut?: number, ignoreRange = false) {
   const origin = await listen((request, response) => {
     requests.push(request.headers);
     urls.push(request.url ?? '');
-    const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? '');
+    const match = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? '');
     if (!match || ignoreRange) {
       response.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': AUDIO.length });
       if (cut !== undefined && !match)
         return response.write(AUDIO.subarray(0, cut), () => response.destroy());
       return response.end(AUDIO);
     }
-    const [start, end] = [Number(match[1]), Number(match[2])];
+    const [start, end] = [Number(match[1]), match[2] ? Number(match[2]) : AUDIO.length - 1];
     response.writeHead(206, {
       'Content-Type': 'audio/mpeg',
       'Content-Range': `bytes ${start}-${end}/${AUDIO.length}`,
@@ -97,7 +97,7 @@ describe('音频路由只请求公网地址', () => {
     expect(isPublicAddress(address)).toBe(expected);
   });
 
-  it('上游地址是内网 IP 且不与 lxserver 同源时不发请求，答 502', async () => {
+  it('上游地址是内网 IP 且不与 lxserver 同源时，不发起请求并返回 502', async () => {
     const { origin, requests } = await upstream();
     const { base } = await stream({
       resolve: async () => resource(`${origin}/a.mp3`),
@@ -107,7 +107,7 @@ describe('音频路由只请求公网地址', () => {
     expect(requests).toEqual([]);
   });
 
-  it('与 lxserver 同源的重定向到内网时不跟随，答 502', async () => {
+  it('与 lxserver 同源的地址重定向到内网时，不跟随并返回 502', async () => {
     const { origin: target, requests } = await upstream();
     const other = target.replace('127.0.0.1', '127.0.0.2');
     const trusted = await listen((_request, response) => {
@@ -130,15 +130,17 @@ describe('音频路由', () => {
     '/music/stream/wy/7.mp3',
     '/music/stream/wy/7.mp3?q=192k',
     '/music/stream/wy/7.mp3?q=320k&x=1',
+    '/music/stream/wy/7.mp3?q=320k&hold=2',
+    '/music/stream/wy/7.mp3?q=320k&hold=1&x=1',
     '/music/stream/wy/a%2Fb.mp3?q=320k',
-  ])('路径或档位不对时答 404：%s', async (path) => {
+  ])('路径或档位无效时返回 404：%s', async (path) => {
     const resolve = vi.fn();
     const { base } = await stream({ resolve, trustedOrigin: () => null });
     expect((await fetch(base + path)).status).toBe(404);
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('HEAD 按扩展名立即应答，不取地址', async () => {
+  it('HEAD 请求按扩展名立即应答，不解析地址', async () => {
     const resolve = vi.fn();
     const { base } = await stream({ resolve, trustedOrigin: () => null });
     const answer = await fetch(`${base}/music/stream/wy/7.flac?q=flac`, { method: 'HEAD' });
@@ -148,7 +150,7 @@ describe('音频路由', () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it('GET 转发 Range 与上游的长度；同一首同时打开只取一次地址，之后复用', async () => {
+  it('GET 转发 Range 与上游的长度，同一首同时打开时只解析一次地址，之后复用', async () => {
     const { origin, requests } = await upstream();
     const resolve = vi.fn(async () => resource(`${origin}/a.mp3`, 'flac'));
     const { base } = await stream({ resolve, trustedOrigin: () => origin });
@@ -179,7 +181,7 @@ describe('音频路由', () => {
     ]);
   });
 
-  it('不转发上游的 Content-Type，按实际档位给：网易云把 FLAC 标成 audio/mpeg', async () => {
+  it('不转发上游的 Content-Type，按实际档位设置。网易云把 FLAC 标成 audio/mpeg', async () => {
     const { origin } = await upstream();
     const resolve = async () => resource(`${origin}/a`, 'flac24bit');
     const { base } = await stream({ resolve, trustedOrigin: () => origin });
@@ -189,7 +191,7 @@ describe('音频路由', () => {
     expect((await answer.arrayBuffer()).byteLength).toBe(AUDIO.length);
   });
 
-  it('实际档位是 MP3 时给 audio/mpeg：解灰或音源脚本可能把 MP3 填进 .flac 地址', async () => {
+  it('实际档位是 MP3 时设置 audio/mpeg。解灰或音源脚本可能把 MP3 填进 .flac 地址', async () => {
     const { origin } = await upstream();
     const resolve = async () => resource(`${origin}/a`, '320k');
     const { base } = await stream({ resolve, trustedOrigin: () => origin });
@@ -197,7 +199,7 @@ describe('音频路由', () => {
     expect(answer.headers.get('content-type')).toBe('audio/mpeg');
   });
 
-  it('实际档位未知时不给 Content-Type，交给播放器按内容识别', async () => {
+  it('实际档位未知时不设置 Content-Type，交给播放器按内容识别', async () => {
     const { origin } = await upstream();
     const resolve = async () => resource(`${origin}/a`);
     const { base } = await stream({ resolve, trustedOrigin: () => origin });
@@ -206,7 +208,7 @@ describe('音频路由', () => {
     expect(answer.headers.get('content-type')).toBeNull();
   });
 
-  it('取地址失败或上游拒绝时答 502，失败不留在缓存里', async () => {
+  it('解析地址失败或上游拒绝时返回 502，失败不留在缓存里', async () => {
     const { origin } = await upstream();
     const resolve = vi
       .fn<Parameters<typeof startMusicStream>[0]['resolve']>()
@@ -228,11 +230,11 @@ describe('音频路由', () => {
     expect((await fetch(`${other.base}/music/stream/wy/7.mp3?q=320k`)).status).toBe(502);
   });
 
-  describe('地址打不开时换音源', () => {
+  describe('地址打不开时更换音源', () => {
     type Resolve = Parameters<typeof startMusicStream>[0]['resolve'];
     const PATH = '/music/stream/kw/7.mp3?q=320k';
 
-    /** `/bad` 答 404，`/slow` 不答，其余答整首 */
+    /** `/bad` 返回 404，`/slow` 不响应，其余返回整首 */
     async function flaky() {
       return listen((request, response) => {
         if (request.url === '/slow') return;
@@ -251,7 +253,7 @@ describe('音频路由', () => {
       sourceName,
     });
 
-    it('排除打不开的音源重新取，取到能播的就转发；记下谁失败、谁成功，之后复用这个地址', async () => {
+    it('排除打不开的音源后重新取，取到可播放的就转发。记录哪个失败、哪个成功，之后复用这个地址', async () => {
       const origin = await flaky();
       const resolve = vi.fn<Resolve>(async (_ref, _quality, _signal, exclude = []) =>
         exclude.includes('长青') ? lx(`${origin}/good`, '野花') : lx(`${origin}/bad`, '长青'),
@@ -268,7 +270,7 @@ describe('音频路由', () => {
       expect(resolve).toHaveBeenCalledTimes(2);
     });
 
-    it('最多试四个音源，都打不开答 502，失败按「地址打不开」记，不留在缓存里', async () => {
+    it('最多试四个音源，都打不开时返回 502，失败记为「地址打不开」，不留在缓存里', async () => {
       const origin = await flaky();
       const resolve = vi.fn<Resolve>(async (_ref, _quality, _signal, exclude = []) =>
         lx(`${origin}/bad`, `音源${exclude.length}`),
@@ -281,7 +283,7 @@ describe('音频路由', () => {
       expect(resolve).toHaveBeenCalledTimes(8);
     });
 
-    it('换音源后取不到地址是候选用完了，仍记成地址打不开', async () => {
+    it('换音源后取不到地址是候选用完了，仍记为「地址打不开」', async () => {
       const origin = await flaky();
       const resolve = vi
         .fn<Resolve>()
@@ -292,7 +294,7 @@ describe('音频路由', () => {
       expect(music.failures(0).items.map((item) => item.code)).toEqual(['unplayable']);
     });
 
-    it('没报音源名的来源不换，打不开就是失败', async () => {
+    it('没报音源名的来源不更换音源，打不开就是失败', async () => {
       const origin = await flaky();
       const resolve = vi.fn<Resolve>(async () => ({
         ...lx(`${origin}/bad`, 'x'),
@@ -326,7 +328,7 @@ describe('音频路由', () => {
     });
   });
 
-  it('同时取地址的数量有上限，排队的在前面的完成后接着取', async () => {
+  it('同时取地址的数量有上限，排队的后到先取', async () => {
     const pending: (() => void)[] = [];
     const resolve = vi.fn(
       (ref: { id: string }) =>
@@ -335,12 +337,18 @@ describe('音频路由', () => {
         ),
     );
     const { base, music } = await stream({ resolve, trustedOrigin: () => null });
-    const requests = Array.from({ length: 6 }, (_, index) =>
-      fetch(`${base}/music/stream/wy/${index + 1}.mp3?q=320k`).then((answer) => answer.status),
-    );
+    const requests: Promise<number>[] = [];
+    for (let id = 1; id <= 6; id += 1) {
+      requests.push(
+        fetch(`${base}/music/stream/wy/${id}.mp3?q=320k`).then((answer) => answer.status),
+      );
+      // 排队顺序就是到达顺序，请求之间隔开一点，免得同时到达
+      await new Promise((wake) => setTimeout(wake, 20));
+    }
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledTimes(4));
     pending.shift()?.();
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledTimes(5));
+    expect(resolve.mock.calls[4]?.[0]).toMatchObject({ id: '6' });
     for (const done of pending.splice(0)) done();
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledTimes(6));
     for (const done of pending.splice(0)) done();
@@ -372,7 +380,7 @@ describe('音频路由', () => {
   });
 });
 
-/** 读到连接断开为止，交出已收到的字节与是否读完。 */
+/** 读到连接断开为止，返回已收到的字节与是否读完 */
 async function drain(answer: Response) {
   const reader = answer.body?.getReader();
   if (!reader) throw new Error('没有响应体');
@@ -422,8 +430,115 @@ describe('断流续传', () => {
   });
 });
 
+describe('整首留在内存里', () => {
+  const NOTICE = '/music/stream/wy/7.flac?q=flac&hold=1';
+  const PLAIN = '/music/stream/wy/7.flac?q=flac';
+
+  /** 起一个后端，页面先发 HEAD 通知。`notify` 为假时不通知 */
+  async function held(options: { cut?: number; notify?: boolean } = {}) {
+    const up = await upstream(options.cut);
+    const resolve = vi.fn(async () => resource(`${up.origin}/a.mp3`, 'flac'));
+    const { base, music } = await stream({ resolve, trustedOrigin: () => up.origin });
+    if (options.notify !== false) {
+      const notice = await fetch(base + NOTICE, { method: 'HEAD' });
+      expect(notice.status).toBe(200);
+    }
+    return { ...up, resolve, music, path: base + PLAIN, base };
+  }
+
+  it('通知之后对原地址的整首与各种 Range 读取只向上游请求一次，都从内存给出', async () => {
+    const { path, requests, resolve } = await held();
+    const whole = await fetch(path);
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('content-type')).toBe('audio/flac');
+    expect(whole.headers.get('content-length')).toBe('4096');
+    expect(Buffer.from(await whole.arrayBuffer())).toEqual(AUDIO);
+    const reads = [
+      ['bytes=1024-2047', 'bytes 1024-2047/4096', AUDIO.subarray(1024, 2048)],
+      ['bytes=4000-', 'bytes 4000-4095/4096', AUDIO.subarray(4000)],
+      ['bytes=-100', 'bytes 3996-4095/4096', AUDIO.subarray(3996)],
+    ] as const;
+    for (const [range, contentRange, bytes] of reads) {
+      const part = await fetch(path, { headers: { Range: range } });
+      expect(part.status).toBe(206);
+      expect(part.headers.get('content-range')).toBe(contentRange);
+      expect(Buffer.from(await part.arrayBuffer())).toEqual(bytes);
+    }
+    expect(requests.map((headers) => headers.range)).toEqual([undefined]);
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
+  it('没通知过的曲目照旧逐次转发，不进内存', async () => {
+    const { path, requests } = await held({ notify: false });
+    await (await fetch(path, { headers: { Range: 'bytes=0-9' } })).arrayBuffer();
+    await (await fetch(path, { headers: { Range: 'bytes=0-9' } })).arrayBuffer();
+    expect(requests).toHaveLength(2);
+  });
+
+  it('重复通知无害，通知之后立刻来的几个读者共用一次下载', async () => {
+    const { path, base, requests } = await held();
+    await fetch(base + NOTICE, { method: 'HEAD' });
+    const answers = await Promise.all([
+      fetch(path),
+      fetch(path, { headers: { Range: 'bytes=100-199' } }),
+      fetch(path, { headers: { Range: 'bytes=3000-' } }),
+    ]);
+    expect(Buffer.from(await answers[0].arrayBuffer())).toEqual(AUDIO);
+    expect(Buffer.from(await answers[1].arrayBuffer())).toEqual(AUDIO.subarray(100, 200));
+    expect(Buffer.from(await answers[2].arrayBuffer())).toEqual(AUDIO.subarray(3000));
+    expect(requests).toHaveLength(1);
+  });
+
+  it('Range 落在整首之外返回 416', async () => {
+    const { path } = await held();
+    const answer = await fetch(path, { headers: { Range: 'bytes=5000-' } });
+    expect(answer.status).toBe(416);
+    expect(answer.headers.get('content-range')).toBe('bytes */4096');
+  });
+
+  it('上游中途断开时从已下载的字节处续传，读者拿到完整的一首', async () => {
+    const { path, requests } = await held({ cut: 1000 });
+    const answer = await fetch(path);
+    expect(Buffer.from(await answer.arrayBuffer())).toEqual(AUDIO);
+    expect(requests.map((headers) => headers.range)).toEqual([undefined, 'bytes=1000-']);
+  });
+
+  it('clear 之后不再从内存给出，读取退回逐次转发', async () => {
+    const { path, requests, music } = await held();
+    await (await fetch(path)).arrayBuffer();
+    music.clear();
+    expect(Buffer.from(await (await fetch(path)).arrayBuffer())).toEqual(AUDIO);
+    expect(requests).toHaveLength(2);
+  });
+
+  it('上游不给长度时留不住：读者退回逐次转发，照样拿到整首', async () => {
+    let opened = 0;
+    const origin = await listen((_request, response) => {
+      opened += 1;
+      response.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      response.end(AUDIO);
+    });
+    const { base } = await stream({
+      resolve: async () => resource(`${origin}/a.mp3`, 'flac'),
+      trustedOrigin: () => origin,
+    });
+    await fetch(base + NOTICE, { method: 'HEAD' });
+    const answer = await fetch(base + PLAIN);
+    expect(answer.status).toBe(200);
+    expect(Buffer.from(await answer.arrayBuffer())).toEqual(AUDIO);
+    expect(opened).toBe(2);
+  });
+
+  it('hold 只认 HEAD 上的 hold=1：GET 带它、别的值、多余的参数都返回 404', async () => {
+    const { base } = await held({ notify: false });
+    expect((await fetch(base + NOTICE)).status).toBe(404);
+    for (const path of ['&hold=2', '&hold=1&x=1'])
+      expect((await fetch(base + PLAIN + path, { method: 'HEAD' })).status).toBe(404);
+  });
+});
+
 describe('失败记录', () => {
-  it('记下取地址失败与上游拒绝的原因，序号递增，只交出给定序号之后的', async () => {
+  it('记录解析地址失败与上游拒绝的原因，序号递增，只返回给定序号之后的', async () => {
     const refused = await listen((_request, response) => {
       response.writeHead(403);
       response.end();
@@ -450,7 +565,7 @@ describe('失败记录', () => {
     expect(music.failures(latest).items).toEqual([]);
   });
 
-  it('补全的每次打开都记来源；不是补全的只在上次是补全时记一条，序号与失败共用', async () => {
+  it('补全的每次打开都记录来源，不是补全的只在上次是补全时记一条，序号与失败共用', async () => {
     const { origin } = await upstream();
     const unblocked = [true, true, false, false];
     const resolve = vi.fn(async () => resource(`${origin}/a.mp3`, null, unblocked.shift()));

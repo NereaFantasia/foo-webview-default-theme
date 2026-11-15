@@ -1,12 +1,12 @@
 {
   "name": "foo-webview-default-theme",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "foo_ui_webview2 的默认主题（React + Fluent UI React v9）",
   "license": "AGPL-3.0-only",
   "type": "module",
   "hostRequirements": {
-    "foo_ui_webview2": ">=2.1.0"
+    "foo_ui_webview2": ">=2.2.0"
   },
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,7 @@
     "@material/material-color-utilities": "0.4.0",
     "@neteasecloudmusicapienhanced/api": "4.41.1",
     "@tanstack/react-virtual": "3.14.13",
-    "foo-webview-sdk": "2.1.0",
+    "foo-webview-sdk": "2.2.0",
     "jotai": "3.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"

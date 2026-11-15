@@ -7,6 +7,8 @@ import { reducedMotionAtom } from '../motion/reducedMotion.ts';
 import { MOTION_VARIABLES, REDUCED_MOTION_VARIABLES } from '../motion/timing.ts';
 import { materialAtom, backdropSolidAtom } from './backdrop.ts';
 import { colorSchemeAtom } from './colorScheme.ts';
+import { fontChoiceAtom } from './fontChoice.ts';
+import { fontStack, menuFontStack } from './fontStack.ts';
 import { ACRYLIC_ROLES, ROLE_VALUES, roleProperties } from './roles.ts';
 import { accentRampAtom, globalAccentToneAtom } from './accentState.ts';
 import {
@@ -26,6 +28,9 @@ import { MenuBackgroundContext } from './MenuSurface.tsx';
 import { PanelBackgroundContext } from './PopoverSurface.tsx';
 import { surfaceTintAtom } from './surfaceTint.ts';
 
+/** 迷你窗口外框的亚克力着色浓度：比条栏的 45%、面板的 60% 实得多，透出场景的色调但压得住前景文字 */
+const FRAME_ACRYLIC_PERCENT = 85;
+
 // 改 Fluent 组件自身的样式要用 makeStyles：它和组件内部的原子类合并时后者让位，
 // CSS Modules 的类与之同优先级，谁生效取决于样式表的插入顺序
 //
@@ -36,7 +41,7 @@ const useStyles = makeStyles({
   root: {
     // 背景由宿主材质或独立背景层绘制，覆盖 FluentProvider 的缺省底色后才能透出
     backgroundColor: 'transparent',
-    fontFamily: `'Segoe UI Variable', ${tokens.fontFamilyBase}, 'Microsoft YaHei UI', sans-serif`,
+    fontFamily: tokens.fontFamilyBase,
     ...roleProperties(ROLE_VALUES),
     ...MOTION_VARIABLES,
     '--surface-stroke': tokens.colorNeutralStroke2,
@@ -97,6 +102,7 @@ export function ThemeRoot({ children }: ThemeRootProps) {
   const themed = solid && !drawn;
   const accentTone = useAtomValueRawSync(globalAccentToneAtom);
   const themeTint = useAtomValueRawSync(themeBackgroundTintAtom);
+  const font = useAtomValueRawSync(fontChoiceAtom);
   const surfaceTint = useAtomValueRawSync(surfaceTintAtom);
   const { content } = useAtomValueRawSync(backgroundParametersAtom);
   const appearance = useAtomValueRawSync(backgroundAppearanceAtom);
@@ -115,6 +121,7 @@ export function ThemeRoot({ children }: ThemeRootProps) {
   const styles = useStyles();
   const theme = useMemo(() => {
     const next = scheme === 'dark' ? createDarkTheme(ramp) : createLightTheme(ramp);
+    next.fontFamilyBase = fontStack(font);
     if (drawn || themed) {
       const neutral =
         scheme === 'dark' ? next.colorNeutralBackground4 : next.colorNeutralBackground2;
@@ -122,7 +129,7 @@ export function ThemeRoot({ children }: ThemeRootProps) {
       next.colorNeutralBackgroundAlpha2 = `color-mix(in srgb, ${surface} ${content}%, transparent)`;
     }
     return next;
-  }, [scheme, ramp, drawn, themed, content, tone, tint, saturation]);
+  }, [scheme, ramp, drawn, themed, content, tone, tint, saturation, font]);
   const surfaceNeutral =
     (drawn || themed) && scheme === 'dark'
       ? theme.colorNeutralBackground3
@@ -130,6 +137,17 @@ export function ThemeRoot({ children }: ThemeRootProps) {
   const surfaceBackground = tintedSurface(surfaceNeutral, tone, scheme, { tint, saturation });
   const panelBackground = surfaceTint.panels ? surfaceBackground : surfaceNeutral;
   const menuBackground = surfaceTint.menus ? surfaceBackground : surfaceNeutral;
+  // 盖在场景上的迷你窗口（浏览面板）用：内容卡是不透明的阅读面，深色取 Background4；外框深色取窗口底的
+  // Background2，平时是不太透的亚克力，透出场景又不抢内容，性能降级或减弱透明度时回到不透明实底。层次与染色同主窗，
+  // 单一中性灰会在饱和的背景上发脏。浅色沿用覆盖面板的实底，不做亚克力
+  const solidTint = (neutral: string) =>
+    surfaceTint.panels ? tintedSurface(neutral, tone, scheme, { tint, saturation }) : neutral;
+  const frameSolid = scheme === 'dark' ? solidTint(theme.colorNeutralBackground2) : panelBackground;
+  const cardSolid =
+    scheme === 'dark' ? solidTint(theme.colorNeutralBackground4) : theme.colorNeutralBackground1;
+  const frameAcrylic =
+    scheme === 'dark' ? capsuleTint(frameSolid, FRAME_ACRYLIC_PERCENT) : frameSolid;
+  const frameFilter = scheme === 'dark' ? CAPSULE_FILTER : 'none';
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
@@ -143,7 +161,11 @@ export function ThemeRoot({ children }: ThemeRootProps) {
     drawn && styles.drawn,
     drawn && scheme === 'dark' && styles.drawnDark,
   );
-  const style: CSSProperties & Record<`--${string}`, string | number> = { isolation: 'isolate' };
+  const menuFont = menuFontStack(font);
+  const style: CSSProperties & Record<`--${string}`, string | number> = {
+    isolation: 'isolate',
+    '--menu-font-family': menuFont,
+  };
   const surfaceFilter = appearance.surfaceBlur
     ? `blur(${appearance.surfaceBlur}px) saturate(1.1)`
     : 'none';
@@ -160,8 +182,8 @@ export function ThemeRoot({ children }: ThemeRootProps) {
     scheme === 'dark' ? 'blur(6px) saturate(1.25) brightness(1.35)' : 'blur(6px)';
   return (
     <FluentProvider ref={rootRef} theme={theme} className={className} style={style}>
-      {/* Portal 复制类名而不复制行内变量；作用域规则让覆盖面板共享同一份不透明底色。 */}
-      <style>{`.${panelScope}.${panelScope} { --bg-panel-overlay: ${panelBackground}; }\n${SCROLLBAR_CSS_RULES}`}</style>
+      {/* Portal 复制类名而不复制行内变量；作用域规则让覆盖面板共享同一份不透明底色 */}
+      <style>{`.${panelScope}.${panelScope} { --bg-panel-overlay: ${panelBackground}; --bg-frame-solid: ${frameSolid}; --bg-frame-acrylic: ${frameAcrylic}; --acrylic-filter: ${frameFilter}; --bg-card-solid: ${cardSolid}; --menu-font-family: ${menuFont}; }\n${SCROLLBAR_CSS_RULES}`}</style>
       <WindowBackground
         solidColor={tintedSurface(tokens.colorNeutralBackground2, tone, scheme, {
           tint: themeTint,

@@ -28,3 +28,9 @@
   font-size: var(--fontSizeBase300);
   line-height: var(--lineHeightBase300);
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalS);
+}

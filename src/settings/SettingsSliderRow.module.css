@@ -1,0 +1,19 @@
+.control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5ch;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  width: 220px;
+  max-width: 100%;
+}
+
+/* 卡窄、滑块换到标题下面时占满一行 */
+.fill {
+  width: 100%;
+}
+
+.value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

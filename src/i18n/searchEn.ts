@@ -19,6 +19,8 @@ export const searchEn = {
   'search.viewAlbums': 'View {count} albums',
   'search.viewTracksOne': 'View {count} track',
   'search.viewTracks': 'View {count} tracks',
+  'search.viewArtistsOne': 'View {count} artist',
+  'search.viewArtists': 'View {count} artists',
   'search.more': 'Load more',
   'search.moreFailed': 'Could not load more results',
   'search.noMatch': 'No results',

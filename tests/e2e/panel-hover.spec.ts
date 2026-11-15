@@ -74,7 +74,7 @@ test('极窄侧栏点击保留悬停浮窗，中窄图标栏不误触预览', as
   await expect(panel).toHaveCount(0);
 });
 
-test('侧栏预览里打开搜索下拉，点下拉里的范围页签不收侧栏、下拉不位移', async ({ page }) => {
+test('侧栏预览里打开搜索下拉，点下拉里的键不收侧栏、下拉不位移', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.addInitScript(() => {
     localStorage.setItem('default-theme.sidebar.v1', JSON.stringify({ hidden: true }));
@@ -93,11 +93,8 @@ test('侧栏预览里打开搜索下拉，点下拉里的范围页签不收侧�
   const position = () => flyout.evaluate((node) => [node.style.left, node.style.top]);
   const before = await position();
   // 下拉挂在侧栏之外：点它不算点在侧栏外，指针与焦点移过去也不让悬停预览收起
-  await flyout.getByRole('tab', { name: '在线音乐' }).click();
-  await expect(flyout.getByRole('tab', { name: '在线音乐' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await flyout.getByRole('button', { name: '移除「Feather」' }).click();
+  await expect(flyout.getByRole('option')).toHaveCount(1);
   await page.waitForTimeout(800);
   await expect(panel).toBeVisible();
   expect(await position()).toEqual(before);
@@ -152,7 +149,7 @@ test('掠过或触摸入口不打开；右侧预览中的键盘焦点阻止离�
   await expect(panel).toHaveCount(0);
   await key.hover();
   await expect(panel).toBeVisible();
-  await panel.getByRole('tab', { name: '队列', exact: true }).focus();
+  await panel.getByRole('button', { name: '面板选项', exact: true }).focus();
   await page.mouse.move(640, 790);
   await page.waitForTimeout(650);
   await expect(panel).toBeVisible();

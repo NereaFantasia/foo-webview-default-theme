@@ -61,6 +61,5 @@ export function genreEntryOf(
     albumCount: new Set(tracks.flatMap((track) => trackAlbumKeyOf(track) ?? [])).size,
     duration: tracks.reduce((total, track) => total + track.duration, 0),
     artists: [...new Set(selected.flatMap((entry) => entry.artists))].slice(0, 4),
-    issue: null,
   };
 }

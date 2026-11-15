@@ -2,21 +2,29 @@ import { Tooltip } from '@fluentui/react-components';
 import {
   ArrowDown16Regular,
   ArrowUp16Regular,
+  CalendarLtr16Regular,
+  MicRegular,
   MoreHorizontal16Regular,
   Person48Regular,
   PuzzlePiece16Regular,
   Record48Regular,
+  RecordRegular,
+  TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { memo, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import { translateAtom } from '../../../i18n/locale.ts';
+import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
+import { pluralAtom } from '../../../i18n/plural.ts';
 import type { MessageKey } from '../../../i18n/en.ts';
 import { FadeImage } from '../../../kit/FadeImage.tsx';
+import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
 import { useService } from '../../../kit/useService.ts';
 import { musicStatusKey } from '../../../playback/musicStatus.ts';
 import { durationText } from '../../../table/cellText.ts';
 import {
   MUSIC_QUALITIES,
+  type MusicAlbum,
+  type MusicArtist,
   type MusicQuality,
   type MusicTrack,
 } from '../../../server/musicObjects.ts';
@@ -27,9 +35,18 @@ import { musicTrackLinks } from '../../../track/trackLinks.ts';
 import { onlineCoverUrl } from '../../../playback/onlineTracks.ts';
 import type { TablePoint } from '../../../table/tableItems.ts';
 import type { SearchListItemProps } from '../SearchResultList.tsx';
+import { FavoriteCell } from './FavoriteCell.tsx';
+import {
+  ONLINE_COLUMN_LABELS,
+  ONLINE_TRACK_LAYOUTS,
+  type OnlineColumn,
+  type OnlineTrackLayout,
+  type OnlineTrackSort,
+} from './onlineColumns.ts';
 import styles from './OnlineItems.module.css';
 
-function Cover({
+/** 在线曲目、专辑的方形封面，没有封面或加载失败画占位 */
+export function Cover({
   src,
   size,
   round = false,
@@ -63,7 +80,7 @@ function Cover({
   );
 }
 
-const QUALITY_LABELS: Readonly<Record<MusicQuality, MessageKey>> = {
+export const QUALITY_LABELS: Readonly<Record<MusicQuality, MessageKey>> = {
   '128k': 'online.quality.128k',
   '320k': 'online.quality.320k',
   flac: 'online.quality.flac',
@@ -77,7 +94,7 @@ export function bestQuality(track: MusicTrack): MusicQuality | null {
   );
 }
 
-const ACCESS_LABELS = {
+export const ACCESS_LABELS = {
   vip: 'online.vip',
   purchase: 'online.purchase',
   unavailable: 'online.unavailable',
@@ -100,41 +117,14 @@ export function useUnblock(): boolean | null {
 export const blockedTrack = (track: Pick<MusicTrack, 'access'>, unblock: boolean | null) =>
   track.access === 'unavailable' && unblock === false;
 
-export type OnlineColumn =
-  'number' | 'cover' | 'title' | 'artist' | 'album' | 'quality' | 'duration' | 'menu';
-
-/**
- * 曲目表的几种列：搜索结果不带序号；在线列表带序号与行尾的 ⋯，专辑那一种不出封面与专辑两列。列宽写在样式里，
- * 按 `data-layout` 取
- */
-export const ONLINE_TRACK_LAYOUTS = {
-  search: ['cover', 'title', 'artist', 'album', 'quality', 'duration'],
-  list: ['number', 'cover', 'title', 'artist', 'album', 'quality', 'duration', 'menu'],
-  album: ['number', 'title', 'artist', 'quality', 'duration', 'menu'],
-} as const satisfies Record<string, readonly OnlineColumn[]>;
-export type OnlineTrackLayout = keyof typeof ONLINE_TRACK_LAYOUTS;
-
 const COLUMN_CLASSES: Partial<Record<OnlineColumn, string>> = {
   number: styles.number,
   album: styles.album,
+  added: styles.added,
   quality: styles.quality,
   duration: styles.duration,
 };
-/** 有字的列头；在线列表页的排序字段也照它写 */
-export const ONLINE_COLUMN_LABELS = {
-  title: 'table.title',
-  artist: 'table.artist',
-  album: 'table.album',
-  quality: 'online.quality',
-  duration: 'table.duration',
-} as const satisfies Partial<Record<OnlineColumn, MessageKey>>;
 const COLUMN_LABELS: Partial<Record<OnlineColumn, MessageKey>> = ONLINE_COLUMN_LABELS;
-
-export interface OnlineTrackSort {
-  /** `number` 是列表本来的顺序 */
-  readonly column: OnlineColumn;
-  readonly descending: boolean;
-}
 
 /**
  * 曲目表的列头，列宽与 `OnlineTrackRow` 同一套网格。给了 `onSort` 时有字的列头是按钮，点了按这一列排，
@@ -197,6 +187,8 @@ export interface OnlineTrackRowProps extends SearchListItemProps<MusicTrack> {
   readonly number?: string;
   /** 正在播的这一首暂停着：记号静止 */
   readonly paused?: boolean;
+  /** 收藏时间（毫秒），只有收藏页的版式用 */
+  readonly added?: number;
 }
 
 export const OnlineTrackRow = memo(function OnlineTrackRow({
@@ -214,8 +206,10 @@ export const OnlineTrackRow = memo(function OnlineTrackRow({
   layout = 'search',
   number = '',
   paused = false,
+  added,
 }: OnlineTrackRowProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const { active: locale } = useAtomValueRawSync(localeAtom);
   const quality = bestQuality(track);
   const dimmed = blockedTrack(track, unblock);
   const unblocked = track.access === 'unavailable' && unblock === true;
@@ -312,6 +306,16 @@ export const OnlineTrackRow = memo(function OnlineTrackRow({
                 {quality ? t(QUALITY_LABELS[quality]) : ''}
               </span>
             );
+          case 'added':
+            return (
+              <span key={column} className={styles.added}>
+                {added === undefined
+                  ? ''
+                  : new Date(added).toLocaleDateString(locale, { dateStyle: 'medium' })}
+              </span>
+            );
+          case 'favorite':
+            return <FavoriteCell key={column} track={track} always={layout === 'favorites'} />;
           case 'duration':
             return (
               <span key={column} className={styles.duration}>
@@ -382,48 +386,90 @@ export function OnlineBestRow({
   );
 }
 
-/** 搜索下拉里的一首在线曲目：与本地结果行同高，左图 40，下面一行是艺人与专辑，右边是时长 */
+/**
+ * 搜索下拉里的一首在线曲目、一位在线艺人或一张在线专辑：与媒体库的行同高，左图 40，艺人是圆形。
+ * 曲目下面一行是艺人与专辑、右边是时长；艺人与专辑下面一行是数目或署名与年份，右边写种类
+ */
 export function OnlineSuggestionRow({
-  track,
+  item,
   id,
   selected,
   onOpen,
   onMenu,
 }: {
-  readonly track: MusicTrack;
+  readonly item: MusicTrack | MusicArtist | MusicAlbum;
   readonly id: string;
   readonly selected: boolean;
   onOpen(): void;
   onMenu(at: TablePoint): void;
 }) {
+  const t = useAtomValueRawSync(translateAtom);
+  const plural = useAtomValueRawSync(pluralAtom);
+  const count = (value: number | null, one: MessageKey, many: MessageKey) =>
+    value === null ? null : t(plural(value, one, many), { count: value });
+  let title: string;
+  let fields: ReactNode;
+  let tail: string;
+  if ('durationMs' in item) {
+    title = item.title;
+    fields = (
+      <TrackMetadata
+        className={styles.bestFields}
+        artist={artistNames(item)}
+        album={item.album?.title ?? ''}
+      />
+    );
+    tail = item.durationMs === null ? '' : durationText(item.durationMs / 1000);
+  } else if ('name' in item) {
+    title = item.name;
+    const albums = count(item.albumCount, 'album.countOne', 'album.count');
+    const tracks = count(item.trackCount, 'album.menuTracksOne', 'album.menuTracks');
+    fields = (
+      <Metadata className={styles.bestFields}>
+        {albums && <MetadataItem icon={<RecordRegular />}>{albums}</MetadataItem>}
+        {tracks && <MetadataItem icon={<TextNumberListLtr16Regular />}>{tracks}</MetadataItem>}
+      </Metadata>
+    );
+    tail = t('search.artists');
+  } else {
+    title = item.title;
+    const year = item.releaseDate?.slice(0, 4);
+    fields = (
+      <Metadata className={styles.bestFields}>
+        <MetadataItem icon={<MicRegular />} label={t('trackInfo.albumArtist')}>
+          {artistNames(item)}
+        </MetadataItem>
+        {year && (
+          <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
+            {year}
+          </MetadataItem>
+        )}
+      </Metadata>
+    );
+    tail = t('search.albums');
+  }
+  const cover = 'name' in item ? item.avatar : item.artwork;
+  const hint =
+    'name' in item ? [] : [artistNames(item), 'durationMs' in item ? item.album?.title : ''];
   return (
     <div
       id={id}
       role="option"
       aria-selected={selected}
       className={styles.suggestion}
-      data-online-suggestion={track.ref.id}
+      data-online-suggestion={item.ref.id}
       data-selected={selected || undefined}
-      title={[track.title, artistNames(track), track.album?.title].filter(Boolean).join('\n')}
+      title={[title, ...hint].filter(Boolean).join('\n')}
       onPointerDown={(event) => event.preventDefault()}
       onClick={onOpen}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onMenu({ x: event.clientX, y: event.clientY });
-      }}
+      onContextMenu={(event) => menuAt(event, onMenu)}
     >
-      <Cover src={track.artwork} size={40} />
+      <Cover src={cover} size={40} round={'name' in item} />
       <span className={styles.bestLabels}>
-        <span className={styles.bestTitle}>{track.title}</span>
-        <TrackMetadata
-          className={styles.bestFields}
-          artist={artistNames(track)}
-          album={track.album?.title ?? ''}
-        />
+        <span className={styles.bestTitle}>{title}</span>
+        {fields}
       </span>
-      <span className={styles.tail}>
-        {track.durationMs === null ? '' : durationText(track.durationMs / 1000)}
-      </span>
+      <span className={styles.tail}>{tail}</span>
     </div>
   );
 }

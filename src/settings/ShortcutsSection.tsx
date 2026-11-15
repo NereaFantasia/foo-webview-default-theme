@@ -1,11 +1,12 @@
 import { Button, Tooltip } from '@fluentui/react-components';
 import { Dismiss16Regular, ErrorCircle16Filled, Keyboard20Regular } from '@fluentui/react-icons';
-import { useAtomValueRawSync } from 'jotai/react';
-import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useAtomValueRawSync, useStore } from 'jotai/react';
+import { Fragment, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import type { Translate } from '../i18n/translate.ts';
 import { useService } from '../kit/useService.ts';
 import { desktopLyricsKey } from '../lyrics/desktop/desktopLyrics.ts';
+import { captureAllKeys } from '../nav/reservedKeys.ts';
 import {
   DESKTOP_LYRICS_HOTKEYS,
   hotkeyFromKeyboard,
@@ -43,6 +44,9 @@ function HotkeyRow({ name }: { readonly name: DesktopLyricsHotkey }) {
   const { hotkeyTaken } = useAtomValueRawSync(service.state);
   const controls = useViewControlStyles();
   const [recording, setRecording] = useState(false);
+  const store = useStore();
+  // 录键期间全部按键交给页面，否则录入 foobar2000 里绑定过的键（如 Ctrl+O）时，它会先执行对应命令
+  useEffect(() => (recording ? captureAllKeys(store) : undefined), [recording, store]);
   const chord = hotkeys[name];
   const other = DESKTOP_LYRICS_HOTKEYS.find((key) => key !== name);
 

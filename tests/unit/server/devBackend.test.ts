@@ -174,8 +174,35 @@ describe('开发服务器的后端短路', () => {
     });
   });
 
+  it('半截的运行时目录（只有 node.exe.partial）不挑，哪怕版本更高', async () => {
+    const env = setup({ 'rt/node-24.22.1-x64_634125/node.exe.partial': 'bin' });
+    const service = startDevBackend(
+      { connectManual: env.connectManual },
+      {
+        host: {
+          file: env.host.fb.file,
+          shell: env.host.fb.shell,
+          getSource: async () => ({
+            success: true,
+            source: 'devServer' as const,
+            activeTemplateName: 'default',
+            templatesDirectory: TEMPLATE_DIRECTORY.slice(0, -'default'.length - 1),
+          }),
+        },
+        storage: storage(),
+        url: url(),
+        page: page(SOURCE),
+        log: env.log,
+      },
+    );
+    await expect(service.ready).resolves.toBe(true);
+    const spawned = JSON.stringify(env.spawn.mock.calls[0]?.[0]);
+    expect(spawned).not.toContain('634125');
+    expect(spawned).toContain('a92576');
+  });
+
   it('源码直跑时仓库里有现成的组件就直接用，不再传组件描述', async () => {
-    // 假的文件系统只认模板目录下的路径，仓库就放在那下面。
+    // 假的文件系统只认模板目录下的路径，仓库就放在那下面
     const repo = `${TEMPLATE_DIRECTORY}\\repo`;
     const env = setup({
       'repo/node_modules/@neteasecloudmusicapienhanced/api/package.json': '{}',

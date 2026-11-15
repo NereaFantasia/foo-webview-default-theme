@@ -30,7 +30,7 @@ function albumsAnswer(albums: AlbumInfo[]) {
   };
 }
 
-/** 地址里带着请求尺寸，升档前后分得清。 */
+/** 地址里带着请求尺寸，升档前后分得清 */
 function sizedUrls(host: UnitHost): void {
   host.answer('artwork.getFb2kUrlByPath', (params) => ({
     success: true,
@@ -45,7 +45,7 @@ interface SetupOptions {
   readonly ratio?: number;
   readonly limit?: number;
   readonly retryDelays?: readonly number[];
-  /** 缺省不问状态，出错一律按退避重试算。 */
+  /** 缺省不问状态，出错一律按退避重试算 */
   readonly probe?: CoverProbe;
   readonly analysis?: { forget(): void };
 }
@@ -82,6 +82,19 @@ describe('startAlbumCovers', () => {
     ]);
     expect(version()).toBeGreaterThan(0);
     expect(covers.coverOf(A, 200)).toMatchObject({ status: 'ready', size: 384 });
+  });
+
+  it('指定取 artist 图时按这个类型取，缓存与限流照旧', async () => {
+    const host = installFakeHost();
+    sizedUrls(host);
+    const store = createStore();
+    const covers = startAlbumCovers(store, host.fb, { type: 'artist', probe: null });
+    expect(covers.coverOf(A, 120)).toBeUndefined();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(host.callsTo('artwork.getFb2kUrlByPath')).toEqual([
+      expect.objectContaining({ path: A.firstTrackPath, type: 'artist' }),
+    ]);
+    expect(covers.coverOf(A, 120)).toMatchObject({ status: 'ready' });
   });
 
   it('没连上宿主时不问、画占位', async () => {
@@ -264,7 +277,7 @@ describe('startAlbumCovers', () => {
     const host = installFakeHost();
     sizedUrls(host);
     const { covers, flush, setRatio } = setup(host, { limit: 1 });
-    /** 一块图块：按此刻的封面重渲染一次；浏览器只在 src 变过之后才对它发 load 或 error。 */
+    /** 一块图块：按此刻的封面重渲染一次；浏览器只在 src 变过之后才对它发 load 或 error */
     const tile = (album: AlbumInfo) => {
       let changed = false;
       const load = createCoverLoad(
@@ -309,7 +322,7 @@ describe('startAlbumCovers', () => {
     t1.fire('error');
     for (const each of [t1, tx, t2]) each.render();
     for (const each of [t1, t2, tx]) each.fire('load');
-    // 每张图都有了结局，唯一的名额应当空着：漏掉的借用会一直占着它。
+    // 每张图都有了结局，唯一的名额应当空着：漏掉的借用会一直占着它
     const late = albumRow('Z', 'X');
     covers.coverOf(late, 160);
     await flush();
@@ -417,7 +430,7 @@ describe('startAlbumCovers', () => {
   });
 });
 
-/** 问状态的替身：记下问过的地址，结论由测试逐个给。 */
+/** 问状态的替身：记下问过的地址，结论由测试逐个给 */
 function heldProbe() {
   const asked: string[] = [];
   const answers: ((verdict: CoverVerdict) => void)[] = [];

@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { searchQuery } from '../../src/library/search/searchQuery.ts';
 import { SEARCH_HISTORY_KEY } from '../../src/library/search/searchHistory.ts';
+import { SEARCH_ONLINE } from '../../src/playback/searchOnlinePref.ts';
 import { albumsAnswer } from '../fixtures/albumLibrary.ts';
 import { numberParam, stringParam } from '../fixtures/hostAnswers.ts';
 import { albumTrackRow } from '../fixtures/libraryRows.ts';
@@ -8,6 +9,7 @@ import { trackPathOf } from '../../src/host/libraryContract.ts';
 import { trackSortPattern } from '../../src/track/trackSort.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
 import { SONG_ALBUMS, SONG_TRACKS } from '../fixtures/songsPage.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -26,18 +28,13 @@ async function openSearch(page: Page) {
     [searchQuery('Match')?.query, BULK_TRACKS],
   ]);
   const host = await installPageHost(page, {
-    config: { [SEARCH_HISTORY_KEY]: ['Nujabes', 'Feather'] },
+    // 本文件测媒体库的搜索；主窗没有在线音乐后端，开着时在线一区只会写连不上，还会占掉下拉的高度
+    config: { [SEARCH_HISTORY_KEY]: ['Nujabes', 'Feather'], [SEARCH_ONLINE.key]: false },
     answers: {
       library: {
         getAlbums: albumsAnswer(SONG_ALBUMS),
         // 「曲目」一类的表格按 handle 从整库曲目里取行
-        getAll: {
-          success: true,
-          tracks: [...SONG_TRACKS, ...BULK_TRACKS],
-          items: [...SONG_TRACKS, ...BULK_TRACKS],
-          total: SONG_TRACKS.length + BULK_TRACKS.length,
-          offset: 0,
-        },
+        search: wholeLibrary([...SONG_TRACKS, ...BULK_TRACKS]),
         query: (params) => {
           const hits = matches.get(stringParam(params, 'query')) ?? [];
           return {
@@ -58,7 +55,7 @@ async function openSearch(page: Page) {
     },
   });
   await page.goto('/');
-  // 主窗等偏好存储读完才建服务、渲染，load 之后按键要等它挂上。
+  // 主窗等偏好存储读完才建服务、渲染，load 之后按键要等它挂上
   await expect(page.locator('main')).toBeVisible();
   const input = page.locator('[data-search-input="sidebar"]:visible');
   const flyout = page.locator('[data-search-flyout]');
@@ -79,7 +76,7 @@ function trackRow(view: Locator, title: string) {
     .getByRole('row', { name: new RegExp(`(^|\\s)${escaped}(\\s|$)`) });
 }
 
-test('侧栏搜索可用，最近历史可单条删除和清空，Esc 先关闭再清词', async ({ page }) => {
+test('侧栏搜索可用，最近历史可单条删除和清空，Esc 先关闭再清词 @smoke', async ({ page }) => {
   const { host, errors, input, flyout } = await openSearch(page);
   await expect(input).toBeEnabled();
   await input.focus();
@@ -99,7 +96,7 @@ test('侧栏搜索可用，最近历史可单条删除和清空，Esc 先关闭�
   expect(errors).toEqual([]);
 });
 
-test('最佳匹配不自动选中，Enter 进入结果页，分类不增加导航历史', async ({ page }) => {
+test('最佳匹配不自动选中，Enter 进入结果页，分类不增加导航历史 @smoke', async ({ page }) => {
   const { errors, input, flyout } = await openSearch(page);
   await input.fill('Nujabes');
   await expect(flyout.getByRole('option')).toHaveCount(4);
@@ -133,7 +130,9 @@ test('建议键盘进入专辑，后退恢复原页面、查询、浮层与焦�
   expect(errors).toEqual([]);
 });
 
-test('最佳匹配可以是艺人并打开艺人页；节头「查看 N 张」进结果页的专辑类', async ({ page }) => {
+test('最佳匹配可以是艺人并打开艺人页；节头「查看 N 张」进结果页的专辑类 @smoke', async ({
+  page,
+}) => {
   const { errors, input, flyout } = await openSearch(page);
   await input.fill('Nujabes');
   await expect(flyout.getByRole('option')).toHaveCount(4);
@@ -153,6 +152,54 @@ test('最佳匹配可以是艺人并打开艺人页；节头「查看 N 张」�
   await expect(view.getByRole('option', { name: /Nujabes/ })).toHaveCount(1);
   expect(errors).toEqual([]);
 });
+test('下拉里的专辑与艺人，鼠标单击就打开', async ({ page }) => {
+  const { errors, input, flyout } = await openSearch(page);
+  await input.fill('Nujabes');
+  await expect(flyout.getByRole('option')).toHaveCount(4);
+  await flyout
+    .getByRole('option', { name: /Modal Soul/ })
+    .first()
+    .click();
+  await expect(page.locator('[data-page="album"]')).toBeVisible();
+  await expect(flyout).toHaveCount(0);
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(flyout).toBeVisible();
+  await flyout
+    .getByRole('option', { name: /Nujabes/ })
+    .first()
+    .click();
+  await expect(page.locator('[data-page="artists"]')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('结果页的艺人与专辑单击就打开，Ctrl 单击仍是多选', async ({ page }) => {
+  const { errors, input } = await openSearch(page);
+  await input.fill('Nujabes');
+  await input.press('Enter');
+  const view = page.locator('[data-page="search"]');
+  await view.getByRole('tab', { name: '艺人', exact: true }).click();
+  await view.getByRole('option', { name: /Nujabes/ }).click({ modifiers: ['Control'] });
+  await expect(view).toBeVisible();
+  await expect(view.getByRole('option', { name: /Nujabes/ })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await view.getByRole('option', { name: /Nujabes/ }).click();
+  await expect(page.locator('[data-page="artists"]')).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await page
+    .locator('[data-page="search"]')
+    .getByRole('tab', { name: '专辑', exact: true })
+    .click();
+  await page
+    .locator('[data-page="search"]')
+    .getByRole('listbox', { name: '专辑', exact: true })
+    .getByRole('option')
+    .click();
+  await expect(page.locator('[data-page="album"]')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('结果页打开专辑后返回恢复分类；编辑草稿不改变已提交结果', async ({ page }) => {
   const { errors, input, flyout } = await openSearch(page);
   await input.fill('Nujabes');
@@ -325,17 +372,13 @@ test('键盘可到达历史管理按钮，删除后焦点回到输入框', async
   const { errors, input, flyout } = await openSearch(page);
   await input.focus();
   await expect(flyout.getByRole('option')).toHaveCount(2);
-  // 键盘序：输入框 → 两枚范围页签（各占一个 Tab 停靠点）→ 清空历史 → 各条的移除键
+  // 键盘序：输入框 → 清空历史 → 各条的移除键
   await input.press('Tab');
-  await expect(flyout.getByRole('tab', { name: '媒体库' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(flyout.getByRole('tab', { name: '在线音乐' })).toBeFocused();
-  await page.keyboard.press('Tab');
   const clear = flyout.getByRole('button', { name: '清空历史' });
   await expect(clear).toBeFocused();
-  for (let step = 0; step < 3; step += 1) await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab');
   await expect(input).toBeFocused();
-  for (let step = 0; step < 4; step += 1) await page.keyboard.press('Tab');
+  for (let step = 0; step < 2; step += 1) await page.keyboard.press('Tab');
   const remove = flyout.getByRole('button', { name: '移除「Nujabes」' });
   await expect(remove).toBeFocused();
   await remove.press('Enter');
@@ -529,13 +572,7 @@ test('曲目表的行取自整库曲目，混着标签不全的曲目也能批�
   const known = SONG_TRACKS[0]!;
   const unknown = albumTrackRow('Unknown', 'Unknown Artist', 'Unknown Track');
   host.answer('library.query', { success: true, tracks: [known, unknown], total: 2 });
-  host.answer('library.getAll', {
-    success: true,
-    tracks: [known, unknown],
-    items: [known, unknown],
-    total: 2,
-    offset: 0,
-  });
+  host.answer('library.search', wholeLibrary([known, unknown]));
   await input.fill('Mixed');
   await input.press('Enter');
   const view = page.locator('[data-page="search"]');

@@ -1,0 +1,25 @@
+.root {
+  display: grid;
+  gap: var(--spacingVerticalM);
+  min-width: 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+
+/* 本地统计一行、常合作艺人一行，接在简介正文下面 */
+.facts {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}
+
+.collaborators {
+  margin: 0;
+}

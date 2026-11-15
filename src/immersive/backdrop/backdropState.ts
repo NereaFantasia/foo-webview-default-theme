@@ -11,6 +11,16 @@ import {
   type BackdropChoice,
   type BackdropRendererId,
 } from './backdropChoice.ts';
+import {
+  NO_STORED_OPTIONS,
+  formatBackdropOptions,
+  parseBackdropOptions,
+  withBackdropFlowSpeed,
+  withBackdropOption,
+  withoutBackdropOptions,
+  type OptionedRenderer,
+  type StoredBackdropOptions,
+} from './backdropOptions.ts';
 
 export const BACKDROP_PREF_KEY = 'default-theme.immersive.backdrop.v1';
 
@@ -23,9 +33,62 @@ const choice: LocalPref<BackdropChoice> = defineLocalPref({
 export const backdropChoiceAtom: Atom<BackdropChoice> = choice.atom;
 export const chooseBackdrop = choice.set;
 
+export const BACKDROP_OPTIONS_KEY = 'default-theme.immersive.backdropOptions.v1';
+
+/** 各渲染器的可调项，只记用户改过的；与所选的渲染器分开存，换渲染器不丢 */
+const options: LocalPref<StoredBackdropOptions> = defineLocalPref({
+  key: BACKDROP_OPTIONS_KEY,
+  fallback: NO_STORED_OPTIONS,
+  parse: parseBackdropOptions,
+  format: formatBackdropOptions,
+});
+
+export const backdropOptionsAtom: Atom<StoredBackdropOptions> = options.atom;
+
+export function chooseBackdropFlowSpeed(
+  store: Store,
+  percent: number,
+  storage?: PrefStorage | null,
+): boolean {
+  return options.set(store, withBackdropFlowSpeed(store.get(options.atom), percent), storage);
+}
+
+export function chooseBackdropOption(
+  store: Store,
+  target: OptionedRenderer,
+  key: string,
+  value: unknown,
+  storage?: PrefStorage | null,
+): boolean {
+  return options.set(
+    store,
+    withBackdropOption(store.get(options.atom), target, key, value),
+    storage,
+  );
+}
+
+/** 恢复某个渲染器的全部项，含共用的流动速度 */
+export function resetBackdropOptions(
+  store: Store,
+  id: BackdropRendererId,
+  storage?: PrefStorage | null,
+): boolean {
+  return options.set(store, withoutBackdropOptions(store.get(options.atom), id), storage);
+}
+
+/** 整份写回：设置编辑点「取消」时把进编辑前的那一份放回去 */
+export function restoreBackdropOptions(
+  store: Store,
+  value: StoredBackdropOptions,
+  storage?: PrefStorage | null,
+): boolean {
+  return options.set(store, value, storage);
+}
+
 /** 从持久化存储载入背景效果偏好 */
 export function loadBackdropPrefs(store: Store, storage?: PrefStorage | null): void {
   choice.load(store, storage);
+  options.load(store, storage);
 }
 
 const unavailableAtom = atom<ReadonlySet<BackdropRendererId>>(new Set<BackdropRendererId>());

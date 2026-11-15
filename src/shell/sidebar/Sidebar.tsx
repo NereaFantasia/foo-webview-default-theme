@@ -13,7 +13,7 @@ import { useShellSlots } from '../shellSlots.ts';
 import { playlistsAtom } from '../../playback/playlists.ts';
 import { historyAtom, historyKey } from '../../nav/navHistory.ts';
 import { PANE_ONLY_ATTR } from '../../nav/sidebar/paneFades.ts';
-import { PLACE_LABELS } from '../../nav/places.ts';
+import { PLACE_LABELS, type PlaceId } from '../../nav/places.ts';
 import styles from './Sidebar.module.css';
 import { SidebarIcon } from '../../nav/sidebar/SidebarIcon.tsx';
 import { SidebarItem } from '../../nav/sidebar/SidebarItem.tsx';
@@ -51,8 +51,16 @@ const PANE_ONLY = { [PANE_ONLY_ATTR]: true };
  * 点哪一项都是去一个地点，经全局历史切过去；亮哪一项跟着历史的当前地点走，不自己记
  * 搜索框内的方向键归搜索建议，其他位置的上下方向键在各项之间移动焦点。图标态（`SidebarRail`）里两种形态都有的
  * 项摆在同样的高度，换形态时不跳
+ *
+ * `omit` 里的地点不列出：浏览面板承载不了视频与设置
  */
-export function Sidebar({ className }: { readonly className?: string }) {
+export function Sidebar({
+  className,
+  omit,
+}: {
+  readonly className?: string;
+  readonly omit?: ReadonlySet<PlaceId>;
+}) {
   const slots = useShellSlots();
   const t = useAtomValueRawSync(translateAtom);
   const { place } = useAtomValueRawSync(historyAtom);
@@ -75,6 +83,7 @@ export function Sidebar({ className }: { readonly className?: string }) {
   }
   useSelectionIndicator(root, selected, reduced);
 
+  const listed = (item: SidebarEntry) => !omit?.has(item.place);
   const entry = (item: SidebarEntry) => (
     <SidebarItem
       key={item.id}
@@ -106,12 +115,12 @@ export function Sidebar({ className }: { readonly className?: string }) {
         expanded={sections.library}
         onToggle={() => sidebar.toggleSection('library')}
       >
-        {LIBRARY_ITEMS.map(entry)}
+        {LIBRARY_ITEMS.filter(listed).map(entry)}
       </SidebarSection>
       <div className={styles.playlists} {...PANE_ONLY}>
         <slots.SidebarPlaylists className={styles.fill} selected={selected} />
       </div>
-      <div className={styles.footer}>{entry(SETTINGS_ITEM)}</div>
+      {listed(SETTINGS_ITEM) && <div className={styles.footer}>{entry(SETTINGS_ITEM)}</div>}
     </Nav>
   );
 }

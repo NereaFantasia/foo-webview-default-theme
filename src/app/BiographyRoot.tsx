@@ -1,26 +1,17 @@
 import { Button, Switch } from '@fluentui/react-components';
 import { Delete20Regular, Globe20Regular, Open20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
-import { localeAtom, translateAtom } from '../i18n/locale.ts';
-import { sidebarViewAtom } from '../nav/sidebar/sidebarView.ts';
-import { playerBarStyleAtom, playerShellOf } from '../theme/playerBarStyle.ts';
-import { BiographyOnlineSetting, BiographyPanel } from '../library/biography/BiographyPanel.tsx';
-import { BiographyPhotos } from '../library/biography/BiographyPhotos.tsx';
-import { BiographyLibraryInfo } from '../library/biography/local/BiographyLibraryInfo.tsx';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { translateAtom } from '../i18n/locale.ts';
+import { BiographyOnlineSetting } from '../library/biography/BiographyPanel.tsx';
 import {
   LastfmKeySetting,
   lastfmKeyStatus,
 } from '../library/biography/lastfm-api/LastfmKeySetting.tsx';
-import {
-  BIOGRAPHY_LANGUAGES,
-  type BiographyLanguagePreference,
-} from '../library/biography/biographyModel.ts';
-import { localeName } from '../settings/localeName.ts';
-import {
-  OnlineSettingsContext,
-  OnlineSettingsNavigationContext,
-} from '../settings/onlineSettingsContext.ts';
+import { BIOGRAPHY_SOURCE_KEY } from '../library/biography/biographySourcePrefs.ts';
+import { OnlineSettingsContext } from '../settings/onlineSettingsContext.ts';
+import { settingsNavKey } from '../settings/settingsNav.ts';
+import { useService } from '../kit/useService.ts';
 import { SettingsCard } from '../settings/SettingsCard.tsx';
 import { SettingsExpander } from '../settings/SettingsExpander.tsx';
 import { SettingsRow } from '../settings/SettingsRow.tsx';
@@ -29,50 +20,21 @@ import { EXTERNAL_LINK_CONFIRM } from '../kit/external-link/externalLinkGate.ts'
 import { OnboardingOnlineContext } from '../settings/onboarding/onboardingSlots.ts';
 import { SettingsSaveNotice } from '../settings/SettingsSaveNotice.tsx';
 import { LASTFM_KEY_PREF } from '../library/biography/lastfm-api/lastfmKey.ts';
-import { SettingsSelect, type SettingsOption } from '../settings/SettingsSelect.tsx';
 import { RightCardBiographyContext } from '../shell/right-card/rightCardContext.ts';
 import type { AppServices } from './services.ts';
 import { startBiographyIntegration, type BiographyIntegration } from './biographyIntegration.ts';
 import { ArtistsRoot } from './ArtistsRoot.tsx';
+import { BiographyContent } from './BiographyContent.tsx';
+import {
+  BiographyFallbackRow,
+  BiographyLanguageRow,
+  BiographyMotionRow,
+  BiographySourceRow,
+} from './BiographySourceRows.tsx';
 import { ExternalLinkProvider } from '../kit/external-link/ExternalLinkProvider.tsx';
 import { useCommand } from '../nav/useCommand.ts';
 import { BACK_KEYS, BACK_BUTTON, FORWARD_KEYS, FORWARD_BUTTON } from '../nav/navCommands.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
-
-function BiographyContent({ integration }: { readonly integration: BiographyIntegration }) {
-  const input = useAtomValueRawSync(integration.input);
-  const language = useAtomValueRawSync(integration.language);
-  const artistImages = useAtomValueRawSync(integration.artistImages.state);
-  const t = useAtomValueRawSync(translateAtom);
-  const locale = useAtomValueRawSync(localeAtom).active;
-  const { tier } = useAtomValueRawSync(sidebarViewAtom);
-  const shell = playerShellOf(useAtomValueRawSync(playerBarStyleAtom), tier === 'wide');
-  return (
-    <BiographyPanel
-      artist={input?.artist ?? null}
-      language={language}
-      service={integration.service}
-      identity={integration.identity}
-      prefs={integration.prefs}
-      t={t}
-      summary={<BiographyLibraryInfo service={integration.local} locale={locale} t={t} />}
-      related={
-        <BiographyLibraryInfo service={integration.local} locale={locale} t={t} collaborators />
-      }
-      onOpenSettings={integration.openSettings}
-      artistImages={artistImages}
-      onRefresh={integration.refresh}
-      photos={
-        <BiographyPhotos
-          service={integration.photos}
-          t={t}
-          top={shell.inTitlebar ? 56 : 48}
-          onRetry={integration.refreshPhotos}
-        />
-      }
-    />
-  );
-}
 
 function LastfmKeyRow({
   integration,
@@ -100,6 +62,17 @@ function LastfmKeyRow({
 }
 
 /** 新人引导的独立开关卡，和设置页共用开关逻辑，说明行写清数据发给谁 */
+/** 隐私说明按来源写；Apple 来源打开了 Last.fm 补全时，后面再加一句发给 MusicBrainz 与 Last.fm 的说明 */
+function usePrivacy(integration: BiographyIntegration): string {
+  const t = useAtomValueRawSync(translateAtom);
+  const source = useAtomValueRawSync(integration.sourcePrefs.source);
+  const fallback = useAtomValueRawSync(integration.sourcePrefs.lastfmFallback);
+  if (source !== 'apple') return t('biography.privacy');
+  return fallback
+    ? `${t('biography.privacyApple')} ${t('biography.privacyLastfmFallback')}`
+    : t('biography.privacyApple');
+}
+
 function BiographyOnlineCard({
   integration,
   inputRef,
@@ -108,12 +81,9 @@ function BiographyOnlineCard({
   readonly inputRef?: Ref<HTMLInputElement>;
 }) {
   const t = useAtomValueRawSync(translateAtom);
+  const privacy = usePrivacy(integration);
   return (
-    <SettingsCard
-      icon={<Globe20Regular />}
-      title={t('biography.online')}
-      description={t('biography.privacy')}
-    >
+    <SettingsCard icon={<Globe20Regular />} title={t('biography.online')} description={privacy}>
       {({ labelId }) => (
         <BiographyOnlineSetting
           prefs={integration.prefs}
@@ -135,22 +105,25 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
   const check = useAtomValueRawSync(integration.lastfmKey.check);
   const checkDetail = useAtomValueRawSync(integration.lastfmKey.checkDetail);
   const keyStatus = lastfmKeyStatus(key, check, prefs.enabled, t, checkDetail);
+  const source = useAtomValueRawSync(integration.sourcePrefs.source);
+  const fallback = useAtomValueRawSync(integration.sourcePrefs.lastfmFallback);
+  // 来源是 Last.fm，或 Apple 来源打开了 Last.fm 补全时，才用得上 Last.fm 密钥
+  const lastfm = source === 'lastfm' || fallback;
+  const privacy = usePrivacy(integration);
   const error = prefs.failed
     ? t('biography.prefsFailed')
-    : keyStatus.error
+    : lastfm && keyStatus.error
       ? keyStatus.text
       : cache.failed
         ? t('biography.cacheClearFailed')
         : undefined;
   const requested = useAtomValueRawSync(integration.settingsRequested);
-  const selectOnline = useContext(OnlineSettingsNavigationContext);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!requested || !prefs.loaded || prefs.busy || !input.current || !selectOnline) return;
-    selectOnline();
+    if (!requested || !prefs.loaded || prefs.busy || !input.current) return;
     input.current.focus({ preventScroll: true });
     integration.settingsFocused();
-  }, [requested, prefs.loaded, prefs.busy, integration, selectOnline]);
+  }, [requested, prefs.loaded, prefs.busy, integration]);
   const size = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(
     cache.bytes / 1024,
   );
@@ -161,23 +134,25 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
       : cache.failed
         ? t('biography.cacheClearFailed')
         : `${cache.count} ${t('biography.cacheEntries')} · ${size} KiB`;
-  const options: readonly SettingsOption<BiographyLanguagePreference>[] = [
-    { value: 'auto', label: t('biography.followLanguage') },
-    ...BIOGRAPHY_LANGUAGES.map((value) => ({ value, label: localeName(value) })),
-  ];
   return (
     <>
       <SettingsExpander
         icon={<Globe20Regular />}
         title={t('biography.online')}
-        description={[t('biography.privacy'), error].filter(Boolean).join(' ')}
+        description={[privacy, error].filter(Boolean).join(' ')}
         error={error !== undefined}
         defaultOpen={false}
         feedback={
-          <SettingsSaveNotice
-            persistence={integration.lastfmKey.persistence}
-            keys={[LASTFM_KEY_PREF.key]}
-          />
+          <>
+            <SettingsSaveNotice
+              persistence={integration.sourcePrefs.persistence}
+              keys={[BIOGRAPHY_SOURCE_KEY]}
+            />
+            <SettingsSaveNotice
+              persistence={integration.lastfmKey.persistence}
+              keys={[LASTFM_KEY_PREF.key]}
+            />
+          </>
         }
         control={({ labelId }) => (
           <BiographyOnlineSetting
@@ -188,18 +163,11 @@ function BiographySetting({ integration }: { readonly integration: BiographyInte
           />
         )}
       >
-        <SettingsRow title={t('biography.language')} disabled={!prefs.enabled} field>
-          {(ids) => (
-            <SettingsSelect
-              {...ids}
-              options={options}
-              value={prefs.language}
-              disabled={!prefs.loaded || prefs.busy || !prefs.enabled}
-              onChange={(value) => integration.prefs.setLanguage(value)}
-            />
-          )}
-        </SettingsRow>
-        <LastfmKeyRow integration={integration} online={prefs.enabled} />
+        <BiographySourceRow integration={integration} />
+        <BiographyFallbackRow integration={integration} />
+        <BiographyMotionRow integration={integration} />
+        <BiographyLanguageRow integration={integration} />
+        {lastfm && <LastfmKeyRow integration={integration} online={prefs.enabled} />}
         <SettingsRow title={t('biography.cache')} description={summary} error={cache.failed}>
           {() => (
             <Button
@@ -263,7 +231,8 @@ export function BiographyRoot({
   readonly children: ReactNode;
 }) {
   const [integration, setIntegration] = useState<BiographyIntegration | null>(null);
-  const { store, rightCard, history, configWriter } = services;
+  const { store, rightCard, configWriter } = services;
+  const settingsNav = useService(settingsNavKey);
   const externalOpen = () => !!integration && store.get(integration.links.prompt) !== null;
   useCommand({
     id: 'biography.external.close',
@@ -283,10 +252,10 @@ export function BiographyRoot({
   });
   useEffect(() => {
     // 每次挂载建立新实例，清理后重挂不能复用已释放的订阅
-    const next = startBiographyIntegration({ store, rightCard, history, configWriter });
+    const next = startBiographyIntegration({ store, rightCard, settingsNav, configWriter });
     setIntegration(next);
     return () => next.dispose();
-  }, [store, rightCard, history, configWriter]);
+  }, [store, rightCard, settingsNav, configWriter]);
   const content = (
     <OnlineSettingsContext
       value={integration ? <BiographySetting integration={integration} /> : null}

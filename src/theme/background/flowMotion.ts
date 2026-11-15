@@ -45,8 +45,11 @@ export function setFlowPaused(state: FlowMotion, paused: boolean, immediate = fa
   }
 }
 
-/** 固定为 120 BPM、60 Hz 的运动配方；绘制限帧不改变速度，休眠时间由调用方排除 */
-export function advanceFlowMotion(state: FlowMotion, milliseconds: number): void {
+/**
+ * 固定为 120 BPM、60 Hz 的运动配方；绘制限帧不改变速度，休眠时间由调用方排除。`rate` 是用户设的速度倍率，
+ * 1 是配方原速，只缩放时间的推进，暂停时的减速照常叠在它上面
+ */
+export function advanceFlowMotion(state: FlowMotion, milliseconds: number, rate = 1): void {
   const elapsed = Math.max(0, Math.min(100, milliseconds));
   const changing = Math.min(elapsed, DURATION_MS.slow - state.speedElapsed);
   const previousSpeed = state.speed;
@@ -59,7 +62,7 @@ export function advanceFlowMotion(state: FlowMotion, milliseconds: number): void
   // 速度线性变化时按梯形面积积分；跨过过渡终点的余下时间按目标速度推进
   state.remainder +=
     ((changing * (previousSpeed + state.speed)) / 2 + (elapsed - changing) * state.speedTarget) *
-    FLOW_RATE;
+    (FLOW_RATE * rate);
   const step = 1000 / 60;
   while (state.remainder + 1e-9 >= step) {
     state.remainder = Math.max(0, state.remainder - step);

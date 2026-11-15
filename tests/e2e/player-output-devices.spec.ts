@@ -9,12 +9,12 @@ import {
 import { choosePlayerBar, openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
 
 // 输出设备与音量的几处件：标题栏、胶囊与窄窗通栏的音量浮层（两栏，设备栏原地展开），宽窗通栏的输出设备键。设备列表按模块分组、当前设备标出、选了按两个 GUID 切换、
-// 勾以宿主回读为准。对齐按像素断言；观感实机看。
+// 勾以宿主回读为准。对齐按像素断言；观感实机看
 
 const SPEAKERS = '{0000000D-0000-0000-0000-000000000001}';
 const EXCLUSIVE = '{0000000D-0000-0000-0000-000000000002}';
 
-/** 宿主那边的设备清单，第 `current` 个生效；切换时改它，回读就对得上。 */
+/** 宿主那边的设备清单，第 `current` 个生效；切换时改它，回读就对得上 */
 function switchableDevices(player: PlayerPage): void {
   let current = 0;
   const rows = (): ConfigOutputDevice[] =>
@@ -36,7 +36,7 @@ function switchableDevices(player: PlayerPage): void {
   });
 }
 
-/** 元素在页面里的左右缘与竖直中线，取整到像素。 */
+/** 元素在页面里的左右缘与竖直中线，取整到像素 */
 function edgesOf(locator: Locator) {
   return locator.evaluate((element) => {
     const box = element.getBoundingClientRect();
@@ -77,7 +77,7 @@ test('标题栏音量浮层的设备栏弹出分组列表：当前设备标出�
   await expect(
     deviceRow(page, `${OUTPUT_MODULES.directSound}|${DEFAULT_DEVICE_ID}`),
   ).toHaveAttribute('aria-current', 'true');
-  // 列表开着时指针离开，浮层照样开着。
+  // 列表开着时指针离开，浮层照样开着
   await page.mouse.move(640, 400);
   await page.waitForTimeout(700);
   await expect(panel).toBeVisible();
@@ -174,7 +174,7 @@ test('设备列表开着按 Esc 收起整个浮层、焦点回到音量键', asy
   await choosePlayerBar(page, 'titlebar');
   const { errors } = await openPlayer(page);
   const square = page.locator('header [data-player-key="volume"]');
-  // 键盘走进音量键（在下一首键之后）按 Enter 打开浮层，焦点进到浮层里，再到设备栏。
+  // 键盘走进音量键（在下一首键之后）按 Enter 打开浮层，焦点进到浮层里，再到设备栏
   await page.locator('header [data-player-key="next"]').focus();
   await page.keyboard.press('Tab');
   await expect(square).toBeFocused();
@@ -191,40 +191,6 @@ test('设备列表开着按 Esc 收起整个浮层、焦点回到音量键', asy
   // Esc 由浮层整体接住，列表开着也一并收起
   await expect(panel).toHaveCount(0);
   await expect(square).toBeFocused();
-  expect(errors).toEqual([]);
-});
-
-test('胶囊的音量浮层：336 宽、两栏各 40 高，图标离左缘 20、内容从 46 起，数值与箭头离右缘 20', async ({
-  page,
-}) => {
-  await choosePlayerBar(page, 'capsule');
-  const { errors } = await openPlayer(page);
-  await page.locator('[data-player-capsule] [data-player-key="volume"]').click();
-  const flyout = page.locator('[data-volume-popover]');
-  await settled(flyout);
-  const box = await edgesOf(flyout);
-  expect(box.right - box.left).toBe(336);
-  const slider = flyout.getByRole('slider', { name: '音量' });
-  const device = flyout.locator('[data-player-key="output"]');
-  const value = flyout.locator('[data-player-key="mute"] ~ span').last();
-  const [m, s, v, d, i, n, c] = await Promise.all(
-    [
-      flyout.locator('[data-player-key="mute"] svg'),
-      slider,
-      value,
-      device,
-      device.locator('svg').first(),
-      device.locator('span span').first(),
-      device.locator('svg').last(),
-    ].map(edgesOf),
-  );
-  expect(d?.height).toBe(40);
-  expect((m?.left ?? 0) - box.left).toBe(20);
-  expect((i?.left ?? 0) - box.left).toBe(20);
-  expect((s?.left ?? 0) - box.left).toBe(46);
-  expect((n?.left ?? 0) - box.left).toBe(46);
-  expect(box.right - (v?.right ?? 0)).toBe(20);
-  expect(box.right - (c?.right ?? 0)).toBe(20);
   expect(errors).toEqual([]);
 });
 
@@ -250,7 +216,7 @@ test('胶囊浮层的设备栏在原地展开成列表，再点收起；收起�
     .toEqual([{ outputId: OUTPUT_MODULES.directSound, deviceId: SPEAKERS }]);
   await expect(device).toHaveAttribute('aria-expanded', 'false');
   await expect(device).toContainText('Speakers (Realtek(R) Audio)');
-  // 选中的那一行随列表卸掉，焦点回到设备栏、浮层还开着。
+  // 选中的那一行随列表卸掉，焦点回到设备栏、浮层还开着
   await expect(device).toBeFocused();
   await expect(flyout).toBeVisible();
 

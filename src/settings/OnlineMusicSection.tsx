@@ -12,6 +12,7 @@ import {
 import {
   HeadphonesSoundWave20Regular,
   Person20Regular,
+  Search20Regular,
   ShieldError16Regular,
   Wand20Regular,
 } from '@fluentui/react-icons';
@@ -24,6 +25,7 @@ import { Dialog } from '../motion/Surfaces.tsx';
 import { musicClientKey } from '../playback/musicClient.ts';
 import { musicStatusKey } from '../playback/musicStatus.ts';
 import { ONLINE_QUALITY, onlineQualityKey } from '../playback/onlineQuality.ts';
+import { SEARCH_ONLINE, searchOnlinePrefKey } from '../playback/searchOnlinePref.ts';
 import { type MusicLoginCode, type MusicLoginState } from '../server/musicProtocol.ts';
 import { MUSIC_QUALITIES, type MusicQuality } from '../server/musicObjects.ts';
 import { OtherPlatformsCard } from './OtherPlatformsCard.tsx';
@@ -45,7 +47,7 @@ const QUALITY_LABELS: Readonly<Record<MusicQuality, MessageKey>> = {
 /** 扫码后隔多久问一次登录状态，毫秒 */
 const LOGIN_POLL_MS = 2000;
 
-/** 「在线音乐」一组：网易云账号、默认音质、解灰，以及经 lxserver 的其他平台 */
+/** 「在线音乐」一组：网易云账号、默认音质、搜索时包含在线音乐、解灰，以及经 lxserver 的其他平台 */
 export function OnlineMusicSection() {
   const status = useService(musicStatusKey);
   useEffect(() => status.refresh(), [status]);
@@ -53,6 +55,7 @@ export function OnlineMusicSection() {
     <>
       <AccountCard />
       <QualityCard />
+      <SearchOnlineCard />
       <UnblockCard />
       <OtherPlatformsCard />
     </>
@@ -336,6 +339,29 @@ function QualityCard() {
           options={MUSIC_QUALITIES.map((value) => ({ value, label: t(QUALITY_LABELS[value]) }))}
           value={quality}
           onChange={(value) => void service.set(value)}
+        />
+      )}
+    </SettingsCard>
+  );
+}
+
+function SearchOnlineCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const enabled = useAtomValueRawSync(SEARCH_ONLINE.atom);
+  const service = useService(searchOnlinePrefKey);
+  return (
+    <SettingsCard
+      icon={<Search20Regular />}
+      title={t('online.searchInclude')}
+      description={t('online.searchIncludeDetail')}
+      feedback={<SettingsSaveNotice persistence={service.persistence} keys={[SEARCH_ONLINE.key]} />}
+    >
+      {({ labelId, descriptionId }) => (
+        <Switch
+          checked={enabled}
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          onChange={(_, data) => void service.set(data.checked)}
         />
       )}
     </SettingsCard>

@@ -1,10 +1,10 @@
+import { QUEUE_BATCH } from '../../../src/host/queueCommands.ts';
 import { createStore } from 'jotai/vanilla';
 import { describe, expect, it, vi } from 'vitest';
 import { MAIN_COMMANDS } from '../../../src/playlist/playlistActions.ts';
 import { startPlaylists } from '../../../src/playback/playlists.ts';
 import {
   createPlaylistTrackActions,
-  QUEUE_NEXT_BATCH,
   SEND_TO_INLINE_LIMIT,
 } from '../../../src/playlist/playlistTrackActions.ts';
 import type { SelectionRanges } from '../../../src/table/rangeSelection.ts';
@@ -101,14 +101,14 @@ describe('createPlaylistTrackActions', () => {
 
   it('下一首播放按行序读路径，按批依次插到队首', async () => {
     const host = installFakeHost();
-    const { actions } = await setup(host, QUEUE_NEXT_BATCH + 10);
-    expect(await actions.queueNext(MAIN, span(0, QUEUE_NEXT_BATCH + 3))).toBe(true);
+    const { actions } = await setup(host, QUEUE_BATCH + 10);
+    expect(await actions.queueNext(MAIN, span(0, QUEUE_BATCH + 3))).toBe(true);
     const calls = host.callsTo('queue.insertNext');
     expect(calls).toHaveLength(2);
     expect(calls[0]?.['position']).toBe(0);
     expect(calls[1]).toMatchObject({
-      paths: [0, 1, 2].map((offset) => makeRow('Main', QUEUE_NEXT_BATCH + offset).handle),
-      position: QUEUE_NEXT_BATCH,
+      paths: [0, 1, 2].map((offset) => makeRow('Main', QUEUE_BATCH + offset).handle),
+      position: QUEUE_BATCH,
     });
   });
 

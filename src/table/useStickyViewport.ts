@@ -44,7 +44,11 @@ export function useStickyViewport(
     if (!box) return;
     const shown = shownRange(box, latest.current.placement);
     if (viewport.current) viewport.current.style.height = `${shown.height}px`;
-    if (strip.current) strip.current.style.transform = `translateY(${-shown.top}px)`;
+    if (strip.current) {
+      // 平移量取整到设备像素：表体偏移与吸顶偏移都是整数 CSS 像素，125% 这类缩放下乘出来常带 .5，行带整个落在半个像素上
+      const scale = window.devicePixelRatio || 1;
+      strip.current.style.transform = `translateY(${-Math.round(shown.top * scale) / scale}px)`;
+    }
   });
 
   useLayoutEffect(() => {

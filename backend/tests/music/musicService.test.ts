@@ -15,7 +15,7 @@ import { zipForRelease } from '../../../scripts/release/zip.mjs';
 const DIRECTORIES: string[] = [];
 const BACKENDS: BackendServer[] = [];
 const UPSTREAMS: Server[] = [];
-/** 先于删目录释放：曲目库的 SQLite 文件开着时 Windows 删不掉。 */
+/** 先于删目录释放：曲目库的 SQLite 文件开着时 Windows 删不掉 */
 const MUSICS: { dispose(): Promise<void> }[] = [];
 const SONG = {
   source: 'tx',
@@ -510,6 +510,70 @@ describe('音乐 HTTP 服务', () => {
     await pending;
     await vi.waitFor(() => expect(closed).toBe(true));
   });
+
+  it('本地收藏走管理路由，不要网易云组件：加入、读键、分页、刷新、取消；参数不对答 400，其他平台答不支持', async () => {
+    const env = await environment(false);
+    const track = (id: string, platform = 'wy') => ({
+      ref: { platform, id },
+      title: `曲目 ${id}`,
+      subtitle: null,
+      artists: [],
+      album: null,
+      durationMs: 1000,
+      artwork: null,
+      qualities: ['128k'],
+      access: null,
+    });
+    const post = async (path: string, body: unknown) => ({
+      status: (await env.request(path, body)).status,
+    });
+    const added = await env.request('/music/favorites-add', { kind: 'track', items: [track('7')] });
+    expect(added.status).toBe(200);
+    expect(await added.json()).toMatchObject({ success: true, data: [{ ref: { id: '7' } }] });
+    expect(await (await env.request('/music/favorites-keys')).json()).toMatchObject({
+      data: { track: [['wy', '7', expect.any(Number)]] },
+    });
+    expect(
+      await (await env.request('/music/favorites-list', { kind: 'track', cursor: null })).json(),
+    ).toMatchObject({ data: { items: [{ kind: 'track', item: { title: '曲目 7' } }], total: 1 } });
+    const refreshed = await env.request('/music/favorites-refresh', {
+      kind: 'track',
+      items: [{ ...track('7'), title: '改名' }, track('8')],
+    });
+    expect(await refreshed.json()).toMatchObject({ data: [{ ref: { id: '7' } }] });
+    expect(
+      await (
+        await env.request('/music/favorites-remove', {
+          kind: 'track',
+          refs: [{ platform: 'wy', id: '7' }],
+        })
+      ).json(),
+    ).toMatchObject({ data: { removed: 1 } });
+    await env.restart();
+    expect(await (await env.request('/music/favorites-keys')).json()).toMatchObject({
+      data: { track: [] },
+    });
+
+    const many = Array.from({ length: 101 }, (_, index) => track(String(index + 1)));
+    for (const [path, body] of [
+      ['/music/favorites-keys', { more: 1 }],
+      ['/music/favorites-list', { kind: 'radio', cursor: null }],
+      ['/music/favorites-list', { kind: 'track', cursor: null, more: 1 }],
+      ['/music/favorites-add', { kind: 'track', items: [] }],
+      ['/music/favorites-add', { kind: 'track', items: many }],
+      ['/music/favorites-add', { kind: 'track', items: [track('1'), track('1')] }],
+      ['/music/favorites-add', { kind: 'track', items: [{ title: '缺字段' }] }],
+      ['/music/favorites-add', { kind: 'album', items: [track('1')] }],
+      ['/music/favorites-remove', { kind: 'track', refs: [] }],
+      ['/music/favorites-remove', { kind: 'track', refs: [{ platform: 'wy' }] }],
+    ] as const)
+      expect((await post(path, body)).status, `${path} ${JSON.stringify(body).slice(0, 40)}`).toBe(
+        400,
+      );
+    expect(
+      (await post('/music/favorites-add', { kind: 'track', items: [track('1', 'tx')] })).status,
+    ).toBe(501);
+  });
 });
 
 describe('网易云经 NCM', () => {
@@ -553,6 +617,11 @@ describe('网易云经 NCM', () => {
         privileges: [],
       },
     })),
+    banner: vi.fn(async () => ({ body: { code: 200, banners: [] } })),
+    top_song: vi.fn(async () => ({ body: { code: 200, data: [{ id: 7 }] } })),
+    personalized: vi.fn(async () => ({ body: { code: 200, result: [] } })),
+    album_new: vi.fn(async () => ({ body: { code: 200, albums: [] } })),
+    toplist_detail: vi.fn(async () => ({ body: { code: 200, list: [] } })),
     login_qr_key: vi.fn(async () => ({ body: { code: 200, data: { unikey: 'unikey' } } })),
     login_qr_create: vi.fn(async () => ({
       body: { code: 200, data: { qrimg: 'data:image/png;base64,iVBORw0KGgo=' } },
@@ -694,6 +763,31 @@ describe('网易云经 NCM', () => {
     const missing = await post(album);
     expect(missing.status).toBe(404);
     expect(await missing.json()).toMatchObject({ success: false, error: { code: 'not-found' } });
+  });
+
+  it('公共推荐：按类与地区答网易云的内容，参数不对答 400，组件没下载答未安装', async () => {
+    const ncm = api();
+    const call = await netease({ installed: () => true, load: async () => ncm });
+    expect(await call('/music/discover', { kind: 'new-tracks', area: 'ea' })).toMatchObject({
+      success: true,
+      data: [{ ref: { platform: 'wy', id: '7' }, title: '曲目' }],
+    });
+    expect(vi.mocked(ncm.top_song).mock.calls[0]?.[0]).toMatchObject({ type: 96 });
+    const post = (body: unknown) =>
+      fetch(`${call.url}/music/discover`, { method: 'POST', body: JSON.stringify(body) });
+    for (const body of [
+      {},
+      { kind: 'mv' },
+      { kind: 'new-tracks' },
+      { kind: 'new-albums', area: 'us' },
+      { kind: 'banners', area: 'all' },
+    ])
+      expect((await post(body)).status).toBe(400);
+    const missing = await netease({ installed: () => false, load: async () => ncm });
+    expect(await missing('/music/discover', { kind: 'banners' })).toMatchObject({
+      success: false,
+      error: { code: 'not-installed' },
+    });
   });
 
   it('艺人专辑只由网易云提供：参数不对答 400，其他平台答不支持，艺人不存在答 404', async () => {

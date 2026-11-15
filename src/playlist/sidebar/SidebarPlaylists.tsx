@@ -31,12 +31,12 @@ import { PlaylistEntry } from './PlaylistEntry.tsx';
 import { PlaylistMenu, type PlaylistMenuTarget } from './PlaylistMenu.tsx';
 import { PlaylistNameBox } from './PlaylistNameBox.tsx';
 import { playlistActionFailureAtom, playlistActionsKey } from '../playlistActions.ts';
-import { isOwnSlot } from './playlistReorder.ts';
+import { isOwnSlot } from '../../kit/listReorder.ts';
 import { playlistsAtom, playlistsKey } from '../../playback/playlists.ts';
 import styles from './SidebarPlaylists.module.css';
 import { usePlaylistKeys } from './usePlaylistKeys.ts';
 import { usePlaylistMove } from './usePlaylistMove.ts';
-import { usePlaylistReorder } from './usePlaylistReorder.ts';
+import { useListReorder } from '../../kit/useListReorder.ts';
 import { useService } from '../../kit/useService.ts';
 import { playlistPlacesKey } from '../playlistPlaces.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
@@ -100,8 +100,9 @@ export function SidebarPlaylists({
   const canReorder = rename.editing === null && draft.name === null && filter.trim() === '';
 
   const move = usePlaylistMove(scroller, items, actions);
-  const reorder = usePlaylistReorder({
+  const reorder = useListReorder({
     scroller,
+    row: '[data-playlist-entry]',
     enabled: canReorder,
     signature: items.map((item) => item.guid).join(' '),
     drop: move,
@@ -123,7 +124,7 @@ export function SidebarPlaylists({
   );
   const hits = items.filter((item) => matchWords(item.name, filter)).length;
   const { drag } = reorder;
-  const dragFrom = drag ? items.findIndex((item) => item.guid === drag.guid) : -1;
+  const dragFrom = drag ? items.findIndex((item) => item.guid === drag.key) : -1;
   /**
    * 插入线画在哪一行：插入位 k 画在第 k 行上沿，末尾画在最后一行下沿；落在原位不画。插入位按清单里的
    * 位置算，不是宿主序号：清单不含宿主自己建的那几张
@@ -247,7 +248,7 @@ export function SidebarPlaylists({
             entry={entry}
             selected={selected === playlistKey(entry.guid)}
             editing={rename.editing === entry.guid}
-            dragging={drag?.guid === entry.guid}
+            dragging={drag?.key === entry.guid}
             drop={dropOf(entry)}
             menuOpen={menu?.guid === entry.guid}
             onOpen={() => places.open(entry.guid)}

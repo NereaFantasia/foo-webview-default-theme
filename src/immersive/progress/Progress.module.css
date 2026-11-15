@@ -64,3 +64,27 @@
   border-radius: var(--borderRadiusCircular);
   background: var(--player-rail);
 }
+
+/* 预览放在元素里（`preview="inline"`）：不占位，歌词浮在线的上方（底边离线 4，向上长，两行最高 36），压在元素上面那块内容上；
+   那块内容由外框在 `data-previewing` 出现时模糊变淡，歌词才读得清。预览区不接指针，指针只落在命中区上；
+   里面的 `SeekLyrics` 自己按预览目标淡入淡出，歌词放不下就省略 */
+.overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(100% - var(--spacingVerticalXS));
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.overlay > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 预览时下面的时间行左边写预览的位置：取主色、加粗 */
+.times [data-previewing] {
+  color: var(--text-primary);
+  font-weight: var(--fontWeightSemibold);
+}

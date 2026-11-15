@@ -1,23 +1,13 @@
 import { atom, type Atom, type createStore } from 'jotai/vanilla';
 import type { AlbumsState } from '../albums.ts';
-import type { BiographyLanguage } from '../biography/biographyModel.ts';
-import type { BiographyPrefsService } from '../biography/biographyPrefs.ts';
-import type { BiographyResources } from '../biography/biographyResources.ts';
-import type { LastfmKeyService } from '../biography/lastfm-api/lastfmKey.ts';
-import { startBiography } from '../biography/biographyService.ts';
-import { startBiographyIdentity } from '../biography/identity/biographyIdentity.ts';
+import { localAlbumsOf } from '../biography/biographyInput.ts';
+import { startBiographyStack, type BiographyStackShared } from '../biography/biographyStack.ts';
 import { startBiographyPhotos } from '../biography/biographyPhotos.ts';
-import { startBiographyOnlinePhoto } from '../biography/online/biographyOnlinePhoto.ts';
+import { cachedApplePhoto } from '../biography/online/onlinePhotoSource.ts';
 import { startBiographyArtistImages } from '../biography/local/biographyArtistImages.ts';
 
-export interface ArtistBiographyShared {
-  readonly prefs: BiographyPrefsService;
-  readonly resources: BiographyResources;
-  readonly lastfmKey: LastfmKeyService;
-  readonly language: Atom<BiographyLanguage>;
-  readonly locale: Atom<string>;
+export interface ArtistBiographyShared extends BiographyStackShared {
   readonly viewerTop: Atom<number>;
-  readonly probe: (url: string) => Promise<Uint8ClampedArray | null>;
   readonly same: (a: ArrayLike<number>, b: ArrayLike<number>) => boolean;
   openSettings(): void;
 }
@@ -31,85 +21,11 @@ export function startArtistBiography(
   store: ReturnType<typeof createStore>,
   deps: ArtistBiographyDeps,
 ) {
-  const enabled = atom((get) => get(deps.prefs.state).enabled);
-  const manual = atom(
-    (get) =>
-      get(deps.prefs.state).identities.find((item) => item.artist === get(deps.subject)) ?? null,
-  );
-  const identity = startBiographyIdentity(
-    store,
-    {
-      artist: deps.subject,
-      active: deps.active,
-      enabled,
-      manual,
-      locale: deps.locale,
-      resources: deps.resources,
-      albums: atom((get) => {
-        const library = get(deps.albums);
-        return library.status === 'idle' || library.status === 'loading'
-          ? null
-          : library.albums
-              .filter((album) => album.albumArtist === get(deps.subject))
-              .map((album) => album.name);
-      }),
-    },
-    deps.resources.musicbrainz,
-  );
-  const sourceArtist = atom((get) => {
-    const name = get(deps.subject);
-    const chosen = get(manual);
-    const found = get(identity.state);
-    return (
-      chosen?.sourceArtist ??
-      (found.artist === name && found.status === 'resolved' && !found.manual
-        ? found.sourceArtist
-        : null)
-    );
+  const stack = startBiographyStack(store, {
+    ...deps,
+    albums: atom((get) => localAlbumsOf(get(deps.albums), get(deps.subject))),
   });
-  const input = atom((get) => {
-    const artist = get(deps.subject);
-    return artist === null
-      ? null
-      : { artist, sourceArtist: get(sourceArtist), language: get(deps.language) };
-  });
-  const source = deps.resources.lastfm;
-  const service = startBiography(
-    store,
-    {
-      input,
-      enabled,
-      active: deps.active,
-      resources: deps.resources,
-      fetchText: source.fetchText,
-      sourceKey: deps.lastfmKey.key,
-    },
-    undefined,
-    undefined,
-    source.fetchDetails,
-  );
-  const photoSource = atom((get) => {
-    const artist = get(sourceArtist);
-    const state = get(service.state);
-    if (!get(enabled) || !artist) return null;
-    return (
-      (state.document?.artist === artist ? state.document.photo : null) ??
-      (state.details?.artist === artist ? state.details.photo : null) ??
-      null
-    );
-  });
-  const onlinePhoto = startBiographyOnlinePhoto(store, {
-    source: photoSource,
-    active: deps.active,
-    probe: deps.probe,
-    artist: atom((get) => (get(enabled) ? get(sourceArtist) : null)),
-    language: deps.language,
-    cache: deps.resources.photos,
-    ready: atom((get) => {
-      const state = get(service.state);
-      return state.status !== 'loading' && !state.refreshing && !state.detailsLoading;
-    }),
-  });
+  const { service, onlinePhoto } = stack;
   const photos = startBiographyPhotos(store, {
     artist: deps.subject,
     active: deps.active,
@@ -125,40 +41,44 @@ export function startArtistBiography(
     albums: deps.albums,
     probe: deps.probe,
   });
-  const stops = [
-    store.sub(service.state, () => {
-      const state = store.get(service.state);
-      for (const problem of [state.problem, state.detailsProblem])
-        if (problem === 'keyInvalid' || problem === 'keySuspended') deps.lastfmKey.report(problem);
-    }),
-    store.sub(deps.resources.textRevision, () => {
-      onlinePhoto.clear();
-      photos.refresh();
-    }),
-  ];
+  /**
+   * 墙上图块用的 Apple 艺术照，按本地艺人名查；只读缓存，不发请求。图要从 Apple 的图片服务器取，
+   * 所以在线关闭、来源不是 Apple、来源偏好还没读回时一律没有。两份缓存读回或写入后重新算
+   */
+  const wallPhoto = atom((get) => {
+    get(deps.resources.cacheState);
+    get(deps.resources.appleIdentityCacheState);
+    const manual = get(deps.sourcePrefs.identities);
+    const allowed =
+      get(deps.prefs.state).enabled &&
+      get(deps.sourcePrefs.loaded) &&
+      get(deps.sourcePrefs.source) === 'apple';
+    return (artist: string) =>
+      allowed
+        ? cachedApplePhoto(
+            artist,
+            manual,
+            deps.resources.appleIdentityCache,
+            deps.resources.caches.apple,
+          )
+        : null;
+  });
+  const stop = store.sub(deps.resources.textRevision, () => photos.refresh());
   return {
     ...deps,
-    input,
-    sourceArtist,
-    enabled,
-    identity,
-    service,
+    ...stack,
     photos,
-    onlinePhoto,
     artistImages,
+    wallPhoto,
     refresh() {
-      identity.refresh();
-      service.refresh();
+      stack.refresh();
       photos.refresh();
-      onlinePhoto.refresh();
       artistImages.refresh();
     },
     dispose() {
-      stops.forEach((stop) => stop());
-      identity.dispose();
-      service.dispose();
+      stop();
+      stack.dispose();
       photos.dispose();
-      onlinePhoto.dispose();
       artistImages.dispose();
     },
   };

@@ -8,7 +8,9 @@ import { MoreHorizontal20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { EMPTY_GENRE } from '../../nav/places.ts';
+import { genresCatalogAtom } from './genresCatalog.ts';
 import { genresQuery } from './genresModel.ts';
+import { useRetained } from '../../kit/useRetained.ts';
 import { useService } from '../../kit/useService.ts';
 import { genresKey } from './genresServices.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
@@ -24,6 +26,9 @@ export function GenresMenu({ keys, at, onClose, fill }: GenresMenuProps) {
   const t = useAtomValueRawSync(translateAtom);
   const viewControls = useViewControlStyles();
   const genres = useService(genresKey);
+  const catalog = useAtomValueRawSync(genresCatalogAtom);
+  // 关闭时落点先被清空，退场动画里菜单要按关闭前的落点画，不然会跳到左上角再消失
+  const shownAt = useRetained(at);
   const names = keys.map((key) => (key === EMPTY_GENRE ? t('genres.unknown') : key));
   const name =
     names.length === 1 ? (names[0] ?? '') : t('genres.multiple', { count: names.length });
@@ -61,6 +66,9 @@ export function GenresMenu({ keys, at, onClose, fill }: GenresMenuProps) {
         >
           {t('genres.openSongs')}
         </MenuItem>
+        {keys.some((key) => catalog.issues.has(key)) ? (
+          <MenuItem onClick={() => genres.tidy.ignore(keys)}>{t('genres.ignore')}</MenuItem>
+        ) : null}
         <MenuItem onClick={() => void genres.actions.copy(names.join('\n'))}>
           {t('genres.copy')}
         </MenuItem>
@@ -75,7 +83,9 @@ export function GenresMenu({ keys, at, onClose, fill }: GenresMenuProps) {
           if (!data.open) onClose?.();
         }}
         positioning={{
-          target: at ? { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) } : undefined,
+          target: shownAt
+            ? { getBoundingClientRect: () => new DOMRect(shownAt.x, shownAt.y, 0, 0) }
+            : undefined,
         }}
       >
         {menu}

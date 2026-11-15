@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BIOGRAPHY_DEBOUNCE_MS } from '../../../../src/library/biography/biographyService.ts';
 import { fetchLastfmDetails } from '../../../../src/library/biography/details/fetchLastfmDetails.ts';
-import { lastfmArtistUrl } from '../../../../src/library/biography/biographyModel.ts';
+import {
+  lastfmArtistUrl,
+  lastfmInput,
+  type ApplePhoto,
+  type BiographyInput,
+} from '../../../../src/library/biography/biographyModel.ts';
+import {
+  onlinePhotoOf,
+  onlinePhotoReady,
+} from '../../../../src/library/biography/online/onlinePhotoSource.ts';
 import { BIOGRAPHY_FILE, setupBiography } from '../../../fixtures/biographyHost.ts';
 import { biographyDocument } from '../../../fixtures/biographySamples.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
@@ -29,6 +38,22 @@ describe('简介服务', () => {
     expect(env.host.callsTo('http.get')).toHaveLength(1);
     expect(env.files.get(BIOGRAPHY_FILE)).toContain('完成的正文');
   });
+  it('防抖从换人那一刻起算：身份晚一步才认定时（已经停够了）马上取正文；换了艺人仍要停够', async () => {
+    const env = setupBiography();
+    await env.service.ready;
+    env.store.set(env.input, lastfmInput('Queen', null, 'zh'));
+    env.store.set(env.enabled, true);
+    await vi.advanceTimersByTimeAsync(BIOGRAPHY_DEBOUNCE_MS * 3);
+    expect(env.host.callsTo('http.get')).toHaveLength(0);
+    env.store.set(env.input, lastfmInput('Queen', 'Queen', 'zh'));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(env.host.callsTo('http.get')).toHaveLength(1);
+    env.store.set(env.input, lastfmInput('B', 'B', 'zh'));
+    await vi.advanceTimersByTimeAsync(BIOGRAPHY_DEBOUNCE_MS - 1);
+    expect(env.host.callsTo('http.get')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2);
+    expect(env.host.callsTo('http.get')).toHaveLength(2);
+  });
   it('重新显示时同步恢复有效缓存，不先进入加载态或等待防抖', async () => {
     const env = setupBiography();
     await env.service.ready;
@@ -51,7 +76,15 @@ describe('简介服务', () => {
       return {
         ok: true,
         store: true,
-        entry: { artist, language, fetchedAt: now, expiresAt: now + 60_000, document },
+        entry: {
+          source: 'lastfm',
+          sourceId: artist,
+          artist,
+          language,
+          fetchedAt: now,
+          expiresAt: now + 60_000,
+          document,
+        },
       };
     });
     await env.service.ready;
@@ -139,7 +172,7 @@ describe('简介服务', () => {
     const held = env.host.hold('file.write');
     const clear = env.service.clearCache();
     await tick();
-    env.store.set(env.input, { artist: 'B', sourceArtist: 'B', language: 'en' });
+    env.store.set(env.input, lastfmInput('B', 'B', 'en'));
     held.respond(0);
     held.release();
     expect(await clear).toBe(true);
@@ -158,11 +191,11 @@ describe('简介服务', () => {
     env.store.set(env.enabled, true);
     await tick();
     expect(env.state().status).toBe('idle');
-    env.store.set(env.input, { artist: 'Queen', sourceArtist: null, language: 'zh' });
+    env.store.set(env.input, lastfmInput('Queen', null, 'zh'));
     env.store.set(env.active, true);
     await tick();
     expect(env.state().status).toBe('unconfirmed');
-    env.store.set(env.input, { artist: '群星', sourceArtist: 'Queen', language: 'zh' });
+    env.store.set(env.input, lastfmInput('群星', 'Queen', 'zh'));
     await tick();
     expect(env.state().status).toBe('idle');
     expect(env.host.callsTo('http.get')).toEqual([]);
@@ -205,9 +238,9 @@ describe('简介服务', () => {
     const held = env.host.hold('http.get');
     env.store.set(env.enabled, true);
     await tick();
-    env.store.set(env.input, { artist: 'B', sourceArtist: 'B', language: 'zh' });
+    env.store.set(env.input, lastfmInput('B', 'B', 'zh'));
     await tick();
-    env.store.set(env.input, { artist: 'C', sourceArtist: 'C', language: 'zh' });
+    env.store.set(env.input, lastfmInput('C', 'C', 'zh'));
     expect(env.state().document).toBeNull();
     await tick();
     expect(held.pending).toHaveLength(1);
@@ -289,7 +322,7 @@ describe('简介服务', () => {
             responseType: 'text' as const,
           },
     );
-    first.store.set(first.input, { artist: '周杰伦', sourceArtist: '周杰伦', language: 'zh' });
+    first.store.set(first.input, lastfmInput('周杰伦', '周杰伦', 'zh'));
     first.store.set(first.enabled, true);
     await tick();
     expect(first.state()).toMatchObject({
@@ -299,10 +332,10 @@ describe('简介服务', () => {
     const cached = first.files.get(BIOGRAPHY_FILE) ?? '';
     expect(cached).toContain(encodeURIComponent('周杰伦'));
 
-    // 关掉再按缓存开：水合的条目照常显示，不再发请求。
+    // 关掉再按缓存开：水合的条目照常显示，不再发请求
     const second = setupBiography(cached);
     await second.service.ready;
-    second.store.set(second.input, { artist: '周杰伦', sourceArtist: '周杰伦', language: 'zh' });
+    second.store.set(second.input, lastfmInput('周杰伦', '周杰伦', 'zh'));
     second.store.set(second.enabled, true);
     await tick();
     expect(second.state()).toMatchObject({
@@ -317,10 +350,10 @@ describe('简介服务', () => {
     await env.service.ready;
     env.store.set(env.enabled, true);
     await tick();
-    env.store.set(env.input, { artist: 'Queen', sourceArtist: 'Queen', language: 'en' });
+    env.store.set(env.input, lastfmInput('Queen', 'Queen', 'en'));
     await tick();
     expect(env.state().document?.language).toBe('en');
-    env.store.set(env.input, { artist: '赵咏华', sourceArtist: '趙詠華', language: 'zh' });
+    env.store.set(env.input, lastfmInput('赵咏华', '趙詠華', 'zh'));
     await tick();
     expect(env.state().document?.artist).toBe('趙詠華');
     expect(env.host.callsTo('http.get')).toHaveLength(3);
@@ -340,7 +373,7 @@ describe('简介服务', () => {
     expect(env.state()).toMatchObject({ status: 'error', problem: 'rateLimited' });
     env.service.refresh();
     await tick();
-    env.store.set(env.input, { artist: 'B', sourceArtist: 'B', language: 'zh' });
+    env.store.set(env.input, lastfmInput('B', 'B', 'zh'));
     await tick();
     expect(env.host.callsTo('http.get')).toHaveLength(1);
     expect(env.host.callsTo('file.write')).toEqual([]);
@@ -443,7 +476,7 @@ describe('简介服务', () => {
     await tick();
     expect(env.state().problem).toBe('invalid');
     env.host.answer('http.get', { success: true, status: 200, headers: {}, body: 'B 的正文' });
-    env.store.set(env.input, { artist: 'B', sourceArtist: 'B', language: 'zh' });
+    env.store.set(env.input, lastfmInput('B', 'B', 'zh'));
     await tick();
     expect(env.state().document?.paragraphs).toEqual(['B 的正文']);
   });
@@ -544,11 +577,11 @@ describe('简介服务', () => {
   it('日语独立取数，法语缺失后回退英文遇到限流仍按全局退避处理', async () => {
     const env = setupBiography();
     await env.service.ready;
-    env.store.set(env.input, { artist: 'Queen', sourceArtist: 'Queen', language: 'ja' });
+    env.store.set(env.input, lastfmInput('Queen', 'Queen', 'ja'));
     env.store.set(env.enabled, true);
     await tick();
     expect(env.state().document?.language).toBe('ja');
-    env.store.set(env.input, { artist: 'Queen', sourceArtist: 'Queen', language: 'fr' });
+    env.store.set(env.input, lastfmInput('Queen', 'Queen', 'fr'));
     env.host.answer('http.get', (params) => ({
       success: true,
       status: String(params['url']).includes('/fr/') ? 404 : 429,
@@ -572,7 +605,7 @@ describe('简介服务', () => {
       await tick();
       if (action === '关闭') env.store.set(env.enabled, false);
       else if (action === '释放') env.service.dispose();
-      else env.store.set(env.input, { artist: 'Other', sourceArtist: null, language: 'zh' });
+      else env.store.set(env.input, lastfmInput('Other', null, 'zh'));
       held.respond(0, { success: true, status: 404, headers: {}, body: '' });
       await tick();
       expect(env.host.callsTo('http.get')).toHaveLength(1);
@@ -599,6 +632,93 @@ describe('简介服务', () => {
     expect(
       env.host.callsTo('http.get').filter((call) => !String(call['url']).includes('/zh/')),
     ).toHaveLength(1);
+  });
+
+  it('Apple 默认页没有正文时改取英文：告诉取数函数这是回落，默认页里的主图先交出，曲风等英文那份', async () => {
+    const page = 'https://music.apple.com/cn/artist/mili/906934266';
+    const mili: BiographyInput = {
+      artist: 'Mili',
+      source: 'apple',
+      sourceId: '906934266',
+      sourceArtist: 'Mili',
+      language: 'zh',
+    };
+    const photo: ApplePhoto = {
+      source: 'apple',
+      url: 'https://is1-ssl.mzstatic.com/image/thumb/Music/v4/aa/mili.png',
+      pageUrl: page,
+    };
+    const calls: [string, boolean][] = [];
+    let english: (() => void) | undefined;
+    let englishFails = true;
+    const env = setupBiography(undefined, true, undefined, async (id, language, fallback) => {
+      calls.push([language, fallback]);
+      if (language === 'en') {
+        await new Promise<void>((resolve) => (english = resolve));
+        if (englishFails) return { ok: false, problem: 'network', retryAt: Date.now() + 1_000 };
+      }
+      const now = Date.now();
+      const expiresAt = now + 60_000;
+      return {
+        ok: true,
+        store: true,
+        entry: {
+          source: 'apple',
+          sourceId: id,
+          artist: 'Mili',
+          language,
+          fetchedAt: now,
+          expiresAt,
+          document: null,
+          details: {
+            source: 'apple',
+            artist: 'Mili',
+            language,
+            url: page,
+            fetchedAt: now,
+            expiresAt,
+            tags: [language === 'en' ? 'Anime' : '动画'],
+            counters: [],
+            similar: [],
+            photo,
+          },
+        },
+      };
+    });
+    env.store.set(env.input, mili);
+    await env.service.ready;
+    env.store.set(env.enabled, true);
+    await tick();
+    expect(calls).toEqual([
+      ['zh', false],
+      ['en', true],
+    ]);
+    // 英文那一页还在取：主图已经可以开始取，曲风不先出中文
+    expect(env.state()).toMatchObject({ status: 'loading', photo });
+    expect(env.state().details ?? null).toBeNull();
+    expect(onlinePhotoReady(env.state())).toBe(true);
+    expect(onlinePhotoOf(mili, env.state())).toEqual(photo);
+    english?.();
+    await tick();
+    expect(env.state()).toMatchObject({ status: 'error', problem: 'network', photo });
+
+    // 重新显示：默认页走缓存，英文那一页再取，期间主图同样先交出；英文到了由资料里的主图接替
+    await vi.advanceTimersByTimeAsync(2_000);
+    englishFails = false;
+    env.store.set(env.active, false);
+    env.store.set(env.active, true);
+    await tick();
+    expect(calls).toEqual([
+      ['zh', false],
+      ['en', true],
+      ['en', true],
+    ]);
+    expect(env.state()).toMatchObject({ status: 'loading', photo });
+    english?.();
+    await tick();
+    expect(env.state()).toMatchObject({ status: 'missing', details: { tags: ['Anime'] } });
+    expect(env.state()).not.toHaveProperty('photo');
+    expect(onlinePhotoOf(mili, env.state())).toEqual(photo);
   });
 });
 
@@ -666,8 +786,7 @@ describe('简介附加资料生命周期', () => {
       held.respond(0);
       await tick();
       if (action === '关闭') env.store.set(env.enabled, false);
-      if (action === '换艺人')
-        env.store.set(env.input, { artist: 'Other', sourceArtist: null, language: 'zh' });
+      if (action === '换艺人') env.store.set(env.input, lastfmInput('Other', null, 'zh'));
       if (action === '清理') await env.service.clearCache();
       if (action === '释放') env.service.dispose();
       held.respond(0, { success: true, status: 200, headers: {}, body: '不应写入' });
@@ -696,7 +815,7 @@ describe('简介附加资料生命周期', () => {
       detailsProblem: 'rateLimited',
     });
     const count = env.host.callsTo('http.get').length;
-    env.store.set(env.input, { artist: 'Other', sourceArtist: 'Other', language: 'zh' });
+    env.store.set(env.input, lastfmInput('Other', 'Other', 'zh'));
     await tick();
     expect(env.state()).toMatchObject({ problem: 'rateLimited', document: null });
     expect(env.host.callsTo('http.get')).toHaveLength(count);
@@ -776,7 +895,7 @@ describe('简介附加资料生命周期', () => {
     await tick();
     held.respond(0);
     await tick();
-    env.store.set(env.input, { artist: 'Other', sourceArtist: 'Other', language: 'zh' });
+    env.store.set(env.input, lastfmInput('Other', 'Other', 'zh'));
     await tick();
     held.respond(0, {
       success: true,

@@ -96,6 +96,22 @@ describe('prepareLyricsLines', () => {
     }
   });
 
+  it('括号包裹的背景人声行末尾剩下的无字音节倒序时收成零时长，整首仍逐字显示', () => {
+    const source = parse(
+      '[02:07.89]<02:07.89>（<02:07.90>wu <02:12.66>a <02:12.69>）\n[02:12.60]<02:12.80>下一句<02:15.00>',
+    );
+    expect(source[0]?.isBG).toBe(true);
+    const prepared = prepareLyricsLines(source);
+    expect(prepared?.[0]?.words.at(-1)).toMatchObject({
+      word: '',
+      startTime: 132690,
+      endTime: 132690,
+    });
+    expect(prepared?.[0]?.endTime).toBe(132690);
+    expect(prepared?.[1]).toEqual(source[1]);
+    expect(source[0]?.words.at(-1)?.endTime).toBe(132600);
+  });
+
   it('词内倒序或下一行不能提供更晚边界时显示文字', () => {
     expect(prepareLyricsLines(parse('[00:10]<00:10>甲<00:09>乙<00:12>'))).toBeNull();
     expect(prepareLyricsLines(parse('[00:10]<00:10>甲<00:15>乙\n[00:12]丙'))).toBeNull();

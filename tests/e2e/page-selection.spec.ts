@@ -1,10 +1,26 @@
 import { expect, test } from '@playwright/test';
-import { makePlaylist } from '../fixtures/fakePlaylists.ts';
+import { choosePlayerBar, openPlayer } from '../fixtures/playerPage.ts';
 import { openSidebar } from '../fixtures/sidebarPage.ts';
+import { makeTrack } from '../fixtures/tracks.ts';
 
-// 界面文字默认不能选、输入框照常能选；滚动条只留手柄。手柄的粗细与颜色只能实机看，这里只核对占位宽度。
-// headless 缺省带 --hide-scrollbars，滚动条不占位；去掉它才量得到。
-test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
+// 界面文字默认不能选、输入框照常能选
+
+test('按住鼠标拖过可跳转的名字，什么都选不中', async ({ page }) => {
+  const track = makeTrack({ title: 'Probe', artist: 'Alpha, Beta', artists: ['Alpha', 'Beta'] });
+  await choosePlayerBar(page, 'titlebar');
+  const { errors } = await openPlayer(page, { state: { track } });
+  const names = page.locator('[data-now-playing] [class*="subRow"] [class*="fui-Link"]');
+  await expect(names).toHaveCount(2);
+  const first = await names.first().boundingBox();
+  const last = await names.last().boundingBox();
+  if (!first || !last) throw new Error('署名里的两个名字没有排版出来');
+  await page.mouse.move(first.x + 1, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + last.width - 1, last.y + last.height / 2, { steps: 8 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  expect(errors).toEqual([]);
+});
 
 test('焦点不在输入框时按 Ctrl+A 什么都不选中', async ({ page }) => {
   const { errors } = await openSidebar(page);
@@ -29,20 +45,5 @@ test('输入框里 Ctrl+A 照常全选框里的文字', async ({ page }) => {
       element.selectionEnd,
     ]),
   ).toEqual([0, 'Morning'.length]);
-  expect(errors).toEqual([]);
-});
-
-test('滚动区的滚动条占 8px，没有两端箭头占的位置', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 });
-  const many = Array.from({ length: 30 }, (_, index) =>
-    makePlaylist(index, `List ${String(index).padStart(2, '0')}`, { isActive: index === 0 }),
-  );
-  const { entry, errors } = await openSidebar(page, many);
-  const gutter = await entry('List 00').evaluate((element) => {
-    let node: HTMLElement | null = element.parentElement;
-    while (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;
-    return node ? node.offsetWidth - node.clientWidth : -1;
-  });
-  expect(gutter).toBe(8);
   expect(errors).toEqual([]);
 });

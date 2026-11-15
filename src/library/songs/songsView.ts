@@ -1,4 +1,5 @@
 import type { LibraryTrack } from 'foo-webview-sdk';
+import { albumKeyOf, trackAlbumKeyOf, type Album } from '../../host/libraryContract.ts';
 import type { TableRowItem, TableTrack } from '../../table/tableItems.ts';
 import type { TrackStats } from '../album-list/listSort.ts';
 import { withStats } from '../playStats.ts';
@@ -32,4 +33,20 @@ export function buildSongsView(
     return { kind: 'row', key: handle, order, track: row };
   });
   return { items, trackAt: (index) => tracks[index], duration };
+}
+
+/**
+ * 表格行所属的专辑：表格交回的行只有 `TableTrack` 的字段，折专辑键要的多值艺术家按 handle 从整库曲目里取；
+ * 在线曲目、没有专辑名的、或库里没有这张专辑的答 undefined。歌曲页与搜索的曲目页共用
+ */
+export function albumLookupOf(
+  albums: readonly Album[],
+  byHandle: ReadonlyMap<string, LibraryTrack>,
+): (track: TableTrack) => Album | undefined {
+  const index = new Map(albums.map((album) => [albumKeyOf(album), album]));
+  return (track) => {
+    const full = byHandle.get(track.handle);
+    const key = full ? trackAlbumKeyOf(full) : null;
+    return key ? index.get(key) : undefined;
+  };
 }

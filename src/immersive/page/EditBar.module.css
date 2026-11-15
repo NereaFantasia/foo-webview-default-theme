@@ -1,0 +1,56 @@
+/* 设置编辑条：高 44、圆角 8；材质是 `useBarSurface` 的 Acrylic，这里只管排布与进退场。
+   出现时 167 ms 线性淡入，退出编辑时 83 ms 淡出 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalL);
+  box-sizing: border-box;
+  height: 44px;
+  padding-inline: var(--spacingHorizontalL) var(--spacingHorizontalSNudge);
+  border-radius: var(--borderRadiusXLarge);
+  white-space: nowrap;
+  animation: bar-in var(--motion-fast) var(--curveLinear) backwards;
+}
+
+.bar[data-leaving] {
+  animation: bar-out var(--motion-faster) var(--curveLinear) forwards;
+}
+
+@keyframes bar-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bar-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 窄窗时整排页签换成菜单键；界限按六个分类的整排宽度加左右各 32 取 */
+.menu {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .tabs {
+    display: none;
+  }
+
+  .menu {
+    display: inline-flex;
+  }
+}
+
+.divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background-color: var(--line);
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+}

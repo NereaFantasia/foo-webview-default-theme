@@ -1,11 +1,12 @@
 import type { LibraryTrack } from 'foo-webview-sdk';
-import { createStore } from 'jotai/vanilla';
+import { createStore, type Atom } from 'jotai/vanilla';
 import { expect, onTestFinished, vi } from 'vitest';
 import { startLibraryTracks } from '../../src/library/libraryTracks.ts';
 import { genresCatalogAtom, startGenresCatalog } from '../../src/library/genres/genresCatalog.ts';
 import { startGenreValues } from '../../src/library/genreValues.ts';
 import { trackRow } from './libraryRows.ts';
 import { installFakeHost } from './unitHost.ts';
+import { wholeLibrary } from './wholeLibrary.ts';
 
 export const GENRE_TRACKS = [
   trackRow('First', 'One', { genre: 'Rock', discNumber: 1, trackNumber: 1 }),
@@ -13,21 +14,17 @@ export const GENRE_TRACKS = [
   trackRow('Second', 'Three', { genre: 'Jazz', trackNumber: 1 }),
   trackRow('', 'Four', { genre: '' }),
 ];
-export const genreTracksAnswer = (tracks: readonly LibraryTrack[]) => ({
-  success: true as const,
-  tracks: [...tracks],
-  items: [...tracks],
-  total: tracks.length,
-  offset: 0,
-});
 
-export function genresLibrary(tracks: readonly LibraryTrack[] = GENRE_TRACKS) {
+export function genresLibrary(
+  tracks: readonly LibraryTrack[] = GENRE_TRACKS,
+  ignored?: Atom<ReadonlySet<string>>,
+) {
   const host = installFakeHost();
-  host.answer('library.getAll', genreTracksAnswer(tracks));
+  host.answer('library.search', wholeLibrary(tracks));
   const store = createStore();
   const library = startLibraryTracks(store, () => 7, host.fb);
   const values = startGenreValues(store, library, host.fb);
-  const catalog = startGenresCatalog(store, values);
+  const catalog = startGenresCatalog(store, values, ignored);
   onTestFinished(() => {
     catalog.dispose();
     values.dispose();

@@ -1,0 +1,80 @@
+/* 图像在完成宽高比测量且缓存就绪后挂载，仅执行淡入动画以避免局部渲染闪烁 */
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * 底色、静帧、视频与渐隐遮罩均位于该层；高度比外层缩减 4px
+ * 非整数缩放比例下（如 722px × 1.25 = 902.5），遮罩与裁剪按整像素对齐，而视频合成层向外取整，
+ * 容易导致边缘像素行溢出裁剪边界并在滚动渐隐末端出现亮线；缩减 4px 处于渐隐全透明区间，消除缝隙且不影响视觉
+ */
+.stage {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 4px);
+  /* 优先渲染页面指定的底色，静帧就绪后覆盖显示；未指定时保持透明 */
+  background-color: var(--artist-hero-color, transparent);
+  overflow: clip;
+  /*
+   * 底部渐隐遮罩：上方 30% 完全不透明，后续沿五次平滑曲线（6t⁵ − 15t⁴ + 10t³）递减至底边完全透明，采样步长为 5%
+   * 曲线两端斜率与曲率均为零以消除过渡接缝；采样密集以平滑分段斜率差异
+   * 艺人名与操作按钮位于淡出后半段；遮罩设置为单次不重复平铺，边缘未填满区域按全透明处理
+   */
+  mask-image: linear-gradient(
+    to bottom,
+    var(--colorNeutralForeground1) 30%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 99.7%, transparent) 35%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 97.7%, transparent) 40%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 93.1%, transparent) 45%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 85.5%, transparent) 50%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 75.4%, transparent) 55%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 63.2%, transparent) 60%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 50%, transparent) 65%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 36.8%, transparent) 70%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 24.6%, transparent) 75%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 14.5%, transparent) 80%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 6.9%, transparent) 85%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 2.3%, transparent) 90%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 0.3%, transparent) 95%,
+    transparent 100%
+  );
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  animation: reveal var(--motion-normal) var(--curveLinear);
+}
+
+/* 顶部对齐：图像高度超出头部时向下延展，溢出部分置于渐隐区域中，保持顶边不被裁切 */
+.image,
+.video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;
+}
+/* 静帧在尺寸测量与缓存就绪后挂载，仅执行淡入动画 */
+.image {
+  animation: reveal var(--motion-normal) var(--curveLinear);
+}
+/* 视频叠置于静帧上方并在就绪后淡入；系统开启减弱动态效果时上游不传递视频地址 */
+.video {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity var(--motion-normal) var(--curveLinear);
+  pointer-events: none;
+}
+.video[data-ready] {
+  opacity: 1;
+}

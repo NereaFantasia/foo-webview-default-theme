@@ -44,35 +44,53 @@ function textLog() {
 }
 
 // 打包前的更新器在真实 Chromium 里跑一轮：根清单由 Node 用发版脚本签名，前端包由发版脚本打包，
-// 验签、解压、哈希与 base64 往返都在浏览器里做；宿主替身只负责网络应答和内存里的模板目录。
+// 验签、解压、哈希与 base64 往返都在浏览器里做；宿主替身只负责网络应答和内存里的模板目录
 
 test.use({ screenshot: 'off' });
+
+/** 前端描述的校验值对不上，本地服务准备失败。把 installed.json 改回没有描述，重试后整项消失 */
+async function mountBackendFailure(page: Page, view: 'settings' | 'onboarding') {
+  const host = await installPageHost(page);
+  host.config.set('defaultTheme.update.mode', 'off');
+  host.config.set('defaultTheme.changelog.seen', CURRENT_VERSION);
+  const disk = answerTemplateDisk(host, {
+    [`fe/${CURRENT_VERSION}/installed.json`]: JSON.stringify({
+      files: { 'backend.json': 'a'.repeat(64) },
+    }),
+    [`fe/${CURRENT_VERSION}/backend.json`]: '{}',
+  });
+  await page.route('**/backend-ui-probe', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<!doctype html><html lang="zh-CN"><title>本地服务</title></html>',
+    }),
+  );
+  await page.goto('/backend-ui-probe');
+  await page.evaluate(
+    async ({ startup, view }) => {
+      const { mountChangelogPage }: typeof import('../fixtures/ChangelogPage.tsx') = await import(
+        `${location.origin}/tests/fixtures/ChangelogPage.tsx`
+      );
+      mountChangelogPage([], startup, view);
+    },
+    { startup: STARTUP, view },
+  );
+  return disk;
+}
+
+test('引导的第 4 步显示本地服务状态，失败时可重试，恢复后整项消失', async ({ page }) => {
+  const disk = await mountBackendFailure(page, 'onboarding');
+  await expect(page.getByText('本地服务', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('本地服务未就绪', { exact: true }).first()).toBeVisible();
+  disk.write(`fe/${CURRENT_VERSION}/installed.json`, JSON.stringify({ files: {} }));
+  await page.getByRole('button', { name: '重试本地服务', exact: true }).click();
+  await expect(page.getByText('本地服务', { exact: true })).toHaveCount(0);
+});
 
 for (const colorScheme of ['light', 'dark'] as const)
   test(`本地服务失败显示诊断与重试，恢复后移除提醒（${colorScheme}）`, async ({ page }) => {
     await page.emulateMedia({ colorScheme });
-    const host = await installPageHost(page);
-    host.config.set('defaultTheme.update.mode', 'off');
-    host.config.set('defaultTheme.changelog.seen', CURRENT_VERSION);
-    const disk = answerTemplateDisk(host, {
-      [`fe/${CURRENT_VERSION}/installed.json`]: JSON.stringify({
-        files: { 'backend.json': 'a'.repeat(64) },
-      }),
-      [`fe/${CURRENT_VERSION}/backend.json`]: '{}',
-    });
-    await page.route('**/backend-ui-probe', (route) =>
-      route.fulfill({
-        contentType: 'text/html',
-        body: '<!doctype html><html lang="zh-CN"><title>本地服务</title></html>',
-      }),
-    );
-    await page.goto('/backend-ui-probe');
-    await page.evaluate(async (startup) => {
-      const { mountChangelogPage }: typeof import('../fixtures/ChangelogPage.tsx') = await import(
-        `${location.origin}/tests/fixtures/ChangelogPage.tsx`
-      );
-      mountChangelogPage([], startup);
-    }, STARTUP);
+    const disk = await mountBackendFailure(page, 'settings');
     await page.locator('[data-settings-toggle]').click();
     await expect(page.getByText('本地服务未就绪', { exact: true }).first()).toBeVisible();
     await page.getByText('诊断详情', { exact: true }).click();
@@ -97,7 +115,7 @@ const STARTUP = {
 } as const;
 const text = (value: string) => new TextEncoder().encode(value);
 
-/** 一个近似真实大小的前端：入口、几十万字节的脚本与一份二进制资源。 */
+/** 一个近似真实大小的前端：入口、几十万字节的脚本与一份二进制资源 */
 function frontendFiles() {
   const script = Array.from({ length: 6000 }, (_, index) => `export const v${index} = ${index};`);
   const binary = new Uint8Array(70_000).map((_, index) => (index * 7919) % 256);
@@ -261,7 +279,7 @@ test('Node 默认的 DER 格式签名在浏览器里验不过', async ({ page })
   expect(host.callsTo('http.get').map((params) => params['url'])).toEqual([ROOT_URL]);
 });
 
-test('仅通知检查不安装，主动下载后才提交 pending', async ({ page }) => {
+test('仅通知检查不安装，主动下载后才提交 pending @smoke', async ({ page }) => {
   const published = await publish();
   const { status, disk, host } = await run(page, published, 'check');
   expect(status).toMatchObject({ phase: 'available', version: NEXT_VERSION });

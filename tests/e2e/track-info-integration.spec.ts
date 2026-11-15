@@ -6,6 +6,7 @@ import { answerTrackInfo } from '../fixtures/trackInfoAnswers.ts';
 import { stringParam } from '../fixtures/hostAnswers.ts';
 import type { PageHost } from '../fixtures/pageHost.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 function informationAnswers(host: PageHost, tracks: readonly Track[]) {
   answerTrackInfo(host);
@@ -34,13 +35,9 @@ function informationAnswers(host: PageHost, tracks: readonly Track[]) {
 }
 
 async function showInfo(page: Page) {
-  if (!(await page.locator('[data-right-card]').isVisible())) {
-    await page.locator('[data-right-card-key="queue"]').click();
-    // 键上的悬停提示会盖在分页栏上，等它收了再点页签
-    await page.mouse.move(640, 700);
-    await expect(page.getByRole('tooltip')).toHaveCount(0);
+  if (!(await page.locator('[data-track-info]').isVisible())) {
+    await openRightCardPage(page, 'info');
   }
-  await page.locator('[data-right-card-page="info"]').click();
   await expect(page.locator('[data-track-info]')).toBeVisible();
 }
 
@@ -110,23 +107,16 @@ test('歌曲单击、键盘与跨页保留，关卡后选择在重新打开时�
   await page.getByRole('button', { name: '信息来源' }).click();
   await page.getByRole('menuitemradio', { name: '正在预览', exact: true }).click();
   await expect(head(page)).toContainText('Feather');
-  await page.locator('[data-right-card-page="queue"]').click();
+  await openRightCardPage(page, 'queue');
   await expect(page.locator('[data-queue-current]')).toContainText('正在播放的曲目');
   const toolbar = page.locator('[data-right-card] > div').first();
-  const tabs = page.locator('[data-right-card] [role="tablist"]');
   const more = page.getByRole('button', { name: '面板选项', exact: true });
   const queueToolbar = await toolbar.boundingBox();
-  const queueTabs = await tabs.boundingBox();
   const queueMore = await more.boundingBox();
-  const queueBorder = await toolbar.evaluate(
-    (element) => getComputedStyle(element).borderBottomWidth,
-  );
-  await page.locator('[data-right-card-page="info"]').click();
+  await openRightCardPage(page, 'info');
   await expect(head(page)).toContainText('Feather');
   expect(await toolbar.boundingBox()).toEqual(queueToolbar);
-  expect(await tabs.boundingBox()).toEqual(queueTabs);
   expect(await more.boundingBox()).toEqual(queueMore);
-  await expect(toolbar).toHaveCSS('border-bottom-width', queueBorder);
   await closeInfo(page);
   await expect(page.locator('[data-track-info]')).not.toBeVisible();
   const readCount = host.callsTo('metadata.read').length;
@@ -261,7 +251,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       page.locator('[data-track-info]').getByText('不适用', { exact: true }).first(),
     ).toBeVisible();
     expect(view.host.callsTo('metadata.read')).toHaveLength(reads);
-    // 播放栏会请求 512 像素封面；信息页收起的封面只使用 64 至 128 像素。
+    // 播放栏会请求 512 像素封面；信息页收起的封面只使用 64 至 128 像素
     expect(
       view.host
         .callsTo('artwork.getFb2kUrlByPath')

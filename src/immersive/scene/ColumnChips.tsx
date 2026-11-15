@@ -1,21 +1,9 @@
 import { Button, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import type { MouseEvent, ReactElement, ReactNode } from 'react';
+import type { MouseEvent, ReactElement } from 'react';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { roleVar } from '../../theme/roles.ts';
-import { useBarSurface } from './acrylic.ts';
 
 const useStyles = makeStyles({
-  // 药丸分组：高度 36px，采用全圆角胶囊外观；内部按极窄间隙排布紧凑按键
-  group: {
-    display: 'inline-flex',
-    flex: 'none',
-    alignItems: 'center',
-    boxSizing: 'border-box',
-    height: '36px',
-    paddingInline: tokens.spacingHorizontalXS,
-    columnGap: tokens.spacingHorizontalXXS,
-    borderRadius: tokens.borderRadiusCircular,
-  },
   // 紧凑圆形控制键：28×28 规格，图标槽位尺寸 18px，状态底色由控制样式提供
   key: {
     minWidth: '28px',
@@ -28,17 +16,6 @@ const useStyles = makeStyles({
     '& svg': { width: '18px', height: '18px' },
   },
 });
-
-/** 列头药丸分组容器；采用 Acrylic 材质承载功能相关的紧凑控制键，组间以空白间距分隔 */
-export function ChipGroup({ children }: { readonly children: ReactNode }) {
-  const classes = useStyles();
-  const surface = useBarSurface();
-  return (
-    <div role="group" className={mergeClasses(classes.group, surface)}>
-      {children}
-    </div>
-  );
-}
 
 interface ChipKeyProps {
   readonly icon: ReactElement;

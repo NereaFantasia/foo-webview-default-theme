@@ -1,4 +1,4 @@
-/* 整层铺满视图，自己不接指针，只有键接：否则会把场景里的件（整轨波形的 seek）挡住 */
+/* 整层铺满视图，自身不接收指针，只有按钮接收：否则会挡住场景里的元素（如整轨波形的 seek） */
 .controls {
   position: absolute;
   inset: 0;
@@ -14,12 +14,31 @@
   opacity: 0;
 }
 
+/* 视图过渡进行时，控制层里的控件各自挂 view-transition 名称。
+   过渡的快照层压在所有活动内容之上，不挂名称时，视图键、页签、全屏键与 Esc 胶囊会被满幅封面的快照盖住，消失一阵。
+   挂了名称，它们的快照组始终位于封面与胶囊之上（次序见 `sceneTransition.css`）。
+   名称只在过渡进行时挂载：带名称的元素是 `backdrop-filter` 的背景根，长期挂着会使按钮上的毛玻璃模糊永久失效。
+   名称挂在控件上，不挂在控制层上：带名称的祖先会让内部的毛玻璃在过渡开始的那一帧（名称已套上、快照层尚未出现、
+   页面照常绘制的那一帧）退化为平面并闪一下。按钮自带 `backdrop-filter`，名称挂在按钮上，它的模糊由过渡转移到按钮的快照组上，
+   `match-element` 为每个按钮分配不重复的名称。按钮仍是活动元素，指针穿过快照即可点到。编辑条的毛玻璃位于编辑槽内，
+   槽挂了名称，过渡期间它是平面 */
+:global(html[data-scene-transition]) :is(.leading, .corner) button {
+  view-transition-name: match-element;
+  view-transition-class: scene-key;
+}
+
+:global(html[data-scene-transition]) :is(.tabsSlot, .editSlot) {
+  view-transition-name: match-element;
+  view-transition-class: scene-top;
+}
+
 .controls[data-hidden] > * {
   pointer-events: none;
 }
 
-/* 键都是 44 的圆，离顶 20、离左右 32，上下居中线在 y = 42，与页签行同线；窗高不到 466 时收到离顶 12（见文件末）；全屏键与 Esc 胶囊不收缩，挤扁就成了椭圆。
-   键落在拖窗条里；app-region 不继承，每颗键自己退出拖动才点得到 */
+/* 按钮是直径 44px 的圆，距顶 20px、距左右 32px，垂直中心线在 y = 42，与页签行同线。窗口高度不足 466px 时距顶收到 12px（见文件末）。
+   全屏键与 Esc 胶囊不收缩，否则会被挤成椭圆。
+   按钮落在拖窗条里，`app-region` 不继承，每个按钮需各自退出拖动才能被点到 */
 .leading,
 .corner {
   position: absolute;
@@ -44,7 +63,7 @@
   app-region: no-drag;
 }
 
-/* 预设场景的页签落在顶部居中，行高 32、离窗口顶 26，中线与键同在 y = 42 */
+/* 预设场景的页签在顶部居中，行高 32px、距窗口顶 26px，垂直中心线与按钮同在 y = 42 */
 .tabsSlot {
   position: absolute;
   top: 26px;
@@ -54,7 +73,7 @@
   app-region: no-drag;
 }
 
-/* 预设场景自己的键落在视图键之后；没有元素挂进来时整个藏起，免得空盒子在键组里多出一份间隔 */
+/* 预设场景自己的按钮排在视图按钮之后。没有元素挂进来时整体隐藏，免得空盒子在按钮组里多出一份间隔 */
 .viewsSlot {
   display: flex;
   gap: var(--spacingHorizontalS);
@@ -69,14 +88,47 @@
   app-region: no-drag;
 }
 
-/* 胶囊上只写 Esc，边框就是胶囊的边框；「退出沉浸」只给读屏与悬停提示 */
+/* 设置的编辑条在页签的位置，高 44px，垂直中心线与按钮同在 y = 42。没有元素挂进来时整体隐藏 */
+.editSlot {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  translate: -50% 0;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.editSlot:empty {
+  display: none;
+}
+
+/* 编辑时顶部的按钮与页签让位：83 ms 淡出后整体隐藏并不再接收指针。退出编辑时 167 ms 淡回 */
+.leading,
+.corner,
+.tabsSlot {
+  transition:
+    opacity var(--motion-fast) var(--curveLinear),
+    visibility 0s;
+}
+
+.leading[data-away],
+.corner[data-away],
+.tabsSlot[data-away] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    visibility 0s linear var(--motion-faster);
+}
+
+/* 胶囊上只写 Esc，边框即胶囊自身的边框。「退出沉浸」只提供给读屏与悬停提示 */
 .key {
   font-family: var(--fontFamilyMonospace);
   font-size: var(--fontSizeBase200);
 }
 
-/* 窗高到 466 以上，封面列的上沿不小于 64，键底 64 刚好碰不到它；窗高再低时上沿最低会落到 56，
-   键就收到离顶 12、键底 56，页签行跟着上移到 18。界限与分栏预设压缩版式的 `COMPACT_HEIGHT` 同值 */
+/* 窗口高度不低于 466px 时，封面列上沿不小于 64px，按钮底边在 64px，刚好碰不到它。窗口更矮时封面列上沿最低落到 56px，
+   按钮收到距顶 12px、底边 56px，页签行随之上移到 18px。界限与分栏预设压缩版式的 `COMPACT_HEIGHT` 同值 */
 @media (max-height: 465px) {
   .leading,
   .corner {
@@ -85,5 +137,9 @@
 
   .tabsSlot {
     top: 18px;
+  }
+
+  .editSlot {
+    top: 12px;
   }
 }

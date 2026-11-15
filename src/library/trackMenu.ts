@@ -26,6 +26,11 @@ export interface TrackMenuState {
   readonly targets: readonly SendTarget[];
   /** 「更多命令」：宿主对这批曲目的上下文命令树；还没读到或过了上限是空树 */
   readonly tree: ContextTree;
+  /**
+   * 单选时「播放」做的事：沿页面上的列表从落点起播，与双击同一条。页面没有这个概念、或作用于多首时为 null，
+   * 「播放」播放这一批
+   */
+  readonly play: (() => void) | null;
 }
 
 const EMPTY_MENU: TrackMenuState = {
@@ -34,6 +39,7 @@ const EMPTY_MENU: TrackMenuState = {
   ratingStamp: 0,
   targets: [],
   tree: EMPTY_CONTEXT_TREE,
+  play: null,
 };
 const stateAtom = atom<TrackMenuState>(EMPTY_MENU);
 
@@ -52,6 +58,7 @@ export interface TrackMenuService {
     tracks: readonly LibraryTrack[],
     anchor?: LibraryTrack,
     ratingStamp?: number,
+    play?: () => void,
   ): Promise<void>;
   retry(): Promise<void>;
   close(): void;
@@ -85,7 +92,7 @@ export function startTrackMenu(store: Store, host: TrackMenuFace = fb): TrackMen
 
   return {
     retry,
-    async prepare(tracks, anchor, ratingStamp = 0) {
+    async prepare(tracks, anchor, ratingStamp = 0, play) {
       const mine = ++generation;
       const current = () => !disposed && mine === generation;
       store.set(stateAtom, {
@@ -93,6 +100,7 @@ export function startTrackMenu(store: Store, host: TrackMenuFace = fb): TrackMen
         tracks: [...tracks],
         anchor: anchor ?? tracks[0] ?? null,
         ratingStamp,
+        play: play ?? null,
       });
       if (disposed) return;
       if (!host.isAvailable()) return update({ tree: FAILED_CONTEXT_TREE });

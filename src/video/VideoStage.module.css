@@ -3,6 +3,14 @@
   inset: 0;
   overflow: hidden;
 }
+/* 画面的底，信箱黑边与画面同色；没有画面的内嵌占位不铺底，透出内容卡 */
+.screen {
+  position: absolute;
+  inset: 0;
+}
+.screen[data-solid] {
+  background: var(--colorNeutralBackground4);
+}
 .picture {
   width: 100%;
   height: 100%;

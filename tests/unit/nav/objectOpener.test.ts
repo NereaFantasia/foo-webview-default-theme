@@ -24,7 +24,7 @@ function setup() {
   vi.useFakeTimers();
   onTestFinished(() => void vi.useRealTimers());
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const answers: ((prepared: Prepared) => void)[] = [];
   const entered: string[] = [];
   const catalog = atom<Availability>('ready');
@@ -146,7 +146,7 @@ describe('对象打开服务', () => {
 /** 艺人一种换成带钩子的打开器，其余不用取数据 */
 function startWith(artist: KindOpener<Extract<ObjectRef, { kind: 'artist' }>>) {
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const objects = startObjectOpener(store, {
     history,
     kinds: { ...READY_KINDS, artist },

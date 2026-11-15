@@ -1,3 +1,4 @@
+import backdropFlow from './backdrop-flow.webp';
 import backdropIsolation from './backdrop-isolation.webp';
 import backdropMesh from './backdrop-mesh.webp';
 import backdropOff from './backdrop-off.webp';
@@ -8,10 +9,11 @@ import paperLight from './paper-light.webp';
 import styles from './ViewThumbs.module.css';
 
 /** 歌词视图背景类型，取值与偏好一致；此处独立声明以避免缩略图反向依赖背景模块 */
-export type BackdropThumbChoice = 'mesh' | 'titanium' | 'isolation' | 'off';
+export type BackdropThumbChoice = 'mesh' | 'flow' | 'titanium' | 'isolation' | 'off';
 
 const BACKDROP_SHOTS: Readonly<Record<BackdropThumbChoice, string>> = {
   mesh: backdropMesh,
+  flow: backdropFlow,
   titanium: backdropTitanium,
   isolation: backdropIsolation,
   off: backdropOff,

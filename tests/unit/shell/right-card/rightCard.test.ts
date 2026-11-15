@@ -102,7 +102,7 @@ describe('startRightCard', () => {
     expect(store.get(card.view).prefs.page).toBe('lyrics');
     expect(card.history.back()).toBe(true);
     expect(store.get(card.navigation).place.id).toBe('lyricsSearch');
-    card.select('bio');
+    card.history.navigate({ id: 'bio' });
     expect(store.get(card.navigation).next).toBeNull();
     expect(store.get(card.view).prefs.page).toBe('bio');
     card.history.back();
@@ -120,7 +120,7 @@ describe('startRightCard', () => {
     let track = 'song-a';
     for (const id of ['lyricsSearch', 'lyricsCandidate'] as const)
       card.history.registerSubject(id, { exists: (subject) => subject === track });
-    card.select('lyrics');
+    card.history.navigate({ id: 'lyrics' });
     card.history.navigate({ id: 'lyricsSearch', subject: track });
     card.history.navigate({ id: 'lyricsCandidate', subject: track, candidate: 'source:1' });
     track = 'song-b';
@@ -136,10 +136,10 @@ describe('startRightCard', () => {
     const storage = memoryStorage(JSON.stringify({ page: 'bio', open: true }));
     const card = startRightCard(store, { wide: atom(true) }, storage);
     expect(store.get(card.view)).toMatchObject({ form: 'docked', prefs: { page: 'bio' } });
-    card.select('lyrics');
+    card.history.navigate({ id: 'lyrics' });
     expect(store.get(card.view).prefs.page).toBe('lyrics');
-    card.select('queue');
-    card.select('bio');
+    card.history.navigate({ id: 'queue' });
+    card.history.navigate({ id: 'bio' });
     expect(JSON.parse(storage.value() ?? '{}')).toMatchObject({ page: 'bio', open: true });
     card.toggle('bio');
     expect(store.get(card.view).form).toBe('none');

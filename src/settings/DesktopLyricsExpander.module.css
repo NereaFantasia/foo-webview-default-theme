@@ -41,3 +41,20 @@
 .xlarge {
   font-size: 16px;
 }
+
+.custom {
+  font-size: 12px;
+}
+
+/* 自定义动效的「多行歌词」小标题：说明下面几项的作用范围，自己占一条分隔线，下一行的分隔线让给它 */
+.caption {
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalXS)
+    calc(var(--spacingHorizontalL) * 2 + var(--settings-icon-size));
+  border-top: var(--strokeWidthThin) solid var(--line);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+}
+
+.caption + :global([data-settings-row]) {
+  border-top: 0;
+}

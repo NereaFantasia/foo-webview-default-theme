@@ -17,15 +17,23 @@ import { queueKey } from './queueServices.ts';
 import { QueueMenu, type QueueMenuTarget } from './QueueMenu.tsx';
 import { pathOf } from './queueMenu.ts';
 import styles from './QueueList.module.css';
-import { QueueRow, type RowPoint } from './QueueRow.tsx';
+import { QueueRow, type QueueRowProps, type RowPoint } from './QueueRow.tsx';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { upEarlierAtom } from './upNext.ts';
 import { UP_NEXT_PAGE_SIZE, type UpNextRow } from './upNextModel.ts';
 import { useQueueRowHeight } from './queueRowHeight.ts';
+import { rowOffset } from './rowOffset.ts';
 import { useQueueVirtualRows } from './useQueueVirtualRows.ts';
 
 interface EarlierVariables extends CSSProperties {
   '--queue-number-width': string;
+}
+
+/** 前面这一段自成一组，前面没有段头卡，首尾行都要标出来 */
+function edgeOf(index: number, total: number): QueueRowProps['edge'] {
+  if (total === 1) return 'only';
+  if (index === 0) return 'start';
+  return index === total - 1 ? 'end' : undefined;
 }
 
 interface QueueEarlierProps {
@@ -35,6 +43,8 @@ interface QueueEarlierProps {
   perform(command: () => Promise<boolean>): void;
   /** 从这一段播起之前调：换过去之后当前卡置顶 */
   onPlay(): void;
+  /** 假时不向来源读行（见 `QueueListProps.active`） */
+  readonly active: boolean;
 }
 
 /**
@@ -45,13 +55,13 @@ interface QueueEarlierProps {
  * DOM 排在队列页最后，靠 `order` 摆到最上面：Tab 先进当前曲目与后面几段，不先掉进看不见的这一段
  * 只能浏览、单选、双击或 Enter 从这一首播起、开曲目菜单；不能拖、不能移除，选择也不和「接下来」连着走
  */
-export function QueueEarlier({ root, block, perform, onPlay }: QueueEarlierProps) {
+export function QueueEarlier({ root, block, perform, onPlay, active }: QueueEarlierProps) {
   const t = useAtomValueRawSync(translateAtom);
   const services = useService(queueKey);
   const viewControls = useViewControlStyles();
   const rowHeight = useQueueRowHeight();
   const view = useAtomValueRawSync(upEarlierAtom);
-  const rows = useQueueVirtualRows(root, view.total);
+  const rows = useQueueVirtualRows(root, view.total, undefined, { sticky: false });
   const [selected, setSelected] = useState<string | null>(null);
   const [menu, setMenu] = useState<QueueMenuTarget | null>(null);
   const menuVersion = useRef(0);
@@ -59,8 +69,8 @@ export function QueueEarlier({ root, block, perform, onPlay }: QueueEarlierProps
   const first = rows.visible[0]?.index ?? 0;
   const last = Math.min(view.total - 1, rows.visible.at(-1)?.index ?? first);
   useEffect(() => {
-    if (view.total && last >= first) void services.upNext.readEarlier(first, last);
-  }, [services, first, last, view.version, view.refreshing, view.total]);
+    if (active && view.total && last >= first) void services.upNext.readEarlier(first, last);
+  }, [services, active, first, last, view.version, view.refreshing, view.total]);
 
   const source = view.list;
   const play = (row: UpNextRow) => {
@@ -125,10 +135,7 @@ export function QueueEarlier({ root, block, perform, onPlay }: QueueEarlierProps
                 key={row?.key ?? `pending:${view.version}:${item.index}`}
                 className={styles.virtualRow}
                 data-queue-earlier-index={item.index}
-                style={{
-                  height: rowHeight,
-                  transform: `translateY(${item.start - rows.margin}px)`,
-                }}
+                style={{ height: rowHeight, ...rowOffset(item.start - rows.margin) }}
               >
                 {row ? (
                   <QueueRow
@@ -139,6 +146,7 @@ export function QueueEarlier({ root, block, perform, onPlay }: QueueEarlierProps
                     selected={selected === row.key}
                     current={tabKey === row.key}
                     lifted={false}
+                    edge={edgeOf(item.index, view.total)}
                     onPlay={() => play(row)}
                     onMenu={(_, at) => openMenu(row, at)}
                     onFocus={() => setSelected(row.key)}

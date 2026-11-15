@@ -14,10 +14,13 @@ import { TRAY_IDS } from './trayMenu.ts';
  * `.fb-np-*`、`data-item-id`、`.fb-slider-*`）。标签元素的 `[part="item-label"]` 不在公开清单上，
  * 是宿主菜单脚本建标签时设的，宿主改名不会有提示
  */
-export function trayMenuCss(theme: Theme, dark: boolean): string {
+export function trayMenuCss(
+  theme: Theme,
+  dark: boolean,
+  font: string = theme.fontFamilyBase,
+): string {
   const playback = '.fb-zone[data-zone="playback"]';
   const playPause = `${playback} .fb-item[data-item-id="${TRAY_IDS.playPause}"]`;
-  const font = `'Segoe UI Variable', ${theme.fontFamilyBase}, 'Microsoft YaHei UI', sans-serif`;
   return `
 :root { color-scheme: ${dark ? 'dark' : 'light'}; }
 #menu, .fb-menu {

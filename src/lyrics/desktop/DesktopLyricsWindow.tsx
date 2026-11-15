@@ -30,11 +30,11 @@ import {
   type RefObject,
 } from 'react';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
-import { DEFAULT_LYRICS_DISPLAY, type LyricsDisplay } from '../lyricsDisplay.ts';
-import { LYRICS_MOTION_PRESET_VALUES, type LyricsMotion } from '../lyricsMotion.ts';
+import { DEFAULT_LYRICS_DISPLAY, lyricsFontStyle, type LyricsDisplay } from '../lyricsDisplay.ts';
 import { LyricsPlayer } from '../LyricsPlayer.tsx';
 import { SINGLE_PADDING_X, translationFontSizeOf } from './desktopLyricsHeight.ts';
 import type { DesktopLyricsLabel, DesktopLyricsView } from './desktopLyricsLink.ts';
+import { desktopMotion, motionCustomFrom } from './desktopLyricsMotion.ts';
 import type { DesktopLyricsAlign } from './desktopLyricsPrefs.ts';
 import type { DesktopLyricsPopup, PopupRect } from './desktopLyricsPopup.ts';
 import styles from './DesktopLyricsWindow.module.css';
@@ -111,6 +111,14 @@ function useLyricsViewport(area: RefObject<HTMLDivElement | null>, ready: boolea
     };
   }, [area, ready]);
   return viewport;
+}
+
+/** 内容相同就沿用上一份：共享状态每推一次都解析出新对象，而对象一换 AMLL 就重建歌词行 */
+function useSameValue<T>(value: T): T {
+  const [kept, setKept] = useState(value);
+  if (JSON.stringify(kept) === JSON.stringify(value)) return kept;
+  setKept(value);
+  return value;
 }
 
 function Key({
@@ -245,13 +253,10 @@ export function DesktopLyricsWindow({
   const single = view?.mode === 'single';
   const interactive = ready && !single && !locked && !hidden && !viewport?.resizing;
   const preset = view?.motionPreset ?? 'amll';
-  const motion = useMemo<LyricsMotion>(
-    () => ({
-      ...LYRICS_MOTION_PRESET_VALUES[preset],
-      alignPosition: 0.5,
-      ...(single ? { hidePassedLines: true, scale: false } : {}),
-    }),
-    [preset, single],
+  const customMotion = useSameValue(view?.motionCustom);
+  const motion = useMemo(
+    () => desktopMotion(single, preset, customMotion ?? motionCustomFrom('amll')),
+    [preset, single, customMotion],
   );
   useEffect(() => {
     if (!interactive) {
@@ -300,7 +305,7 @@ export function DesktopLyricsWindow({
   }, [popup, locked, hidden, reveal]);
 
   const fontSize = view?.fontSize ?? 34;
-  const translationFontSize = translationFontSizeOf(fontSize);
+  const translationFontSize = view?.translationFontSize ?? translationFontSizeOf(fontSize);
   const showTranslation = view?.showTranslation ?? true;
   const showRomanization = view?.showRomanization ?? false;
   useDesktopLayout(popup, lyricsBox, {
@@ -310,21 +315,37 @@ export function DesktopLyricsWindow({
     lines,
     lyricsWidth: viewport?.width ?? 0,
     fontSize,
+    translationFontSize,
     showTranslation,
     showRomanization,
+    font: view?.font ?? '',
+    fontWeight: view?.fontWeight ?? null,
   });
 
+  const process = useSameValue(view?.process);
   // 显示参数换了对象 AMLL 就重建歌词行；只在这几项变了时才换，改尺寸、悬停引起的重渲染不碰它
   const display = useMemo<LyricsDisplay>(
     () => ({
       ...DEFAULT_LYRICS_DISPLAY,
+      ...process,
+      fontFamily: view?.font ?? '',
+      fontWeight: view?.fontWeight ?? null,
       fontSize,
       translationFontSize,
       showTranslation,
       showRomanization,
       align,
     }),
-    [fontSize, translationFontSize, showTranslation, showRomanization, align],
+    [
+      process,
+      view?.font,
+      view?.fontWeight,
+      fontSize,
+      translationFontSize,
+      showTranslation,
+      showRomanization,
+      align,
+    ],
   );
 
   if (!view) return <div className={styles.window} />;
@@ -341,7 +362,11 @@ export function DesktopLyricsWindow({
     '--single-padding-x': `${SINGLE_PADDING_X}px`,
   };
   const title = [view.title, view.artist].filter(Boolean).join(' — ');
-  const fallback = <p className={styles.title}>{title}</p>;
+  const fallback = (
+    <p className={styles.title} style={lyricsFontStyle(view.font, view.fontWeight)}>
+      {title}
+    </p>
+  );
   const active = !hidden && !viewport?.resizing && state === 'playing';
   const lyricsStyle: CSSProperties | undefined = viewport
     ? {

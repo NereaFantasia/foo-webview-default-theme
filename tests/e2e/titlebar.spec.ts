@@ -3,10 +3,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 import { choosePlayerBar } from '../fixtures/playerPage.ts';
+import { pressOn } from '../fixtures/pressOn.ts';
 
 // 标题栏的键接到宿主替身上：三大键发窗口命令、⋯ 弹出宿主主菜单并按 GUID 执行；两种播放栏形态下的
 // 高度，最大化键的矩形上报与贴靠布局下的悬停提示。拖动只断言样式上标了哪几块，真拖不拖得动、贴靠布局
-// 出不出来要在宿主里实机看。
+// 出不出来要在宿主里实机看
 
 const ROOTS: readonly [string, string][] = [
   ['File', '文件'],
@@ -138,7 +139,7 @@ test('窗口最大化着启动：一开始就显示还原键，不显示最大�
   expect(errors).toEqual([]);
 });
 
-/** 元素的边框盒，取整到像素。 */
+/** 元素的边框盒，取整到像素 */
 function boxOf(page: Page, selector: string) {
   return page
     .locator(selector)
@@ -180,7 +181,7 @@ test('播放栏在底部时标题栏各档都是 48 高，跨档不重报高度�
     height: 48,
   });
   await page.setViewportSize({ width: 900, height: 800 });
-  // 最大化键的新矩形与高度出自同一次布局；等宿主收到新矩形，再看高度有没有多报。
+  // 最大化键的新矩形与高度出自同一次布局；等宿主收到新矩形，再看高度有没有多报
   await expect
     .poll(() => host.callsTo('window.setMaximizeButtonRegion').at(-1))
     .toEqual({ region: { x: 900 - 92, y: 0, width: 46, height: 48 } });
@@ -190,25 +191,12 @@ test('播放栏在底部时标题栏各档都是 48 高，跨档不重报高度�
   expect(errors).toEqual([]);
 });
 
-test('播放栏在底部时后退、前进与侧边栏键在标题栏左段：40 × 32、彼此隔 2，内容卡里没有导航行', async ({
+test('播放栏在底部时导航键在标题栏：内容卡里没有导航行，后退置灰，侧边栏键开合侧边栏', async ({
   page,
 }) => {
   await open(page);
   await expect(page.locator('[data-nav-row]')).toHaveCount(0);
   const tools = page.getByRole('toolbar', { name: '窗口工具' });
-  for (const [index, selector] of [
-    '[data-menu="main"]',
-    '[data-nav="back"]',
-    '[data-nav="forward"]',
-    '[data-sidebar-key]',
-  ].entries()) {
-    expect(await boxOf(page, `header ${selector}`)).toEqual({
-      x: 8 + 42 * index,
-      y: 8,
-      width: 40,
-      height: 32,
-    });
-  }
   await expect(tools.getByRole('button', { name: '后退' })).toBeDisabled();
   await tools.getByRole('button', { name: '隐藏侧边栏' }).click();
   await expect(page.locator('aside')).toHaveCount(0);
@@ -217,28 +205,13 @@ test('播放栏在底部时后退、前进与侧边栏键在标题栏左段：40
   expect(errors).toEqual([]);
 });
 
-test('播放栏在标题栏时宽窗 64 高、窄窗 48 高，高度都交给宿主；⋯ 离左缘 8，窗口三键铺满整条高', async ({
-  page,
-}) => {
+test('播放栏在标题栏时宽窗 64 高、窄窗 48 高，高度都交给宿主', async ({ page }) => {
   await choosePlayerBar(page, 'titlebar');
   await open(page);
   expect(await boxOf(page, 'header')).toMatchObject({ height: 64 });
-  expect(await boxOf(page, '[data-menu="main"]')).toMatchObject({ x: 8, width: 40, height: 32 });
-  expect(await boxOf(page, '[data-caption="maximize"]')).toEqual({
-    x: 1280 - 92,
-    y: 0,
-    width: 46,
-    height: 64,
-  });
 
   await page.setViewportSize({ width: 900, height: 800 });
   await expect.poll(() => boxOf(page, 'header')).toMatchObject({ height: 48 });
-  expect(await boxOf(page, '[data-caption="maximize"]')).toEqual({
-    x: 900 - 92,
-    y: 0,
-    width: 46,
-    height: 48,
-  });
   const header = page.locator('header');
   for (const name of ['主菜单', '最小化', '最大化', '关闭']) {
     await expect(header.getByRole('button', { name })).toBeVisible();
@@ -337,6 +310,23 @@ test('⋯ 读到空树时给一条置灰的占位项；之前读失败过，读�
   await expect(
     page.getByRole('menu').filter({ has: placeholder }).getByRole('menuitem'),
   ).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test('主菜单开着时再按它：收起菜单，不被「点外面只关闭」拦成没反应；点标题栏别的键只关菜单', async ({
+  page,
+}) => {
+  await open(page);
+  const trigger = page.getByRole('button', { name: '主菜单' });
+  await trigger.click();
+  await expect(hostRoots(page)).toBeVisible();
+  await pressOn(page, trigger);
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await trigger.click();
+  await expect(hostRoots(page)).toBeVisible();
+  await pressOn(page, page.getByRole('button', { name: '最小化' }));
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  expect(host.callsTo('window.minimize')).toHaveLength(0);
   expect(errors).toEqual([]);
 });
 

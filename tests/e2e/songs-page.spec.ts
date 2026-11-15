@@ -4,13 +4,13 @@ import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { openSongs, SONG_TRACKS } from '../fixtures/songsPage.ts';
 
 // 歌曲页：从侧边栏进、按宿主排好的顺序画整库，搜索框按词与按查询筛、筛选浮层的常用条件与分面、列头排序、双击按查询
-// 填表起播、专辑格进详情页。
+// 填表起播、专辑格进详情页
 
 const queries = (calls: readonly Record<string, unknown>[]) => calls.map((call) => call['query']);
 const header = (page: Page, name: string) =>
   page.locator('[data-page="songs"]').getByRole('columnheader', { name });
 
-test('侧边栏的歌曲能点，进来按艺术家排整库；页头写首数与总长，列头是缺省的七列', async ({
+test('侧边栏的歌曲能点，进来按艺术家排整库；页头写首数与总长，列头是缺省的七列 @smoke', async ({
   page,
 }) => {
   const songs = await openSongs(page);
@@ -47,7 +47,7 @@ test('按词过滤：宿主按词查，副题接全库首数；Esc 清空回到�
   expect(songs.errors).toEqual([]);
 });
 
-test('字段菜单末项切到高级查询：报错时保留上次结果，说明打开语法示例；回到普通搜索', async ({
+test('字段菜单末项切到高级查询：报错时保留上次结果，说明直接打开语法参考面板；回到普通搜索', async ({
   page,
 }) => {
   const songs = await openSongs(page);
@@ -59,10 +59,13 @@ test('字段菜单末项切到高级查询：报错时保留上次结果，说�
   const hint = songs.view.locator('[data-songs-invalid]');
   await expect(hint).toContainText('显示上次的 8 首结果');
   expect(await songs.titles()).toHaveLength(8);
-  await hint.getByRole('button', { name: '语法示例' }).click();
-  const examples = page.getByRole('menu', { name: '查询', exact: true });
-  await expect(examples).toBeVisible();
-  await examples.locator('[data-query-mode="text"]').click();
+  // 一下就开参考面板，不再先开菜单、要点第二下
+  await hint.getByRole('button', { name: '语法参考' }).click();
+  await expect(page.locator('[data-syntax-reference]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-syntax-reference]')).toHaveCount(0);
+  await songs.view.locator('[data-query-scope]').click();
+  await page.locator('[data-query-mode="text"]').click();
   await expect(songs.view.locator('[data-query-scope="all"]')).toBeVisible();
   await songs.box.fill('massive');
   await expect(songs.box).not.toHaveAttribute('aria-invalid', 'true');
@@ -138,12 +141,12 @@ test('命令栏的排序：选字段按它向宿主要顺序，菜单里换方�
   expect(songs.errors).toEqual([]);
 });
 
-test('双击一行：按同一串查询与排序向宿主要路径，整份换进专用列表，核对那一行再起播', async ({
+test('双击一行：按同一串查询与排序向宿主要路径，整份换进专用列表，核对那一行再起播 @smoke', async ({
   page,
 }) => {
   const songs = await openSongs(page);
   await songs.box.fill('nujabes');
-  // 去抖期间表格还是整库，双击按显示的那一份起播；等宿主按词答回来再点。
+  // 去抖期间表格还是整库，双击按显示的那一份起播；等宿主按词答回来再点
   await expect(songs.subtitle).toHaveText(/^2 首/);
   await songs.row('Luv (sic) Part 3').dblclick();
   await expect.poll(() => songs.host.callsTo('playlist.playTrack').length).toBe(1);
@@ -347,5 +350,46 @@ test('显示统计列时统计组件检查失败：横幅说明并可重试，�
   });
   await notice.getByRole('button', { name: '重试' }).click();
   await expect(notice).toHaveCount(0);
+  expect(songs.errors).toEqual([]);
+});
+
+test('勾上文件名、文件夹与作曲：前两列从路径取，作曲向宿主现算，只问画在屏上的行', async ({
+  page,
+}) => {
+  const songs = await openSongs(page, {
+    configure: (host) =>
+      host.answer('titleformat.evalBatch', (params) => {
+        const pattern = String(params['pattern']);
+        const list: unknown = params['paths'];
+        const paths = Array.isArray(list) ? list.map(String) : [];
+        if (!pattern.includes('%composer%')) return hostFailure('OPERATION_FAILED');
+        return {
+          success: true as const,
+          pattern,
+          total: paths.length,
+          successCount: paths.length,
+          errorCount: 0,
+          results: paths.map((path) => ({
+            path,
+            success: true,
+            result: `作曲 ${path.split(/[\\/]/).pop() ?? ''}`,
+          })),
+        };
+      }),
+  });
+  await songs.view.locator('[data-songs-view]').click();
+  await page.locator('[data-action="columns"]').click();
+  for (const name of ['文件名', '文件夹', '作曲'])
+    await page.getByRole('menuitemcheckbox', { name, exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const cell = (id: string) => songs.grid.locator(`[role="gridcell"][data-column-id="${id}"]`);
+  await expect(cell('fileName').first()).toHaveText(/\.(flac|mp3)$/);
+  await expect(cell('folder').first()).toHaveText(/\S/);
+  await expect(cell('composer').first()).toHaveText(/^作曲 .+\.(flac|mp3)$/);
+  const asked = songs.host
+    .callsTo('titleformat.evalBatch')
+    .filter((call) => String(call['pattern']).includes('%composer%'));
+  expect(asked.map((call) => call['pattern'])).toEqual(['[%composer%]']);
   expect(songs.errors).toEqual([]);
 });

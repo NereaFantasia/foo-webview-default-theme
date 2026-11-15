@@ -19,8 +19,16 @@ export interface QueueMotionState {
 
 /** 每个分区只保留一轮可见快照，数据抵达和滚动挂载分别处理 */
 export function createQueueStateMotion(root: HTMLElement, lane: Lane) {
+  const rows = `[data-queue-row][data-kind="${lane}"]`;
+  // 列表画成卡的时候（根上有 `data-queue-cards`），「已加入队列」段的节头卡与行同一道进出：
+  // 节头是大圆角卡，段出现、消失时单独硬切比行突兀得多；平铺的节头是文字，不参与
+  const withHead = lane === 'queued' && root.hasAttribute('data-queue-cards');
   const selector =
-    lane === 'current' ? '[data-current-part]' : `[data-queue-row][data-kind="${lane}"]`;
+    lane === 'current'
+      ? '[data-current-part]'
+      : withHead
+        ? `${rows}, [data-queue-head="queued"]`
+        : rows;
   let previous: Map<string, QueueMotionItem> | null = null;
   let revision: string | null = null;
   let lastState: QueueMotionState | null = null;

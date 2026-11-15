@@ -3,6 +3,7 @@ import {
   Folder20Regular,
   Grid20Regular,
   Guitar20Regular,
+  Heart20Regular,
   Home20Regular,
   Library20Regular,
   Mic20Regular,
@@ -14,6 +15,7 @@ import type { SidebarItemId } from './sidebarNav.ts';
 
 const ICONS = {
   home: Home20Regular,
+  favorites: Heart20Regular,
   recent: Clock20Regular,
   artists: Mic20Regular,
   albums: Library20Regular,

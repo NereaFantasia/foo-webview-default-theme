@@ -35,7 +35,7 @@ test('超过像素限制的背景图在整图解码前被拒绝，也不保存',
     });
     Reflect.set(window, '__bitmapCalls', () => calls);
   });
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const content = hugePng(8192).toString('base64');
   settings.host.answer('dialog.openFile', {
     success: true,

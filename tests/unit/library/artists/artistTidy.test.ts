@@ -48,6 +48,23 @@ describe('需要整理', () => {
       expect(issues.has(name)).toBe(false);
   });
 
+  it('分号直接算写了几位；全角的 ＆、／、； 与半角同样认，拆开后库里没有的照旧不算', () => {
+    const issues = findTidyIssues([
+      artist('周杰伦；方文山'),
+      artist('A;B'),
+      artist('Ａ ＆ Ｂ'),
+      artist('A'),
+      artist('B'),
+      artist('Ｘ／Ｙ'),
+    ]);
+    expect(issues.get('周杰伦；方文山')).toEqual([
+      { kind: 'multiple', parts: ['周杰伦', '方文山'] },
+    ]);
+    expect(issues.get('A;B')).toEqual([{ kind: 'multiple', parts: ['A', 'B'] }]);
+    expect(issues.get('Ａ ＆ Ｂ')).toEqual([{ kind: 'multiple', parts: ['A', 'B'] }]);
+    expect(issues.has('Ｘ／Ｙ')).toBe(false);
+  });
+
   it('忽略过的名字不再提示', () => {
     const issues = findTidyIssues(
       [artist('Boyz Party'), artist('BOYZ PARTY'), artist('A ft. B')],

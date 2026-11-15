@@ -13,7 +13,7 @@ import {
 } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { useService } from '../kit/useService.ts';
-import { historyAtom, historyKey } from '../nav/navHistory.ts';
+import { mainHistoryAtom, historyKey } from '../nav/navHistory.ts';
 import { START_PLACE, type PageProps } from '../nav/places.ts';
 import { useCommand } from '../nav/useCommand.ts';
 import { PageEntryContext } from '../nav/usePageSnapshot.ts';
@@ -30,7 +30,7 @@ function PageStatus({ failed = false }: { readonly failed?: boolean }) {
     id: 'page.loading.leave',
     layer: 'overlay',
     keys: [{ key: 'Escape' }],
-    enabled: () => store.get(historyAtom).entry === entry,
+    enabled: () => store.get(mainHistoryAtom).entry === entry,
     run: () => {
       if (!history.back()) history.navigate(START_PLACE);
     },
@@ -85,7 +85,7 @@ export function deferPage(load: () => Promise<ComponentType<PageProps>>): Compon
   );
   return function DeferredPage(props: PageProps) {
     const entry = useContext(PageEntryContext);
-    const current = useAtomValueRawSync(historyAtom).entry === entry;
+    const current = useAtomValueRawSync(mainHistoryAtom).entry === entry;
     const shown = useRef(false);
     // 已显示的页面保留退场；尚未显示就离开时，不让迟到的 Portal 或页面副作用重新挂载
     if (!current && !shown.current) return null;

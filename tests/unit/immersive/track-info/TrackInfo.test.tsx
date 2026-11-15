@@ -26,7 +26,7 @@ describe('TrackInfo', () => {
     expect(html.match(/class="[^"]*(titleRow|subRow)/g)).toHaveLength(2);
   });
 
-  it('本地曲目：曲名、各带图标的艺人与专辑、编码框与星，艺人与专辑的名字可点', async () => {
+  it('本地曲目：曲名、分成两组的艺人与专辑、编码框与星，艺人与专辑的名字可点', async () => {
     const env = await startSceneEnv();
     env.play(LOCAL);
     await flush();
@@ -36,7 +36,8 @@ describe('TrackInfo', () => {
     expect(html).toContain('FLAC');
     expect(html).toContain('data-now-playing-rating');
     const sub = html.slice(html.indexOf('subRow'));
-    expect(sub.match(/role="img"/g)).toHaveLength(2);
+    expect(sub.match(/role="group"/g)).toHaveLength(2);
+    expect(sub).not.toContain('role="img"');
     expect(sub).not.toContain(' · ');
     expect(sub).toMatch(/fui-Link[^>]*>Nujabes feat\. Shing02</);
     expect(sub).toMatch(/fui-Link[^>]*>Modal Soul</);
@@ -71,11 +72,11 @@ describe('TrackInfo', () => {
     expect(env.render(<TrackInfo size="medium" />)).not.toContain('data-now-playing-rating');
   });
 
-  it('字号档与对齐写在根上，供样式取档', async () => {
+  it('字号档写在根上，供样式取档；对齐不再写，主副标题一律靠左', async () => {
     const env = await startSceneEnv();
-    const html = env.render(<TrackInfo size="small" align="center" overflow="clip" />);
+    const html = env.render(<TrackInfo size="small" overflow="clip" />);
     expect(html).toContain('data-size="small"');
-    expect(html).toContain('data-align="center"');
+    expect(html).not.toContain('data-align');
   });
 });
 

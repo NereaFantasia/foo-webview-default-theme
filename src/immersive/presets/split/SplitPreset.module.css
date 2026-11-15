@@ -2,20 +2,9 @@
    （`splitLayout.ts`），这里不写字面像素。
 
    表面：背景每帧在变，行与键静止时透明；歌词工具条及其弹出的面板、队列与历史页的列头药丸用毛玻璃（Acrylic，帧率守门
-   跳闸后降成近实底）；队列与历史页的列只在半透明的底后面做模糊，不着色，跳闸后去掉模糊。外框给一组变量，元素只用
-   这一组画底与状态：文字取前景色的 100%、72%、48%，悬停 10%、按下 6%，选中取封面强调色的 22%；播放与评分取强调色
-   （`--accent`）。 */
+   跳闸后降成近实底）；队列与历史页的列只在半透明的底后面做模糊，不着色，跳闸后去掉模糊。外框给元素的那一组
+   表面变量由根上的 `SurfaceFrame` 给；播放与评分取强调色（`--accent`）。 */
 .split {
-  --text-primary: var(--colorNeutralForeground1);
-  --text-secondary: color-mix(in srgb, var(--colorNeutralForeground1) 72%, transparent);
-  --text-muted: color-mix(in srgb, var(--colorNeutralForeground1) 48%, transparent);
-  --line: color-mix(in srgb, var(--colorNeutralForeground1) 32%, transparent);
-  --state-hover: color-mix(in srgb, var(--colorNeutralForeground1) 10%, transparent);
-  --state-pressed: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
-  --bg-hover: var(--state-hover);
-  --bg-selected: color-mix(in srgb, var(--accent) 22%, transparent);
-  --bg-surface: color-mix(in srgb, var(--colorNeutralForeground1) 8%, transparent);
-
   position: absolute;
   top: 0;
   left: 0;
@@ -53,24 +42,26 @@
   width: var(--split-cover);
 }
 
+/* 暂停时封面以中心缩到 0.85（取自 nereal），播放时回到原大；只缩封面，下面的曲目信息与进度不动；
+   是已在场元素的缩放：点到点曲线 333 ms，不要 nereal 的回弹过冲；减弱动效时时长变量自己变短 */
 .cover {
   flex: none;
   width: var(--split-cover);
   height: var(--split-cover);
+  transition: transform var(--motion-slow) var(--motion-curve-point-to-point);
 }
 
-/* 曲目信息与更多键一行：更多键在行右，与两行字整体垂直居中；居中版式里左边留同宽的空位，文字仍居中在封面轴线上 */
+.cover[data-paused] {
+  transform: scale(0.85);
+}
+
+/* 曲目信息与更多键一行：更多键在行右，与两行字整体垂直居中 */
 .infoRow {
   display: flex;
   align-items: center;
   column-gap: var(--spacingHorizontalXS);
   height: var(--split-row-info);
   margin-top: var(--split-gap-cover);
-}
-
-.balance {
-  flex: none;
-  width: var(--split-key);
 }
 
 .info {

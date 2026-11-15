@@ -1,0 +1,36 @@
+/* 阅读面上的一张提示卡：轻量中性底加淡线，与首页其他卡片同一种表面 */
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  background: var(--bg-view-control);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+.title {
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+}
+
+.detail {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.progress {
+  max-width: 360px;
+  margin: var(--spacingVerticalXS) 0;
+}

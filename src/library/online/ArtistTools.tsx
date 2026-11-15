@@ -6,7 +6,6 @@ import {
   MenuItemCheckbox,
   MenuList,
   MenuTrigger,
-  Tab,
   type MenuCheckedValueChangeData,
   type MenuCheckedValueChangeEvent,
 } from '@fluentui/react-components';
@@ -19,7 +18,6 @@ import {
   ScrollMenu as Menu,
   ScrollMenuPopover as MenuPopover,
 } from '../../kit/ScrollMenuPopover.tsx';
-import { TabList } from '../../motion/Surfaces.tsx';
 import type { MusicAlbumSubType } from '../../server/musicObjects.ts';
 import { FilterToggle } from '../../track/FilterSurface.tsx';
 import { DetailTools } from '../detail/DetailTools.tsx';
@@ -31,14 +29,9 @@ import {
   type ReleaseKind,
   type ReleaseSortField,
 } from './artistReleases.ts';
-import type { ArtistReleases, ArtistTab } from './useArtistReleases.ts';
+import type { ArtistReleases } from './useArtistReleases.ts';
 import styles from './ArtistTools.module.css';
 
-const TAB_LABELS = {
-  songs: 'artistAlbums.tab.songs',
-  albums: 'artistAlbums.tab.albums',
-  singles: 'artistAlbums.tab.singles',
-} as const satisfies Record<ArtistTab, MessageKey>;
 const SORT_LABELS = {
   date: 'artistAlbums.sort.date',
   name: 'artistAlbums.sort.name',
@@ -68,42 +61,13 @@ interface FacetColumn {
   }[];
 }
 
-/** 工具行靠左的页签：热门歌曲、专辑、单曲与 EP */
-export function ArtistTabs({ releases }: { readonly releases: ArtistReleases }) {
-  const t = useAtomValueRawSync(translateAtom);
-  return (
-    <TabList
-      size="small"
-      aria-label={t('artistAlbums.tabs')}
-      selectedValue={releases.tab}
-      onTabSelect={(_, data) => {
-        const next = releases.tabs.find((value) => value === data.value);
-        if (next) releases.setTab(next);
-      }}
-    >
-      {releases.tabs.map((value) => (
-        <Tab key={value} value={value}>
-          {t(TAB_LABELS[value])}
-        </Tab>
-      ))}
-    </TabList>
-  );
-}
-
 /**
- * 艺人发行列表工具栏：集成关键词搜索、多维筛选与排序（仅作用于当前页签）
+ * 艺人发行列表工具栏：集成关键词搜索、多维筛选与排序
  *
  * 筛选菜单按类型与版本分组呈现，并标明候选数量；可用选项不足两项的分组自动隐藏，全部不足时隐藏筛选按钮；
  * 激活筛选条件时按键呈现角标并在条件行展示已选药丸
  */
-export function ArtistReleaseTools({
-  releases,
-  tabs = true,
-}: {
-  readonly releases: ArtistReleases;
-  /** 工具行靠左是否放页签；专辑墙页只有一节，不放 */
-  readonly tabs?: boolean;
-}) {
+export function ArtistReleaseTools({ releases }: { readonly releases: ArtistReleases }) {
   const t = useAtomValueRawSync(translateAtom);
   const [open, setOpen] = useState(false);
   const { view, facets } = releases;
@@ -167,7 +131,6 @@ export function ArtistReleaseTools({
         onSort={releases.setSort}
         findLabel={t('artistAlbums.find')}
         sortLabel={t('artistAlbums.sort')}
-        start={tabs ? <ArtistTabs releases={releases} /> : undefined}
         filter={
           columns.length > 0 ? (
             <Menu

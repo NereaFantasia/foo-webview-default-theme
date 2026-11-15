@@ -43,6 +43,11 @@ tester.run('layering', layering, {
     { filename: at('src/immersive/x.ts'), code: "import { p } from '../playback/playback.ts';" },
     { filename: at('src/app/x.ts'), code: "import { a } from '../library/albums.ts';" },
     { filename: at('src/main.tsx'), code: "import { App } from './App.tsx';" },
+    { filename: at('src/update/x.ts'), code: "import { log } from '../diagnostics/eventLog.ts';" },
+    {
+      filename: at('src/playback/x.ts'),
+      code: "import { log } from '../diagnostics/eventLog.ts';",
+    },
     { filename: at('src/library/songs/x.ts'), code: "import { a } from '../albums.ts';" },
     { filename: at('src/library/x.ts'), code: "import { useMemo } from 'react';" },
     { filename: at('tests/unit/x.test.ts'), code: "import { a } from '../../src/shell/y.ts';" },
@@ -71,6 +76,11 @@ tester.run('layering', layering, {
     {
       filename: at('src/host/x.ts'),
       code: "import type { Store } from '../shell/store.ts';",
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      filename: at('src/diagnostics/x.ts'),
+      code: "import { a } from '../playback/y.ts';",
       errors: [{ messageId: 'upward' }],
     },
     {

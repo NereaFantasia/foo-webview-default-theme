@@ -1,8 +1,12 @@
 import type { Track } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import type { Atom } from 'jotai/vanilla';
-import { settle } from '../../host/hostCall.ts';
-import { enqueuePaths, playKeepingQueue, type EnqueuePlace } from '../../host/queueCommands.ts';
+import {
+  enqueuePaths,
+  playHandleNow,
+  playKeepingQueue,
+  type EnqueuePlace,
+} from '../../host/queueCommands.ts';
 import type { TrackArtwork } from '../../covers/trackArtwork.ts';
 import type { Store } from '../../kit/store.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
@@ -79,11 +83,7 @@ export function startQueueServices(
     commands: {
       enqueue: (handles, place) => enqueuePaths(host, handles, place),
       playFrom: (guid, row, handle) => playKeepingQueue(host, guid, row, handle),
-      async playHandle(handle) {
-        const inserted = await enqueuePaths(host, [handle], 'next');
-        const done = inserted && (await settle(() => host.queue.playNow(0)))?.success === true;
-        return done;
-      },
+      playHandle: (handle) => playHandleNow(host, handle),
     },
     covers,
     menu,

@@ -1,0 +1,19 @@
+/* 沉浸视图里弹出的菜单、面板、提示的统一挂载点：盖满视图、自己不接指针，里面每个浮层的挂载节点接。
+   它在视图之后、同样是 fixed，所以压在视图上面；浮层靠它才有一个固定的名字可挂。
+
+   视图过渡进行时有浮层开着就挂名字 `scene-overlay`：过渡的快照层压在所有活的内容之上，浮层不挂名字就被封面的快照
+   盖在底下消失一阵；挂了名字，它按绘制次序排在后面，始终在上面。空着时不挂（空的整屏快照白占显存），
+   只在过渡进行时挂（带名字的元素是 `backdrop-filter` 的背景根，常挂会让浮层的玻璃模糊永久失效） */
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
+:global(html[data-scene-transition]) .overlay:not(:empty) {
+  view-transition-name: scene-overlay;
+}

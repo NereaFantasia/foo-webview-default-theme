@@ -6,9 +6,10 @@ import type { AnswerTable, HostParams } from './fakeHost.ts';
 import { hostFailure, numberParam, stringParam } from './hostAnswers.ts';
 import { albumRow, albumTrackRow, playlistRow } from './libraryRows.ts';
 import { collectPageErrors, installPageHost, type PageHost } from './pageHost.ts';
+import { wholeLibrary } from './wholeLibrary.ts';
 
 // 歌曲页的 e2e 共用：一个小媒体库，宿主按查询排序的替身只认页面会拼出来的那几种写法（词的 HAS、流派与艺术家的
-// IS、无损），从侧边栏进歌曲页。
+// IS、无损），从侧边栏进歌曲页
 
 const ALBUMS = [
   ['Donuts', 'J Dilla', 'Hip-Hop', '2006', ['Workinonit', 'Time: The Donut of the Heart']],
@@ -21,7 +22,7 @@ export const SONG_ALBUMS = ALBUMS.map(([name, artist, genre, year]) =>
   albumRow(name, artist, { genre, year, trackCount: 2 }),
 );
 
-/** 八首；第一首是 MP3，其余是 FLAC。 */
+/** 八首；第一首是 MP3，其余是 FLAC */
 export const SONG_TRACKS: readonly LibraryTrack[] = ALBUMS.flatMap(
   ([album, artist, genre, date, titles], at) =>
     titles.map((title, index) =>
@@ -59,7 +60,7 @@ function matches(track: LibraryTrack, query: string): boolean {
   );
 }
 
-/** 宿主排好的 handle：只认按标题与按艺术家两种排序串，其余照库序。 */
+/** 宿主排好的 handle：只认按标题与按艺术家两种排序串，其余照库序 */
 function sorted(query: string, sort: string): string[] {
   const hits = SONG_TRACKS.filter((track) => matches(track, query));
   const by = sort.startsWith('%title%')
@@ -71,10 +72,10 @@ function sorted(query: string, sort: string): string[] {
   return [...hits].sort(by).map((track) => track.handle);
 }
 
-/** 查询里 `%` 不成对就当宿主认不出。 */
+/** 查询里 `%` 不成对就当宿主认不出 */
 const malformed = (query: string) => (query.match(/%/g)?.length ?? 0) % 2 === 1;
 
-/** 查询结果里的一行：起播要路径与子曲目号，表格只用 handle，一并给上。 */
+/** 查询结果里的一行：起播要路径与子曲目号，表格只用 handle，一并给上 */
 function songRow(handle: string, index: number) {
   const track = SONG_TRACKS.find((row) => row.handle === handle);
   return { index, handle, path: track?.path, subsong: track?.subsong };
@@ -88,20 +89,14 @@ const pathToHandle = new Map(
 );
 
 function songsAnswers(): AnswerTable {
-  // 专用列表此刻的内容（handle），起播前核对行时照它答。
+  // 专用列表此刻的内容（handle），起播前核对行时照它答
   let filled: string[] = [];
   const view = playlistRow(1, LIBRARY_VIEW_PLAYLIST);
   return {
     library: {
       getAlbums: albumsAnswer(SONG_ALBUMS),
       getAlbumTracks: albumTracksAnswer,
-      getAll: {
-        success: true,
-        tracks: [...SONG_TRACKS],
-        items: [...SONG_TRACKS],
-        total: SONG_TRACKS.length,
-        offset: 0,
-      },
+      search: wholeLibrary(SONG_TRACKS),
       query: (params: HostParams) => {
         const query = stringParam(params, 'query');
         if (malformed(query)) return hostFailure('INVALID_PARAMS', '无效过滤器表达式');
@@ -161,15 +156,15 @@ export interface SongsPage {
   readonly view: Locator;
   readonly grid: Locator;
   readonly subtitle: Locator;
-  /** 过滤框本身（输入框）。 */
+  /** 过滤框本身（输入框） */
   readonly box: Locator;
-  /** 标题正是 `title` 的那一行。 */
+  /** 标题正是 `title` 的那一行 */
   row(title: string): Locator;
-  /** 表格里各行的标题，按显示顺序。 */
+  /** 表格里各行的标题，按显示顺序 */
   titles(): Promise<string[]>;
 }
 
-/** 装上替身、打开页面，从侧边栏点进歌曲页，等表格画出行。 */
+/** 装上替身、打开页面，从侧边栏点进歌曲页，等表格画出行 */
 export async function openSongs(
   page: Page,
   options: {
@@ -186,7 +181,7 @@ export async function openSongs(
   const view = page.locator('[data-page="songs"]');
   await expect(view.getByRole('heading', { level: 1, name: '歌曲' })).toBeVisible();
   const grid = view.getByRole('treegrid', { name: '歌曲' });
-  // 骨架行的标题格里没有字：等第一行有了标题才算画出来。
+  // 骨架行的标题格里没有字：等第一行有了标题才算画出来
   if (options.waitForRows !== false) {
     await expect(grid.locator('[role="gridcell"][data-column-id="title"]').first()).toHaveText(
       /\S/,

@@ -1,8 +1,10 @@
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
+import { DEFAULT_FONT_CHOICE, menuFontStack } from './fontStack.ts';
 import { roleVar } from './roles.ts';
 
 export const MENU_OVERLAP = 8;
-const SURFACE_FONT_FAMILY = "'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', sans-serif";
+// 主题根把用户选的字体算进 `--menu-font-family`，挂在 Portal 里的浮层也读得到；没有时取默认栈
+const SURFACE_FONT_FAMILY = `var(--menu-font-family, ${menuFontStack(DEFAULT_FONT_CHOICE)})`;
 
 export const useMenuStyles = makeStyles({
   typography: {
@@ -16,6 +18,7 @@ export const useMenuStyles = makeStyles({
     '& .fui-MenuList': { rowGap: tokens.spacingVerticalXXS },
     '& [role^="menuitem"], & [role="option"]': {
       minHeight: '32px',
+      flexShrink: 0,
       padding: `${tokens.spacingVerticalSNudge} ${tokens.spacingHorizontalM}`,
       columnGap: tokens.spacingHorizontalM,
       alignItems: 'center',

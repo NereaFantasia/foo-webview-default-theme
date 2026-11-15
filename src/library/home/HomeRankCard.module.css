@@ -1,0 +1,231 @@
+.card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL) var(--spacingVerticalM);
+  background-color: var(--bg-view-control);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+/* 第一名的封面放大模糊后垫在卡片底下，给卡片一点它的颜色；占位图标不参与 */
+.glow {
+  position: absolute;
+  inset: -30%;
+  z-index: -1;
+  opacity: 0.13;
+  filter: blur(30px) saturate(1.3);
+  pointer-events: none;
+}
+
+.glow > * {
+  width: 100% !important;
+  height: 100% !important;
+  background: none;
+}
+
+.glow svg {
+  display: none;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--borderRadiusSmall);
+  padding: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.name:focus-visible,
+.cover:focus-visible,
+.entry:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+.note {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.note,
+.caption,
+.meta,
+.detail {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin-top: calc(var(--spacingVerticalSNudge) * -1);
+}
+
+.lead {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.cover {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--borderRadiusSmall);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cover:disabled,
+.entry:disabled {
+  cursor: default;
+}
+
+.thumb {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusSmall);
+}
+
+.card[data-round] .cover,
+.card[data-round] .cover > *,
+.card[data-round] .thumb,
+.card[data-round] .thumb > * {
+  border-radius: var(--borderRadiusCircular);
+}
+
+/* 播放标记压在封面上：封面什么颜色都有，用固定的暗罩与白色图标 */
+.play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--colorBackgroundOverlay);
+  color: var(--colorNeutralForegroundStaticInverted);
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.lead:hover .play,
+.cover:focus-visible .play {
+  opacity: 1;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: start;
+}
+
+.leadTitle,
+.entryTitle {
+  overflow: hidden;
+  color: var(--colorNeutralForeground1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadTitle {
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+}
+
+.entryTitle {
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.rest {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * 其余几名的行：悬停底向两侧伸出一截，内容仍与第一名对齐，底不贴着名次与行尾。行上缘的细线画在伪元素上、
+ * 与内容同宽；悬停的行收掉自己上下两道线，免得线从圆角外露出来
+ */
+.entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacingHorizontalMNudge);
+  height: 44px;
+  margin-inline: calc(var(--spacingHorizontalS) * -1);
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  padding: 0 var(--spacingHorizontalS);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--motion-faster) var(--curveLinear);
+}
+
+.entry::before {
+  position: absolute;
+  top: 0;
+  inset-inline: var(--spacingHorizontalS);
+  border-top: var(--strokeWidthThin) solid var(--line-subtle);
+  content: '';
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.entry:hover::before,
+.entry:hover + .entry::before {
+  opacity: 0;
+}
+
+.entry:hover {
+  background: var(--state-hover);
+}
+
+.entry:active {
+  background: var(--state-pressed);
+}
+
+.rank {
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  text-align: end;
+}

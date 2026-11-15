@@ -6,6 +6,14 @@ import { startPluginController } from './plugin-update/controller.ts';
 import { MUSIC_ACTIONS, startMusicService } from './music/musicService.ts';
 import { componentDirectory, type ComponentPackage } from './music/componentInstall.ts';
 import { ncmLoader } from './music/ncmSource.ts';
+import { startLyricsCache } from './lyrics/lyricsCache.ts';
+import { startLibraryMirror } from './library/libraryMirror.ts';
+import { LYRICS_CACHE_ACTIONS, type LyricsCacheAction } from '../src/server/lyricsCacheProtocol.ts';
+import {
+  LIBRARY_MIRROR_ACTIONS,
+  LIBRARY_MIRROR_BODY_LIMIT,
+  type LibraryMirrorAction,
+} from '../src/server/libraryMirrorProtocol.ts';
 import {
   BACKEND_ORIGIN,
   BACKEND_PROTOCOL,
@@ -153,6 +161,52 @@ export async function startBackend(options: BackendOptions): Promise<BackendServ
         ? { lxHost: { install: { components, package: lx }, data: lxData } }
         : {}),
   });
+  const lyricsCache = startLyricsCache(state);
+  const libraryMirror = startLibraryMirror(state);
+  async function libraryRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    action: LibraryMirrorAction,
+  ): Promise<void> {
+    try {
+      let size = 0;
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+        size += bytes.length;
+        if (size > LIBRARY_MIRROR_BODY_LIMIT) return respond(response, 413);
+        chunks.push(bytes);
+      }
+      const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      respond(response, 200, libraryMirror.request(action, body));
+    } catch (error) {
+      respond(response, 400, {
+        error: error instanceof Error ? error.message : '媒体库镜像请求失败',
+      });
+    }
+  }
+  async function lyricsRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    action: LyricsCacheAction,
+  ): Promise<void> {
+    try {
+      let size = 0;
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+        size += bytes.length;
+        if (size > 6 * 1024 * 1024) return respond(response, 413);
+        chunks.push(bytes);
+      }
+      const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      respond(response, 200, lyricsCache.request(action, body));
+    } catch (error) {
+      respond(response, 400, {
+        error: error instanceof Error ? error.message : '歌词缓存请求失败',
+      });
+    }
+  }
   async function pluginRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
     try {
       let size = 0;
@@ -199,6 +253,16 @@ export async function startBackend(options: BackendOptions): Promise<BackendServ
       MUSIC_ACTIONS.some((action) => request.url === `/music/${action}`)
     ) {
       void music.handle(request, response);
+      return;
+    }
+    const lyricsAction = LYRICS_CACHE_ACTIONS.find((item) => request.url === `/lyrics/${item}`);
+    if (request.method === 'POST' && lyricsAction) {
+      void lyricsRequest(request, response, lyricsAction);
+      return;
+    }
+    const libraryAction = LIBRARY_MIRROR_ACTIONS.find((item) => request.url === `/library/${item}`);
+    if (request.method === 'POST' && libraryAction) {
+      void libraryRequest(request, response, libraryAction);
       return;
     }
     if (
@@ -276,6 +340,8 @@ export async function startBackend(options: BackendOptions): Promise<BackendServ
       server.closeAllConnections();
     }).then(async () => {
       await musicStopped;
+      lyricsCache.dispose();
+      libraryMirror.dispose();
       await plugins.dispose().catch(() => {});
       // 定位记录可能已被新进程覆盖；退出只清理本次启动独占的文件
       await unlink(descriptorPath).catch(() => {});

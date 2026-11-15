@@ -12,6 +12,7 @@ import {
 import { controlsVisibleAtom, IDLE_HIDE_MS } from '../../../src/immersive/page/immersiveShell.ts';
 import { startCommandRegistry } from '../../../src/nav/commandRegistry.ts';
 import { historyAtom, startNavHistory } from '../../../src/nav/navHistory.ts';
+import { stubBrowserPanel } from '../../fixtures/browserPanelStub.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
 const flush = async () => {
@@ -46,7 +47,7 @@ function setup() {
     { refreshState: async () => {} },
     { document, window },
   );
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const commands = startCommandRegistry(null);
   const playback = {
     playOrPause: vi.fn(async () => {}),
@@ -56,7 +57,7 @@ function setup() {
   const windowShell = { coverMaximizeButton: vi.fn() };
   const integration = startImmersiveIntegration(
     store,
-    { history, commands, playback, windowShell },
+    { history, browser: stubBrowserPanel().service, commands, playback, windowShell },
     host.fb,
   );
   const entry = () => store.get(historyAtom).entry;
@@ -120,7 +121,7 @@ describe('沉浸会话装配', () => {
     expect(shell?.shell.current()).toBe(true);
     expect(x.integration.enter(x.entry())).toBe(shell);
     expect(x.host.listenerCount('window:stateChanged')).toBe(1);
-    expect(x.commands.list()).toHaveLength(8);
+    expect(x.commands.list()).toHaveLength(10);
   });
 
   it('会话开着时盖住最大化键：进入时盖上，换记录与应用释放时放开', () => {
@@ -166,7 +167,7 @@ describe('沉浸会话装配', () => {
       x.emitFullscreen(true);
       x.mini(false);
       expect(x.integration.enter(own)?.shell).toBe(shell);
-      expect(x.commands.list()).toHaveLength(8);
+      expect(x.commands.list()).toHaveLength(10);
     }
     expect(x.host.callsTo('window.enterFullscreen')).toHaveLength(1);
     expect(x.host.callsTo('window.exitFullscreen')).toEqual([]);
@@ -185,7 +186,7 @@ describe('沉浸会话装配', () => {
     await shell.toggleFullscreen();
     const own = x.entry();
     x.focus(false);
-    expect(x.commands.list()).toHaveLength(8);
+    expect(x.commands.list()).toHaveLength(10);
     x.visible(false);
     expect(x.commands.list()).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
@@ -195,7 +196,7 @@ describe('沉浸会话装配', () => {
     expect(x.store.get(controlsVisibleAtom)).toBe(true);
     x.visible(true);
     expect(x.integration.enter(own)?.shell).toBe(shell);
-    expect(x.commands.list()).toHaveLength(8);
+    expect(x.commands.list()).toHaveLength(10);
     vi.advanceTimersByTime(IDLE_HIDE_MS);
     expect(x.store.get(controlsVisibleAtom)).toBe(false);
     expect(x.host.callsTo('window.enterFullscreen')).toHaveLength(1);

@@ -27,8 +27,8 @@ export function tidyKey(name: string): string {
     .replace(/[\s\-‐‑‒–—―_]+/g, '');
 }
 
-/** 不管两边是谁都算写了几位的分隔：feat.、ft.、featuring、× */
-const ALWAYS = /\s+(?:feat\.?|ft\.?|featuring)\s+|\s*×\s*/i;
+/** 不管两边是谁都算写了几位的分隔：feat.、ft.、featuring、×、分号 */
+const ALWAYS = /\s+(?:feat\.?|ft\.?|featuring)\s+|\s*×\s*|\s*;\s*/i;
 /** 两边的名字都单独出现在库里才算写了几位的分隔：&、/、、、逗号 */
 const MAYBE = /\s*[&/、,，]\s*/;
 
@@ -41,8 +41,9 @@ function partsOf(name: string, pattern: RegExp): readonly string[] {
 
 /**
  * 整份清单里每位的整理提示。`ignored` 是用户点过「忽略」的名字，合辑艺术家由调用方先剔掉
- * 写了几位：带 feat.、ft.、× 的直接算；带 &、/、、 的要拆出来的每一位都单独在库里，
- * Simon & Garfunkel、AC/DC 这样拆开后库里没有的不算
+ * 写了几位：带 feat.、ft.、×、分号的直接算；带 &、/、、 的要拆出来的每一位都单独在库里，
+ * Simon & Garfunkel、AC/DC 这样拆开后库里没有的不算。拆分前先做兼容归一，全角的 ＆、／、，、；
+ * 与半角同样认，拆出的名字也是归一后的写法
  */
 export function findTidyIssues(
   artists: readonly TidyArtist[],
@@ -69,12 +70,13 @@ export function findTidyIssues(
     }
   }
   for (const artist of artists) {
-    const always = partsOf(artist.name, ALWAYS);
+    const text = artist.name.normalize('NFKC');
+    const always = partsOf(text, ALWAYS);
     if (always.length > 1) {
       add(artist.name, { kind: 'multiple', parts: always });
       continue;
     }
-    const maybe = partsOf(artist.name, MAYBE);
+    const maybe = partsOf(text, MAYBE);
     if (maybe.length > 1 && maybe.every((part) => known.has(tidyKey(part))))
       add(artist.name, { kind: 'multiple', parts: maybe });
   }

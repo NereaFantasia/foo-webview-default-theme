@@ -21,6 +21,8 @@ export const searchZhCN: Record<keyof typeof searchEn, string> = {
   'search.viewAlbums': '查看 {count} 张',
   'search.viewTracksOne': '查看 {count} 首',
   'search.viewTracks': '查看 {count} 首',
+  'search.viewArtistsOne': '查看 {count} 位',
+  'search.viewArtists': '查看 {count} 位',
   'search.more': '加载更多',
   'search.moreFailed': '继续加载失败',
   'search.noMatch': '没有匹配结果',

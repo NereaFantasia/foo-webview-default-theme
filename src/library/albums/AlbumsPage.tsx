@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { createSnapshotSlot } from '../../nav/navHistory.ts';
 import { usePageSnapshot } from '../../nav/usePageSnapshot.ts';
+import type { QueryInput } from '../../track/queryInput.ts';
 import { ratingsRefetchAtom } from '../../track/trackRatings.ts';
 import { AlbumList } from '../album-list/AlbumList.tsx';
 import { AlbumMenu } from '../AlbumMenu.tsx';
@@ -30,8 +31,8 @@ import { useService } from '../../kit/useService.ts';
 import { albumsKey } from '../albumServices.ts';
 import { albumListKey } from '../album-list/albumList.ts';
 
-/** 回到这条历史记录时交还的过滤词；滚动与焦点归封面墙自己的那一份 */
-const PAGE_SLOT = createSnapshotSlot<{ readonly term: string }>();
+/** 回到这条历史记录时交还的搜索框输入（含模式与两份草稿）；滚动与焦点归封面墙自己的那一份 */
+const PAGE_SLOT = createSnapshotSlot<{ readonly input: QueryInput }>();
 
 /**
  * 专辑页：页头、筛选条、横幅，下面是封面墙或列表形态。形态按页面记住、切换不进历史；切到列表再切回来，
@@ -45,7 +46,7 @@ export function AlbumsPage() {
   const { sort } = useAtomValueRawSync(wallSortAtom);
   const loaded = useAtomValueRawSync(libraryTracksAtom);
   const { available } = useAtomValueRawSync(playStatsAtom);
-  const { term, facets } = useAtomValueRawSync(albumBrowseAtom);
+  const { input, facets } = useAtomValueRawSync(albumBrowseAtom);
   const refetch = useAtomValueRawSync(ratingsRefetchAtom);
   const albums = useService(albumsKey);
   const albumList = useService(albumListKey);
@@ -80,7 +81,7 @@ export function AlbumsPage() {
 
   usePageSnapshot(
     PAGE_SLOT,
-    { capture: () => ({ term }), restore: (snapshot) => albums.browse.setTerm(snapshot.term) },
+    { capture: () => ({ input }), restore: (snapshot) => albums.browse.setInput(snapshot.input) },
     true,
   );
 

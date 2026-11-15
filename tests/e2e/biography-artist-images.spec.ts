@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { albumsAnswer } from '../fixtures/albumLibrary.ts';
 import { biographyHtml, biographyOverviewHtml } from '../fixtures/biographySamples.ts';
 import { albumRow } from '../fixtures/libraryRows.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { withoutMusicbrainz } from '../fixtures/musicbrainzSamples.ts';
@@ -11,11 +12,13 @@ import {
   openBiographyLink,
   openBiographySettings,
 } from '../fixtures/biographyActions.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 const panel = (page: Page) => page.locator('[data-biography]');
 
 async function start(page: Page, width: number) {
   const env = await openPlayer(page, {
+    config: LASTFM_SOURCE_CONFIG,
     width,
     state: { track: makeTrack({ artist: 'Queen', artists: ['Queen'] }) },
   });
@@ -63,13 +66,11 @@ async function start(page: Page, width: number) {
     })),
   );
   await page.reload();
-  await page.locator('[data-right-card-key="queue"]').click();
-  await page.getByRole('tab', { name: '简介', exact: true }).click();
+  await openRightCardPage(page, 'bio');
   await openBiographySettings(page);
   await page.getByRole('switch', { name: '在线艺人简介' }).check();
   if (width < 1008) {
-    await page.locator('[data-right-card-key="queue"]').click();
-    await page.getByRole('tab', { name: '简介', exact: true }).click();
+    await openRightCardPage(page, 'bio');
   }
   await openBiographyLink(page);
   await panel(page).getByRole('button', { name: '确认艺人', exact: true }).click();
@@ -87,7 +88,9 @@ for (const [colorScheme, width] of [
   }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     const env = await start(page, width);
-    const bowie = panel(page).getByRole('button', { name: 'David Bowie · Last.fm' });
+    // 库里有的相似艺人链到库内的艺人页，名字后不带 Last.fm
+    const bowie = panel(page).getByRole('button', { name: 'David Bowie', exact: true });
+    const beatles = panel(page).getByRole('button', { name: 'The Beatles · Last.fm' });
     const image = bowie.locator('img');
     await expect(image).toBeVisible();
     expect(
@@ -99,9 +102,7 @@ for (const [colorScheme, width] of [
     expect((await image.boundingBox())?.width).toBe(20);
     expect((await image.boundingBox())?.height).toBe(20);
     await expect(image).toHaveCSS('object-fit', 'cover');
-    await expect(
-      panel(page).getByRole('button', { name: 'The Beatles · Last.fm' }).locator('img'),
-    ).toHaveCount(0);
+    await expect(beatles.locator('img')).toHaveCount(0);
     expect(
       env.host.callsTo('artwork.getFb2kUrlByPath').filter((call) => call['type'] === 'artist'),
     ).toEqual([
@@ -109,11 +110,11 @@ for (const [colorScheme, width] of [
       { path: 'E:\\Later.flac', type: 'artist', maxSize: 64 },
     ]);
     env.host.answer('shell.openExternal', { success: true });
-    await bowie.click();
+    await beatles.click();
     await confirmBiographyExternal(page);
     await expect
       .poll(() => env.host.callsTo('shell.openExternal').at(-1)?.['url'])
-      .toBe('https://www.last.fm/zh/music/David%20Bowie');
+      .toBe('https://www.last.fm/zh/music/The%20Beatles');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -124,7 +125,7 @@ for (const [colorScheme, width] of [
 test('头像失效退回文字，刷新恢复，关闭在线后不继续读相似艺人照片', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const env = await start(page, 1280);
-  const bowie = panel(page).getByRole('button', { name: 'David Bowie · Last.fm' });
+  const bowie = panel(page).getByRole('button', { name: 'David Bowie', exact: true });
   await expect(bowie.locator('img')).toBeVisible();
   await bowie.locator('img').evaluate((element) => element.dispatchEvent(new Event('error')));
   await expect(bowie.locator('img')).toHaveCount(0);

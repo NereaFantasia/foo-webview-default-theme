@@ -11,10 +11,17 @@
   display: flex;
   flex: 0 1 320px;
   min-width: 200px;
+  /* 框随语句加宽或缩回时的过渡：已在场元素的点到点；减弱动效时时长变量自动是 1 ms */
+  transition: flex-basis var(--motion-fast) var(--motion-curve-point-to-point);
 }
 .bar[data-tier='medium'] .search {
   flex: 1 1 auto;
   min-width: 0;
+}
+/* 搜索框里的内容比 320 长（高级查询的语句）：宽档下框随内容加宽，宽度由 `.search` 的行内 flex-basis 给；
+   空间不够时只让搜索框让路，视图键不被挤 */
+.bar[data-tier='wide'][data-search-grown] .tools {
+  flex: 1 0 auto;
 }
 .search > *,
 .expanded > * {

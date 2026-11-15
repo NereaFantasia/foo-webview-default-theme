@@ -7,8 +7,8 @@ import {
 } from '../fixtures/albumLibrary.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
-// 封面墙的下拉：单击开合、同一行换一张、换行、自动滚动、减弱动效、键盘与收起的几种情形。
-// 专辑按名字平铺，1280 宽时一行五块；替身每张答两首。
+// 封面墙的下拉：单击开合、同一行换一张、换行、自动滚动、减弱动效、键盘与收起的几种情形
+// 专辑按名字平铺，1280 宽时一行五块；替身每张答两首
 
 const tiles = (page: Page) => page.locator('[data-album-tile]');
 const tile = (page: Page, name: string) => tiles(page).filter({ hasText: name });
@@ -33,14 +33,14 @@ async function start(
   return host;
 }
 
-/** 面板此刻露出多高：开合的时钟逐帧写进 --fold-visible。 */
+/** 面板此刻露出多高：开合的时钟逐帧写进 --fold-visible */
 function visibleOf(slot: Locator): Promise<number> {
   return slot.evaluate((element) =>
     parseFloat(getComputedStyle(element).getPropertyValue('--fold-visible')),
   );
 }
 
-/** 面板高：条目流里给它留的高，第 0 帧就到终值。 */
+/** 面板高：条目流里给它留的高，第 0 帧就到终值 */
 function panelOf(slot: Locator): Promise<number> {
   return slot.evaluate((element) =>
     parseFloat(getComputedStyle(element).getPropertyValue('--panel-height')),
@@ -48,8 +48,8 @@ function panelOf(slot: Locator): Promise<number> {
 }
 
 /**
- * 在页面里逐帧记一个值，直到连续几帧不变（动画停了）或超时，答每一帧的值。
- * `read` 在页面里跑，读的是第一个匹配 `selector` 的元素。
+ * 在页面里逐帧记一个值，直到连续几帧不变（动画停了）或超时，答每一帧的值
+ * `read` 在页面里跑，读的是第一个匹配 `selector` 的元素
  */
 function sample(
   page: Page,
@@ -97,7 +97,7 @@ test('单击封面在这一行下面展开下拉：先露出一截，逐帧长�
   const values = await opening;
   const height = await panelOf(slots(page));
   expect(values.at(-1)).toBe(height);
-  // 中间至少有一帧在半路上：不是一步到位。
+  // 中间至少有一帧在半路上：不是一步到位
   expect(values.some((value) => value > 0 && value < height)).toBe(true);
   await expect(panel(page)).toContainText('Blue Train');
   await expect(panel(page)).toContainText('John Coltrane');
@@ -221,10 +221,10 @@ test('✕ 收起；右键一首曲目出只作用于它的菜单', async ({ page
 
 test('这张被过滤掉、换了排序就收起；切到列表形态再切回来还开着、直接到位', async ({ page }) => {
   const host = await start(page);
-  const filter = page.locator('input[data-album-filter]');
+  const filter = page.locator('input[data-query-input]');
   await tile(page, 'Moanin').click();
   await expect(slots(page)).toHaveCount(1);
-  // 过滤词的曲目级命中回来、条目流排定之后才算被过滤掉。
+  // 过滤词的曲目级命中回来、条目流排定之后才算被过滤掉
   await filter.fill('blue');
   await expect.poll(() => host.callsTo('library.search').length).toBe(1);
   await expect(tiles(page)).toHaveCount(2);

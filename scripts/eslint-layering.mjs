@@ -14,6 +14,7 @@ export const LAYERS = {
   motion: 0,
   styles: 0,
   kit: 0,
+  diagnostics: 0,
   playback: 1,
   track: 1,
   table: 1,

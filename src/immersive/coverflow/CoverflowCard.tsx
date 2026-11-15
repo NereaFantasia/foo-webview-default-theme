@@ -2,7 +2,7 @@ import { MusicNote224Regular, Pause48Filled, Play48Filled } from '@fluentui/reac
 import { useAtomValueRawSync } from 'jotai/react';
 import { useCallback, useState } from 'react';
 import { artworkRequestSize } from '../../host/artworkSize.ts';
-import { trackOrigin } from '../../host/trackOrigin.ts';
+import { coverPathOf } from '../../covers/coverPath.ts';
 import { playingAudibleAtom } from '../../playback/playingTrack.ts';
 import { useQueueCover } from '../../playback/queue/useQueueCover.ts';
 import { useDisplayTrack } from '../../track/displayTrack.ts';
@@ -24,14 +24,6 @@ export function coverRequestSizes(cover: number, ratio: number): CoverRequestSiz
     center: artworkRequestSize(cover, ratio),
     side: artworkRequestSize(cover * slotAt(1).size, ratio),
   };
-}
-
-/** 获取封面资源请求标识（优先使用句柄，网络流或无曲目时返回空字符串） */
-export function coverPathOf(
-  track: { readonly path: string; readonly handle: string } | null,
-): string {
-  if (!track) return '';
-  return trackOrigin(track.path) === 'stream' ? '' : track.handle || track.path;
 }
 
 /**

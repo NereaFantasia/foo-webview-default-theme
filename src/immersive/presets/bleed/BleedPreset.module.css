@@ -1,0 +1,87 @@
+/* 预设 2「满幅封面」的框：封面贴窗口左上、宽 0.58、满窗高；右栏从窗宽一半起占到右缘；胶囊浮在封面底部。
+   位置与尺寸由模板写进来的变量给（`bleedLayout.ts`），这里不写字面像素
+
+   表面：背景每帧在变，右栏里的行与键静止时透明，队列与历史页的列、胶囊用毛玻璃（Acrylic，帧率守门跳闸后降成近实底）。
+   外框给元素的那一组表面变量由根上的 `SurfaceFrame` 给；播放与评分取强调色（`--accent`） */
+.bleed {
+  position: absolute;
+  inset: 0;
+}
+
+/* 封面左缘；居中时尺寸不变、只移到窗口正中，带着共享名字走视图过渡，位置变化由过渡带 */
+.cover {
+  position: absolute;
+  top: 0;
+  left: var(--bleed-cover-left);
+  width: var(--bleed-cover-width);
+  height: 100%;
+}
+
+.info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 传输行：播放顺序、上一首、播放、下一首，隔 16 是音量 */
+.keys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.volume {
+  display: inline-flex;
+  margin-inline-start: var(--spacingHorizontalL);
+}
+
+/* 右栏占满窗高，歌词、队列、历史各自管自己的边距与滚动 */
+.side {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: var(--bleed-side-left) 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 侧栏随居中与常规互转进退场：它不进视图过渡的快照，是页面里的活元素，封面在过渡层里永远盖在它上面。
+   进场从右边滑回来，退场朝右边滑走，同时淡变；时长是点到点的时长放慢到五成（`--bleed-speed`），与封面同步 */
+.side[data-phase='enter'] {
+  /* 只填充到开始前（backwards）：播完就不再有动画作用在这一层上，里面的 `backdrop-filter` 才取得到背景 */
+  animation:
+    side-slide-in calc(var(--motion-normal) / var(--bleed-speed)) var(--motion-curve-point-to-point)
+      backwards,
+    side-fade-in calc(var(--motion-faster) / var(--bleed-speed)) var(--curveLinear) backwards;
+}
+
+.side[data-phase='leave'] {
+  pointer-events: none;
+  animation:
+    side-slide-out calc(var(--motion-normal) / var(--bleed-speed))
+      var(--motion-curve-point-to-point) both,
+    side-fade-out calc(var(--motion-fast) / var(--bleed-speed)) var(--curveLinear) both;
+}
+
+@keyframes side-slide-in {
+  from {
+    translate: var(--spacingHorizontalXXXL) 0;
+  }
+}
+
+@keyframes side-slide-out {
+  to {
+    translate: var(--spacingHorizontalXXXL) 0;
+  }
+}
+
+@keyframes side-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes side-fade-out {
+  to {
+    opacity: 0;
+  }
+}

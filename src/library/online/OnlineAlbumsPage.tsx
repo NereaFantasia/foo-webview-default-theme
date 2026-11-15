@@ -36,6 +36,7 @@ import styles from './OnlineAlbumsPage.module.css';
 
 const TITLES = {
   albums: 'artistAlbums.tab.albums',
+  singles: 'artistAlbums.tab.singles',
   compilations: 'artistAlbums.compilations',
   featured: 'artistAlbums.featured',
 } as const satisfies Record<AlbumWallSection, MessageKey>;
@@ -173,20 +174,13 @@ function OnlineAlbums({ wall }: { readonly wall: OnlineAlbumsSubject }) {
                 </MessageBarActions>
               </MessageBar>
             )}
-            <ArtistReleaseTools releases={releases} tabs={false} />
+            <ArtistReleaseTools releases={releases} />
           </>
         }
         onScroller={setScroller}
         onNarrow={setNarrow}
       >
-        <ArtistReleasePane
-          releases={releases}
-          scroller={scroller}
-          setNotice={setNotice}
-          preview={false}
-          artist={wall.ref}
-          name={wall.name}
-        />
+        <ArtistReleasePane releases={releases} scroller={scroller} setNotice={setNotice} />
       </DetailFrame>
     </CoverTheme>
   );

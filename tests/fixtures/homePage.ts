@@ -1,8 +1,9 @@
 import { expect, type Page } from '@playwright/test';
 import { HOME_CHANNELS_KEY } from '../../src/library/home/homeChannels.ts';
-import { albumsAnswer, albumTracksAnswer, allTracksAnswer, SAMPLE_ALBUMS } from './albumLibrary.ts';
+import { albumsAnswer, albumTracksAnswer, albumsTracks, SAMPLE_ALBUMS } from './albumLibrary.ts';
 import { hostFailure, listParam, stringParam, numberParam } from './hostAnswers.ts';
 import { collectPageErrors, installPageHost, type PageHost } from './pageHost.ts';
+import { wholeLibrary } from './wholeLibrary.ts';
 import type { ConfigGetSuccess } from 'foo-webview-sdk';
 
 export async function openHome(
@@ -13,14 +14,13 @@ export async function openHome(
   } = {},
 ) {
   const errors = collectPageErrors(page);
-  const all = allTracksAnswer(SAMPLE_ALBUMS);
-  const tracks = all.success ? (all.tracks ?? []) : [];
+  const tracks = albumsTracks(SAMPLE_ALBUMS);
   const host = await installPageHost(page, {
     answers: {
       library: {
         getAlbums: albumsAnswer(SAMPLE_ALBUMS),
         getAlbumTracks: albumTracksAnswer,
-        getAll: all,
+        search: wholeLibrary(tracks),
         getRecentlyAdded: {
           success: true,
           tracks: tracks.map((track) => ({ ...track, added: '2025-01-01 00:00:00' })),
@@ -28,6 +28,16 @@ export async function openHome(
           limit: 300,
           sortBy: options.statistics === false ? 'modified' : 'added',
           fallback: options.statistics === false,
+        },
+        getStats: {
+          success: true,
+          totalTracks: tracks.length,
+          totalAlbums: SAMPLE_ALBUMS.length,
+          totalArtists: new Set(tracks.map((track) => track.artist)).size,
+          totalDuration: tracks.reduce((sum, track) => sum + track.duration, 0),
+          totalSize: 0,
+          cacheValid: true,
+          lastModified: 0,
         },
         query: (params) => {
           const query = stringParam(params, 'query');
@@ -42,7 +52,7 @@ export async function openHome(
       },
     },
   });
-  // 从替身的初值起步：其中带着「已走完新人引导」的记录，首页的用例不被引导挡住。
+  // 以替身的初值为起点：其中带有「已走完新人引导」的记录，首页的用例不会被引导挡住
   const config = new Map<string, ConfigGetSuccess['value']>(host.config);
   host.answer('config.get', (params) => {
     const key = stringParam(params, 'key');
@@ -88,8 +98,7 @@ export async function openHome(
   await entry.click();
   const view = page.locator('[data-page="home"]');
   await expect(view.getByRole('heading', { name: '首页', exact: true })).toBeVisible();
-  await expect(
-    view.getByRole('region', { name: '探索音乐' }).locator('[data-home-album]'),
-  ).toHaveCount(3);
+  // 快捷入口在量到行宽后才出，出了说明各行已按宽度排好
+  await expect(view.locator('[data-home-section="quick"]')).toBeVisible();
   return { host, view, errors, channels: () => config.get(HOME_CHANNELS_KEY) };
 }

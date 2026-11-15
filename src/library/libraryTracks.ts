@@ -5,6 +5,7 @@ import { settle } from '../host/hostCall.ts';
 import { waitForHost, type HostReadyFace } from '../host/waitForHost.ts';
 import type { Store } from '../kit/store.ts';
 import { collator } from './albumSections.ts';
+import type { LibraryMirrorSource } from './mirror/mirrorSource.ts';
 import {
   LIBRARY_COALESCE_MS,
   onLibraryChanged,
@@ -13,8 +14,17 @@ import {
   type LibraryEventsFace,
 } from '../host/libraryContract.ts';
 
-/** `library.getAll` 一次要的条数：要盖住整个库，宿主才留着这一份、下次从缓存答 */
+/** 取整库的查询共用的条数上限，盖得住整个库 */
 export const TRACK_LIMIT = 1_000_000;
+
+/**
+ * 整库曲目每页请求的行数；宿主分页查询占用主线程，分页过大阻塞并发调用，分页过小增加往返开销，
+ * 2000 行是兼顾吞吐量与界面响应的折中上限
+ */
+export const TRACK_PAGE_SIZE = 2000;
+
+/** foobar2000 的 ALL 查询命中库里的每一首 */
+const ALL_QUERY = 'ALL';
 
 /** idle：还没要过；failed：最近一次读取失败，手上的旧曲目照旧留着 */
 export type LibraryTracksStatus = 'idle' | 'loading' | 'ready' | 'failed';
@@ -23,7 +33,7 @@ export interface LibraryTracksState {
   readonly status: LibraryTracksStatus;
   /** 按专辑键分好的曲目，每张按碟号、曲号排好；没有专辑名的曲目不在里面 */
   readonly byAlbum: ReadonlyMap<AlbumKey, readonly LibraryTrack[]>;
-  /** 整库每一首，按 handle；没有专辑名的也在。歌曲页按宿主给的 handle 次序从这里取行 */
+  /** 整库曲目按句柄索引，包含无专辑名曲目；歌曲页按宿主返回的句柄次序取行 */
   readonly byHandle: ReadonlyMap<string, LibraryTrack>;
   /** 这一份发请求之前从评分服务拿的戳，见 `TrackRatingsService.stamp` */
   readonly stamp: number;
@@ -43,20 +53,19 @@ const stateAtom = atom<LibraryTracksState>(INITIAL);
 export const libraryTracksAtom: Atom<LibraryTracksState> = atom((get) => get(stateAtom));
 
 export interface LibraryTracksFace extends HostReadyFace, LibraryEventsFace {
-  library: Pick<typeof fb.library, 'getAll'>;
+  library: Pick<typeof fb.library, 'search'>;
 }
 
 export interface LibraryTracksService {
   /**
-   * 登记一处使用并返回释放函数，释放函数重复调用无效。没有使用方时不取整库曲目；最后一处释放后，进行中的
-   * 请求作废，库变更只标记过时，下次登记时再取
+   * 登记使用并返回释放函数，释放函数重复调用无效；无使用方时不抓取整库曲目，全部释放后保留当前缓存并收下进行中的响应；
+   * 库变更时仅标记过期，重新登记时若库未变则沿用缓存
    */
   want(): () => void;
   /** 临时持有曲目并等待当前刷新完成；失败或服务释放时答 null */
   read(): Promise<LibraryTracksState | null>;
   /**
-   * 评分服务的重取信号（`ratingsRefetchAtom`）此刻的值。与上次交来的不同就重取：一次改动报不全时，其余曲目
-   * 的评分只能靠重取行更新。还没取过的只记下，取的时候本来就是新的
+   * 同步评分服务的重取信号（`ratingsRefetchAtom`）；信号变更触发重新抓取，未抓取前仅记录当前值
    */
   syncRefetch(signal: number): void;
   /** 失败横幅上的重试 */
@@ -88,17 +97,34 @@ function groupByAlbum(tracks: readonly LibraryTrack[]): Map<AlbumKey, LibraryTra
 }
 
 /**
- * 列表形态用的整库曲目：`library.getAll` 一次取全，按专辑分好。与专辑清单同一套规矩：先订库变更再取，变更按
- * 1 s 合并后整份重取；重取期间旧的一份留着、状态不退回 loading；晚到的旧应答丢掉。`stamp` 是评分服务的
- * `stamp`，每次发请求前拿一个
+ * 按页抓取整库曲目；缺省 fields 时返回完整字段；分页期间若库内容发生增删，后续库变更事件会触发整份重取；
+ * 请求失败或被新请求取代时返回 null
+ */
+async function fetchAllTracks(
+  host: LibraryTracksFace,
+  stale: () => boolean,
+): Promise<LibraryTrack[] | null> {
+  const tracks: LibraryTrack[] = [];
+  for (;;) {
+    const page = await settle(() =>
+      host.library.search(ALL_QUERY, TRACK_PAGE_SIZE, { offset: tracks.length }),
+    );
+    if (stale() || !page || page.success === false) return null;
+    tracks.push(...(page.tracks as LibraryTrack[]));
+    if (page.tracks.length === 0 || tracks.length >= page.total) return tracks;
+  }
+}
+
+/**
+ * 列表视图使用的整库曲目服务：以 ALL 查询分页抓取并按专辑归类；遵循先订阅变更再抓取、1 秒合并重取、保留旧状态与丢弃过期响应原则
  *
- * 使用方按引用计数登记：改一首歌的标签或播放统计都会触发库变更，每次重取的都是整库，所以没有使用方时只标记
- * 过时，不重取
+ * 使用方采用引用计数管理：无使用方时仅标记过期不执行重取，避免全库频繁刷新
  */
 export function startLibraryTracks(
   store: Store,
   stamp: () => number,
   host: LibraryTracksFace = fb,
+  mirror?: Pick<LibraryMirrorSource, 'tracks'>,
 ): LibraryTracksService {
   store.set(stateAtom, INITIAL);
   let disposed = false;
@@ -123,24 +149,27 @@ export function startLibraryTracks(
     const before = store.get(stateAtom);
     if (before.status !== 'ready') store.set(stateAtom, { ...before, status: 'loading' });
     const taken = stamp();
-    const answer = await settle(() => host.library.getAll(0, TRACK_LIMIT));
+    // 镜像追平了宿主就读镜像，不占宿主主线程；读不到（没建好、落后、后端没连）退回宿主翻页
+    const mirrored = mirror ? await mirror.tracks(stale) : null;
+    const tracks = mirrored ?? (stale() ? null : await fetchAllTracks(host, stale));
     if (stale()) return;
     const current = store.get(stateAtom);
-    if (!answer || answer.success === false) {
+    if (!tracks) {
       store.set(stateAtom, { ...current, status: 'failed' });
       return;
     }
     store.set(stateAtom, {
       status: 'ready',
-      byAlbum: groupByAlbum(answer.tracks),
-      byHandle: new Map(answer.tracks.map((track) => [track.handle, track])),
+      byAlbum: groupByAlbum(tracks),
+      byHandle: new Map(tracks.map((track) => [track.handle, track])),
       stamp: taken,
       generation: current.generation + 1,
     });
   }
 
-  /** 记下进行中的请求，连续登记时不重复发请求 */
+  /** 记下进行中的请求，连续登记时不重复发请求；这一次取已含库变更，还在等的合并作废 */
   function reload(): Promise<void> {
+    cancelTimer();
     const next = load();
     loading = next;
     void next.finally(() => {
@@ -165,7 +194,8 @@ export function startLibraryTracks(
   }
 
   async function connect(): Promise<void> {
-    if (!(await waiter.done) || disposed) return;
+    // 连上之前登记几次就进来几次，只有头一次订阅
+    if (!(await waiter.done) || disposed || connected) return;
     connected = true;
     offLibrary = onLibraryChanged(host, schedule);
     if (active > 0 && dirty && !loading) await reload();
@@ -175,18 +205,14 @@ export function startLibraryTracks(
     if (disposed) return () => {};
     active += 1;
     if (!connected) void connect();
-    else if (dirty && !loading) void reload();
+    // 上次读取失败的，第一处再要时重取；已有人在要的，失败留给界面上的重试
+    else if (dirty || (active === 1 && !loading && store.get(stateAtom).status === 'failed'))
+      void reload();
     let released = false;
     return () => {
       if (released || disposed) return;
       released = true;
       active -= 1;
-      if (active > 0) return;
-      // 作废进行中的请求：应答回来时已无人使用，写进状态只会多留一份整库
-      cancelTimer();
-      generation += 1;
-      loading = null;
-      dirty = true;
     };
   }
 
@@ -199,7 +225,6 @@ export function startLibraryTracks(
         // ready 保留上次可画的快照，不能据此判断后台刷新是否结束
         while (!disposed) {
           if (dirty) {
-            cancelTimer();
             await Promise.race([reload(), stopped]);
           } else if (loading) {
             await Promise.race([loading, stopped]);
@@ -217,12 +242,10 @@ export function startLibraryTracks(
       if (!changed || disposed || !connected) return;
       dirty = true;
       if (active === 0) return;
-      cancelTimer();
       void reload();
     },
     retry() {
       if (disposed || !connected) return Promise.resolve();
-      cancelTimer();
       return reload();
     },
     dispose() {

@@ -87,13 +87,16 @@ test('慢速换曲全程保留 DOM、滚动高度与阅读锚点，不出现中�
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 350)));
   const heldHeight = await queueScroller(page).evaluate((box) => box.scrollHeight);
   expect(heldHeight).toBe(before.height);
-  positions.respond(0, {
+  // 换曲时队列与换曲方向的推断各读一次当前位置：两次读取都到了，改答新位置后一起放行
+  await expect.poll(() => positions.pending.length).toBe(2);
+  player.host.answer('playback.getCurrentTrackIndex', {
     playlistGuid: QUEUE_LIST_GUID,
     success: true,
     found: true,
     playlist: 0,
     index: 1,
   });
+  positions.release();
   await expect.poll(() => pages.pending.length).toBeGreaterThan(0);
   expect(await queueScroller(page).evaluate((box) => box.scrollHeight)).toBe(before.height);
   pages.release();
@@ -129,29 +132,20 @@ test('连续换曲只发布最后可信范围，队首 DOM 复用且退场层不
     player.state.track = track(index);
     await player.host.emit('playback:trackChanged', player.state.track);
   }
-  await expect.poll(() => positions.pending.length).toBe(3);
-  positions.respond(2, {
+  // 每次换曲，队列与换曲方向的推断各读一次当前位置，两次读取按换曲先后排在一起。
+  // 先答最后一次换曲的两次读取，再让前两次换曲的旧应答晚到
+  await expect.poll(() => positions.pending.length).toBe(6);
+  const at = (index: number) => ({
     playlistGuid: QUEUE_LIST_GUID,
-    success: true,
-    found: true,
+    success: true as const,
+    found: true as const,
     playlist: 0,
-    index: 3,
+    index,
   });
+  positions.respond(5, at(3));
+  positions.respond(4, at(3));
   await expect(page.locator('[data-kind="upnext"]').first()).toContainText('曲目 4');
-  positions.respond(0, {
-    playlistGuid: QUEUE_LIST_GUID,
-    success: true,
-    found: true,
-    playlist: 0,
-    index: 1,
-  });
-  positions.respond(0, {
-    playlistGuid: QUEUE_LIST_GUID,
-    success: true,
-    found: true,
-    playlist: 0,
-    index: 2,
-  });
+  for (const index of [1, 1, 2, 2]) positions.respond(0, at(index));
   await expect.poll(() => page.locator('[data-queue-motion-layer]').count()).toBe(0);
   const result = await finish(page);
   expect(result.frames.every((frame) => !frame.empty && frame.rows > 0)).toBe(true);

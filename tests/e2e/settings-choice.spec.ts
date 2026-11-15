@@ -8,13 +8,13 @@ import {
   openSettings,
 } from '../fixtures/settingsPage.ts';
 
-// 设置页的缩略图单选与图标分段：选中即生效、方向键换项、状态随偏好走。
+// 设置页的缩略图单选与图标分段：选中即生效、方向键换项、状态随偏好走
 
 const PLAYER_BAR_KEY = 'default-theme.player-bar.v1';
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), PLAYER_BAR_KEY);
 
 test('播放栏位置：缩略图单选选中即生效，胶囊背景模糊只在标题栏与胶囊时出现', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const group = settings.radios('播放栏位置');
   const card = settings.card('播放栏位置');
   await expect(group.getByRole('radio')).toHaveCount(3);
@@ -32,7 +32,7 @@ test('播放栏位置：缩略图单选选中即生效，胶囊背景模糊只�
 });
 
 test('播放栏位置：方向键在三张缩略图之间换，点缩略图与点单选一样', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const group = settings.radios('播放栏位置');
   await group.getByRole('radio', { name: '窗口底部' }).focus();
   await page.keyboard.press('ArrowRight');
@@ -44,7 +44,7 @@ test('播放栏位置：方向键在三张缩略图之间换，点缩略图与�
 });
 
 test('颜色模式：三张缩略图，选中即生效，跟随系统时说明行写当前一档', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const group = settings.radios('颜色模式');
   await expect(group.getByRole('radio')).toHaveCount(3);
   await expect(group.getByRole('radio', { name: '跟随系统' })).toBeChecked();
@@ -54,7 +54,7 @@ test('颜色模式：三张缩略图，选中即生效，跟随系统时说明�
   await expect(settings.card('颜色模式')).not.toContainText('当前：');
 });
 
-/** 缩略图方框与里面的播放键，各取中心。 */
+/** 缩略图方框与里面的播放键，各取中心 */
 async function playThumbCenters(page: Page) {
   return page.locator('[data-play-thumb]').evaluateAll((buttons) =>
     buttons.map((button) => {
@@ -71,7 +71,7 @@ async function playThumbCenters(page: Page) {
 }
 
 test('主播放按钮：五张缩略图，选中即生效，播放键在缩略图正中，窄卡也是', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await settings.expand('强调色');
   const group = settings.radios('主播放按钮');
   await expect(group.getByRole('radio')).toHaveCount(5);
@@ -92,7 +92,7 @@ test('主播放按钮：五张缩略图，选中即生效，播放键在缩略�
 });
 
 test('窄卡：缩略图最多三列，多出的折行', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await page.setViewportSize({ width: 390, height: 800 });
   await settings.expand('强调色');
   const tops = await settings
@@ -106,7 +106,7 @@ test('窄卡：缩略图最多三列，多出的折行', async ({ page }) => {
 });
 
 test('基础强调色：宽卡是图标分段，窄卡换成单选，选中的一项在两种形态里一致', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await settings.expand('强调色');
   const tabs = page.getByRole('tablist', { name: '基础强调色', exact: true });
   await expect(tabs.getByRole('tab')).toHaveCount(3);
@@ -134,7 +134,7 @@ const storedSource = (page: Page) =>
   }, BACKGROUND_KEY);
 
 test('窗口背景：缺省收起，卡头有当前来源的小缩略图；展开是来源五选一', async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, {}, '外观');
   const card = backgroundCard(page);
   await expect(card.locator('[data-settings-toggle]')).toHaveAttribute('aria-expanded', 'false');
   await expect(card.locator('[data-tile]')).toHaveCount(1);
@@ -146,7 +146,7 @@ test('窗口背景：缺省收起，卡头有当前来源的小缩略图；展�
 test('窗口背景：封面、色场、图片只换来源，材质留着；主题色回系统材质时回到跟随首选项', async ({
   page,
 }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await chooseBackground(page, 'Mica');
   await expectBackground(page, 'Mica');
 
@@ -168,7 +168,7 @@ test('窗口背景：封面、色场、图片只换来源，材质留着；主�
 });
 
 test('窗口背景：窄卡里材质一行换成单选', async ({ page }) => {
-  await openSettings(page);
+  await openSettings(page, {}, '外观');
   await chooseBackground(page, '系统材质');
   await page.setViewportSize({ width: 390, height: 800 });
   const radios = page.getByRole('radiogroup', { name: '材质', exact: true });
@@ -186,7 +186,7 @@ const storedImmersive = (page: Page, key: string) =>
   page.evaluate((name) => localStorage.getItem(name), key);
 
 test('沉浸视图：视图样式与波形显示方式是缩略图单选，选中即生效', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '沉浸视图');
   const scenes = settings.radios('视图样式');
   await expect(scenes.getByRole('radio')).toHaveCount(2);
   await expect(scenes.getByRole('radio', { name: '图纸' })).toBeChecked();
@@ -201,11 +201,11 @@ test('沉浸视图：视图样式与波形显示方式是缩略图单选，选�
   await expect(settings.card('波形显示方式')).toHaveCount(0);
 });
 
-test('沉浸视图：歌词样式的视图背景是四张缩略图，进入时显示的页签是图标分段', async ({ page }) => {
-  const settings = await openSettings(page);
+test('沉浸视图：歌词样式的视图背景是五张缩略图，进入时显示的页签是图标分段', async ({ page }) => {
+  const settings = await openSettings(page, {}, '沉浸视图');
   await settings.choose('视图样式', '歌词');
   const backdrops = settings.radios('视图背景');
-  await expect(backdrops.getByRole('radio')).toHaveCount(4);
+  await expect(backdrops.getByRole('radio')).toHaveCount(5);
   await expect(backdrops.getByRole('radio', { name: '网格渐变' })).toBeChecked();
   await settings.choose('视图背景', '隔离');
   await expect(backdrops.getByRole('radio', { name: '隔离' })).toBeChecked();
@@ -227,7 +227,7 @@ test('沉浸视图：歌词样式的视图背景是四张缩略图，进入时�
 test('歌词：文字对齐是图标分段，当前行位置是三张缩略图，对齐位置在同一张卡的底部', async ({
   page,
 }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '歌词');
   const tabs = page.getByRole('tablist', { name: '文字对齐', exact: true });
   await expect(tabs.getByRole('tab')).toHaveCount(3);
   await expect(tabs.getByRole('tab', { name: '居左' })).toHaveAttribute('aria-selected', 'true');
@@ -249,7 +249,7 @@ test('歌词：文字对齐是图标分段，当前行位置是三张缩略图�
 });
 
 test('桌面歌词：背景与配色是缩略图，字号与对齐是图标分段', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '歌词');
   await settings.expand('桌面歌词');
   const backgrounds = settings.radios('背景');
   await expect(backgrounds.getByRole('radio')).toHaveCount(2);
@@ -263,7 +263,7 @@ test('桌面歌词：背景与配色是缩略图，字号与对齐是图标分�
   await expect(backgrounds.getByRole('radio', { name: '透明' })).toBeChecked();
 
   const sizes = page.getByRole('tablist', { name: '字号', exact: true });
-  await expect(sizes.getByRole('tab')).toHaveCount(4);
+  await expect(sizes.getByRole('tab')).toHaveCount(5);
   await settings.choose('字号', '大');
   await expect(sizes.getByRole('tab', { name: '大', exact: true })).toHaveAttribute(
     'aria-selected',
@@ -275,7 +275,7 @@ test('桌面歌词：背景与配色是缩略图，字号与对齐是图标分�
 });
 
 test('启动时打开：宽卡是六项图标分段，窄卡换成两列三行的单选', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '常规');
   const tabs = page.getByRole('tablist', { name: '启动时打开', exact: true });
   await expect(tabs.getByRole('tab')).toHaveCount(6);
   await expect(tabs.getByRole('tab', { name: '专辑' })).toHaveAttribute('aria-selected', 'true');

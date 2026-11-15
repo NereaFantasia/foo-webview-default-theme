@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { pressOn } from '../fixtures/pressOn.ts';
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/src/main.tsx', (route) =>
@@ -85,7 +86,7 @@ test('短窗口中央打开高菜单，上下都放不下时仍保持在视口�
     .toBeGreaterThan(0);
 });
 
-test('评分勾选、点击外部不抢焦点、不可用项不执行', async ({ page }) => {
+test('评分勾选、点击外部只关菜单、不可用项不执行', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto('/');
   await page.locator('[data-open-menu]').click();
@@ -99,9 +100,12 @@ test('评分勾选、点击外部不抢焦点、不可用项不执行', async ({
   await expect(page.locator('output')).toHaveText('five');
   await expect(page.locator('[data-context-menu-owner]')).toHaveCount(0);
   await page.locator('[data-open-menu]').click();
-  await page.getByRole('textbox', { name: '其他输入' }).click();
-  await expect(page.getByRole('textbox', { name: '其他输入' })).toBeFocused();
+  const input = page.getByRole('textbox', { name: '其他输入' });
+  await pressOn(page, input);
   await expect(page.locator('[data-context-menu-owner]')).toHaveCount(0);
+  await expect(input).not.toBeFocused();
+  await input.click();
+  await expect(input).toBeFocused();
 });
 
 test('重试保留菜单，绑定对象变化时立即关闭', async ({ page }) => {

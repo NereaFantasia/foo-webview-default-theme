@@ -41,21 +41,27 @@ test('枚举区仅禁用已有专门入口的功能，没有 GUID 的其他命�
   await expect(menu).toHaveCount(0);
 });
 
-test('播放所选只复制选区并保留重复分轨，从此处播放使用右键落点', async ({ page }) => {
+test('单选「播放」沿原列表从右键落点继续，菜单里没有单列的「从此处播放」；播放所选只复制选区并保留重复分轨', async ({
+  page,
+}) => {
   const path = 'file://E:/Music/Disc.cue';
   const tracks = [0, 1, 2, 3].map((row) =>
     makeRow('Mix', row, row % 2 ? { path, subsong: 2 } : {}),
   );
   const { host, lists, row, guid } = await openPlaylist(page, 'Mix', tracks);
-  await row('Mix 2').click();
-  await row('Mix 4').click({ modifiers: ['Control'] });
   await row('Mix 4').click({ button: 'right' });
   const menu = page.locator('[data-playlist-track-menu]');
-  await menu.locator('[data-action="play-from-here"]').click();
+  await expect(menu.locator('[data-action="play-from-here"]')).toHaveCount(0);
+  await expect(menu.locator('[data-action="play"]')).toContainText('播放');
+  await menu.locator('[data-action="play"]').click();
   await expect
     .poll(() => host.callsTo('playlist.playTrack').at(-1))
     .toMatchObject({ playlistGuid: guid, index: 3 });
+  expect(host.callsTo('library.addToPlaylist')).toEqual([]);
+  await row('Mix 2').click();
+  await row('Mix 4').click({ modifiers: ['Control'] });
   await row('Mix 4').click({ button: 'right' });
+  await expect(menu.locator('[data-action="play"]')).toContainText('播放所选');
   await menu.locator('[data-action="play"]').click();
   await expect
     .poll(() => host.callsTo('library.addToPlaylist'))

@@ -7,7 +7,7 @@ import {
   Play24Filled,
   Previous20Regular,
 } from '@fluentui/react-icons';
-import { useAtomValueRawSync, useStore } from 'jotai/react';
+import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactElement } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { roleVar } from '../../theme/roles.ts';
@@ -16,10 +16,11 @@ import styles from './PlaybackControls.module.css';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
 import { handOffPlayerFocus, ORDER_FOCUS, PLAYER_KEY_ATTR } from './playerFocus.ts';
 import { playingAudibleAtom } from '../../playback/playingTrack.ts';
-import { noteSkip } from '../../playback/now-playing/trackSwap.ts';
 import { useService } from '../../kit/useService.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
+import { currentTrackAtom } from '../../playback/playback.ts';
+import { PlayerFavoriteKey } from './PlayerFavoriteKey.tsx';
 
 // 三种布局的图标共用尺寸：播放与暂停 22，其余 20。标题栏与胶囊的命中区是 28 × 36，
 // 底部通栏的键 36 见方、隔 8，播放键另用 40 的主色圆底
@@ -73,19 +74,25 @@ export interface PlaybackControlsProps {
   readonly compact?: boolean;
   /** 底部通栏那一档：键更大、键间隔 8，播放键是主色圆底 */
   readonly prominent?: boolean;
+  /** 下一首右边加收藏键，与左端的顺序键左右对称；标题栏那一组不传，它的收藏键在正在播放条上 */
+  readonly favorite?: boolean;
 }
 
 /**
- * 播放控制组：播放顺序、上一首、播放 / 暂停、下一首。标题栏、胶囊与底部通栏共用。播放键的
+ * 播放控制组：播放顺序、上一首、播放 / 暂停、下一首，底部通栏与胶囊另在下一首右边加收藏键。标题栏、胶囊与底部通栏共用。播放键的
  * 图标与名字跟着宿主报的状态走；顺序键弹出七选一的菜单（`OrderMenuButton`）。命令不做乐观更新，以宿主
- * 回读为准。没连上宿主时全部置灰。上一首、下一首键按下时记下方向，换曲的过渡按它翻（`trackSwap.ts`）
+ * 回读为准。没连上宿主时全部置灰。上一首、下一首由播放服务记下方向，换曲的过渡按它翻（`trackSwap.ts`）
  */
-export function PlaybackControls({ compact = false, prominent = false }: PlaybackControlsProps) {
+export function PlaybackControls({
+  compact = false,
+  prominent = false,
+  favorite = false,
+}: PlaybackControlsProps) {
   const t = useAtomValueRawSync(translateAtom);
+  const current = useAtomValueRawSync(currentTrackAtom);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const audible = useAtomValueRawSync(playingAudibleAtom);
   const playback = useService(playbackKey);
-  const store = useStore();
   const classes = useStyles();
   const disabled = !connected;
   const key = mergeClasses(classes.key, prominent && classes.roomy);
@@ -99,7 +106,7 @@ export function PlaybackControls({ compact = false, prominent = false }: Playbac
       aria-label={t('player.controls')}
       data-prominent={prominent || undefined}
     >
-      {/* 最窄一档里顺序键单独卸下，焦点也要跟走。 */}
+      {/* 最窄一档里顺序键单独卸下，焦点要随之交接 */}
       {!compact && (
         <span ref={handOffPlayerFocus} className={styles.slot}>
           <OrderMenuButton className={key} disabled={disabled} large {...ORDER_FOCUS} />
@@ -111,10 +118,7 @@ export function PlaybackControls({ compact = false, prominent = false }: Playbac
         icon={<Previous20Regular />}
         className={key}
         disabled={disabled}
-        onClick={() => {
-          noteSkip(store, 'previous');
-          void playback.previous();
-        }}
+        onClick={() => void playback.previous()}
       />
       <PlayerKey
         name="play"
@@ -138,11 +142,14 @@ export function PlaybackControls({ compact = false, prominent = false }: Playbac
         icon={<Next20Regular />}
         className={key}
         disabled={disabled}
-        onClick={() => {
-          noteSkip(store, 'next');
-          void playback.next();
-        }}
+        onClick={() => void playback.next()}
       />
+      {/* 最窄一档里顺序键卸下，收藏键跟着卸下 */}
+      {favorite && !compact && (
+        <span ref={handOffPlayerFocus} className={styles.slot}>
+          <PlayerFavoriteKey path={current?.path} className={key} />
+        </span>
+      )}
     </div>
   );
 }

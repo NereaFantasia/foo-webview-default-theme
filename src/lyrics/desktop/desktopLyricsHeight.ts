@@ -95,11 +95,11 @@ export function singleExtraHeight(input: SingleRowsInput): number {
 }
 
 /** 基于 Canvas 2D 上下文测量文本排版宽度；上下文不可用时按单字等宽宽松估算 */
-export function canvasMeasure(family: string): MeasureText {
+export function canvasMeasure(family: string, weight = '400'): MeasureText {
   const context = document.createElement('canvas').getContext('2d');
   return (text, fontSize) => {
     if (!context) return text.length * fontSize;
-    context.font = `${fontSize}px ${family}`;
+    context.font = `${weight} ${fontSize}px ${family}`;
     return context.measureText(text).width;
   };
 }

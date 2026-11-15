@@ -2,34 +2,33 @@ import type { WindowStateChangedPayload } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { settle } from '../../host/hostCall.ts';
-import { historyAtom, type NavHistoryService } from '../../nav/navHistory.ts';
+import { mainHistoryAtom, type NavHistoryService } from '../../nav/navHistory.ts';
 import { START_PLACE } from '../../nav/places.ts';
 import type { Store } from '../../kit/store.ts';
 
 /**
- * 正在播放全屏页的壳：控件层的静止计时、宿主主窗全屏的记账，以及离开这一页
+ * 沉浸全屏视图外壳：控件层闲置超时管理、宿主主窗口全屏状态联动与视图退出调度
  *
- * 页面加载完成时启动，由应用持有；启动时的历史记录不再是当前记录，或应用调了 `dispose()`，
- * 都算离开，以先到的为准。隐藏页面只停控件计时。离开之后不再写状态，也不再响应宿主事件：
- * 页面在退场过渡里还挂着，这段时间宿主报的全屏变化不能再触发一次后退
+ * 页面加载完成时启动，由应用持有。启动时的历史记录不再是当前记录，或应用调用了 `dispose()`，都算离开视图（以先发生者为准），
+ * 页面隐藏时暂停控件闲置计时。离开视图后不再更新状态，亦不响应宿主事件：避免退场过渡动画期间因宿主全屏状态变化二次触发导航后退
  *
- * 全屏：宿主在时先订 `window:stateChanged`，再问一次 `isFullscreen`，`hostFullscreenAtom` 跟着宿主走；
- * 问不到（面板模式、这扇窗不支持全屏）是 null。视图让宿主进的全屏（进入时按偏好，或按视图里的全屏键）
- * 只在 `enterFullscreen` 应答 `isFullscreen: true` 时记账；离开时只退记了账的那一次，进视图前宿主已经
- * 全屏的不动。命令失败或没有宿主（浏览器里跑开发服务器）时照常留在视图里，不算失败
- * 记了账的全屏被宿主侧自己退了（用户按了宿主的快捷键）时跟着离开这一页，且不再发退出命令
+ * 全屏管理：宿主可用时先订阅 `window:stateChanged`，并初次查询 `isFullscreen`，`hostFullscreenAtom` 实时同步宿主状态
+ * 查询失败（面板模式或当前窗口不支持全屏）时置为 null。由本视图请求进入的全屏（进入时按偏好自动触发，或点击视图全屏按钮）
+ * 仅在 `enterFullscreen` 成功返回 `isFullscreen: true` 时记录有效状态。离开视图时仅撤销由本视图发起的全屏，进入前已处于全屏状态的保持不变
+ * 命令执行失败或处于无宿主开发环境时正常停留在视图内，不视作异常
+ * 视图发起的全屏若被宿主外部行为退出（例如用户触发全局快捷键），自动联动退出当前视图，且不再重复派发退出全屏指令
  *
- * `window:stateChanged` 发给所有窗口，只认本窗口的：窗口 id 经 `getCurrentWindowId` 取回之前按主窗 `main` 认
+ * `window:stateChanged` 事件广播至所有窗口，此处仅过滤并处理当前窗口事件。窗口 ID 经 `getCurrentWindowId` 获取之前，按主窗口 `main` 处理
  *
- * 同一时刻只有一个壳在跟宿主：启动时进入时全屏的命令推到下一个微任务再发，发之前壳已释放就不发（开发时
- * React 的严格模式会把页面挂上、立即卸下、再挂上，第一个壳不该发命令）。已经离开的壳等到进入全屏的成功应答时，
- * 这一页若又有了新的壳，记账交给它，不发退出
+ * 同一时刻仅允许单一外壳实例与宿主交互：启动时请求进入全屏推迟至微任务执行，派发前若外壳已释放则取消派发
+ * （避免开发环境 React 严格模式重复挂载卸载导致派发多余指令）。已释放的外壳若收到进入全屏的成功响应，
+ * 且当前视图已创建新外壳实例，则将状态交接给新外壳，避免发送退出指令
  */
 
-/** 指针与键盘都静止这么久（毫秒）后藏控件层与光标；有指针移动或按键立刻回来 */
+/** 指针与键盘均处于闲置状态达到该阈值（毫秒）后隐藏控件层与光标。产生指针移动或按键输入时立即唤出 */
 export const IDLE_HIDE_MS = 3000;
 
-/** 壳用到的宿主接口，类型逐项取自 SDK 的 `fb` */
+/** 外壳所依赖的宿主接口，类型定义取自 SDK 的 `fb` */
 export interface ImmersiveHost {
   isAvailable: typeof fb.isAvailable;
   on: typeof fb.on;
@@ -39,35 +38,37 @@ export interface ImmersiveHost {
   >;
 }
 
-/** 窗口 id 取回之前按主窗认：沉浸视图只在主窗里 */
+/** 窗口 ID 获取完成前默认匹配主窗口：沉浸视图仅在主窗口中运行 */
 const MAIN_WINDOW_ID = 'main';
 
-/** 过 `ms` 毫秒调一次 `run`，返回取消函数 */
+/** 延迟指定毫秒后执行回调，返回取消函数 */
 export type Schedule = (run: () => void, ms: number) => () => void;
 
 export interface ImmersiveShellDeps {
   history: Pick<NavHistoryService, 'back' | 'navigate'>;
-  /** 进入时要不要让宿主主窗一起全屏；启动时读一次 */
+  /** 进入视图时是否请求宿主主窗口同步全屏。初始化时读取一次 */
   fullscreenOnEnter: () => boolean;
-  /** 迷你窗口保存与恢复期间，全屏变化由它管理，不据此后退或重新进入全屏 */
+  /** 迷你窗口保存与恢复期间全屏状态由其接管，不据此后退或重新进入全屏 */
   fullscreenManaged?: () => boolean;
-  /** 隐藏时停止控件计时，保留全屏记账；未提供时视为一直可见 */
+  /** 视图隐藏时暂停控件层计时，保留全屏状态记录。未传入时视为始终可见 */
   active?: Atom<boolean>;
+  /** 为真时阻止控件层与光标自动隐藏：浏览面板处于展开态时交互均在面板内进行，需保持入口按钮可见。变为假时重置计时 */
+  hold?: Atom<boolean>;
   host?: ImmersiveHost;
-  /** 静止计时用的定时器，缺省是 `setTimeout` */
+  /** 闲置计时调度器，默认使用 `setTimeout` */
   schedule?: Schedule;
 }
 
 export interface ImmersiveShell {
-  /** 这一页还是当前地点、壳还没释放；视图里的按键命令据此决定认不认领 */
+  /** 当前视图仍为活动地点且外壳未释放。按键命令据此判定是否响应 */
   current(): boolean;
-  /** 有指针移动或按键：控件层与光标立刻回来，静止计时从头数 */
+  /** 接收到指针移动或按键事件：恢复控件层与光标显示，并重置闲置计时 */
   touch(): void;
-  /** 视图里的全屏键：宿主全屏就退，否则进。宿主不在或不支持全屏时不动 */
+  /** 视图全屏切换按钮：当前全屏则退出，否则进入。宿主不可用或不支持全屏时忽略 */
   toggleFullscreen(): Promise<void>;
   /**
-   * 离开这一页：Esc 与右上的 Esc 胶囊调它。视图让宿主进的全屏先退，再后退；
-   * 后退退不回去（前面的记录都被历史上限挤掉了）时去 `START_PLACE`
+   * 退出沉浸视图，供 Esc 键与右上角 Esc 胶囊按钮调用：优先撤销本视图发起的全屏再执行后退，
+   * 没有可后退的记录（此前的记录已被历史上限挤掉）时导航至 `START_PLACE`
    */
   leave(): void;
   dispose(): void;
@@ -81,9 +82,9 @@ interface ShellState {
 const INITIAL: ShellState = { controlsVisible: true, hostFullscreen: null };
 const stateAtom = atom<ShellState>(INITIAL);
 
-/** 控件层与光标此刻该不该显示 */
+/** 控件层与光标当前的可见状态 */
 export const controlsVisibleAtom: Atom<boolean> = atom((get) => get(stateAtom).controlsVisible);
-/** 宿主主窗此刻是否全屏；null 是不知道或不支持，视图里的全屏键不出。只在壳开着时跟宿主 */
+/** 宿主主窗口当前的全屏状态。null 表示未知或不支持，视图全屏按钮隐藏。仅在外壳激活期间跟踪宿主 */
 export const hostFullscreenAtom: Atom<boolean | null> = atom(
   (get) => get(stateAtom).hostFullscreen,
 );
@@ -93,23 +94,23 @@ const browserSchedule: Schedule = (run, ms) => {
   return () => clearTimeout(timer);
 };
 
-/** 正在跟宿主的那个壳；已经离开的壳晚到的全屏记账交给它 */
+/** 当前正在与宿主交互的外壳实例。已释放外壳收到的全屏响应交接予该实例 */
 let liveShell: { adopt(): void } | null = null;
 
 export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): ImmersiveShell {
   const { history, host = fb, schedule = browserSchedule } = deps;
-  const own = store.get(historyAtom).entry;
+  const own = store.get(mainHistoryAtom).entry;
   store.set(stateAtom, INITIAL);
   let left = false;
-  // 视图让宿主确实进了全屏才为真：离开时据它决定要不要发 exitFullscreen
+  // 仅在确认由当前视图触发宿主全屏时置为真：离开时据此决定是否派发 exitFullscreen
   let entered = false;
-  // 每写一次全屏态加一：`isFullscreen` 的初读晚于事件或命令应答到达时丢掉
+  // 全屏状态写入计数器：用于丢弃晚于事件或命令响应到达的 isFullscreen 初始读取结果
   let fullscreenWrites = 0;
   let cancelIdle: (() => void) | undefined;
   let offState: (() => void) | undefined;
   let windowId = MAIN_WINDOW_ID;
   const self = {
-    // 已经离开的壳让宿主进了全屏：这一页还开着，记账归这个壳
+    // 已释放的外壳成功触发宿主全屏：当前视图仍然打开时，将全屏状态记录移交当前外壳
     adopt(): void {
       if (left) return;
       entered = true;
@@ -118,7 +119,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
   };
   liveShell = self;
 
-  // 离开之后不写：新的一页可能已经启动了自己的壳，共用同一份状态
+  // 离开视图后忽略更新：新视图可能已启动自身外壳并共享状态原子
   function update(patch: Partial<ShellState>): void {
     if (left) return;
     const state = store.get(stateAtom);
@@ -139,14 +140,16 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
   function armIdle(): void {
     cancelIdle?.();
     cancelIdle = undefined;
-    if (left || (deps.active && !store.get(deps.active))) return;
+    if (left || (deps.active && !store.get(deps.active)) || (deps.hold && store.get(deps.hold))) {
+      return;
+    }
     cancelIdle = schedule(() => {
       cancelIdle = undefined;
       update({ controlsVisible: false });
     }, IDLE_HIDE_MS);
   }
 
-  // 失败只可能是本来就不在全屏（宿主答 OPERATION_FAILED）或宿主不在，都不用再做什么
+  // 执行失败仅可能由于原本未处于全屏（宿主返回 OPERATION_FAILED）或宿主不可用，无需额外处理
   function exitHostFullscreen(): void {
     void settle(() => host.ui.exitFullscreen());
   }
@@ -165,6 +168,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
     offState = undefined;
     offHistory();
     offActive?.();
+    offHold?.();
     if (!entered) return;
     entered = false;
     exitHostFullscreen();
@@ -174,7 +178,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
     if (left || payload.windowId !== windowId) return;
     const { isFullscreen } = payload;
     setFullscreen(isFullscreen);
-    // 视图让它进的全屏被宿主自己退了：它已不在全屏里，只后退，不再发 exitFullscreen
+    // 由本视图请求的全屏被宿主外部行为退出：已脱离全屏，直接后退且不再派发 exitFullscreen
     if (entered && !isFullscreen && !deps.fullscreenManaged?.()) {
       entered = false;
       goBack();
@@ -196,7 +200,7 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
       self.adopt();
       return;
     }
-    // 等应答期间已经离开：这一页又有了新的壳就交给它；没有就补一次退出，不把主窗留在全屏里
+    // 等待响应期间已离开视图：若存在新外壳实例则移交管理，否则补发退出全屏以恢复主窗口状态
     if (liveShell) liveShell.adopt();
     else exitHostFullscreen();
   }
@@ -211,8 +215,8 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
     if (!left && answer !== null && answer.success) windowId = answer.windowId;
   }
 
-  const offHistory = store.sub(historyAtom, () => {
-    if (store.get(historyAtom).entry !== own) depart();
+  const offHistory = store.sub(mainHistoryAtom, () => {
+    if (store.get(mainHistoryAtom).entry !== own) depart();
   });
   const offActive = deps.active
     ? store.sub(deps.active, () => {
@@ -220,9 +224,15 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
         armIdle();
       })
     : undefined;
+  const offHold = deps.hold
+    ? store.sub(deps.hold, () => {
+        update({ controlsVisible: true });
+        armIdle();
+      })
+    : undefined;
 
   armIdle();
-  // 宿主缺席时 SDK 的调用要等约 100 ms 才答 `NOT_SUPPORTED`：不问它，没有全屏键
+  // 宿主未连接时 SDK 方法约等待 100ms 返回 NOT_SUPPORTED：跳过查询且不显示全屏切换按钮
   if (host.isAvailable()) {
     offState = host.on('window:stateChanged', onStateChanged);
     void readWindowId();
@@ -245,10 +255,10 @@ export function startImmersiveShell(store: Store, deps: ImmersiveShellDeps): Imm
         await requestFullscreen();
         return;
       }
-      // 自己退的不算宿主侧退出：先清记账，随后的 stateChanged 就不会连带离开这一页
+      // 主动调用退出全屏不视为宿主侧外部退出：提前清除记录，避免随后的 stateChanged 事件连带触发导航后退
       entered = false;
       const answer = await settle(() => host.ui.exitFullscreen());
-      // 退不出就留在全屏，状态等 stateChanged 来纠正
+      // 退出失败则保持全屏状态，等待后续 stateChanged 事件校准
       if (answer !== null && answer.success) setFullscreen(answer.isFullscreen);
     },
     leave() {

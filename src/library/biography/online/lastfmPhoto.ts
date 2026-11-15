@@ -1,8 +1,20 @@
-import { lastfmArtistFromUrl, lastfmArtistUrl, type BiographyLanguage } from '../biographyModel.ts';
+import {
+  lastfmArtistFromUrl,
+  lastfmArtistUrl,
+  type BiographyLanguage,
+  type BiographyPhoto,
+} from '../biographyModel.ts';
 
 export interface LastfmPhoto {
+  /** 不写：与 Apple 的照片区分靠它是否为 `'apple'` */
+  readonly source?: undefined;
   readonly url: string;
   readonly pageUrl: string;
+}
+
+/** 文档或附加资料里的照片只有 Last.fm 的才走 Last.fm 的取图管线，Apple 的另有取法 */
+export function lastfmPhotoOf(photo: BiographyPhoto | null | undefined): LastfmPhoto | null {
+  return photo && photo.source !== 'apple' ? photo : null;
 }
 
 export function lastfmPhotoId(value: string): string | null {

@@ -233,6 +233,43 @@ test('窄窗单行控件、溢出菜单与宽窗恢复', async ({ page }) => {
   await expect(controls.getByRole('button', { name: '前进 5 秒', exact: true })).toBeVisible();
 });
 
+test('播放栏在标题栏时，页头的标题与操作键让开导航胶囊且点得到', async ({ page }) => {
+  await choosePlayerBar(page, 'titlebar');
+  await openVideo(page);
+  const region = page.getByRole('region', { name: '视频', exact: true });
+  const title = region.getByText('Video sample', { exact: true });
+  const actions = [
+    region.getByRole('button', { name: '浏览视频', exact: true }),
+    region.getByRole('button', { name: '打开所在文件夹', exact: true }),
+  ];
+  // 几何本身就是被测行为：导航胶囊浮在卡片顶部，页头的字与键不能落在它们底下
+  for (const width of [1280, 700, 400]) {
+    await page.setViewportSize({ width, height: 800 });
+    const keys = await page.locator('[data-nav-row] button').evaluateAll((elements) =>
+      elements.map((element) => {
+        const { x, y, width: w, height: h } = element.getBoundingClientRect();
+        return { x, y, right: x + w, bottom: y + h };
+      }),
+    );
+    expect(keys.length).toBeGreaterThan(0);
+    for (const part of [title, ...actions]) {
+      await expect(part).toBeVisible();
+      const box = await part.boundingBox();
+      expect(box).not.toBeNull();
+      const hit = keys.some(
+        (key) =>
+          box!.x < key.right &&
+          key.x < box!.x + box!.width &&
+          box!.y < key.bottom &&
+          key.y < box!.y + box!.height,
+      );
+      expect(hit, `${width} 宽下页头被导航键盖住`).toBe(false);
+    }
+    // 悬停会核对落点：被别的元素盖住时等不到，用例超时
+    for (const action of actions) await action.hover();
+  }
+});
+
 test('深浅主题下视频浮层有底色、工具栏模糊及按钮位置正确', async ({ page }) => {
   await openVideo(page);
   const controls = page.locator('[data-video-controls]');

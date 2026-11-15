@@ -95,10 +95,10 @@ test('信息分页可恢复；隐藏、换分页与沉浸视图暂停，跨页�
   await flush();
   expect(host.callsTo('metadata.read')).toHaveLength(count);
   expect(store.get(target.track)).toEqual(preview);
-  card.select('queue');
+  card.history.navigate({ id: 'queue' });
   await flush();
   expect(store.get(integration.service.state).metadata.status).toBe('idle');
-  card.select('info');
+  card.history.navigate({ id: 'info' });
   await flush();
   expect(store.get(integration.service.state).metadata.status).toBe('ready');
   documentState.visibilityState = 'hidden';

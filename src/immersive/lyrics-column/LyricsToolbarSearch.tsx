@@ -13,14 +13,14 @@ import { currentTrackAtom } from '../../playback/playback.ts';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './LyricsToolbar.module.css';
-import { usePanelSurface, useToolbarStyles } from './toolbarStyles.ts';
+import { usePanelSurface, useToolsStyles } from './toolsStyles.ts';
 
 /**
- * 歌词搜索展开态输入层及下拉结果面板
+ * 歌词搜索展开态的输入层与下拉结果面板
  *
- * 输入层内嵌于工具条外壳（默认预填曲名与艺人）；结果面板通过 Portal 挂载至外壳外部的专用宿主节点，避免溢出裁剪；
- * 面板包含条件筛选与候选卡片，网络未就绪时呈现连接状态提示；防抖检索与输入法行为对齐搜索服务契约；
- * 候选卡仅提供应用操作；应用后收起面板，退出过渡（leaving 为真）期间仅执行淡出动画
+ * 输入层内嵌于工具栏外壳（默认预填曲名与艺人），结果面板通过 Portal 挂载至外壳之外的独立宿主节点以避免溢出裁剪
+ * 面板集成过滤开关与候选结果卡片，网络未就绪时提示连接状态。防抖检索与输入法合成事件遵从搜索服务契约
+ * 候选卡片仅提供应用操作并于点击后收起面板。退场过渡期间（`leaving` 为真）仅执行淡出动效
  */
 export function LyricsToolbarSearch({
   active,
@@ -34,7 +34,7 @@ export function LyricsToolbarSearch({
   onClose(): void;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const surface = usePanelSurface();
   const locale = useAtomValueRawSync(localeAtom).active;
@@ -51,7 +51,7 @@ export function LyricsToolbarSearch({
   const results = useRef<HTMLDivElement>(null);
   const privacyId = useId();
   const { status, candidates } = query.result;
-  // 输入了词、自动搜索还没发出的这一小会儿也先摆骨架；没有词也没有结果时整块面板不画，免得只剩一条空边
+  // 关键词已输入且防抖等待期间展示骨架屏。无关键词且无结果时不渲染面板以避免呈现空边框
   const searchPending = enabled && status === 'idle' && query.keywords.trim() !== '';
   const showResults = !enabled || status !== 'idle' || candidates.length > 0 || searchPending;
   return (

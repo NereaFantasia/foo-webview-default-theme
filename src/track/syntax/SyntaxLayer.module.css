@@ -1,0 +1,81 @@
+/* 着色层：叠在透明文字的输入框后面，字体、字号、内边距都与输入框一致，横向滚动由输入框带着走 */
+.frame {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacingHorizontalXXS);
+  overflow: hidden;
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  white-space: pre;
+  pointer-events: none;
+}
+.text {
+  flex: none;
+}
+/* 多行：字体与折行规则必须与输入元素一致，内边距由 QueryEditor 的输入元素同值给 */
+.multi {
+  align-items: flex-start;
+  padding: var(--spacingVerticalSNudge) var(--spacingHorizontalMNudge);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.multi .text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.kw {
+  color: var(--colorBrandForeground1);
+  font-weight: var(--fontWeightSemibold);
+}
+.fd {
+  color: var(--colorPaletteMarigoldForeground2);
+}
+.fn {
+  color: var(--colorPalettePurpleForeground2);
+}
+.str {
+  color: var(--colorPaletteGreenForeground2);
+}
+.dim {
+  color: var(--colorNeutralForeground3);
+}
+.bad {
+  text-decoration: underline wavy var(--colorPaletteRedForeground1);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.warn {
+  text-decoration: underline wavy var(--colorPaletteMarigoldForeground2);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+/* 补全浮层的锚点：零宽，落在要替换的那一段的起点 */
+.anchor {
+  display: inline-block;
+  width: 0;
+  height: 1em;
+}
+@media (forced-colors: active) {
+  .layer {
+    color: CanvasText;
+  }
+  .kw,
+  .fd,
+  .fn,
+  .str,
+  .dim {
+    color: inherit;
+  }
+}

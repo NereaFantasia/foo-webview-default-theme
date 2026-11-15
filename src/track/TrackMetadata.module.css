@@ -1,0 +1,26 @@
+/* 艺人与专辑之间画一个「-」：画在前一项后面，不进文字、不被选中复制，两侧各留半个字宽
+   选择器比 `.item` 多一级类型，不靠样式表的先后 */
+.names {
+  column-gap: 0;
+}
+
+.names > span {
+  gap: 0;
+}
+
+.names > span:not(:last-child)::after {
+  flex: none;
+  margin-inline: var(--spacingHorizontalXS);
+  content: '-';
+}
+
+/* 一行放不下时，艺人与专辑按「均分、短的让给长的」分宽：基准宽从 0 起平分余下的空间，各项封顶在自己的字宽，
+   封顶后多出来的给另一项。各项自己用省略号截断，哪一项都不会被另一项挤到 0 */
+.share {
+  flex-wrap: nowrap;
+}
+
+.share > span {
+  flex: 1 1 0;
+  max-width: max-content;
+}

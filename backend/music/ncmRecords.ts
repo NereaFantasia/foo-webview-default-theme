@@ -1,22 +1,30 @@
 import { MUSIC_ARTIST_ALBUMS_LIMIT } from '../../src/server/musicArtistAlbums.ts';
 import {
+  MUSIC_CHART_TOP,
+  type MusicChart,
+  type MusicChartEntry,
+  type MusicChartRegion,
+} from '../../src/server/musicDiscover.ts';
+import {
   MUSIC_LIST_LIMIT,
   type MusicListResult,
   type MusicSearchItems,
   type MusicSearchKind,
   type MusicSearchResult,
 } from '../../src/server/musicProtocol.ts';
-import type {
-  MusicAccess,
-  MusicAlbum,
-  MusicAlbumKind,
-  MusicAlbumSubType,
-  MusicArtist,
-  MusicArtistCredit,
-  MusicPlaylist,
-  MusicQuality,
-  MusicRef,
-  MusicTrack,
+import {
+  MUSIC_ALIAS_LENGTH,
+  MUSIC_ALIAS_LIMIT,
+  type MusicAccess,
+  type MusicAlbum,
+  type MusicAlbumKind,
+  type MusicAlbumSubType,
+  type MusicArtist,
+  type MusicArtistCredit,
+  type MusicPlaylist,
+  type MusicQuality,
+  type MusicRef,
+  type MusicTrack,
 } from '../../src/server/musicObjects.ts';
 import { isRecord } from './lxSource.ts';
 import { MusicError } from './musicError.ts';
@@ -65,22 +73,46 @@ function httpUrl(value: unknown): URL | null {
 }
 
 /** 归一化图片地址协议为 HTTPS，防止跨域或混合内容受阻 */
-function artwork(value: unknown): string | null {
+export function artwork(value: unknown): string | null {
   const url = httpUrl(value);
   if (url && (url.hostname === '126.net' || url.hostname.endsWith('.126.net')))
     url.protocol = 'https:';
   return url?.href ?? null;
 }
 
+/** 正整数（ID、毫秒时刻），否则为 null */
+export function positive(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function count(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/**
+ * 把几个数组字段里的别名与译名并成一份，去掉重复与同名的，只留 `MUSIC_ALIAS_LIMIT` 条以内、长度合规的。
+ * 网易云有的接口把它们写成字符串（如 `"[0]"`），不是数组的整个忽略
+ */
+function aliasesOf(
+  name: string,
+  ...lists: readonly unknown[]
+): { readonly aliases?: readonly string[] } {
+  const found = new Set<string>();
+  for (const list of lists)
+    for (const item of Array.isArray(list) ? list : []) {
+      const text = ncmText(item);
+      if (text && text !== name && text.length <= MUSIC_ALIAS_LENGTH) found.add(text);
+    }
+  const aliases = [...found].slice(0, MUSIC_ALIAS_LIMIT);
+  return aliases.length ? { aliases } : {};
 }
 
 function credits(list: unknown): MusicArtistCredit[] {
   const artists: MusicArtistCredit[] = [];
   for (const artist of Array.isArray(list) ? list.slice(0, 100) : []) {
     const name = isRecord(artist) ? ncmText(artist.name) : null;
-    if (isRecord(artist) && name) artists.push({ ref: ref(artist.id), name });
+    if (isRecord(artist) && name)
+      artists.push({ ref: ref(artist.id), name, ...aliasesOf(name, artist.alias, artist.tns) });
   }
   return artists;
 }
@@ -126,6 +158,7 @@ export function readNcmTrack(song: unknown, privilege?: unknown): MusicTrack | n
     ref: reference,
     title,
     subtitle: first(song.alia) ?? first(song.tns),
+    ...aliasesOf(title, song.alia, song.tns),
     artists: credits(song.ar),
     album: albumTitle ? { ref: ref(album.id), title: albumTitle } : null,
     durationMs:
@@ -182,6 +215,7 @@ export function readNcmArtist(artist: unknown): MusicArtist | null {
     name,
     // 仅采用真实艺人写真，忽略平台默认占位头像
     avatar: artwork(artist.picUrl),
+    ...aliasesOf(name, artist.alias, artist.transNames),
     albumCount: count(artist.albumSize),
     trackCount: count(artist.musicSize),
   };
@@ -206,7 +240,7 @@ export function readNcmPlaylist(list: unknown): MusicPlaylist | null {
 }
 
 /** 列表解析并去重，记录丢弃条数 */
-function readNcmItems<T extends { readonly ref: MusicRef }>(
+export function readNcmItems<T extends { readonly ref: MusicRef }>(
   list: unknown,
   read: (item: unknown) => T | null,
 ) {
@@ -324,6 +358,45 @@ export function readNcmPlaylistDetail(body: Record<string, unknown>) {
     ? { ...readNcmTracks(songs, body.privileges), taken: songs.length }
     : null;
   return { owner, ids, first };
+}
+
+/**
+ * 榜单详情里的前几名；排在中间的一首读不出来时就停在它前面，名次不往前挪
+ * `note` 是榜单目录里的更新说明，详情里没有这一项
+ */
+export function readNcmChart(
+  body: Record<string, unknown>,
+  region: MusicChartRegion | null,
+  note: string | null,
+): MusicChart {
+  const list = isRecord(body.playlist) ? body.playlist : null;
+  const owner = readNcmPlaylist(list);
+  if (!list || !owner || !Array.isArray(list.trackIds)) throw new MusicError('invalid-upstream');
+  const songs = new Map<string, unknown>();
+  for (const song of Array.isArray(list.tracks) ? list.tracks.slice(0, 20) : [])
+    if (isRecord(song) && positive(song.id)) songs.set(String(song.id), song);
+  const privileges = new Map<string, unknown>();
+  for (const item of Array.isArray(body.privileges) ? body.privileges.slice(0, 20) : [])
+    if (isRecord(item) && positive(item.id)) privileges.set(String(item.id), item);
+  const entries: MusicChartEntry[] = [];
+  for (const rank of list.trackIds.slice(0, MUSIC_CHART_TOP)) {
+    const id = isRecord(rank) ? positive(rank.id) : null;
+    const track = id ? readNcmTrack(songs.get(String(id)), privileges.get(String(id))) : null;
+    if (!isRecord(rank) || !track) break;
+    // lr 是上一期的名次，从 0 数；没有这一项就是新上榜
+    const last = typeof rank.lr === 'number' && Number.isSafeInteger(rank.lr) ? rank.lr : -1;
+    entries.push({
+      track,
+      previous: last >= 0 ? last + 1 : null,
+      since: positive(rank.at),
+    });
+  }
+  return {
+    chart: { ...owner, kind: 'chart', updateNote: note ?? owner.updateNote },
+    region,
+    updatedAt: positive(list.updateTime),
+    entries,
+  };
 }
 
 /** 依据请求 ID 顺序还原曲目详情列表，自动过滤未收录条目 */

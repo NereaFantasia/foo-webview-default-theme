@@ -68,8 +68,6 @@ export interface SelectionBarProps {
   readonly labelled: boolean;
   /** 作用于选中这一批的起播、入队与发送 */
   readonly handlers: TrackMenuHandlers;
-  /** 选中的太多、入队接不住时置灰下一首播放与加入队列 */
-  readonly queueLimited?: boolean;
   /** 超出内联读取上限时，播放与发送不可用；其余命令仍可从更多菜单执行 */
   readonly inlineLimited?: boolean;
   /** 播放列表页不把来源列表再列为发送目标 */
@@ -168,22 +166,8 @@ export function SelectionBar(props: SelectionBarProps) {
         'play',
         props.inlineLimited ? limited : undefined,
       )}
-      {!compact &&
-        tool(
-          t('album.playNext'),
-          <Next20Regular />,
-          handlers.next,
-          'play-next',
-          props.queueLimited ? limited : undefined,
-        )}
-      {!compact &&
-        tool(
-          t('album.enqueue'),
-          <Add20Regular />,
-          handlers.enqueue,
-          'enqueue',
-          props.queueLimited ? limited : undefined,
-        )}
+      {!compact && tool(t('album.playNext'), <Next20Regular />, handlers.next, 'play-next')}
+      {!compact && tool(t('album.enqueue'), <Add20Regular />, handlers.enqueue, 'enqueue')}
       {!compact && (
         <Menu surfaceMotion={MENU_SURFACE_MOTION}>
           <MenuTrigger disableButtonEnhancement>

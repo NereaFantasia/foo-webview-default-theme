@@ -6,6 +6,7 @@ import type { Store } from '../kit/store.ts';
 import type { MusicQuality } from '../server/musicObjects.ts';
 import { exclusive, LIBRARY_VIEW_PLAYLIST } from './libraryView.ts';
 import { onlineAddress, readOnlineAddress } from '../server/onlineAddress.ts';
+import { startOnlinePrefetch } from './onlinePrefetch.ts';
 import type { PlaybackService } from './playbackContract.ts';
 
 export interface OnlinePlaybackFace {
@@ -18,12 +19,12 @@ export interface OnlinePlaybackFace {
   >;
 }
 
-/** 等 fb2k 换到新地址、再等它能 seek 的时限，毫秒。后端没在监听时 fb2k 约 10 秒才放弃一项 */
+/** 等 fb2k 切换到新地址、再等它能 seek 的时限，毫秒。后端没在监听时，fb2k 约 10 秒才放弃一项 */
 const ARRIVAL_MS = 15000;
-/** 专用列表正忙时隔多久再试一次改写，毫秒 */
+/** 专用列表正忙时，隔多久再试一次改写，毫秒 */
 const BUSY_RETRY_MS = 1000;
 
-/** 旧端口的在线地址换成 `port` 上的；不是旧端口的在线地址时答 null */
+/** 把旧端口的在线地址换成 `port` 上的。不是旧端口的在线地址时返回 null */
 function refreshed(path: string | undefined, port: number): string | null {
   const address = path === undefined ? null : readOnlineAddress(path);
   return address && address.port !== port
@@ -31,7 +32,7 @@ function refreshed(path: string | undefined, port: number): string | null {
     : null;
 }
 
-/** 从后往前找最后一段连续的旧端口在线条目，交回起点与换成新端口的地址；第 `keep` 条不算 */
+/** 从后往前找最后一段连续的旧端口在线条目，返回起点与换成新端口的地址。第 `keep` 条不算 */
 function lastStaleRun(paths: readonly string[], port: number, keep: number | null = null) {
   const fresh: string[] = [];
   let end = paths.length - 1;
@@ -45,7 +46,7 @@ function lastStaleRun(paths: readonly string[], port: number, keep: number | nul
   return fresh.length ? { start: start + 1, fresh } : null;
 }
 
-/** 正在换音质的那一首（换之前的地址）与要换成的档位；没在换时为 null */
+/** 正在换音质的那一首（换之前的地址）与要换成的档位。没在换时为 null */
 export interface QualitySwitch {
   readonly from: string;
   readonly quality: MusicQuality;
@@ -59,28 +60,30 @@ const range = (start: number, length: number) =>
 
 export interface OnlinePlaybackService {
   /**
-   * 正在播的在线曲目换成 `quality`，从当前位置接着播：在 fb2k 看来是换一条路径，插到队首立即播放，再跳回
-   * 原位置。专用列表里那一行不改，之后点「上一首」仍按原来的档位播。当前不是在线曲目、后端没连上，或 fb2k
-   * 没换过去时答 false。换的途中 `qualitySwitchAtom` 记着这一次
+   * 把正在播放的在线曲目换成 `quality`，从当前位置接着播：在 fb2k 看来是换一条路径，插到队首立即播放，再跳回原位置。
+   * 专用列表里那一行不改，之后点「上一首」仍按原来的档位播放。当前不是在线曲目、后端没连上，或 fb2k 没有换过去时返回 false。
+   * 换的途中 `qualitySwitchAtom` 记录着这一次
    */
   switchQuality(quality: MusicQuality): Promise<boolean>;
   dispose(): void;
 }
 
 /**
- * 后端换了端口时，把队列、专用列表与正在播的在线曲目改到新端口。fb2k 只认路径，`queue.setContents`
- * 不收路径，专用列表也没有替换接口，所以按连续的旧条目分段，从后往前删掉再按原位插回；本地条目不动
- * 改写不是原子的：途中 fb2k 可能换曲、队首出队，每段动手前重读，换过曲就重来。`queue.insertNext` 按曲目
- * 去重，同一首在队列里出现两次时改写后只剩一条；专用列表每段改写都会存一个撤销点
+ * 后端换了端口时，把队列、专用列表与正在播放的在线曲目改到新端口。fb2k 只认路径，`queue.setContents` 不收路径，
+ * 专用列表也没有替换接口，所以按连续的旧条目分段，从后往前删除，再按原位插回，本地条目不动。
+ * 改写不是原子的：途中 fb2k 可能换曲、队首出队，因此每段动手前重新读取，换过曲就重来。
+ * `queue.insertNext` 按曲目去重，同一首在队列里出现两次时，改写后只剩一条。专用列表每段改写都会存一个撤销点
  *
- * 正在播的在线曲目会在 fb2k 的预读缓冲用完后断掉，所以先用新地址从当前位置接着播。只在播放中这么做：
- * 暂停时接着播会把暂停解开；暂停后继续时缓冲之外的部分会读不到，由 fb2k 按失败跳过
+ * 正在播放的在线曲目会在 fb2k 的预读缓冲用完后中断，所以先用新地址从当前位置接着播。只在播放中这样做：
+ * 暂停时接着播会解除暂停。暂停后继续播放时，缓冲之外的部分读不到，由 fb2k 按失败跳过
  *
- * fb2k 的续播游标所在的那一行不改：删掉它，下一首会从列表开头放起（实测如此）。游标由
- * `getCurrentTrackIndex` 读；正在播按路径入队的条目时它答没有位置，但 fb2k 仍记着原来那一行，这时整张列表
- * 先不改。没改完的行等换曲后再读一次游标、接着改；游标移到别处后改它原来那一行不影响续播（实测）
+ * fb2k 的续播游标所在的那一行不改：删掉它，下一首会从列表开头播放（实测如此）。
+ * 游标由 `getCurrentTrackIndex` 读取。正在播放按路径入队的条目时，它返回没有位置，但 fb2k 仍记着原来那一行，这时整张列表先不改。
+ * 没改完的行等换曲后再读一次游标，接着改。游标移到别处后，改它原来那一行不影响续播（实测）
  *
- * 页面载入后第一次拿到端口时也查一遍：fb2k 重启时恢复的队列与列表里可能还是上次的端口
+ * 页面载入后第一次拿到端口时也检查一遍：fb2k 重启时恢复的队列与列表里，可能还是上次的端口
+ *
+ * 在线曲目播放时由 `startOnlinePrefetch` 预取下一首，随本服务启动，一起释放
  */
 export function startOnlinePlayback(
   store: Store,
@@ -89,6 +92,7 @@ export function startOnlinePlayback(
   host: OnlinePlaybackFace = fb,
 ): OnlinePlaybackService {
   store.set(switchingAtom, null);
+  const prefetch = startOnlinePrefetch(store);
   let disposed = false;
   let run = 0;
   let shifted = 0;
@@ -103,8 +107,8 @@ export function startOnlinePlayback(
   ];
 
   /**
-   * 换到 `path` 并跳回 `position` 秒；换过去了就答 true，跳不回去只是从头播。整个过程播放栏的进度停在
-   * `position`，不跟宿主的换曲与归零走
+   * 换到 `path` 并跳回 `position` 秒。换过去了就返回 true，跳不回去只是从头播放。
+   * 整个过程播放栏的进度停在 `position`，不跟随宿主的换曲与归零
    */
   async function replaceCurrent(path: string, position: number, current: () => boolean) {
     const release = playback.holdPosition(position);
@@ -121,7 +125,7 @@ export function startOnlinePlayback(
     }
   }
 
-  /** 插到队首立即播放，等 fb2k 换到 `path`：没换过去答 failed，换过去了但等不到能 seek 答 switched */
+  /** 插到队首立即播放，等 fb2k 换到 `path`。没换过去返回 failed，换过去了但等不到能 seek 返回 switched，能 seek 时返回 seekable */
   async function arrive(
     path: string,
     current: () => boolean,
@@ -157,7 +161,7 @@ export function startOnlinePlayback(
     }
   }
 
-  /** `path` 是正在放的旧端口地址 */
+  /** `path` 是正在播放的旧端口地址 */
   async function resumeCurrent(path: string, target: number, current: () => boolean) {
     const state = await settle(() => host.player.getState());
     if (!current() || state?.success !== true || state.state !== 'playing') return;
@@ -181,7 +185,7 @@ export function startOnlinePlayback(
         target,
       );
       if (!segment) return;
-      // 读完之后换过曲，队首已出队，位置不再可信：重读
+      // 读完之后换过曲，队首已出队，位置不再可信：重新读取
       if (seen !== shifted) continue;
       const removed = await settle(() =>
         host.queue.remove(range(segment.start, segment.fresh.length)),
@@ -192,7 +196,7 @@ export function startOnlinePlayback(
     }
   }
 
-  /** 改完答 true；还有因为游标留着没改的行，或读不到状态时答 false，换曲后再来 */
+  /** 改完返回 true。还有因为游标留着没改的行，或读不到状态时返回 false，换曲后再来 */
   async function rewriteLibraryView(target: number, current: () => boolean): Promise<boolean> {
     const all = await settle(() => host.playlist.getAll());
     if (!current() || all?.success !== true) return false;
@@ -206,7 +210,7 @@ export function startOnlinePlayback(
       if (!where.found) return false;
       if (where.playlistGuid === list.guid) held = where.index;
     }
-    // getTracks 默认只给 100 行：按列表现有的行数要，列表变长了下一轮按新的行数要
+    // getTracks 默认只给 100 行：按列表现有的行数请求，列表变长后下一轮按新的行数请求
     let size = list.trackCount;
     for (let round = 0; round <= size; round += 1) {
       const page = await settle(() =>
@@ -229,7 +233,7 @@ export function startOnlinePlayback(
     return false;
   }
 
-  /** 专用列表上的操作与起播共用一把锁；正忙时稍后再试 */
+  /** 专用列表上的操作与起播共用一把锁。正忙时稍后再试 */
   async function listPass(target: number, current: () => boolean): Promise<void> {
     const result = await exclusive(store, () => rewriteLibraryView(target, current));
     if (!current()) return;
@@ -287,6 +291,7 @@ export function startOnlinePlayback(
     },
     dispose() {
       disposed = true;
+      prefetch.dispose();
       clearTimeout(retry);
       for (const off of offs.splice(0)) off();
     },

@@ -1,13 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 import { albumsAnswer } from '../fixtures/albumLibrary.ts';
 import { albumRow } from '../fixtures/libraryRows.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { lastfmCalls } from '../fixtures/musicbrainzSamples.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 async function start(page: Page, count = 2) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const player = await openPlayer(page, {
+    config: LASTFM_SOURCE_CONFIG,
     state: { track: makeTrack({ artist: 'Queen', artists: ['Queen'], title: 'One' }) },
   });
   const pictures = await page.evaluate(() =>
@@ -52,8 +55,7 @@ async function start(page: Page, count = 2) {
     dataUrl: picture(params['path']),
   }));
   await page.reload();
-  await page.locator('[data-right-card-key="queue"]').click();
-  await page.getByRole('tab', { name: '简介', exact: true }).click();
+  await openRightCardPage(page, 'bio');
   await expect(page.getByRole('button', { name: '打开艺人照片' })).toBeVisible();
   await expect(page.getByRole('progressbar', { name: '正在读取本地照片' })).toHaveCount(0);
   return player;
@@ -95,8 +97,8 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await trigger.click();
     await page.keyboard.press('Alt+ArrowLeft');
     await expect(viewer).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: '简介', exact: true })).toHaveAttribute(
-      'aria-selected',
+    await expect(page.locator('[data-right-card-key="bio"]')).toHaveAttribute(
+      'aria-pressed',
       'true',
     );
     expect(errors).toEqual([]);
@@ -106,8 +108,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
 test('窄窗照片完整显示，缩略条隐藏，焦点不落到遮挡内容', async ({ page }) => {
   await start(page);
   await page.setViewportSize({ width: 390, height: 740 });
-  await page.locator('[data-right-card-key="queue"]').click();
-  await page.getByRole('tab', { name: '简介', exact: true }).click();
+  await openRightCardPage(page, 'bio');
   await page.getByRole('button', { name: '打开艺人照片' }).click();
   const viewer = page.getByRole('dialog', { name: 'Queen' });
   await expect(viewer).toBeVisible();

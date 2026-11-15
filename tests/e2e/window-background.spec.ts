@@ -72,7 +72,7 @@ for (const platformVersion of ['13.0.0', null]) {
               },
       });
     }, platformVersion);
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     await expectBackground(page, platformVersion ? 'Acrylic' : '主题色背景');
     await expect(page.locator('[data-window-background="solid"]')).toHaveCount(
       platformVersion ? 0 : 1,
@@ -102,7 +102,7 @@ for (const scheme of ['light', 'dark'] as const) {
         },
       });
     });
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     await expect(settings.card('窗口背景')).toContainText('Windows 10 使用主题色背景');
     await expectBackground(page, '主题色背景');
     await expect(
@@ -156,7 +156,7 @@ for (const scheme of ['light', 'dark'] as const) {
 
   test(`整窗背景、深浅参数与窄窗：${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     await settings.choose('窗口背景', '正在播放的封面');
     // 子行从无到有，卡随即展开。
     await expect(settings.expander('窗口背景').locator('[data-settings-toggle]')).toHaveAttribute(
@@ -216,7 +216,7 @@ test('宿主未激活但网页仍有焦点时淡化背景，重新激活恢复',
       JSON.stringify({ source: 'cover', dark: { inactive: 100 } }),
     );
   });
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const inactive = page.locator('[data-background-inactive]');
   await expect(inactive).toHaveCSS('opacity', '0');
   await focusWindow(settings.host, false);
@@ -235,7 +235,7 @@ test('整窗失焦淡化连续过渡，快速恢复不跳变，减弱动效直�
       JSON.stringify({ source: 'cover', dark: { inactive: 100 } }),
     );
   });
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const inactive = page.locator('[data-background-inactive]');
   await focusWindow(settings.host, true);
   await expect(inactive).toHaveCSS('opacity', '0');
@@ -368,7 +368,7 @@ test('流动色场深色压暗高亮，浅色直接呈现明亮底并保护次�
     };
   });
   const player = await openPlayer(page);
-  await enterSettings(page);
+  await enterSettings(page, '外观');
   const sample = () =>
     page.evaluate(() => {
       const value: unknown = Reflect.get(window, '__flowSample');
@@ -477,7 +477,7 @@ test('固定流动色场忽略旧背景参数，深浅同源，反复隐藏释�
     Reflect.set(window, '__flowTextures', () => textures.size);
   });
   const player = await openPlayer(page);
-  await enterSettings(page);
+  await enterSettings(page, '外观');
   const field = page.locator('[data-palette-field]');
   await expect(field).toHaveAttribute('data-flow-backend', 'webgl2');
   const resources = () =>
@@ -544,7 +544,7 @@ for (const scheme of ['light', 'dark'] as const) {
     const track = makeTrack({ path: 'file://E:/Music/Background/surface.flac' });
     player.state.track = track;
     await player.host.emit('playback:trackChanged', track);
-    await enterSettings(page);
+    await enterSettings(page, '外观');
     const background = page.locator('[data-window-background]');
     await expect(background.locator('[data-background-image]')).toHaveAttribute('src', url);
     const pane = page.locator('main [data-reading-fill]').first();
@@ -696,7 +696,7 @@ for (const scheme of ['light', 'dark'] as const) {
 }
 
 test('图片经 SDK 原子保存，刷新恢复；读取失败保留来源与不透明底', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const url = await imageData(page, '#3466b8');
   const content = url.split(',')[1] ?? '';
   settings.host.answer('dialog.openFile', {

@@ -29,6 +29,7 @@ function setup(key = KEY, page?: LastfmDetailsFetchResult) {
         ok: true,
         store: true,
         details: {
+          source: 'lastfm',
           artist: 'Nujabes',
           language: 'zh',
           url: 'https://www.last.fm/zh/music/Nujabes',

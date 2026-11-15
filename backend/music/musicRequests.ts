@@ -1,6 +1,20 @@
 // 页面发来的音乐请求体：逐项校验，多出的键、类型不符或越界都答请求无效
 
+import {
+  FAVORITE_BATCH_LIMIT,
+  canFavorite,
+  favoriteKind,
+  readFavoriteItem,
+  type FavoriteListRequest,
+  type FavoriteRemoveRequest,
+  type FavoriteWriteRequest,
+} from '../../src/server/musicFavorites.ts';
 import type { MusicArtistAlbumsRequest } from '../../src/server/musicArtistAlbums.ts';
+import {
+  MUSIC_DISCOVER_AREAS,
+  MUSIC_DISCOVER_KINDS,
+  type MusicDiscoverRequest,
+} from '../../src/server/musicDiscover.ts';
 import {
   isMusicCursor,
   MUSIC_LIST_KINDS,
@@ -123,6 +137,20 @@ export function artistAlbumsRequest(value: unknown): MusicArtistAlbumsRequest {
   return { ref: refRequest(value.ref), cursor: value.cursor };
 }
 
+export function discoverRequest(value: unknown): MusicDiscoverRequest {
+  const kind = isRecord(value)
+    ? MUSIC_DISCOVER_KINDS.find((item) => item === value.kind)
+    : undefined;
+  if (!isRecord(value) || !kind) throw new MusicError('invalid-request');
+  if (kind === 'new-tracks' || kind === 'new-albums') {
+    const area = MUSIC_DISCOVER_AREAS.find((item) => item === value.area);
+    if (!area || Object.keys(value).length !== 2) throw new MusicError('invalid-request');
+    return { kind, area };
+  }
+  if (Object.keys(value).length !== 1) throw new MusicError('invalid-request');
+  return { kind };
+}
+
 function sourceId(value: unknown): string {
   if (typeof value !== 'string' || !value || value.length > 256)
     throw new MusicError('invalid-request');
@@ -191,4 +219,53 @@ export function lxSourceOrderRequest(value: unknown): string[] {
   const checked = ids.map(sourceId);
   if (new Set(checked).size !== checked.length) throw new MusicError('invalid-request');
   return checked;
+}
+
+export function favoriteListRequest(value: unknown): FavoriteListRequest {
+  const kind = isRecord(value) ? favoriteKind(value.kind) : null;
+  if (
+    !isRecord(value) ||
+    !kind ||
+    !(value.cursor === null || isMusicCursor(value.cursor)) ||
+    Object.keys(value).some((key) => !['kind', 'cursor'].includes(key))
+  )
+    throw new MusicError('invalid-request');
+  return { kind, cursor: value.cursor };
+}
+
+/** 加入与刷新：一类的一批对象，格式不对、重复或超过一批的上限都算请求无效；首期只收网易云的 */
+export function favoriteWriteRequest(value: unknown): FavoriteWriteRequest {
+  const kind = isRecord(value) ? favoriteKind(value.kind) : null;
+  if (
+    !isRecord(value) ||
+    !kind ||
+    !Array.isArray(value.items) ||
+    !value.items.length ||
+    value.items.length > FAVORITE_BATCH_LIMIT ||
+    Object.keys(value).some((key) => !['kind', 'items'].includes(key))
+  )
+    throw new MusicError('invalid-request');
+  const seen = new Set<string>();
+  const items = value.items.map((raw) => {
+    const item = readFavoriteItem(kind, raw);
+    if (!item || seen.has(item.ref.id)) throw new MusicError('invalid-request');
+    seen.add(item.ref.id);
+    return item;
+  });
+  if (items.some((item) => !canFavorite(item.ref))) throw new MusicError('unsupported');
+  return { kind, items };
+}
+
+export function favoriteRemoveRequest(value: unknown): FavoriteRemoveRequest {
+  const kind = isRecord(value) ? favoriteKind(value.kind) : null;
+  if (
+    !isRecord(value) ||
+    !kind ||
+    !Array.isArray(value.refs) ||
+    !value.refs.length ||
+    value.refs.length > FAVORITE_BATCH_LIMIT ||
+    Object.keys(value).some((key) => !['kind', 'refs'].includes(key))
+  )
+    throw new MusicError('invalid-request');
+  return { kind, refs: value.refs.map(refRequest) };
 }

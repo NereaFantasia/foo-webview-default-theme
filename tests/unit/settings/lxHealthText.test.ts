@@ -42,7 +42,7 @@ describe('音源检测结果的文字', () => {
     expect(label(health({ status: 'failed', reason: 'script' }))).toBe('酷我：没有给出播放地址');
     expect(label(FAILED)).toBe('酷我：地址打不开');
     expect(label(health({ status: 'failed', reason: 'timeout' }))).toBe('酷我：没有回应');
-    expect(label(health({ status: 'unknown', reason: 'no-sample' }))).toBe('酷我：没能检测');
+    expect(label(health({ status: 'unknown', reason: 'no-sample' }))).toBe('酷我：无法检测');
     expect(label(FAILED, true)).toBe('酷我：检测中');
   });
 

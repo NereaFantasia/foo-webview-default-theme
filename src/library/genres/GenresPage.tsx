@@ -79,8 +79,16 @@ export function GenresPage({ place }: PageProps) {
   const previousSubject = useRef(selected);
   const entry = genreEntryOf(catalog.entries, selected);
   const entries = useMemo(
-    () => filterGenres(catalog.entries, text, tidy, prefs.sort, prefs.descending, locale.active),
-    [catalog.entries, text, tidy, prefs.sort, prefs.descending, locale.active],
+    () =>
+      filterGenres(
+        catalog.entries,
+        text,
+        tidy ? catalog.issues : undefined,
+        prefs.sort,
+        prefs.descending,
+        locale.active,
+      ),
+    [catalog.entries, catalog.issues, text, tidy, prefs.sort, prefs.descending, locale.active],
   );
   useEffect(() => {
     genres.catalog.want();
@@ -146,6 +154,7 @@ export function GenresPage({ place }: PageProps) {
   const navigator = (
     <GenresList
       entries={entries}
+      issues={catalog.issues}
       selected={selected}
       focus={listFocus}
       onFocus={setListFocus}

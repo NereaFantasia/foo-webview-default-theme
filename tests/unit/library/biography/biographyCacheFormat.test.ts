@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   biographyFreshness,
   biographyRetryAt,
+  readAppleCacheEntry,
   readBiographyCacheEntry,
 } from '../../../../src/library/biography/biographyCacheFormat.ts';
 import { BIOGRAPHY_DEFAULT_TTL } from '../../../../src/library/biography/biographyModel.ts';
@@ -9,6 +10,8 @@ import { biographyDocument } from '../../../fixtures/biographySamples.ts';
 
 const NOW = 1_800_000_000_000;
 const ENTRY = {
+  source: 'lastfm',
+  sourceId: 'Queen',
   artist: 'Queen',
   language: 'zh',
   fetchedAt: NOW - 1000,
@@ -16,7 +19,140 @@ const ENTRY = {
   document: biographyDocument(),
 };
 
+const APPLE_URL = 'https://music.apple.com/cn/artist/queen/3296287';
+const THUMB = 'https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/92/mza_1.png';
+const HLS = 'https://mvod.itunes.apple.com/itunes-assets/HLSMusic221/v4/cd/P1_default.m3u8';
+const APPLE_ENTRY = {
+  source: 'apple',
+  sourceId: '3296287',
+  artist: 'Queen',
+  language: 'en',
+  fetchedAt: NOW - 1000,
+  expiresAt: NOW + 1000,
+  document: {
+    source: 'apple',
+    sourceId: '3296287',
+    artist: 'Queen',
+    language: 'en',
+    textLanguage: 'en',
+    paragraphs: ['Rock was merely a jumping-off point.'],
+    url: APPLE_URL,
+    attribution: { name: 'Apple Music', url: APPLE_URL },
+    photo: { source: 'apple', url: THUMB, pageUrl: APPLE_URL },
+    logo: { url: THUMB, width: 2930, height: 958 },
+    motion: { square: { video: HLS, poster: THUMB } },
+  },
+  details: {
+    source: 'apple',
+    artist: 'Queen',
+    language: 'en',
+    url: APPLE_URL,
+    fetchedAt: NOW - 1000,
+    expiresAt: NOW + 1000,
+    tags: ['Rock'],
+    counters: [],
+    similar: [],
+  },
+};
+
+describe('Apple 来源的缓存项', () => {
+  it('读回原样，署名按来源重建，不信文件里写的', () => {
+    expect(readAppleCacheEntry(APPLE_ENTRY, NOW)).toEqual(APPLE_ENTRY);
+    const forged = {
+      ...APPLE_ENTRY,
+      document: {
+        ...APPLE_ENTRY.document,
+        attribution: { name: 'Evil', url: 'https://evil.test/', license: { name: 'x', url: 'y' } },
+      },
+    };
+    expect(readAppleCacheEntry(forged, NOW)?.document?.attribution).toEqual({
+      name: 'Apple Music',
+      url: APPLE_URL,
+    });
+  });
+
+  it('早先缓存下来的简介带 <i> 标记时读回去掉标记，整段只剩标记的丢掉', () => {
+    const read = readAppleCacheEntry(
+      {
+        ...APPLE_ENTRY,
+        document: {
+          ...APPLE_ENTRY.document,
+          paragraphs: ['The album <i>Jazz</i> followed.', '<i></i>'],
+        },
+      },
+      NOW,
+    );
+    expect(read?.document?.paragraphs).toEqual(['The album Jazz followed.']);
+  });
+
+  it('艺人 ID、页面地址、来源标记对不上的整项丢掉', () => {
+    const insecure = APPLE_URL.replace('https', 'http');
+    for (const value of [
+      { ...APPLE_ENTRY, sourceId: 'abc' },
+      { ...APPLE_ENTRY, sourceId: undefined },
+      { ...APPLE_ENTRY, sourceId: '999' },
+      { ...APPLE_ENTRY, source: 'lastfm' },
+      { ...APPLE_ENTRY, artist: ' Queen ' },
+      { ...APPLE_ENTRY, document: { ...APPLE_ENTRY.document, url: insecure } },
+      { ...APPLE_ENTRY, document: { ...APPLE_ENTRY.document, artist: 'Other' } },
+      { ...APPLE_ENTRY, document: { ...APPLE_ENTRY.document, paragraphs: [] } },
+    ])
+      expect(readAppleCacheEntry(value, NOW)).toBeNull();
+  });
+
+  it('图片和视频只认 Apple 的域名，不合格的只丢那一项，简介照读', () => {
+    const read = readAppleCacheEntry(
+      {
+        ...APPLE_ENTRY,
+        document: {
+          ...APPLE_ENTRY.document,
+          photo: { source: 'apple', url: 'https://evil.test/a.png', pageUrl: APPLE_URL },
+          logo: { url: 'https://evil.test/a.png', width: 1, height: 1 },
+          motion: { square: { video: 'https://evil.test/a.m3u8', poster: THUMB } },
+        },
+      },
+      NOW,
+    )?.document;
+    expect(read?.paragraphs).toEqual(APPLE_ENTRY.document.paragraphs);
+    expect(read?.photo).toBeNull();
+    expect(read?.logo).toBeUndefined();
+    expect(read?.motion).toBeUndefined();
+  });
+
+  it('Apple 的附加资料没有听众数与相似艺人，读回时一律为空', () => {
+    const details = readAppleCacheEntry(
+      {
+        ...APPLE_ENTRY,
+        details: {
+          ...APPLE_ENTRY.details,
+          counters: [{ label: 'x', value: 1 }],
+          similar: [{ artist: 'Other', url: APPLE_URL }],
+        },
+      },
+      NOW,
+    )?.details;
+    expect(details).toMatchObject({ source: 'apple', tags: ['Rock'], counters: [], similar: [] });
+  });
+
+  it('两个来源的读回函数互不收对方的项', () => {
+    expect(readBiographyCacheEntry(APPLE_ENTRY, NOW)).toBeNull();
+    expect(readAppleCacheEntry(ENTRY, NOW)).toBeNull();
+  });
+});
+
 describe('简介缓存格式', () => {
+  it('没有来源、身份与署名的旧项照读，署名由许可和地址推导', () => {
+    const without = (value: object, ...keys: string[]) =>
+      Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
+    const legacy = {
+      ...without(ENTRY, 'source', 'sourceId'),
+      document: without(ENTRY.document, 'source', 'sourceId', 'attribution'),
+    };
+    const read = readBiographyCacheEntry(legacy, NOW);
+    expect(read).toEqual(ENTRY);
+    expect(read?.document?.attribution.license?.name).toBe('CC BY-SA 3.0');
+  });
+
   it('危险链接、错位身份和时间字段不会成为可信缓存', () => {
     expect(readBiographyCacheEntry(ENTRY, NOW)).toEqual(ENTRY);
     for (const value of [

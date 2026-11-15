@@ -41,7 +41,7 @@ function memory(initial?: unknown): PrefStorage & { saved: Map<string, string> }
   };
 }
 
-/** 专辑艺术家到路径的扩展列，按缺省列序。 */
+/** 专辑艺人到路径的扩展列，按缺省列序 */
 const LATER: readonly ColumnId[] = [
   'albumArtist',
   'year',
@@ -56,15 +56,29 @@ const LATER: readonly ColumnId[] = [
   'fileSize',
   'path',
 ];
-/** 八项那一版之后加的列，按 `COLUMNS` 的下标；读回时按这个次序记成藏着。 */
+/** 二十一项那一版之后加的十列，按缺省列序（也是 `COLUMNS` 的下标次序） */
+const NEWEST: readonly ColumnId[] = [
+  'disc',
+  'fileName',
+  'folder',
+  'composer',
+  'performer',
+  'comment',
+  'bitDepth',
+  'tagType',
+  'lastModified',
+  'firstPlayed',
+];
+/** 八项那一版之后加的列，按 `COLUMNS` 的下标；读回时按这个次序记成藏着 */
 const ADDED: readonly ColumnId[] = [
   ...LATER.filter((id) => !['sampleRate', 'channels', 'fileSize'].includes(id)),
   'art',
   'sampleRate',
   'channels',
   'fileSize',
+  ...NEWEST,
 ];
-/** 八项那一版的列宽与列序。 */
+/** 八项那一版的列宽与列序 */
 const WIDTHS_8 = [100, 24, 40, 300, 200, 88, 60, 150];
 const ORDER_8: ColumnId[] = [
   'cover',
@@ -76,14 +90,40 @@ const ORDER_8: ColumnId[] = [
   'rating',
   'duration',
 ];
-/** 全部列的一份合法存档；缩略图列插在缺省列序里它前面的序号列后面。 */
-const WIDTHS = [...WIDTHS_8, 160, 52, 96, 96, 60, 96, 64, 72, 320, 48, 96, 56, 96];
+/** 全部列的一份合法存档；缩略图列插在缺省列序里它前面的序号列后面 */
+const WIDTHS = [
+  ...WIDTHS_8,
+  160,
+  52,
+  96,
+  96,
+  60,
+  96,
+  64,
+  72,
+  320,
+  48,
+  96,
+  56,
+  96,
+  52,
+  240,
+  160,
+  160,
+  160,
+  240,
+  64,
+  96,
+  96,
+  96,
+];
 const ORDER: ColumnId[] = [
   'cover',
   'number',
   'art',
   ...ORDER_8.slice(2, 6),
   ...LATER,
+  ...NEWEST,
   'rating',
   'duration',
 ];
@@ -133,7 +173,30 @@ describe('读回存档', () => {
   });
 
   it('定宽列一律取缺省宽度；存像素的列夹到最窄宽度，封面可以为零', () => {
-    const widths = [0, 90, 5, 0.5, 0, 10, 12, 1, 0.25, 3, 3, 3, 3, 3, 3, 3, 0, 7, 3, 3, 3];
+    const widths = [
+      0,
+      90,
+      5,
+      0.5,
+      0,
+      10,
+      12,
+      1,
+      0.25,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      0,
+      7,
+      3,
+      3,
+      3,
+      ...NEWEST.map(() => 3),
+    ];
     const storage = memory({ widths, hidden: [], order: ORDER });
     expect(loadColumns(storage, KEY, FALLBACK).widths).toEqual(
       COLUMNS.map((column, at) => {
@@ -198,6 +261,7 @@ describe('读回存档', () => {
         'artist',
         'album',
         ...LATER,
+        ...NEWEST,
         'status',
         'rating',
         'duration',
@@ -237,7 +301,7 @@ describe('写存档', () => {
 });
 
 it('十八列存档保留原列序、宽度和显隐，新增音频字段默认收起', () => {
-  const added: ColumnId[] = ['sampleRate', 'channels', 'fileSize'];
+  const added: ColumnId[] = ['sampleRate', 'channels', 'fileSize', ...NEWEST];
   const oldOrder = ORDER.filter((id) => !added.includes(id));
   const oldWidths = WIDTHS.slice(0, 18);
   const loaded = loadColumns(
@@ -261,7 +325,14 @@ it('页面新增可选列先收起，保存后尊重用户已经打开的列', (
     FALLBACK,
     introduced,
   );
-  expect(old.hidden).toEqual(['albumArtist', 'genre', 'sampleRate', 'channels', 'fileSize']);
+  expect(old.hidden).toEqual([
+    'albumArtist',
+    'genre',
+    'sampleRate',
+    'channels',
+    'fileSize',
+    ...NEWEST,
+  ]);
   const current = loadColumns(
     memory({ widths: WIDTHS, hidden: [], order: ORDER }),
     KEY,

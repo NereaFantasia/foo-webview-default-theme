@@ -1,0 +1,22 @@
+.search {
+  margin-top: var(--spacingVerticalS);
+}
+.choices {
+  height: 280px;
+  overflow: auto;
+}
+.row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacingHorizontalS);
+  padding: var(--spacingVerticalS) 0;
+  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
+}
+.name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

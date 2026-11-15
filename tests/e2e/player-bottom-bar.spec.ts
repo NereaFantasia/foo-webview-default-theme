@@ -4,7 +4,7 @@ import { positionOf } from '../../src/playback/volumeScale.ts';
 import { boxOf, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 
 // 底部通栏（播放栏的缺省形态）：标题栏只剩 ⋯ 与三键；通栏横在窗口最下面，上一行时间与进度线，下一行
-// 封面与曲名、居中的控制组、右边的几个键；按宽度收键；停止时整条收掉。观感只能实机看。
+// 封面与曲名、居中的控制组、右边的几个键；按宽度收键；停止时整条收掉。观感只能实机看
 
 const bar = (page: Page) => page.locator('[data-player-bar]');
 const barKey = (page: Page, name: string) => bar(page).locator(`[data-player-key="${name}"]`);
@@ -28,7 +28,7 @@ test('缺省是底部通栏：标题栏 48 高、没有播放的件，通栏 88 
     width: 1280,
     height: 88,
   });
-  // 侧边栏与内容区都止于通栏的上沿。
+  // 侧边栏与内容区都止于通栏的上沿
   const main = await boxOf(page, 'main');
   expect(main.y + main.height).toBe(800 - 88);
   const aside = await boxOf(page, 'aside');
@@ -68,7 +68,7 @@ test('控制组在窗口正中，播放键 40 见方；封面 48、曲名与艺�
   expect(errors).toEqual([]);
 });
 
-test('键调到对应的命令，播放键的名字跟着宿主报的状态', async ({ page }) => {
+test('键调到对应的命令，播放键的名字跟着宿主报的状态 @smoke', async ({ page }) => {
   const { host, state, calls, errors } = await openPlayer(page);
   await expect(barKey(page, 'play')).toHaveAccessibleName('暂停');
   await barKey(page, 'previous').click();
@@ -91,7 +91,7 @@ test('键调到对应的命令，播放键的名字跟着宿主报的状态', as
   expect(errors).toEqual([]);
 });
 
-test('进度线两头写播到的时间与总长；点哪跳哪，时间先写点到的位置，再跟着宿主报的进度', async ({
+test('进度线两头写播到的时间与总长；点哪跳哪，时间先写点到的位置，再跟着宿主报的进度 @smoke', async ({
   page,
 }) => {
   const { host, calls, errors } = await openPlayer(page);
@@ -186,7 +186,7 @@ test('音量的提示写数值：宽窗悬停音量条出当前值，滚轮时�
   await expect.poll(() => calls('playback.setVolume').length).toBe(1);
   await expect(tooltip).toHaveText(String(now + 1));
 
-  // 宿主的音量没动，隔过「连着滚」的记忆再到窄窗的音量键上：先写宿主报的值，往下滚一格写调到的值。
+  // 宿主的音量没动，隔过「连着滚」的记忆再到窄窗的音量键上：先写宿主报的值，往下滚一格写调到的值
   await page.waitForTimeout(VOLUME_MEMORY_MS + 100);
   await page.setViewportSize({ width: 900, height: 800 });
   await barKey(page, 'volume').hover();
@@ -205,7 +205,7 @@ test('曲名与艺人放得下时不渐隐，只有真截断了才在右缘渐�
       .filter({ hasText: text })
       .first()
       .evaluate((element) => getComputedStyle(element).maskImage);
-  // 通栏左边一列有 500 多宽，这两行都放得下：字盒与字一样宽，末尾不该被淡掉。
+  // 通栏左边一列有 500 多宽，这两行都放得下：字盒与字一样宽，末尾不该被淡掉
   expect(await maskOf(PLAYING_TRACK.title)).toBe('none');
   expect(await maskOf(PLAYING_TRACK.artist)).toBe('none');
 
@@ -256,7 +256,7 @@ test('跨档时焦点跟到功能相同的件上：音量滑条与音量键互�
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(barKey(page, 'volume-slider')).toBeFocused();
 
-  // 沉浸键收掉时，进沉浸视图的还有封面。
+  // 沉浸键收掉时，进沉浸视图的还有封面
   await barKey(page, 'immersive').focus();
   await page.setViewportSize({ width: 900, height: 800 });
   await expect(barKey(page, 'cover')).toBeFocused();

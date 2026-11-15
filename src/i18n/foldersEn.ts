@@ -55,8 +55,6 @@ export const foldersEn = {
   'folders.noTracks': 'This folder has no tracks',
   'folders.pick': 'Select a folder',
   'folders.play': 'Play',
-  'folders.next': 'Play next',
-  'folders.queue': 'Add to queue',
   'folders.send': 'Send to playlist',
   'folders.newPlaylist': 'New playlist',
   'folders.autoplaylist': 'Create autoplaylist',
@@ -82,7 +80,6 @@ export const foldersEn = {
   'folders.previewFailed': 'Could not load this folder’s tracks.',
   'folders.limited':
     'This selection exceeds 10,000 tracks. Select a smaller folder to preview or play.',
-  'folders.queueLimit': 'Select up to 256 tracks for one queue operation.',
   'folders.nativeLimit':
     'Track properties and additional commands support up to 500 tracks at a time.',
   'folders.disabled': 'The media library is disabled. Enable it in foobar2000 preferences.',

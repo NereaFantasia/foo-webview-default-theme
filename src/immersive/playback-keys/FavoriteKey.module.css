@@ -1,0 +1,9 @@
+/* 与更多键同一个外壳：键紧挨着，不留空 */
+.group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.on {
+  color: var(--colorPaletteRedForeground1);
+}

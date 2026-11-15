@@ -8,7 +8,7 @@ import {
   startAlbumList,
 } from '../../../../src/library/album-list/albumList.ts';
 import { startBrowserPrefs } from '../../../../src/library/albums/browserPrefs.ts';
-import { libraryTracksAtom, TRACK_LIMIT } from '../../../../src/library/libraryTracks.ts';
+import { libraryTracksAtom } from '../../../../src/library/libraryTracks.ts';
 import { playStatsAtom } from '../../../../src/library/playStats.ts';
 import { albumsAnswer } from '../../../fixtures/albumLibrary.ts';
 import type { HostParams } from '../../../fixtures/fakeHost.ts';
@@ -17,6 +17,7 @@ import { trackPathOf } from '../../../../src/host/libraryContract.ts';
 import { PLAY_LIMIT } from '../../../../src/playback/libraryView.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
+import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
 
 const ALBUMS = [
   albumRow('Blue Train', 'John Coltrane', { genre: 'Jazz', trackCount: 1 }),
@@ -43,14 +44,7 @@ function evalAnswer(params: HostParams) {
 async function setup(tracks = TRACKS) {
   const host = installFakeHost({ config: { 'defaultTheme.browser.dimension': 'genre' } });
   host.answer('library.getAlbums', albumsAnswer(ALBUMS));
-  host.answer('library.getAll', {
-    success: true,
-    tracks,
-    items: tracks,
-    total: tracks.length,
-    offset: 0,
-    limit: TRACK_LIMIT,
-  });
+  host.answer('library.search', wholeLibrary(tracks));
   host.answer('titleformat.evalBatch', evalAnswer);
   host.answer('config.getComponents', {
     success: true,
@@ -98,7 +92,7 @@ describe('行序号', () => {
       trackNumber: 2,
     };
     const { host, list, played } = await setup([first, second]);
-    const held = host.hold('library.getAll');
+    const held = host.hold('library.search');
     list.prefs.sortTracks('title');
     list.prefs.sortTracks('title');
     const playing = list.playAll('list', false);
@@ -240,14 +234,7 @@ describe('播放全部', () => {
         trackNumber: index + 1,
       }),
     );
-    host.answer('library.getAll', {
-      success: true,
-      tracks,
-      items: tracks,
-      total: tracks.length,
-      offset: 0,
-      limit: TRACK_LIMIT,
-    });
+    host.answer('library.search', wholeLibrary(tracks));
     await list.playAll('wall', false);
     expect(played.at(-1)).toEqual(tracks.slice(0, PLAY_LIMIT).map(trackPathOf));
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.999999);
@@ -279,7 +266,7 @@ describe('播放全部', () => {
 
   it('整库曲目读不到时不播', async () => {
     const { host, list, played } = await setup();
-    host.answer('library.getAll', hostFailure('OPERATION_FAILED'));
+    host.answer('library.search', hostFailure('OPERATION_FAILED'));
     await expect(list.playAll('wall', false)).resolves.toBe(false);
     expect(played.at(-1)).toBeNull();
   });

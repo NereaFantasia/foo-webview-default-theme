@@ -3,6 +3,7 @@ import type { Atom } from 'jotai/vanilla';
 import type { Store } from '../kit/store.ts';
 import { startPlaylistCovers, type PlaylistCoversService } from './groups/playlistCovers.ts';
 import { startPlaylistDuration, type PlaylistDurationService } from './playlistDuration.ts';
+import { startPlaylistFacets, type PlaylistFacetsService } from './filter/playlistFacets.ts';
 import { startPlaylistFilter, type PlaylistFilterService } from './filter/playlistFilter.ts';
 import { startPlaylistGroups, type PlaylistGroupsService } from './groups/playlistGroups.ts';
 import { startPlaylistLocate, type PlaylistLocateService } from './playlistLocate.ts';
@@ -20,6 +21,8 @@ export interface PlaylistPageServices {
   readonly groups: PlaylistGroupsService;
   readonly covers: PlaylistCoversService;
   readonly filter: PlaylistFilterService;
+  /** 筛选面板里分面的取值 */
+  readonly facets: PlaylistFacetsService;
   readonly locate: PlaylistLocateService;
   readonly tracks: PlaylistTrackActions;
   readonly menu: PlaylistTrackMenuService;
@@ -55,6 +58,7 @@ export function startPlaylistPageServices(
     undefined,
     deps.configWriter,
   );
+  const facets = startPlaylistFacets(store, { rows });
   const locate = startPlaylistLocate(store, {
     places: deps.places,
     rows,
@@ -68,6 +72,7 @@ export function startPlaylistPageServices(
     groups,
     covers,
     filter,
+    facets,
     locate,
     tracks,
     menu,
@@ -76,6 +81,7 @@ export function startPlaylistPageServices(
       menu.dispose();
       duration.dispose();
       locate.dispose();
+      facets.dispose();
       filter.dispose();
       covers.dispose();
       groups.dispose();

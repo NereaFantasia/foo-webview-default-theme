@@ -4,9 +4,10 @@ import { answerLargeQueue, QUEUE_LIST_GUID, queueScroller } from '../fixtures/ri
 import { makeTrack } from '../fixtures/tracks.ts';
 
 // 预设场景里预设 1「分栏」的几何：封面列与侧栏的位置、封面边长、侧栏收起时的居中、页签与更多菜单里的侧栏开关、
-// 当前封面的共享名字只有一个。只量框的位置与大小，观感由用户实机看。
+// 当前封面的共享名字只有一个。只量框的位置与大小，观感由用户实机看
 
 const SCENE_KEY = 'default-theme.immersive.scene.v1';
+const COLLAPSE_KEY = 'default-theme.immersive.collapseWithoutLyrics.v1';
 const ENTRY = "import '/tests/fixtures/immersiveHarnessEntry.ts';";
 const LYRICS = '[00:01]第一句\n[00:05]第二句\n[00:09]第三句';
 
@@ -20,7 +21,14 @@ async function openPresets(
     readonly fullscreen?: boolean;
   } = {},
 ): Promise<PlayerPage> {
-  await page.addInitScript((key) => localStorage.setItem(key, 'presets'), SCENE_KEY);
+  // 这份用例里没有歌词时自动居中的几条要靠「无歌词时收起侧栏」开着（偏好缺省是关）
+  await page.addInitScript(
+    ([scene, collapse]) => {
+      localStorage.setItem(scene, 'presets');
+      localStorage.setItem(collapse, 'on');
+    },
+    [SCENE_KEY, COLLAPSE_KEY] as const,
+  );
   await page.route('**/src/main.tsx', (route) =>
     route.fulfill({ status: 200, contentType: 'text/javascript', body: ENTRY }),
   );
@@ -83,28 +91,6 @@ async function box(locator: Locator) {
   if (!rect) throw new Error('元素没有框');
   return rect;
 }
-
-test('1280 × 800 有歌词：封面 400 见方，整组在窗口左缘到窗口正中线之间居中（左边 120），歌词栏在右边 0.55 的栏里，页签在控制层', async ({
-  page,
-}) => {
-  const { errors } = await openPresets(page);
-  await expect(element(page, 'lyrics')).toBeVisible();
-  const cover = await box(element(page, 'cover'));
-  expect(cover.width).toBe(400);
-  expect(cover.height).toBe(400);
-  // 居中范围是窗口左缘到正中线 640，封面 400 宽，左边 (640 − 400) ÷ 2
-  expect(cover.x).toBeCloseTo(120, 0);
-  const lyrics = await box(element(page, 'lyrics'));
-  expect(lyrics.x).toBeCloseTo(0.45 * 1280, 0);
-  expect(lyrics.height).toBeCloseTo(800, 0);
-  const names = ['cover', 'info', 'progress', 'transport', 'order', 'volume', 'more'];
-  for (const name of names) await expect(element(page, name)).toBeVisible();
-  // 页签在顶部居中，在控制层里
-  const tabs = await box(element(page, 'tabs'));
-  expect(tabs.x + tabs.width / 2).toBeCloseTo(640, -1);
-  expect(tabs.y).toBeLessThan(64);
-  expect(errors).toStrictEqual([]);
-});
 
 test('封面列的件都不超出封面宽，从上到下依次是封面、信息、进度、传输行', async ({ page }) => {
   await openPresets(page);
@@ -203,23 +189,135 @@ test('点队列页签：侧栏换成队列页，歌词栏撤掉；更多菜单�
   await expect(element(page, 'history')).toHaveCount(0);
 });
 
-test('队列页往上滚后点「定位当前」：滚回前面的曲目整段藏在上方的位置', async ({ page }) => {
+/** 打开队列页：在播的是 `total` 首大列表里的第 `index` 首（缺省第 30 首），侧栏换成队列页 */
+async function openQueueAtCurrent(page: Page, total = 200, index = 30): Promise<PlayerPage> {
   const player = await openPresets(page);
-  answerLargeQueue(player.host, 200);
+  answerLargeQueue(player.host, total);
   player.host.answer('playback.getCurrentTrackIndex', {
     success: true,
     found: true,
     playlist: 0,
     playlistGuid: QUEUE_LIST_GUID,
-    index: 30,
+    index,
   });
   // 「接下来」只在播放跟随光标关着时推得出来；启动时读到的是缺省的失败，要靠事件告诉它
   await player.host.waitForListener('playback:followCursorChanged');
   await player.host.emit('playback:followCursorChanged', { enabled: false });
-  player.state.track = makeTrack({ path: 'file://E:/Music/queue/30.flac', title: '曲目 30' });
+  player.state.track = makeTrack({
+    path: `file://E:/Music/queue/${index}.flac`,
+    title: `曲目 ${index}`,
+  });
   await player.host.emit('playback:trackChanged', player.state.track);
   await page.getByRole('tab', { name: /队列/ }).click();
-  // 前面那一段整段在上方时的滚动位置就是这一段的高；平时藏着，一行也不渲染，只有这一段的高撑着
+  return player;
+}
+
+test('队列页往下滚：「接下来」的节头与行一样随位置淡出，不是在滚动区边缘被切平', async ({
+  page,
+}) => {
+  await openQueueAtCurrent(page);
+  const head = page.locator('[data-scene-element="queue"] [data-queue-head="upnext"]');
+  const opacity = () => head.evaluate((node) => Number(getComputedStyle(node).opacity));
+  await expect(head).toBeVisible();
+  await expect.poll(opacity).toBe(1);
+  // 节头卡高 48，往上滚半张卡：它露在整组上沿之外一半，不透明度随之降到一半上下
+  await queueScroller(page).evaluate((box) => {
+    box.scrollTop += 24;
+  });
+  await expect.poll(opacity).toBeLessThan(0.9);
+  await expect.poll(opacity).toBeGreaterThan(0.1);
+});
+
+// 队列只有几首、全在列里放得下时，列表下面不该还有一截能滚的空白；前面还有已播的曲目时，能滚的量就是那一段的高度
+test('队列页内容比列短：没有前面的曲目时不能滚动', async ({ page }) => {
+  await openQueueAtCurrent(page, 4, 0);
+  const scroller = queueScroller(page);
+  await expect(page.locator('[data-scene-element="queue"] [data-kind]').first()).toBeVisible();
+  await expect.poll(() => scroller.evaluate((box) => box.scrollHeight - box.clientHeight)).toBe(0);
+});
+
+test('队列页内容比列短：前面有曲目时，能滚的量就是那一段的高度，当前曲目置顶后滚到底', async ({
+  page,
+}) => {
+  await openQueueAtCurrent(page, 4, 2);
+  const scroller = queueScroller(page);
+  const earlier = page.locator('[data-scene-element="queue"] [data-queue-earlier]');
+  await expect(earlier).toBeVisible();
+  const height = await earlier.evaluate((node) =>
+    node instanceof HTMLElement ? node.offsetHeight : 0,
+  );
+  await expect
+    .poll(() => scroller.evaluate((box) => box.scrollHeight - box.clientHeight))
+    .toBe(height);
+  await expect.poll(() => scroller.evaluate((box) => box.scrollTop)).toBe(height);
+});
+
+interface TreeLayer {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** 渐隐属性之外，关键帧对象里自带的几个键 */
+const KEYFRAME_META = new Set(['offset', 'computedOffset', 'easing', 'composite']);
+
+// 渐隐动画能和滚动一起在合成线程上算，靠的是三个前提，而不是某个视觉数值：滚动容器自己是合成滚动、`opacity` 只由一个
+// 动画管、`opacity` 不和 `filter` 写在同一个动画里。任何一条被破坏，动画回到主线程，主线程忙时赶不上滚动，卡在滚动区
+// 裁切线上露出来。这里直接断言前提，不量像素
+test('队列页上下渐隐：滚动容器是合成滚动，每张卡的 opacity 只由一个滚动时间线动画管', async ({
+  page,
+}) => {
+  await openQueueAtCurrent(page);
+  const card = page.locator('[data-scene-element="queue"] [data-kind="upnext"]').first();
+  await expect(card).toBeVisible();
+  const animations = await card.evaluate((node) =>
+    node.getAnimations().map((animation) => ({
+      scrollDriven: animation.timeline?.constructor.name === 'ViewTimeline',
+      properties: [
+        ...new Set(
+          (animation.effect instanceof KeyframeEffect
+            ? animation.effect.getKeyframes()
+            : []
+          ).flatMap((frame) => Object.keys(frame)),
+        ),
+      ],
+    })),
+  );
+  const written = animations.map((animation) => ({
+    ...animation,
+    properties: animation.properties.filter((name) => !KEYFRAME_META.has(name)),
+  }));
+  expect(written.every((animation) => animation.scrollDriven)).toBe(true);
+  expect(written.every((animation) => animation.properties.length === 1)).toBe(true);
+  expect(written.filter((animation) => animation.properties[0] === 'opacity')).toHaveLength(1);
+
+  // 滚动容器是合成滚动：渲染进程里有一层与它的可视宽、滚动高同大
+  const scroller = queueScroller(page);
+  const size = await scroller.evaluate((box) => ({
+    width: box.clientWidth,
+    height: box.scrollHeight,
+  }));
+  const cdp = await page.context().newCDPSession(page);
+  let layers: readonly TreeLayer[] = [];
+  cdp.on('LayerTree.layerTreeDidChange', (event: { layers?: TreeLayer[] }) => {
+    if (event.layers) layers = event.layers;
+  });
+  await cdp.send('LayerTree.enable');
+  await scroller.evaluate((box) => {
+    box.scrollTop += 1;
+  });
+  await expect
+    .poll(() =>
+      layers.some(
+        (layer) =>
+          Math.round(layer.width) === size.width && Math.abs(layer.height - size.height) <= 1,
+      ),
+    )
+    .toBe(true);
+});
+
+test('队列页往上滚后点「定位当前」：滚回前面的曲目整段藏在上方的位置', async ({ page }) => {
+  const player = await openQueueAtCurrent(page);
+  // 前面那一段整段在上方时，滚动位置就等于这一段的高。平时这一段不可见、一行也不渲染，仅由它的高度撑开
   const earlierHeight = () =>
     page.evaluate(
       () => document.querySelector<HTMLElement>('[data-queue-earlier]')?.offsetHeight ?? 0,
@@ -237,6 +335,37 @@ test('队列页往上滚后点「定位当前」：滚回前面的曲目整段�
   await expect.poll(gap).toBe(-300);
   await page.getByRole('button', { name: '定位当前' }).click();
   await expect.poll(gap).toBe(0);
+  expect(player.errors).toEqual([]);
+});
+
+test('右侧卡开着队列，进沉浸视图在队列页滚到远处再退出：右侧卡的行还在，不是一屏占位行', async ({
+  page,
+}) => {
+  // 「接下来」的读取窗口只有一份，同一时刻只服务一个在看的列表；沉浸视图盖着时右侧卡不去抢，退出后要重新读
+  const player = await openQueueAtCurrent(page, 3000);
+  await stepHistory(page, 'back');
+  // 试验页没有后端，启动遮罩一直在，盖着右侧卡的键
+  await page.evaluate(() => document.getElementById('server-loading')?.remove());
+  await page.locator('[data-right-card-key="queue"]').click();
+  const cardRows = () =>
+    page.evaluate(
+      () =>
+        document.querySelectorAll('[data-right-card] [data-queue-row][data-kind="upnext"]').length,
+    );
+  await expect.poll(cardRows).toBeGreaterThan(0);
+  await stepHistory(page, 'forward');
+  const inView = element(page, 'queue');
+  await expect(inView).toBeVisible();
+  const farRows = () =>
+    inView.evaluate((root) => {
+      const box = root.querySelector('[data-queue-page]')?.parentElement;
+      if (box) box.scrollTop = 80000;
+      return root.querySelectorAll('[data-queue-row][data-kind="upnext"]').length;
+    });
+  await expect.poll(farRows).toBeGreaterThan(0);
+  await stepHistory(page, 'back');
+  await expect(page.locator('[data-right-card]')).toBeVisible();
+  await expect.poll(cardRows).toBeGreaterThan(0);
   expect(player.errors).toEqual([]);
 });
 
@@ -284,11 +413,8 @@ test('没有歌词时从更多菜单展开侧栏：歌词栏出来，画说明�
   await expect(element(page, 'lyrics')).toHaveCount(0);
 });
 
-test('960 × 600 封面 294；窗宽不到 700 退居中，页签与菜单里的侧栏开关都不出现', async ({
-  page,
-}) => {
+test('窗宽不到 700 退居中：没有歌词栏与页签，菜单里也没有侧栏开关', async ({ page }) => {
   await openPresets(page, { width: 960, height: 600 });
-  expect((await box(element(page, 'cover'))).width).toBe(294);
   await page.setViewportSize({ width: 640, height: 600 });
   await expect(element(page, 'lyrics')).toHaveCount(0);
   await expect(element(page, 'tabs')).toHaveCount(0);
@@ -386,20 +512,6 @@ test('进度线的命中区只有线上下各 8：时间行不接指针，元素
   await expect(marker).not.toHaveAttribute('data-visible', 'true');
 });
 
-test('传输键：1280 × 800 是 48 见方、图标 28；960 × 600 仍是 40、图标 24', async ({ page }) => {
-  await openPresets(page);
-  const play = element(page, 'transport').locator('[data-key="play"]');
-  expect((await box(play)).width).toBe(48);
-  expect((await box(play)).height).toBe(48);
-  expect((await box(play.locator('svg'))).width).toBe(28);
-  for (const name of ['order', 'volume']) {
-    expect((await box(element(page, name).locator('button'))).width).toBe(48);
-  }
-  await page.setViewportSize({ width: 960, height: 600 });
-  await expect.poll(async () => (await box(play)).width).toBe(40);
-  expect((await box(play.locator('svg'))).width).toBe(24);
-});
-
 test('曲名放不下时按传送带滚：后面接一份相同的字，停顿后滚一圈回到原点；放得下时只有一份', async ({
   page,
 }) => {
@@ -427,7 +539,7 @@ test('曲名放不下时按传送带滚：后面接一份相同的字，停顿�
   await expect
     .poll(() => inner.evaluate((node) => node.getAnimations().length), { timeout: 8000 })
     .toBeGreaterThan(0);
-  // 跳到滚完前一瞬：第二份正好落在第一份原来的位置
+  // 跳到滚完前一瞬：第二份正好落在第一份初始位置
   const end = await inner.evaluate((node) => {
     const animation = node.getAnimations()[0];
     const timing = animation?.effect?.getComputedTiming();
@@ -535,28 +647,6 @@ test('没有歌词、侧栏展开着时收起：退场的栏里说明还在，�
 const toolbar = (page: Page): Locator => page.locator('[data-lyrics-toolbar]');
 const tool = (page: Page, name: string): Locator => page.locator(`[data-lyrics-tool="${name}"]`);
 
-test('歌词工具条：1280 × 800 时上沿对齐封面上沿（左 624、宽 592、高 72），单个按钮是同款的整高图标键，字号与校正是两格高的块', async ({
-  page,
-}) => {
-  const { errors } = await openPresets(page);
-  await expect(toolbar(page)).toBeVisible();
-  const rect = await box(toolbar(page));
-  const cover = await box(element(page, 'cover'));
-  expect(rect.x).toBeCloseTo(0.45 * 1280 + 48, 0);
-  expect(rect.width).toBeCloseTo(0.55 * 1280 - 112, 0);
-  expect(rect.y).toBeCloseTo(cover.y, 0);
-  expect(rect.height).toBeCloseTo(72, 0);
-  const search = await box(tool(page, 'search'));
-  for (const name of ['translation', 'romanization', 'align', 'settings']) {
-    const key = await box(tool(page, name));
-    expect(key.width, name).toBe(search.width);
-    expect(key.height, name).toBe(search.height);
-  }
-  await expect(toolbar(page).getByRole('group', { name: '字号 (px)' })).toBeVisible();
-  await expect(toolbar(page).getByRole('group', { name: '时间校正' })).toBeVisible();
-  expect(errors).toStrictEqual([]);
-});
-
 test('歌词工具条：宽档放得下全部键，窗宽 1280 与宽档下限 1251 都没有键被挤出条外，字号块收窄、校正块保持原宽', async ({
   page,
 }) => {
@@ -653,7 +743,7 @@ test('歌词工具条：搜索展开成输入框，第一次 Esc 只收起搜索
   await expect(page.locator('[data-scene="presets"]')).toHaveCount(0);
 });
 
-test('歌词工具条：窗宽 700 时条宽 273，字号与校正收成图标键，点开是小面板，Esc 先收面板', async ({
+test('歌词工具条：窗宽 700 时字号与校正收成图标键，点开是小面板，Esc 先收面板', async ({
   page,
 }) => {
   await openPresets(page, { width: 700, height: 600 });

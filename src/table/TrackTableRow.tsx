@@ -10,7 +10,17 @@ import type { Translate } from '../i18n/translate.ts';
 import type { TableServices } from './tableContext.ts';
 import { TrackAlbum, TrackArtists } from '../track/TrackCredits.tsx';
 import { trackDisplayTitle } from '../track/trackDisplayTitle.ts';
-import { bitrateText, dayText, durationText, yearText } from './cellText.ts';
+import type { TrackFieldValues } from '../track/trackFields.ts';
+import {
+  bitDepthText,
+  bitrateText,
+  dayText,
+  discText,
+  durationText,
+  fileNameText,
+  folderNameText,
+  yearText,
+} from './cellText.ts';
 import { columnDef, type ColumnId } from './columns/columns.ts';
 import { RatingCell } from './RatingCell.tsx';
 import type { TableArtwork, TablePoint, TableRowItem, TableTrack } from './tableItems.ts';
@@ -46,6 +56,8 @@ export interface TrackTableRowProps {
   readonly PlayingMark: TableServices['PlayingMark'];
   readonly rating: number;
   readonly ratable: boolean;
+  /** 按标签现算的列（作曲、注释等）的值；还没取到时缺 */
+  readonly fields?: TrackFieldValues | undefined;
   /** 序号格的写法：只写曲号，或「碟.曲」 */
   readonly numberText: (track: TableTrack) => string;
   readonly artwork: TableArtwork | undefined;
@@ -139,6 +151,22 @@ function content(id: ColumnId, track: TableTrack, props: TrackTableRowProps): Re
         : '';
     case 'path':
       return text(track.absolutePath || track.path, textStyles.secondary);
+    case 'disc':
+      return discText(track);
+    case 'fileName':
+      return text(fileNameText(track.absolutePath || track.path), textStyles.secondary);
+    case 'folder':
+      return text(folderNameText(track.absolutePath || track.path), textStyles.secondary);
+    case 'composer':
+    case 'performer':
+    case 'comment':
+    case 'tagType':
+      return text(props.fields?.[id] ?? '', textStyles.secondary);
+    case 'bitDepth':
+      return bitDepthText(props.fields?.bitDepth);
+    case 'lastModified':
+    case 'firstPlayed':
+      return dayText(props.fields?.[id]);
   }
 }
 

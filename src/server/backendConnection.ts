@@ -13,6 +13,9 @@ import {
   type BackendIdentity,
 } from './backendProtocol.ts';
 
+/** 页面向后端发请求的路径：只许小写字母与连字符，各个服务的动作名要照这个取 */
+export const BACKEND_REQUEST_PATH = /^\/[a-z]+(?:\/[a-z-]+)*$/;
+
 export interface BackendLaunch extends BackendIdentity {
   readonly directory: string;
   readonly executable: string;
@@ -331,7 +334,7 @@ export function startBackendConnection(
       signal.throwIfAborted();
       const expected = descriptor;
       if (!expected || store.get(failed)) throw new Error('本地后端尚未连接');
-      if (!/^\/[a-z]+(?:\/[a-z-]+)*$/.test(path)) throw new Error('本地后端请求路径无效');
+      if (!BACKEND_REQUEST_PATH.test(path)) throw new Error('本地后端请求路径无效');
       const response = await fetch(`http://127.0.0.1:${expected.port}${path}`, {
         method: 'POST',
         headers: {

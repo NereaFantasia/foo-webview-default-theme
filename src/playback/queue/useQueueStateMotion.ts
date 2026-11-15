@@ -6,8 +6,15 @@ import { queueViewAtom } from './queueState.ts';
 import { upNextAtom } from './upNext.ts';
 import { createQueueStateMotion } from './queueStateMotion.ts';
 
-/** 各分区独立接收可信快照，来源临时清空与分页填充不会反复入场 */
-export function useQueueStateMotion(root: RefObject<HTMLElement | null>) {
+/**
+ * 各分区独立接收可信快照，来源临时清空与分页填充不会反复入场。
+ * `upNextPlaced` 为假时「接下来」的行还按旧偏移排着，这一道先不补位：阅读锚点等行排好才补滚动，
+ * 补位要在补完之后量位置，否则会把补滚动抵掉的位移当成行在移动
+ */
+export function useQueueStateMotion(
+  root: RefObject<HTMLElement | null>,
+  upNextPlaced: () => boolean = () => true,
+) {
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const review = useAtomValueRawSync(queueReviewAtom);
   const queued = useAtomValueRawSync(queueViewAtom);
@@ -47,7 +54,7 @@ export function useQueueStateMotion(root: RefObject<HTMLElement | null>) {
     lanes.current[1]?.update({
       ...shared,
       revision: String(upcoming.version),
-      pending: upcoming.refreshing,
+      pending: upcoming.refreshing || !upNextPlaced(),
     });
     const frame = requestAnimationFrame(() =>
       lanes.current[2]?.update({

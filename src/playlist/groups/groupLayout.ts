@@ -30,6 +30,16 @@ export interface GroupRun {
   readonly sub?: readonly GroupSubRun[];
 }
 
+/** 一级组里有没有同键的两段：宿主只合并相邻的行，列表顺序对不上分组键时同一组会拆成几段 */
+export function hasSplitGroups(runs: readonly GroupRun[]): boolean {
+  const seen = new Set<string>();
+  for (const run of runs) {
+    if (seen.has(run.key)) return true;
+    seen.add(run.key);
+  }
+  return false;
+}
+
 export type GroupItem =
   | {
       readonly kind: 'header';

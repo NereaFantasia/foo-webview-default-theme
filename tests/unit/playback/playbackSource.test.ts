@@ -36,7 +36,7 @@ const LIBRARY_VIEW = guidOf(7);
 const CHILL = guidOf(1);
 const NIGHT = guidOf(2);
 
-/** `playlist.getPlaying` 答第 `guid` 张在播，名字照给；不给 guid 时是没有在播的表。 */
+/** `playlist.getPlaying` 答第 `guid` 张在播，名字照给；不给 guid 时是没有在播的表 */
 function playing(guid?: string, name = ''): HostResponse<'playlist.getPlaying'> {
   if (guid === undefined) return { success: true, found: false };
   return { success: true, found: true, index: 0, guid, name, trackCount: 10, isActive: false };
@@ -50,7 +50,7 @@ function writerFor(host: UnitHost, data = createMemoryDataWriter()) {
   return createConfigWriter(host.fb, data.writer);
 }
 
-/** 写锁先来先得：排到这次时，之前发起的写入都已执行完。 */
+/** 写锁先来先得：排到这次时，之前发起的写入都已执行完 */
 async function written(host: UnitHost): Promise<void> {
   await writers.get(host)?.run(() => undefined);
 }
@@ -70,7 +70,7 @@ async function start(host: UnitHost, data = createMemoryDataWriter()) {
   };
 }
 
-/** 宿主自己起播或换曲：先 starting 再 trackChanged。 */
+/** 宿主自己起播或换曲：先 starting 再 trackChanged */
 function hostStarts(host: UnitHost): void {
   host.emit('playback:starting', { command: 'play', paused: false });
   host.emit('playback:trackChanged', makeTrack());
@@ -108,6 +108,18 @@ describe('startPlaybackSource', () => {
     await written(host);
     expect(host.config.get(KEY)).toEqual(songs);
     expect(sourceHome(songs)).toEqual({ id: 'songs' });
+  });
+
+  it('首页在线行起播的来源落盘读回照旧，家是首页，没有可打开的对象', async () => {
+    const home: RecordedSource = { kind: 'home', subject: 'new-tracks', name: '新歌速递' };
+    const host = installFakeHost({
+      config: { [KEY]: home },
+      answers: { playlist: { getPlaying: LIBRARY_VIEW_PLAYING } },
+    });
+    const { source } = await start(host);
+    expect(source()).toEqual(home);
+    expect(sourceHome(home)).toEqual({ id: 'home' });
+    expect(refOfSource(home)).toBeNull();
   });
 
   it('流派来源可落盘与读回，专用列表换曲仍保留，家是选中该流派的流派页', async () => {
@@ -161,6 +173,12 @@ describe('startPlaybackSource', () => {
       });
   });
 
+  it('收藏来源：主体固定写 track、名字可以是空串，家是收藏页，没有对应对象', () => {
+    const favorites = { kind: 'onlineFavorites', subject: 'track', name: '' } as const;
+    expect(sourceHome(favorites)).toEqual({ id: 'favorites' });
+    expect(refOfSource(favorites)).toBeNull();
+  });
+
   it('宿主答没有在播的表（停止之后）不改来源', async () => {
     const host = installFakeHost({ answers: { playlist: { getPlaying: playing() } } });
     const { service, source } = await start(host);
@@ -177,7 +195,7 @@ describe('startPlaybackSource', () => {
     const { service, source } = await start(host);
     expect(source()).toEqual({ kind: 'playlist', subject: CHILL, name: 'Chill' });
     const reads = host.hold('playlist.getPlaying');
-    // 正在放 Chill 时主题调 playTrack：宿主切到专用列表，先报停止与 starting，这几条先于 playTrack 的应答到。
+    // 正在放 Chill 时主题调 playTrack：宿主切到专用列表，先报停止与 starting，这几条先于 playTrack 的应答到
     host.answer('playlist.getPlaying', LIBRARY_VIEW_PLAYING);
     host.emit('playback:stopped', { reason: 'user' });
     host.emit('playback:stateChanged', {
@@ -189,7 +207,7 @@ describe('startPlaybackSource', () => {
     });
     host.emit('playback:starting', { command: 'play', paused: false });
     await settle();
-    // playTrack 答了成功，调用方记下来源；新曲目打开后宿主才报 trackChanged 与带 canSeek 的 stateChanged。
+    // playTrack 答了成功，调用方记下来源；新曲目打开后宿主才报 trackChanged 与带 canSeek 的 stateChanged
     service.record(MODAL_SOUL);
     host.emit('playback:trackChanged', makeTrack({ title: 'Feather' }));
     host.emit('playback:stateChanged', {

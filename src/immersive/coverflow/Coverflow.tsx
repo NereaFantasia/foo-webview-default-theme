@@ -32,6 +32,7 @@ import { createCoverflowEngine, type EngineCard, type EngineClock } from './engi
 import { menuTargetOf, type CoverflowMenuTarget } from './menuTarget.ts';
 import { playPlanOf, type PlayPlan } from './playPlan.ts';
 import { RENDER_RADIUS, coverflowLayout, inViewRange, visibleIndexes } from './slots.ts';
+import { useSettledItems } from './useSettledItems.ts';
 
 /** 无交互自动回位至当前播放曲目的超时时间（毫秒） */
 const IDLE_MS = 3000;
@@ -67,7 +68,12 @@ export function Coverflow({ leaving = false }: CoverflowProps) {
   const store = useStore();
   const frame = useSceneFrame();
   const reduced = useAtomValueRawSync(reducedMotionAtom);
-  const items = useAtomValueRawSync(coverflowItemsAtom);
+  const earlier = useAtomValueRawSync(upEarlierAtom);
+  const upNext = useAtomValueRawSync(upNextAtom);
+  const items = useSettledItems(
+    useAtomValueRawSync(coverflowItemsAtom),
+    earlier.refreshing || upNext.refreshing,
+  );
   const { browsed } = useAtomValueRawSync(sceneStateAtom);
   const sceneActions = useSceneActions();
   const queue = useService(queueKey);
@@ -94,7 +100,6 @@ export function Coverflow({ leaving = false }: CoverflowProps) {
     if (browsed !== null && selected === currentAt) sceneActions.browse(null);
   }, [browsed, selected, currentAt, sceneActions]);
   // 沿列表顺序浏览历史曲目时，按浏览深度动态向前预读缓存数据
-  const earlier = useAtomValueRawSync(upEarlierAtom);
   const depth = Math.max(0, currentAt - selected);
   useEffect(() => {
     if (earlier.total <= 0) return;

@@ -1,6 +1,7 @@
 import { useAtomValueRawSync } from 'jotai/react';
 import {
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -16,7 +17,7 @@ import { AlbumTileKeys } from './AlbumTileKeys.tsx';
 import { AlbumColorTheme } from '../AlbumColorTheme.tsx';
 import styles from './AlbumWall.module.css';
 import { AlbumWallSkeleton } from './AlbumWallSkeleton.tsx';
-import { albumBrowseAtom } from '../albums/albumBrowse.ts';
+import { albumBrowseAtom, visibleAlbumsAtom } from '../albums/albumBrowse.ts';
 import { albumCoversVersionAtom } from '../albumCovers.ts';
 import { albumDetailPendingAtom } from '../album-detail/albumDetailOpen.ts';
 import { withDropdowns } from './albumDropdown.ts';
@@ -67,6 +68,9 @@ export function AlbumWall({ memory, onMenu }: AlbumWallProps) {
   const pending = useAtomValueRawSync(albumDetailPendingAtom);
   const opening = pending?.origin === 'album' ? pending.key : null;
   useAtomValueRawSync(albumCoversVersionAtom);
+  const listed = useAtomValueRawSync(visibleAlbumsAtom);
+  // 空闲时把整张墙的封面提前取进缓存，翻到时直接有图；换了清单就按新的次序重来，已有的不再取
+  useEffect(() => albums.covers.warm(listed, TILE_SIZE_MAX), [albums, listed]);
   const gridId = useId();
   const scroller = useRef<HTMLDivElement>(null);
   const base = useAlbumWallLayout();

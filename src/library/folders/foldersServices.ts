@@ -250,6 +250,11 @@ export function startFolders(
           filter.suspend();
           actions.cancel();
           preview.select(null);
+          // 只看视频只在这次停留里有效，下次进入从全部开始；后退回这条记录时由页面快照恢复
+          // 晚一拍再看：同一次提交里旧页的卸载先于新页的挂上，浏览视频带进来的筛选不能被它清掉
+          queueMicrotask(() => {
+            if (!disposed && active === 0) results.setMedia('all');
+          });
         }
         release();
       };

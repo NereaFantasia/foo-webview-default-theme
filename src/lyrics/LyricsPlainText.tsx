@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react';
-import { lyricsFontFamily, type LyricsAlign } from './lyricsDisplay.ts';
+import { lyricsFontStyle, type LyricsAlign } from './lyricsDisplay.ts';
 import styles from './LyricsPlainText.module.css';
 
 export interface LyricsPlainTextProps {
   readonly lines: readonly string[];
   /** 字号，CSS 像素，与带时间轴时的正文同一档 */
   readonly fontSize: number;
+  /** 家族名，空串沿用界面字体 */
   readonly fontFamily?: string;
+  readonly fontWeight?: number | null;
   /** 水平对齐，缺省居左 */
   readonly align?: LyricsAlign;
 }
@@ -16,11 +18,12 @@ export function LyricsPlainText({
   lines,
   fontSize,
   fontFamily = '',
+  fontWeight = null,
   align = 'left',
 }: LyricsPlainTextProps) {
   const style: CSSProperties & Record<`--${string}`, string> = {
     '--lyrics-font-size': `${fontSize}px`,
-    fontFamily: lyricsFontFamily(fontFamily),
+    ...lyricsFontStyle(fontFamily, fontWeight),
   };
   return (
     <div className={styles.root} style={style} data-lyrics-align={align}>

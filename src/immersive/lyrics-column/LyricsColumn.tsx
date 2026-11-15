@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProper
 import { translateAtom } from '../../i18n/locale.ts';
 import { useService } from '../../kit/useService.ts';
 import { lyricsClockKey } from '../../lyrics/lyricsClock.ts';
-import { lyricsDisplayKey, lyricsFontFamily } from '../../lyrics/lyricsDisplay.ts';
+import { immersiveFont, lyricsDisplayKey } from '../../lyrics/lyricsDisplay.ts';
 import { lyricsMotionKey } from '../../lyrics/lyricsMotion.ts';
 import { lyricsKey } from '../../lyrics/lyricsService.ts';
 import { LyricsPlainText } from '../../lyrics/LyricsPlainText.tsx';
@@ -85,7 +85,12 @@ export function LyricsColumn({
     [effects, ratio],
   );
   const base = lyricsFontSize(size, box.width);
-  const scaled = useMemo(() => scaleDisplay(display, base), [display, base]);
+  // 沉浸视图自己选的字体与字重；没选就跟随正在播放面板。播放器与纯文本都按这一份排
+  const { family, weight } = immersiveFont(display);
+  const scaled = useMemo(
+    () => scaleDisplay({ ...display, fontFamily: family, fontWeight: weight }, base),
+    [display, family, weight, base],
+  );
   const ready = state.status === 'ready' ? state : null;
   const readyKey = ready?.key ?? null;
   const body = useRef<HTMLDivElement>(null);
@@ -111,7 +116,8 @@ export function LyricsColumn({
     <LyricsPlainText
       lines={lines}
       fontSize={scaled.fontSize}
-      fontFamily={lyricsFontFamily(display.fontFamily)}
+      fontFamily={family}
+      fontWeight={weight}
       align={display.align}
     />
   );

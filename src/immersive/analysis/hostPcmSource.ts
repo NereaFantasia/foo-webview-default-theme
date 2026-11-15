@@ -1,5 +1,11 @@
 import { PcmDecodeError, fb, type DecodePcmOptions } from 'foo-webview-sdk/bridge';
-import { trackAbilities } from '../../host/trackOrigin.ts';
+import {
+  analysisPlan,
+  DEFAULT_ONLINE_ANALYSIS,
+  type AnalysisPlan,
+  type OnlineAnalysis,
+} from '../../host/onlineAnalysis.ts';
+import { holdOnlineTrack, type HoldTrack } from '../../server/holdTrack.ts';
 import { PcmUnavailableError, type PcmSource, type PcmTrack } from './trackAnalysis.ts';
 import type { PlanesSource } from '../gauges/trackDynamics.ts';
 import { ANALYSIS_SAMPLE_RATE } from '../waveform/waveformBands.ts';
@@ -10,7 +16,8 @@ import { ANALYSIS_SAMPLE_RATE } from '../waveform/waveformBands.ts';
  * 量表（`hostFullRatePcm`）要原采样率、全部声道。解码在宿主的后台线程里跑，不停 fb2k 的主线程
  *
  * 路径交 `track.handle`：分轨自带 `|subsong:N`，宿主按后缀取那一轨；不另传 `cueIndex`，曲目的 `subsong`
- * 是解码器给的标识，不一定是序号。网络流不取。`signal` 原样交给 SDK，中止时由它取消宿主那边的任务
+ * 是解码器给的标识，不一定是序号。电台流没有整轨，不取；在线曲目按用户的选择取（`analysisPlan`）：解码前先通知
+ * 后端把整首留在内存里（`holdOnlineTrack`），或直接按段向上游读，或不取。`signal` 原样交给 SDK，中止时由它取消宿主那边的任务
  * 宿主答 `NOT_SUPPORTED`（没有宿主、运行时不支持共享缓冲、缺重采样器，都是整个页面的事）时抛
  * `PcmUnavailableError`；其余失败原样抛出，只算这一首取不了
  */
@@ -31,13 +38,26 @@ export interface PcmHost {
   audio: { decodePcm(path: string, options?: DecodePcmOptions): Promise<DecodedPcm> };
 }
 
-function decodeTrack(
+/** 在线曲目怎么取：`mode` 每段解码前读一次当时的选择，缺省 `DEFAULT_ONLINE_ANALYSIS` */
+export interface OnlineAccess {
+  readonly mode?: () => OnlineAnalysis;
+  readonly hold?: HoldTrack;
+}
+
+function planOf(track: PcmTrack, access: OnlineAccess): AnalysisPlan {
+  return analysisPlan(track.path, (access.mode ?? (() => DEFAULT_ONLINE_ANALYSIS))());
+}
+
+async function decodeTrack(
   host: PcmHost,
+  plan: AnalysisPlan,
+  hold: HoldTrack,
   track: PcmTrack,
   range: { start: number; end: number },
   signal: AbortSignal,
   format: { sampleRate?: number; mono?: boolean },
 ): Promise<DecodedPcm> {
+  if (plan === 'hold') await hold(track.handle, signal);
   return host.audio
     .decodePcm(track.handle, { start: range.start, end: range.end, ...format, signal })
     .catch((error: unknown) => {
@@ -49,11 +69,13 @@ function decodeTrack(
 }
 
 /** 整轨分频的来源：每段拷成 `AudioBuffer`，拷完就释放共享缓冲，拷贝出错也释放 */
-export function createHostPcmSource(host: PcmHost = fb): PcmSource {
+export function createHostPcmSource(host: PcmHost = fb, access: OnlineAccess = {}): PcmSource {
+  const hold = access.hold ?? holdOnlineTrack;
   return async (track, range, signal) => {
-    if (!trackAbilities(track.path).opensLocally) return null;
+    const plan = planOf(track, access);
+    if (plan === 'skip') return null;
     signal.throwIfAborted();
-    const pcm = await decodeTrack(host, track, range, signal, {
+    const pcm = await decodeTrack(host, plan, hold, track, range, signal, {
       sampleRate: ANALYSIS_SAMPLE_RATE,
       mono: true,
     });
@@ -70,11 +92,13 @@ export function createHostPcmSource(host: PcmHost = fb): PcmSource {
  * 量表的来源：原采样率、全部声道，按声道给共享缓冲上的视图，不拷贝；调用方读完调 `release()`，
  * 释放之后视图不能再读
  */
-export function createHostFullRatePcm(host: PcmHost = fb): PlanesSource {
+export function createHostFullRatePcm(host: PcmHost = fb, access: OnlineAccess = {}): PlanesSource {
+  const hold = access.hold ?? holdOnlineTrack;
   return async (track, range, signal) => {
-    if (!trackAbilities(track.path).opensLocally) return null;
+    const plan = planOf(track, access);
+    if (plan === 'skip') return null;
     signal.throwIfAborted();
-    const pcm = await decodeTrack(host, track, range, signal, {});
+    const pcm = await decodeTrack(host, plan, hold, track, range, signal, {});
     try {
       signal.throwIfAborted();
       return {
@@ -89,7 +113,3 @@ export function createHostFullRatePcm(host: PcmHost = fb): PlanesSource {
     }
   };
 }
-
-export const hostPcmSource: PcmSource = createHostPcmSource();
-
-export const hostFullRatePcm: PlanesSource = createHostFullRatePcm();

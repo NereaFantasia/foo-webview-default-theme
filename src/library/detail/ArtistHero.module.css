@@ -1,0 +1,203 @@
+/*
+ * 头部图像（头像与横幅）在尺寸测量完成且缓存就绪后挂载，仅执行淡入动画以防局部闪烁
+ * 大面积入场采用 normal 时长，纯透明度渐变使用线性曲线
+ */
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 圆形头像位于头部右下角并与操作按钮底边对齐：底层为占位符，上层为淡入照片；阴影样式与专辑页封面一致 */
+.avatar {
+  position: absolute;
+  inset-inline-end: var(--detail-side-inset);
+  bottom: var(--spacingVerticalXL);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--bg-hover);
+  box-shadow: var(--shadow16);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: opacity var(--motion-normal) var(--curveLinear);
+}
+.avatar:disabled {
+  cursor: default;
+}
+/* 切换至横幅模式时头像与横幅交叉淡化；头像保留占位尺寸，防止头部高度发生跳变 */
+.avatar[data-away] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-normal) var(--curveLinear),
+    visibility 0s linear var(--motion-normal);
+}
+.avatar:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThick);
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: reveal var(--motion-normal) var(--curveLinear);
+}
+
+.placeholder {
+  width: 40%;
+  height: 40%;
+}
+
+/*
+ * 头部铺满内容区域，艺人名与操作按钮居左沉底展示
+ * 方形照片及无照片状态在右下角呈现圆形头像；非方形照片呈现扩展横幅，其底边渐隐融入页面光晕
+ * 两种模式共享相同高度，仅切换内部布局以避免高度跳变；文字与按钮位于图像渐隐区域，适配深浅主题对比度
+ */
+.hero {
+  /* 专辑第一行要整行露出来：段标题、一行图块与图块下的两行字，量得 228，留一点余量 */
+  --artist-first-row: 240px;
+  /*
+   * 头部高度上限计算：
+   * 容器盒模型为 content-box，`min-height` 仅包含内容区；
+   * 上下内边距（顶部导航间距与底部 spacingVerticalXL）额外计入总高；
+   * 从视口滚动区总高扣除内边距、底部播放栏预留及首行专辑高度后即为可用空间；空间不足时回退至下限 160px
+   */
+  --artist-hero-room: calc(
+    var(--detail-viewport-height, 100vh) - var(--table-bottom-inset, 0px) - 2 *
+      (var(--detail-top-inset) + var(--nav-inset, 0px)) - var(--spacingVerticalXL) -
+      var(--artist-first-row)
+  );
+  --artist-hero-height: clamp(160px, min(52vh, 520px), var(--artist-hero-room));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin: calc(-1 * (var(--detail-top-inset) + var(--nav-inset, 0px)))
+    calc(-1 * var(--detail-side-inset)) 0;
+  padding: calc(var(--detail-top-inset) + var(--nav-inset, 0px)) var(--detail-side-inset)
+    var(--spacingVerticalXL);
+  min-height: calc(var(--artist-hero-height) + var(--detail-top-inset) + var(--nav-inset, 0px));
+}
+.hero[data-narrow] {
+  --artist-hero-height: clamp(160px, 260px, var(--artist-hero-room));
+}
+
+/*
+ * 宽幅艺术照：数据源提供 16:9 居中裁切画面并绘制于外框背景层（ArtistHeroImage）
+ * 此处仅控制头部高度；尺寸随视口宽度自适应伸缩，文字与操作按钮置于底部渐隐区域
+ */
+.hero[data-shape='wide'] {
+  --artist-hero-height: clamp(160px, min(40vw, 640px), var(--artist-hero-room));
+}
+.hero[data-shape='wide'][data-narrow] {
+  --artist-hero-height: clamp(160px, 300px, var(--artist-hero-room));
+}
+
+/* 扩展横幅：原图等比居中展示且左右边缘羽化；两侧留白区域使用同一张图裁切放大并模糊填充 */
+.media {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  /*
+   * 底部渐隐遮罩：自上方 20% 处开始按缓入缓出曲线分档过渡至完全透明，使底边完全融入页面背景
+   */
+  mask-image: linear-gradient(
+    to bottom,
+    var(--colorNeutralForeground1) 20%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 84%, transparent) 36%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 56%, transparent) 54%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 26%, transparent) 72%,
+    color-mix(in srgb, var(--colorNeutralForeground1) 7%, transparent) 88%,
+    transparent 100%
+  );
+  animation: reveal var(--motion-normal) var(--curveLinear);
+}
+.backdrop {
+  position: absolute;
+  inset: calc(-1 * var(--spacingHorizontalXXL));
+  width: calc(100% + 2 * var(--spacingHorizontalXXL));
+  height: calc(100% + 2 * var(--spacingVerticalXXL));
+  object-fit: cover;
+  filter: blur(var(--spacingHorizontalXXL));
+}
+.contained {
+  position: relative;
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--colorNeutralForeground1) 8%,
+    var(--colorNeutralForeground1) 92%,
+    transparent
+  );
+}
+
+/*
+ * 艺术字图片：高度与艺人名行高一致，宽度按原图比例自适应且不超出列宽；仅适用于深色配色方案
+ * 替换为艺术字后，文本艺人名仅在视觉上隐藏，保留在 DOM 中以供辅助技术访问
+ */
+.logo {
+  display: block;
+  height: var(--lineHeightHero900);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
+  align-self: flex-start;
+}
+.logo[hidden] {
+  display: none;
+}
+.nameHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 艺人名与操作按钮居左垂直排列；圆形头像位于右下角并向内挤占空间，切换至横幅模式后头像淡出且不再挤占空间 */
+.identity {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacingVerticalM);
+  min-width: 0;
+}
+.hero[data-shape='round'] .identity {
+  padding-inline-end: calc(var(--artist-avatar) + var(--spacingHorizontalXXL));
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+/* 播放胶囊：双段并排布局，中间间隙使用描边粗细；各分段圆角与配色在组件中通过 makeStyles 覆盖 */
+.split {
+  display: flex;
+  gap: var(--strokeWidthThick);
+}

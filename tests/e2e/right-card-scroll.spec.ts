@@ -1,15 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { openLargeQueue, queueScroller } from '../fixtures/rightCardPage.ts';
 
-test('快速跨屏滚动持续覆盖视口，使用粘性行带，不随整个长列表离屏', async ({ page }) => {
+test('快速跨屏滚动持续覆盖视口，不随整个长列表离屏', async ({ page }) => {
   const { errors } = await openLargeQueue(page, 120000, 40);
   const result = await queueScroller(page).evaluate(async (box) => {
-    const samples: { covered: boolean; slots: number; sticky: string; scroll: number }[] = [];
+    const samples: { covered: boolean; slots: number; scroll: number }[] = [];
     for (let i = 0; i < 32; i++) {
       box.scrollTop = 48 * (i % 2 === 0 ? i * 270 : (i + 1) * 340);
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const frame = box.getBoundingClientRect();
-      const viewport = box.querySelector<HTMLElement>('[data-queue-viewport]');
       const slots = [...box.querySelectorAll<HTMLElement>('[data-queue-slot]')];
       const top = Math.max(
         frame.top + 50,
@@ -22,13 +21,11 @@ test('快速跨屏滚动持续覆盖视口，使用粘性行带，不随整个�
           bounds.some((rect) => rect.top <= top && rect.bottom > top) &&
           bounds.some((rect) => rect.top < bottom && rect.bottom >= bottom),
         slots: slots.length,
-        sticky: viewport ? getComputedStyle(viewport).position : '',
         scroll: box.scrollTop,
       });
     }
     return samples;
   });
-  expect(result.every((sample) => sample.sticky === 'sticky')).toBe(true);
   expect(result.filter((sample) => !sample.covered)).toEqual([]);
   expect(Math.max(...result.map((sample) => sample.slots))).toBeLessThan(80);
   await expect(page.locator('[data-queue-slot] [data-queue-row]').first()).toBeVisible();

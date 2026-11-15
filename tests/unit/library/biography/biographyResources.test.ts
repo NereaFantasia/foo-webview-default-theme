@@ -1,16 +1,26 @@
 import { atom, createStore } from 'jotai/vanilla';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { startBiographyResources } from '../../../../src/library/biography/biographyResources.ts';
-import { startBiography } from '../../../../src/library/biography/biographyService.ts';
+import {
+  startBiography,
+  type BiographyDeps,
+} from '../../../../src/library/biography/biographyService.ts';
 import { startBiographyIdentity } from '../../../../src/library/biography/identity/biographyIdentity.ts';
-import type {
-  BiographyIdentity,
-  BiographyInput,
+import {
+  lastfmInput,
+  type BiographyFetchSubject,
+  type BiographyIdentity,
+  type BiographyInput,
+  type BiographyLanguage,
 } from '../../../../src/library/biography/biographyModel.ts';
 import type { LastfmFetchResult } from '../../../../src/library/biography/fetchLastfmBiography.ts';
 import type { MusicbrainzClient } from '../../../../src/library/biography/identity/musicbrainzApi.ts';
 import { artistFile, installArtistFiles } from '../../../fixtures/artistFilesHost.ts';
-import { biographyDocument } from '../../../fixtures/biographySamples.ts';
+import {
+  appleArtistUrl,
+  appleFetchResult,
+  biographyDocument,
+} from '../../../fixtures/biographySamples.ts';
 import { artistSample, NUJABES } from '../../../fixtures/musicbrainzSamples.ts';
 
 beforeEach(() => vi.useFakeTimers());
@@ -39,6 +49,8 @@ function setup() {
       ok: true,
       store: true,
       entry: {
+        source: 'lastfm',
+        sourceId: name,
         artist: name,
         language: 'en',
         fetchedAt: Date.now(),
@@ -47,7 +59,7 @@ function setup() {
       },
     })),
   ) {
-    const input = atom<BiographyInput | null>({ artist: name, sourceArtist: name, language: 'en' });
+    const input = atom<BiographyInput | null>(lastfmInput(name, name, 'en'));
     const service = startBiography(
       store,
       {
@@ -83,8 +95,150 @@ function setup() {
     stops.push(service.dispose);
     return service;
   }
-  return { ...env, store, resources, biography, identity };
+  /** Apple 来源的简介服务：身份是艺人 ID，显示名可以相同 */
+  function appleBiography(
+    id: string,
+    fetchText: NonNullable<BiographyDeps['fetchText']>,
+    language: BiographyLanguage = 'en',
+  ) {
+    const input = atom<BiographyInput | null>({
+      artist: 'Nirvana',
+      source: 'apple',
+      sourceId: id,
+      sourceArtist: 'Nirvana',
+      sourceUrl: appleArtistUrl(id),
+      language,
+    });
+    const service = startBiography(
+      store,
+      { input, enabled: atom(true), active: atom(true), resources, fetchText },
+      env.host.fb,
+    );
+    stops.push(service.dispose);
+    return { service, input, state: () => store.get(service.state) };
+  }
+  return { ...env, store, resources, biography, identity, appleBiography };
 }
+
+describe('Apple 来源的简介服务', () => {
+  it('取数收到带来源的身份；资料随正文一起到，不再另取 Last.fm 的资料；缓存按艺人 ID 存在 Apple 自己的文件里', async () => {
+    const env = setup();
+    const fetchText = vi.fn(async (subject: BiographyFetchSubject, language: BiographyLanguage) =>
+      appleFetchResult(subject.id, language),
+    );
+    const apple = env.appleBiography('112018', fetchText);
+    await apple.service.ready;
+    await tick();
+    expect(fetchText).toHaveBeenCalledTimes(1);
+    expect(fetchText.mock.calls[0]?.[0]).toEqual({
+      source: 'apple',
+      id: '112018',
+      name: 'Nirvana',
+      url: appleArtistUrl('112018'),
+    });
+    expect(apple.state()).toMatchObject({
+      status: 'ready',
+      document: { source: 'apple', sourceId: '112018' },
+      details: { source: 'apple', tags: ['Rock'] },
+      detailsLoading: false,
+    });
+    expect(env.host.callsTo('http.get')).toEqual([]);
+    expect(env.resources.caches.apple.get('112018', 'en')?.document?.sourceId).toBe('112018');
+    expect(env.resources.caches.lastfm.get('112018', 'en')).toBeUndefined();
+    expect(env.files.get(artistFile('apple-v1.json'))).toContain('112018');
+  });
+
+  it('同名但 ID 不同的两位艺人各取各的，状态里的正文跟着当前这位', async () => {
+    const env = setup();
+    const fetchText = vi.fn(async (subject: BiographyFetchSubject, language: BiographyLanguage) =>
+      appleFetchResult(subject.id, language, `简介 ${subject.id}`),
+    );
+    const apple = env.appleBiography('112018', fetchText);
+    await apple.service.ready;
+    await tick();
+    expect(apple.state().document?.paragraphs).toEqual(['简介 112018']);
+    env.store.set(apple.input, {
+      artist: 'Nirvana',
+      source: 'apple',
+      sourceId: '256176428',
+      sourceArtist: 'Nirvana',
+      language: 'en',
+    });
+    await tick();
+    expect(fetchText).toHaveBeenCalledTimes(2);
+    expect(apple.state().document).toMatchObject({
+      sourceId: '256176428',
+      paragraphs: ['简介 256176428'],
+    });
+    expect(env.resources.caches.apple.get('112018', 'en')?.document?.paragraphs).toEqual([
+      '简介 112018',
+    ]);
+  });
+
+  it('zh 页面没有简介时改取 en，两次取数各用自己的语言键', async () => {
+    const env = setup();
+    const fetchText = vi.fn(async (subject: BiographyFetchSubject, language: BiographyLanguage) =>
+      appleFetchResult(subject.id, language, language === 'zh' ? '' : 'English only.'),
+    );
+    const apple = env.appleBiography('112018', fetchText, 'zh');
+    await apple.service.ready;
+    await tick();
+    expect(fetchText.mock.calls.map((call) => call[1])).toEqual(['zh', 'en']);
+    expect(apple.state()).toMatchObject({ status: 'ready', document: { language: 'en' } });
+    expect(env.resources.caches.apple.get('112018', 'zh')?.document).toBeNull();
+  });
+
+  it('Last.fm 的艺人名恰好和 Apple 的艺人 ID 同形时，请求不会被当成同一个合并', async () => {
+    const env = setup();
+    let finish: (result: LastfmFetchResult) => void = () => {};
+    const slow = vi.fn(
+      () =>
+        new Promise<LastfmFetchResult>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const lastfm = env.biography('112018', slow);
+    const appleFetch = vi.fn(async (subject: BiographyFetchSubject, language: BiographyLanguage) =>
+      appleFetchResult(subject.id, language),
+    );
+    const apple = env.appleBiography('112018', appleFetch);
+    await Promise.all([lastfm.service.ready, apple.service.ready]);
+    await tick();
+    expect(slow).toHaveBeenCalledTimes(1);
+    expect(appleFetch).toHaveBeenCalledTimes(1);
+    expect(apple.state().document?.source).toBe('apple');
+    finish({
+      ok: true,
+      store: true,
+      entry: {
+        source: 'lastfm',
+        sourceId: '112018',
+        artist: '112018',
+        language: 'en',
+        fetchedAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+        document: biographyDocument('112018', 'en', 'Last.fm 正文'),
+      },
+    });
+    await tick();
+    expect(lastfm.state().document?.source).toBe('lastfm');
+  });
+
+  it('缓存合计是两个来源加起来的，清理一次两份都清', async () => {
+    const env = setup();
+    const apple = env.appleBiography('112018', async (subject, language) =>
+      appleFetchResult(subject.id, language),
+    );
+    const lastfm = env.biography('Queen');
+    await Promise.all([apple.service.ready, lastfm.service.ready]);
+    await tick();
+    expect(env.store.get(env.resources.cacheState)).toMatchObject({ count: 2, loaded: true });
+    expect(await env.resources.clearText()).toBe(true);
+    expect(env.resources.caches.apple.get('112018', 'en')).toBeUndefined();
+    expect(env.resources.caches.lastfm.get('Queen', 'en')).toBeUndefined();
+    expect(env.store.get(env.resources.cacheState)).toMatchObject({ count: 0 });
+  });
+});
 
 describe('简介共享资源', () => {
   it('同一艺人的两个视图合并正文请求并都得到结果', async () => {
@@ -105,6 +259,8 @@ describe('简介共享资源', () => {
       ok: true,
       store: true,
       entry: {
+        source: 'lastfm',
+        sourceId: 'A',
         artist: 'A',
         language: 'en',
         fetchedAt: Date.now(),
@@ -115,7 +271,7 @@ describe('简介共享资源', () => {
     await tick();
     expect(a.state().document?.paragraphs).toEqual(['共享正文']);
     expect(b.state().document?.paragraphs).toEqual(['共享正文']);
-    expect(env.resources.cache.get('A', 'en')?.document?.paragraphs).toEqual(['共享正文']);
+    expect(env.resources.caches.lastfm.get('A', 'en')?.document?.paragraphs).toEqual(['共享正文']);
   });
   it('手选身份写缓存期间清理，写完也不能把旧手选结果交给偏好', async () => {
     const env = setup();
@@ -179,6 +335,8 @@ describe('简介共享资源', () => {
       ok: true,
       store: true,
       entry: {
+        source: 'lastfm',
+        sourceId: 'B',
         artist: 'B',
         language: 'en',
         fetchedAt: Date.now(),

@@ -21,9 +21,9 @@ function memoryStorage(initial: string | null = null) {
 }
 
 describe('startPlace', () => {
-  it('没有存档、存档认不出或存储出错时落在 START_PLACE', () => {
+  it('没有存档、存档无法识别或读取出错时落在首页，与没有可后退记录时的去处一致', () => {
     for (const storage of [null, memoryStorage(), memoryStorage('album'), memoryStorage('home ')]) {
-      expect(loadStartPlace(createStore(), storage)).toEqual(START_PLACE);
+      expect(loadStartPlace(createStore(), storage)).toEqual({ id: 'home' });
     }
     const broken = {
       getItem(): string | null {
@@ -31,7 +31,8 @@ describe('startPlace', () => {
       },
       setItem() {},
     };
-    expect(loadStartPlace(createStore(), broken)).toEqual(START_PLACE);
+    expect(loadStartPlace(createStore(), broken)).toEqual({ id: 'home' });
+    expect(START_PLACE).toEqual({ id: 'home' });
   });
 
   it('读回存档里的那一项，store 里同时记下', () => {
@@ -44,10 +45,10 @@ describe('startPlace', () => {
     const storage = memoryStorage();
     const store = createStore();
     loadStartPlace(store, storage);
-    chooseStartPlace(store, 'home', storage);
-    expect(store.get(startPlaceAtom)).toBe('home');
-    expect(storage.saved.get(START_PLACE_STORAGE_KEY)).toBe('home');
-    expect(loadStartPlace(createStore(), storage)).toEqual({ id: 'home' });
+    chooseStartPlace(store, 'genres', storage);
+    expect(store.get(startPlaceAtom)).toBe('genres');
+    expect(storage.saved.get(START_PLACE_STORAGE_KEY)).toBe('genres');
+    expect(loadStartPlace(createStore(), storage)).toEqual({ id: 'genres' });
   });
 
   it('可选的都是侧边栏里已上线的一级地点', () => {

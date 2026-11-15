@@ -5,9 +5,10 @@ import {
   BiographyOnlineSetting,
   BiographyPanel,
 } from '../../src/library/biography/BiographyPanel.tsx';
-import type {
-  BiographyInput,
-  BiographyLanguage,
+import {
+  lastfmInput,
+  type BiographyInput,
+  type BiographyLanguage,
 } from '../../src/library/biography/biographyModel.ts';
 import { startBiographyPrefs } from '../../src/library/biography/biographyPrefs.ts';
 import { startBiography } from '../../src/library/biography/biographyService.ts';
@@ -30,12 +31,13 @@ const artist = atom('Queen');
 const language = atom<BiographyLanguage>('zh');
 const active = atom(true);
 const prefs = startBiographyPrefs(store, fb, configWriter);
-const input = atom<BiographyInput>((get) => ({
-  artist: get(artist),
-  language: get(language),
-  sourceArtist:
+const input = atom<BiographyInput>((get) =>
+  lastfmInput(
+    get(artist),
     get(prefs.state).identities.find((item) => item.artist === get(artist))?.sourceArtist ?? null,
-}));
+    get(language),
+  ),
+);
 const service = startBiography(store, {
   input,
   active,

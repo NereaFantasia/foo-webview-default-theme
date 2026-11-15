@@ -7,12 +7,14 @@ import { queueCoverKey, queueCoverSize, queueCoverUrlsAtom } from './queueCovers
 
 /**
  * 行只在可见时取图；没有观察目标时用于常驻的当前曲目预览。`preview` 给数字时是要的边长（物理像素），
- * 显示得比预览档还大的封面（Coverflow 正中那张）自己按显示尺寸要图
+ * 显示得比预览档还大的封面（Coverflow 正中那张）自己按显示尺寸要图。`album` 是行所属专辑的键，同专辑的
+ * 各行共用一次取图；预览与 Coverflow 要的是这一首自己的图，不给
  */
 export function useQueueCover(
   path: string,
   preview: boolean | number,
   target?: RefObject<HTMLElement | null>,
+  album?: string | null,
 ) {
   const { covers } = useService(queueKey);
   const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio;
@@ -33,13 +35,14 @@ export function useQueueCover(
   const cover = useAtomValueRawSync(coverAtom);
   useEffect(() => {
     if (!path) return;
-    if (!target) return covers.watch(path, size);
+    if (!target) return covers.watch(path, size, album ?? undefined);
     const element = target.current;
     if (!element) return;
     let release: (() => void) | undefined;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !release) release = covers.watch(path, size);
+        if (entry.isIntersecting && !release)
+          release = covers.watch(path, size, album ?? undefined);
         else if (!entry.isIntersecting && release) {
           release();
           release = undefined;
@@ -52,6 +55,24 @@ export function useQueueCover(
       observer.disconnect();
       release?.();
     };
-  }, [covers, path, size, target]);
+  }, [covers, path, size, target, album]);
+  return cover;
+}
+
+/**
+ * 只要这一档尺寸的图：没到就是 `null`，不拿别的档垫（`useQueueCover` 在预览档没到时会退回行缩略图，
+ * 那一档比调用方手里已有的图还小时，垫上去反而更糊）。`size` 是要的边长（物理像素），`path` 为空不取
+ */
+export function useExactQueueCover(path: string, size: number): string | null {
+  const { covers } = useService(queueKey);
+  const coverAtom = useMemo(
+    () => atom((get) => get(queueCoverUrlsAtom).get(queueCoverKey(path, size)) ?? null),
+    [path, size],
+  );
+  const cover = useAtomValueRawSync(coverAtom);
+  useEffect(() => {
+    if (!path) return;
+    return covers.watch(path, size);
+  }, [covers, path, size]);
   return cover;
 }

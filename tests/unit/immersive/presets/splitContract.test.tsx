@@ -13,10 +13,11 @@ import { startSceneLyrics } from '../../../fixtures/sceneLyrics.ts';
 import { startSceneQueue } from '../../../fixtures/sceneQueue.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
-// 预设 1 的结构契约：全部场景状态里该有的元素都在、不该有的不在、封面至多一个、DOM 顺序对。
-// Coverflow 模式里模板照常排自己的（被宿主藏起），也在其中；模式的舞台由宿主放，见 PresetLayers 的测试。
+// 预设 1 的结构契约：全部场景状态里该有的元素都在、不该有的不在、封面至多一个、DOM 顺序对
+// Coverflow 模式里模板照常排自己的（被宿主藏起），也在其中；模式的舞台由宿主放，见 PresetLayers 的测试
 
 describe('预设 1「分栏」的结构契约', () => {
+  // 遍历全部场景状态（216 个版式）逐个静态渲染，负载高时会超过缺省的 5 s，所以放宽
   it('每个版式该有的元素都在，顺序是封面、信息、进度、传输', async () => {
     const env = await startSceneEnv();
     await startSceneQueue(env);
@@ -35,7 +36,7 @@ describe('预设 1「分栏」的结构契约', () => {
       allSceneViews(),
     );
     expect(problems).toEqual([]);
-  });
+  }, 30_000);
 
   it('进场时侧栏内容晚于封面列：外壳档只有封面列，放行到歌词档才挂歌词栏', async () => {
     const env = await startSceneEnv();

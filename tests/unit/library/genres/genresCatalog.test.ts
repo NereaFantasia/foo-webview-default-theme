@@ -1,10 +1,12 @@
+import { atom } from 'jotai/vanilla';
 import { expect, it, vi } from 'vitest';
 import { EMPTY_GENRE } from '../../../../src/nav/places.ts';
 import { GENRES_VALUES_PATTERN } from '../../../../src/library/genreValues.ts';
 import { libraryTracksAtom } from '../../../../src/library/libraryTracks.ts';
-import { genreTracksAnswer, genresLibrary } from '../../../fixtures/genresLibrary.ts';
+import { genresLibrary } from '../../../fixtures/genresLibrary.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
 import { trackRow } from '../../../fixtures/libraryRows.ts';
+import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
 
 const track = trackRow('One', 'Multi', { genre: 'Rock, Soul' });
 const valuesAnswer = (value: string) => ({
@@ -18,7 +20,7 @@ const valuesAnswer = (value: string) => ({
 
 it('整库先在别处读取失败，首次进入流派直接显示可重试的失败状态', async () => {
   const env = genresLibrary();
-  env.host.answer('library.getAll', hostFailure('OPERATION_FAILED'));
+  env.host.answer('library.search', hostFailure('OPERATION_FAILED'));
   env.library.want();
   await vi.waitFor(() => expect(env.store.get(libraryTracksAtom).status).toBe('failed'));
   env.catalog.want();
@@ -54,19 +56,42 @@ it('补读期间媒体库换代，晚来的旧标签不能覆盖新目录；释�
   const held = env.host.hold('titleformat.evalBatch');
   env.catalog.want();
   await vi.waitFor(() => expect(held.pending).toHaveLength(1));
-  env.host.answer('library.getAll', genreTracksAnswer([trackRow('Two', 'New', { genre: 'Jazz' })]));
+  env.host.answer('library.search', wholeLibrary([trackRow('Two', 'New', { genre: 'Jazz' })]));
   await env.library.retry();
   expect(env.state().entries.map((entry) => entry.key)).toEqual(['Jazz']);
   held.respond(0, valuesAnswer('Old\u001fGenre'));
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(env.state().entries.map((entry) => entry.key)).toEqual(['Jazz']);
-  env.host.answer('library.getAll', genreTracksAnswer([track]));
+  env.host.answer('library.search', wholeLibrary([track]));
   await env.library.retry();
   await vi.waitFor(() => expect(held.pending).toHaveLength(1));
   env.catalog.dispose();
   held.respond(0, valuesAnswer('Late'));
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(env.state().entries.map((entry) => entry.key)).toEqual(['Jazz']);
+});
+
+it('整理提示随目录给出；忽略只重算提示，不重新归类也不再读标签', async () => {
+  const ignored = atom<ReadonlySet<string>>(new Set<string>());
+  const env = genresLibrary(
+    [
+      trackRow('One', 'A', { genre: 'Rock' }),
+      trackRow('One', 'B', { genre: 'Soul' }),
+      trackRow('One', 'C', { genre: 'Rock; Soul' }),
+      trackRow('One', 'D', { genre: 'R&B/Soul' }),
+    ],
+    ignored,
+  );
+  await env.ready();
+  const entries = env.state().entries;
+  expect([...env.state().issues]).toEqual([
+    ['Rock; Soul', [{ kind: 'combined', parts: ['Rock', 'Soul'] }]],
+  ]);
+  const asked = env.host.callsTo('titleformat.evalBatch').length;
+  env.store.set(ignored, new Set(['Rock; Soul']));
+  expect(env.state().issues.size).toBe(0);
+  expect(env.state().entries).toBe(entries);
+  expect(env.host.callsTo('titleformat.evalBatch')).toHaveLength(asked);
 });
 
 it('部分读取没有文件信息时按失败处理，不把它当缺失流派', async () => {
@@ -90,7 +115,7 @@ it('标签补读在途时整库重取失败，晚到标签不能把失败改成�
   const held = env.host.hold('titleformat.evalBatch');
   env.catalog.want();
   await vi.waitFor(() => expect(held.pending).toHaveLength(1));
-  env.host.answer('library.getAll', hostFailure('OPERATION_FAILED'));
+  env.host.answer('library.search', hostFailure('OPERATION_FAILED'));
   await env.library.retry();
   expect(env.state().status).toBe('failed');
   held.release();

@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -152,6 +153,33 @@ function writeInstallation(): void {
   );
 }
 
+/**
+ * 构建完顺带把前后端装进宿主的模板目录（布局同在线安装），目录取环境变量或 .env.local 里的 THEME_INSTALL_DIR，
+ * 没设就什么也不做。装失败只告警，不让构建失败；安装在子进程里跑，不与这次构建共用进程内的 Vite
+ */
+function installToTemplate(): Plugin {
+  let target: string | undefined;
+  return {
+    name: 'theme-install-template',
+    apply: 'build',
+    configResolved(config) {
+      target =
+        process.env.THEME_INSTALL_DIR ||
+        loadEnv(config.mode, config.root, 'THEME_').THEME_INSTALL_DIR ||
+        undefined;
+    },
+    closeBundle() {
+      if (!target) return;
+      const run = spawnSync(
+        process.execPath,
+        [resolve('scripts/release/install-template.mjs'), target],
+        { stdio: 'inherit' },
+      );
+      if (run.status !== 0) console.warn(`装进模板目录失败：${target}`);
+    },
+  };
+}
+
 export default defineConfig({
   // 宿主从本地目录加载页面，资源路径必须是相对的。
   base: './',
@@ -159,6 +187,7 @@ export default defineConfig({
     react(),
     devBackendWatch(),
     { name: 'theme-installation', apply: 'build', writeBundle: writeInstallation },
+    installToTemplate(),
   ],
   // Fluent 的 react-tabster 与它依赖的 tabster 各带一份 keyborg（2.x 与 3.x）。两份共用 window 上的
   // 同一张实例表，却各自从 k1 起编号，编号撞了就会互相注销，键盘导航的焦点判断随之失灵。只打包一份。

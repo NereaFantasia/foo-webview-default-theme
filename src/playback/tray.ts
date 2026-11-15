@@ -11,8 +11,11 @@ import type { PlaybackService } from './playbackContract.ts';
 import { isOrderName } from './playbackOrder.ts';
 import { dbOf, positionOf, volumeScaleAtom } from './volumeScale.ts';
 import { colorSchemeAtom } from '../theme/colorScheme.ts';
+import { fontChoiceAtom } from '../theme/fontChoice.ts';
+import { fontStack } from '../theme/fontStack.ts';
 import { nativeMaterialsAllowedAtom } from '../theme/backdrop.ts';
-import { themeFor } from '../theme/themes.ts';
+import { accentRampAtom } from '../theme/accentState.ts';
+import { themeWithRamp } from '../theme/themes.ts';
 import type { Store } from '../kit/store.ts';
 import {
   buildTrayMenu,
@@ -36,7 +39,7 @@ import { serviceKey } from '../kit/serviceKey.ts';
 /**
  * 托盘集成：管理托盘图标、提示文案、三区自绘上下文菜单以及两项设置开关（`traySwitches.ts`）
  *
- * 菜单样式、配色方案、文案、勾选态及音量滑块位置均随完整菜单下发；任一属性变更均在 `MENU_COALESCE_MS` 内防抖后全量重发
+ * 菜单样式、配色方案、强调色、文案、勾选态及音量滑块位置均随完整菜单下发；任一属性变更均在 `MENU_COALESCE_MS` 内防抖后全量重发
  * （音量滑块与主窗口采用同一换算刻度，调整刻度亦触发重发）
  * 三区布局与配置通过 `setMenuZones` 一次性替换，宿主按序处理，连续下发时以后者为准
  * 歌曲卡片、音量条与播放顺序子菜单的点击经 `tray:menuItemClicked` 回传页面，但在深度挂起状态下无法即时处理
@@ -150,7 +153,8 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
     const mine = ++menuSerial;
     const scheme = store.get(colorSchemeAtom);
     const acrylic = store.get(nativeMaterialsAllowedAtom);
-    const theme = themeFor(scheme);
+    // 菜单是宿主单开的文档，到不了主窗的 CSS 变量，品牌色（播放键、音量条）要按主窗口此刻的强调色现算
+    const theme = themeWithRamp(scheme, store.get(accentRampAtom));
     const nowPlaying = onlineNowPlaying(store);
     sentCard = JSON.stringify(nowPlaying);
     const zones = buildTrayMenu({
@@ -168,6 +172,7 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
       css: trayMenuCss(
         acrylic ? theme : { ...theme, colorNeutralBackgroundAlpha2: theme.colorNeutralBackground1 },
         scheme === 'dark',
+        fontStack(store.get(fontChoiceAtom)),
       ),
     });
     const ok = await hostCommand(() => host.tray.setMenuZones(zones, config));
@@ -216,6 +221,8 @@ export function startTray(store: Store, deps: TrayDeps, host: TrayFace = fb): Tr
       }),
       ...[
         colorSchemeAtom,
+        accentRampAtom,
+        fontChoiceAtom,
         translateAtom,
         playbackOrderAtom,
         volumeDbAtom,

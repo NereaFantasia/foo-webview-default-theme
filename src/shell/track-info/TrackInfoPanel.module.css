@@ -103,6 +103,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+  /* 滚动区上下留出内边距，使首末项的焦点环不被裁切：折叠头的焦点环画在控件外 2px */
+  padding-block: var(--spacingVerticalXXS);
+  scroll-padding-block: var(--spacingVerticalXXS);
 }
 
 .rows {

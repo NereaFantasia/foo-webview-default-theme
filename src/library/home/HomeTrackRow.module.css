@@ -1,51 +1,118 @@
 .root {
   display: flex;
-  min-width: 0;
   align-items: center;
-  gap: var(--spacingHorizontalS);
-  padding: var(--spacingVerticalS) 0;
-  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
-}
-.metadata {
-  flex: 1;
+  gap: var(--spacingHorizontalM);
+  box-sizing: border-box;
   min-width: 0;
+  height: 60px;
+  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--borderRadiusMedium);
+  padding: 0 var(--spacingHorizontalXS) 0 var(--spacingHorizontalS);
+  transition:
+    background-color var(--motion-faster) var(--curveLinear),
+    border-bottom-color var(--motion-faster) var(--curveLinear);
 }
-.title {
-  display: block;
-  max-width: 100%;
+
+/* 悬停的底带圆角，行间细线会从圆角外露出来，这时收掉 */
+.root:hover {
+  border-bottom-color: transparent;
+  background: var(--state-hover);
+}
+
+.art {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: start;
-  color: var(--colorNeutralForeground1);
-  background: transparent;
-  font: inherit;
   border: 0;
+  border-radius: var(--borderRadiusSmall);
   padding: 0;
+  background: transparent;
   cursor: pointer;
 }
+
+.art:disabled {
+  cursor: default;
+}
+
+.art:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+/* 播放标记压在封面上：封面什么颜色都有，用固定的暗罩与白色图标 */
+.play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--colorBackgroundOverlay);
+  color: var(--colorNeutralForegroundStaticInverted);
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.root:hover .play,
+.art:focus-visible .play {
+  opacity: 1;
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.title {
+  max-width: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--borderRadiusSmall);
+  padding: 0;
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font: inherit;
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.title:disabled {
+  cursor: default;
+}
+
 .title:focus-visible {
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
 }
+
 .detail {
-  display: block;
+  display: flex;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.artists {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--colorNeutralForeground2);
-  font-size: var(--fontSizeBase200);
 }
-.duration {
-  width: 4ch;
-  text-align: end;
-  font-variant-numeric: tabular-nums;
+
+.when {
+  flex: none;
+  white-space: nowrap;
 }
-.date {
-  color: var(--colorNeutralForeground2);
-  font-size: var(--fontSizeBase200);
-}
-@media (max-width: 700px) {
-  .date {
-    display: none;
-  }
+
+.artists + .when::before {
+  margin: 0 var(--spacingHorizontalXS);
+  content: '·';
 }

@@ -6,7 +6,13 @@
   pointer-events: none;
 }
 
-.backdrop > canvas {
+/* 渲染器各占一层并铺满；后建的层在 DOM 中靠后，覆盖先建的层 */
+.backdrop > [data-backdrop-layer] {
+  position: absolute;
+  inset: 0;
+}
+
+.backdrop canvas {
   display: block;
   width: 100%;
   height: 100%;

@@ -1,0 +1,40 @@
+.mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--borderRadiusSmall);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.mark:hover:not(:disabled) {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.mark:active:not(:disabled) {
+  background: var(--state-pressed);
+}
+
+.mark:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.mark[data-favorite] {
+  color: var(--colorPaletteRedForeground1);
+}
+
+/* 没收藏时只在指针停在正在播放这一块上、或焦点在里面时出空心；位置一直占着，露不露都不挪别的字 */
+[data-rating-host]:not(:hover, :focus-within) .mark:not([data-favorite]) {
+  opacity: 0;
+}

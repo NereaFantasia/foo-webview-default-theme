@@ -1,15 +1,21 @@
 import type { LyricLine, LyricWord } from '@applemusic-like-lyrics/core';
+import { fontWeightOf } from '../../kit/variableFont.ts';
+import { motionCustomFrom } from './desktopLyricsMotion.ts';
+import { fontNameOf } from '../../theme/fontStack.ts';
+import { parseLyricsDisplay, type LyricsDisplay } from '../lyricsDisplay.ts';
 import {
   DESKTOP_LYRICS_ALIGNS,
   DESKTOP_LYRICS_MODES,
   DESKTOP_LYRICS_MOTION_PRESETS,
   parseDesktopLyricsBounds,
   parseDesktopLyricsSizeMemory,
+  parseMotionCustom,
   type DesktopLyricsAlign,
   type DesktopLyricsBounds,
   type DesktopLyricsMode,
   type DesktopLyricsMotionPreset,
   type DesktopLyricsSizeMemory,
+  type DesktopMotionCustom,
 } from './desktopLyricsPrefs.ts';
 
 /**
@@ -38,15 +44,28 @@ export const DESKTOP_LYRICS_LABELS = [
 ] as const;
 export type DesktopLyricsLabel = (typeof DESKTOP_LYRICS_LABELS)[number];
 
+/** 与主窗口共用的内容整理与屏蔽设置：它们决定显示哪些字，不是桌面自己的显示偏好 */
+export type DesktopLyricsProcess = Pick<LyricsDisplay, 'optimize' | 'maskMode' | 'maskChar'>;
+
 export interface DesktopLyricsView {
   readonly labels: Readonly<Record<DesktopLyricsLabel, string>>;
   readonly locked: boolean;
   readonly align: DesktopLyricsAlign;
   readonly motionPreset: DesktopLyricsMotionPreset;
+  /** 自定义动效的四项，只对多行生效；预设不是自定义时不用 */
+  readonly motionCustom: DesktopMotionCustom;
   readonly mode: DesktopLyricsMode;
   readonly multilineSize: DesktopLyricsSizeMemory | null;
   /** 当前行的字号，CSS 像素 */
   readonly fontSize: number;
+  /** 译文字号，CSS 像素 */
+  readonly translationFontSize: number;
+  /** 桌面歌词的字体与字重；空串、null 沿用界面字体与继承的字重 */
+  readonly font: string;
+  readonly fontWeight: number | null;
+  /** 主窗口的界面字体：弹窗是另一个页面，读不到主窗口的偏好，自己用同一个函数拼字体栈 */
+  readonly uiFont: string;
+  readonly cjkFont: string;
   /** 已唱色；null 是只用一层、照 AMLL 原样淡显未唱部分 */
   readonly sung: string | null;
   /** 未唱色；null 用界面的前景色 */
@@ -66,6 +85,7 @@ export interface DesktopLyricsView {
   readonly artist: string;
   /** 主窗口正在前台显示歌词，弹窗淡出 */
   readonly hidden: boolean;
+  readonly process: DesktopLyricsProcess;
 }
 
 /** `lines` 为 null 是没有带时间轴的歌词，弹窗显示曲名与艺人 */
@@ -101,10 +121,23 @@ const isNumber = (raw: unknown): raw is number => typeof raw === 'number' && Num
 const isString = (raw: unknown): raw is string => typeof raw === 'string';
 const isBoolean = (raw: unknown): raw is boolean => typeof raw === 'boolean';
 const HEX = /^#[0-9a-f]{6}$/i;
+/** 旧版主窗口没有自定义动效这一项：取 AMLL 档的四项 */
+const AMLL_CUSTOM = motionCustomFrom('amll');
 const colorOrNull = (raw: unknown) => (isString(raw) && HEX.test(raw) ? raw : null);
 
 function isLabels(labels: Record<string, unknown>): labels is Record<DesktopLyricsLabel, string> {
   return DESKTOP_LYRICS_LABELS.every((key) => isString(labels[key]));
+}
+
+/** 旧版主窗口没有这一项：取正文的 0.6 倍 */
+function parseTranslationSize(raw: unknown, fontSize: number): number {
+  return isNumber(raw) ? Math.min(96, Math.max(10, raw)) : Math.round(fontSize * 0.6);
+}
+
+/** 缺项或不合法时回到缺省，旧版主窗口的共享状态里没有这一项 */
+function parseProcess(raw: unknown): DesktopLyricsProcess {
+  const { optimize, maskMode, maskChar } = parseLyricsDisplay(raw);
+  return { optimize, maskMode, maskChar };
 }
 
 export function parseDesktopLyricsView(raw: unknown): DesktopLyricsView | null {
@@ -146,9 +179,15 @@ export function parseDesktopLyricsView(raw: unknown): DesktopLyricsView | null {
     locked,
     align,
     motionPreset,
+    motionCustom: parseMotionCustom(field(raw, 'motionCustom'), AMLL_CUSTOM),
     mode,
     multilineSize: parseDesktopLyricsSizeMemory(field(raw, 'multilineSize')),
     fontSize: Math.min(96, Math.max(12, fontSize)),
+    translationFontSize: parseTranslationSize(field(raw, 'translationFontSize'), fontSize),
+    font: fontNameOf(field(raw, 'font')),
+    fontWeight: fontWeightOf(field(raw, 'fontWeight')),
+    uiFont: fontNameOf(field(raw, 'uiFont')),
+    cjkFont: fontNameOf(field(raw, 'cjkFont')),
     sung: colorOrNull(field(raw, 'sung')),
     unsung: colorOrNull(field(raw, 'unsung')),
     tint: colorOrNull(field(raw, 'tint')),
@@ -161,6 +200,7 @@ export function parseDesktopLyricsView(raw: unknown): DesktopLyricsView | null {
     title,
     artist,
     hidden,
+    process: parseProcess(field(raw, 'process')),
   };
 }
 
@@ -229,7 +269,37 @@ export function desktopLyricsViewJson(view: DesktopLyricsView) {
     ...view,
     labels: { ...view.labels },
     multilineSize: view.multilineSize && { ...view.multilineSize },
+    motionCustom: { ...view.motionCustom },
+    process: { ...view.process, optimize: { ...view.process.optimize } },
   };
+}
+
+/** 歌词行转成纯 JSON：共享状态只收标准 JSON，与 `parseDesktopLyricsLines` 互逆 */
+export function desktopLyricsLinesJson(lines: readonly LyricLine[]) {
+  return lines.map((line) => ({
+    startTime: line.startTime,
+    endTime: line.endTime,
+    translatedLyric: line.translatedLyric,
+    romanLyric: line.romanLyric,
+    isBG: line.isBG,
+    isDuet: line.isDuet,
+    words: line.words.map((word) => ({
+      word: word.word,
+      startTime: word.startTime,
+      endTime: word.endTime,
+      romanWord: word.romanWord ?? '',
+      obscene: word.obscene ?? false,
+      ...(word.ruby
+        ? {
+            ruby: word.ruby.map(({ word: text, startTime, endTime }) => ({
+              word: text,
+              startTime,
+              endTime,
+            })),
+          }
+        : {}),
+    })),
+  }));
 }
 
 export function desktopLyricsMessage(command: DesktopLyricsCommand) {

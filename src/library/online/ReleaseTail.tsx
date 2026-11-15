@@ -27,24 +27,22 @@ const LOOKAHEAD = '0px 0px 600px 0px';
 
 /**
  * 艺人发行作品列表底部状态栏：承载滚动触底自动续取、手动加载、重试与截断提示
- * 激活过滤条件时禁用自动触底以防无节制拉取至上限，转为手动加载；非墙面概览视图仅展示预览状态
+ * 激活过滤条件时禁用自动触底以防无节制拉取至上限，转为手动加载
  */
 export function ReleaseTail({
   releases,
   scroller,
-  wall,
 }: {
   readonly releases: ArtistReleases;
   /** 滚动容器元素，作为交叉观察器的视口根节点 */
   readonly scroller: HTMLElement | null;
-  readonly wall: boolean;
 }) {
   const t = useAtomValueRawSync(translateAtom);
   const controls = useViewControlStyles();
   const pill = mergeClasses(controls.field, usePillStyles().pill);
   const { state, search, filtering } = releases;
   const ready = state?.phase === 'ready' ? state : null;
-  const auto = wall && !!ready?.paused && !filtering;
+  const auto = !!ready?.paused && !filtering;
   const sentinel = useRef<HTMLDivElement>(null);
   const latest = useRef(releases.loadMore);
   useLayoutEffect(() => {
@@ -65,9 +63,9 @@ export function ReleaseTail({
   }, [auto, scroller]);
 
   const failed = !!ready?.moreFailed;
-  const loading = wall && !failed && !!ready?.loadingMore;
-  const manual = wall && !failed && !loading && !!ready?.paused && filtering;
-  const limit = wall && !!ready?.truncated;
+  const loading = !failed && !!ready?.loadingMore;
+  const manual = !failed && !loading && !!ready?.paused && filtering;
+  const limit = !!ready?.truncated;
   return (
     <>
       <div ref={sentinel} className={styles.tail} data-artist-releases-tail>

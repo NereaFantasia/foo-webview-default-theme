@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { albumTracksAnswer, libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
-import { openArtists } from '../fixtures/artistsPage.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { installFakeQueue, queueTracks } from '../fixtures/fakeQueue.ts';
 import { openLargeQueue } from '../fixtures/rightCardPage.ts';
@@ -98,23 +97,6 @@ test('下拉曲序刷新保留曲目身份，移除焦点曲目后不留下失�
   await page.keyboard.press('Home');
   await expect(selected).toContainText('Blue Train 2');
   expect(errors).toEqual([]);
-});
-
-test('艺人焦点被过滤后，菜单键和回车不能操作隐藏对象', async ({ page }) => {
-  const env = await openArtists(page);
-  await env.artist('Nujabes').click();
-  await env.view.getByRole('textbox').fill('Fat Jon');
-  await expect(env.artist('Nujabes')).toHaveCount(0);
-  await env.list.focus();
-  await page.keyboard.press('Shift+F10');
-  await expect(page.getByRole('menu')).toHaveCount(0);
-  await page.keyboard.press('Enter');
-  expect(env.host.callsTo('playlist.playTrack')).toHaveLength(0);
-  await page.keyboard.press('Home');
-  await page.keyboard.press('Shift+F10');
-  await page.getByRole('menuitem', { name: '复制名称', exact: true }).click();
-  await expect.poll(() => env.host.callsTo('clipboard.write').at(-1)).toEqual({ text: 'Fat Jon' });
-  expect(env.errors).toEqual([]);
 });
 
 test('队列 Ctrl+A 选中当前段全部曲目，Delete 移除后可撤销', async ({ page }) => {

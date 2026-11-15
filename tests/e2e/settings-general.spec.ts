@@ -146,11 +146,13 @@ test('正在用的外部语言文件被移走：再进设置页，下拉框仍�
     },
   });
   await settings.choose('界面语言', '日本語');
+  // 语言包里只有「复制」一个键，分区名回落到中文；带这个键的按钮在「关于」的版本卡上
+  await settings.show('关于');
   await expect(page.getByRole('button', { name: 'コピー 版本' })).toBeVisible();
 
   settings.host.answer('file.list', listed([]));
   await clickSideButton(page, 'back');
-  await enterSettings(page);
+  await enterSettings(page, '常规');
   await expect.poll(() => settings.host.callsTo('file.list').length).toBeGreaterThan(2);
   await expect(settings.select('界面语言')).toHaveText('日本語');
   await expect(settings.card('界面语言')).not.toContainText('当前：');
@@ -250,14 +252,17 @@ test('没有宿主：靠宿主生效的几项禁用并写明原因，语言与�
   await expect(page.getByRole('switch', { name: '关闭到托盘' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '打开 媒体库文件夹' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '打开 foobar2000 首选项' })).toBeDisabled();
-  await openBackground(page);
-  await expect(backgroundSources(page).getByRole('radio', { name: '主题色背景' })).toBeEnabled();
   for (const title of ['最小化到托盘', '关闭到托盘']) {
     await expect(settings.row(title)).toContainText(NEEDS_HOST);
   }
   for (const title of ['媒体库文件夹', 'foobar2000 首选项']) {
     await expect(settings.card(title)).toContainText(NEEDS_HOST);
   }
+  await expect(settings.select('界面语言')).toBeEnabled();
+
+  // 「窗口背景」与「颜色模式」在「外观」
+  await openBackground(page);
+  await expect(backgroundSources(page).getByRole('radio', { name: '主题色背景' })).toBeEnabled();
   await expect(settings.card('窗口背景')).toContainText(NEEDS_HOST);
   await expect(backgroundSources(page).getByRole('radio', { name: '系统材质' })).toBeDisabled();
   await expect(backgroundSources(page).getByRole('radio', { name: '流动色场' })).toBeEnabled();
@@ -266,9 +271,10 @@ test('没有宿主：靠宿主生效的几项禁用并写明原因，语言与�
       .getByRole('tablist', { name: '材质', exact: true })
       .getByRole('tab', { name: 'Mica', exact: true }),
   ).toBeDisabled();
-
-  await expect(settings.select('界面语言')).toBeEnabled();
   await expect(settings.radios('颜色模式').getByRole('radio').first()).toBeEnabled();
+
+  // 「版本」与「致谢」在「关于」
+  await settings.show('关于');
   await expect(settings.card('版本')).toContainText(NEEDS_HOST);
   await expect(page.getByRole('button', { name: '复制 版本' })).toBeDisabled();
   await expect(page.locator('[data-settings-credit]').first()).toBeDisabled();

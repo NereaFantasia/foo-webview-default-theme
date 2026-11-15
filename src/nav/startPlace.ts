@@ -22,7 +22,7 @@ export const START_PLACE_STORAGE_KEY = 'default-theme.start-place.v1';
 // 缺省与 `START_PLACE` 一致
 const pref = defineLocalPref<StartPlaceChoice>({
   key: START_PLACE_STORAGE_KEY,
-  fallback: 'albums',
+  fallback: 'home',
   ...choiceCodec(START_PLACE_CHOICES),
 });
 

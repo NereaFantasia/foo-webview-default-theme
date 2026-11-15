@@ -3,6 +3,7 @@ import type { PlayerBarStyle } from '../../src/theme/playerBarStyle.ts';
 import { installFakeQueue, queueTracks, type FakeQueue } from '../fixtures/fakeQueue.ts';
 import type { PageHost } from '../fixtures/pageHost.ts';
 import { choosePlayerBar, openPlayer } from '../fixtures/playerPage.ts';
+import { pressOn } from '../fixtures/pressOn.ts';
 
 interface QueuePage {
   readonly host: PageHost;
@@ -62,7 +63,7 @@ test('窄窗：卡是浮层，点外面收起；Esc 收起时焦点回到队列�
   expect(errors).toEqual([]);
 });
 
-test('Delete 移除选中的几首；清空之后出提示，撤销按原来的顺序放回', async ({ page }) => {
+test('Delete 移除选中的几首；清空之后出提示，撤销按原来的顺序放回 @smoke', async ({ page }) => {
   const { queue, errors } = await openQueue(page);
   await row(page, 'Teardrop').click();
   await row(page, 'Accordion').click({ modifiers: ['Control'] });
@@ -80,7 +81,7 @@ test('Delete 移除选中的几首；清空之后出提示，撤销按原来的�
   expect(errors).toEqual([]);
 });
 
-test('拖动排序：按住一行拖到另一行上半截，松手一次提交', async ({ page }) => {
+test('拖动排序：按住一行拖到另一行上半截，松手一次提交 @smoke', async ({ page }) => {
   const { queue, host, errors } = await openQueue(page);
   await row(page, 'Accordion').hover();
   await expect(row(page, 'Accordion').locator('[data-queue-handle]')).toBeVisible();
@@ -98,7 +99,7 @@ test('拖动排序：按住一行拖到另一行上半截，松手一次提交',
   expect(errors).toEqual([]);
 });
 
-test('双击立即播放：排在它前面的跳过，它被取走', async ({ page }) => {
+test('双击立即播放：排在它前面的跳过，它被取走 @smoke', async ({ page }) => {
   const { queue, host, errors } = await openQueue(page);
   await row(page, 'Accordion').dblclick();
   await expect.poll(() => host.callsTo('queue.playNow')).toEqual([{ index: 0 }]);
@@ -113,6 +114,30 @@ test('右键菜单：作用于右键的那一行，「移到队首」改顺序',
   await expect(menu).toContainText('队列第 3 项');
   await menu.getByRole('menuitem', { name: '移到队首' }).click();
   await expect.poll(() => queue.titles()).toEqual(['Accordion', 'Teardrop', 'Glory Box']);
+  expect(errors).toEqual([]);
+});
+
+test('菜单开着时左键点另一行：只关菜单，那一行不被选中；右键另一行直接换成它的菜单', async ({
+  page,
+}) => {
+  const { errors } = await openQueue(page);
+  const menu = page.locator('[data-queue-menu="queued"]');
+  await row(page, 'Accordion').click({ button: 'right' });
+  await expect(menu).toContainText('队列第 3 项');
+  await pressOn(page, row(page, 'Teardrop'));
+  await expect(menu).toHaveCount(0);
+  await expect(row(page, 'Teardrop')).not.toHaveAttribute('aria-selected', 'true');
+  await expect(row(page, 'Accordion')).toHaveAttribute('aria-selected', 'true');
+  await row(page, 'Teardrop').click();
+  await expect(row(page, 'Teardrop')).toHaveAttribute('aria-selected', 'true');
+  await row(page, 'Accordion').click({ button: 'right' });
+  await expect(menu).toContainText('队列第 3 项');
+  await pressOn(page, row(page, 'Glory Box'), { button: 'right' });
+  await expect(menu).toContainText('队列第 2 项');
+  const hideSidebar = page.getByRole('button', { name: '隐藏侧边栏' });
+  await pressOn(page, hideSidebar);
+  await expect(menu).toHaveCount(0);
+  await expect(hideSidebar).toHaveAttribute('aria-expanded', 'true');
   expect(errors).toEqual([]);
 });
 

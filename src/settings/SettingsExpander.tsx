@@ -1,6 +1,7 @@
 import { ChevronDown16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import {
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -13,6 +14,7 @@ import {
 import { FOLD_CLOSE, FOLD_OPEN } from '../motion/foldMotion.ts';
 import { reducedMotionAtom } from '../motion/reducedMotion.ts';
 import { motionDuration } from '../motion/timing.ts';
+import { ExpanderRegistryContext, SettingsGroupContext } from './expanderMemory.ts';
 import { ErrorAnnouncer, type SettingsCardIds } from './SettingsCard.tsx';
 import styles from './SettingsExpander.module.css';
 import { useSettingsLayout } from './useSettingsLayout.ts';
@@ -82,6 +84,28 @@ export function SettingsExpander({
   const descriptionId = useId();
   const panelId = useId();
   const described = description || feedback ? descriptionId : undefined;
+
+  // 设置页把各卡的开合记进历史快照：登记处只在设置页里有，别处的展开卡不登记
+  const registry = useContext(ExpanderRegistryContext);
+  const group = useContext(SettingsGroupContext);
+  const openNow = useRef(open);
+  useLayoutEffect(() => {
+    openNow.current = open;
+  }, [open]);
+  useLayoutEffect(() => {
+    if (!registry || group === null || !expandable) return;
+    return registry.register(`${group}/${title}`, {
+      isOpen: () => openNow.current,
+      setOpen(next) {
+        // 还原是直接到位：标成已播过，开合的动画不再播。
+        // openNow 同步改写：StrictMode 挂载后立即清理并重新登记，那时重渲染还没提交，登记处要读到还原后的值
+        played.current = next;
+        openNow.current = next;
+        setMounted(next);
+        setOpen(next);
+      },
+    });
+  }, [registry, group, title, expandable]);
 
   useEffect(() => {
     if (expandable === wasExpandable.current) return;

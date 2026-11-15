@@ -1,0 +1,89 @@
+.rail {
+  position: relative;
+}
+
+/* 四周留一圈内边距再用负外边距抵掉：滚动容器会裁掉贴边条目的焦点环 */
+.track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--rail-item);
+  column-gap: var(--rail-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: calc(var(--spacingVerticalXS) * -1) calc(var(--spacingHorizontalXS) * -1);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalXS);
+  scroll-padding-inline: var(--spacingHorizontalXS);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.cell {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+/*
+ * 横幅两侧的箭头：没有底与描边，压在横幅图左右边缘的里面，不探出行边（浅色下白箭头落在页面底上看不见）。
+ * 图什么颜色都有，用固定的白色加一圈淡阴影，与封面上的播放标记同一种处理；悬停放大一点，按下时箭头变暗
+ */
+.arrow {
+  position: absolute;
+  top: calc(var(--rail-arrow) - 32px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 64px;
+  border: 0;
+  border-radius: var(--borderRadiusMedium);
+  padding: 0;
+  background: transparent;
+  color: var(--colorNeutralForegroundStaticInverted);
+  filter: drop-shadow(0 0 3px var(--colorBackgroundOverlay));
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.arrow svg {
+  width: 18px;
+  height: 36px;
+}
+
+.rail:hover .arrow,
+.rail:focus-within .arrow {
+  opacity: 1;
+}
+
+/* 放大本身不是动效，减弱动效时照样有，只是不过渡 */
+.arrow:hover {
+  transform: scale(1.1);
+}
+
+/* 按下时白色混入三成透明，透出下面的图，比悬停时暗 */
+.arrow:active {
+  color: color-mix(in srgb, var(--colorNeutralForegroundStaticInverted) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .arrow {
+    transition:
+      opacity var(--motion-faster) var(--curveLinear),
+      transform var(--motion-faster) var(--curveEasyEase);
+  }
+}
+
+.prev {
+  left: var(--spacingHorizontalXS);
+}
+
+.next {
+  right: var(--spacingHorizontalXS);
+}
+
+@media (hover: none) {
+  .arrow {
+    opacity: 1;
+  }
+}

@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { BIOGRAPHY_PREFS_KEY } from '../../src/library/biography/biographyPrefs.ts';
 import { biographyHtml, biographyOverviewHtml } from '../fixtures/biographySamples.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
-import { enterSettings } from '../fixtures/settingsPage.ts';
+import { enterSettings, showSection } from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { lastfmCalls, withoutMusicbrainz } from '../fixtures/musicbrainzSamples.ts';
 import {
@@ -10,20 +11,19 @@ import {
   expandBiographyArticle,
   openBiographyLink,
 } from '../fixtures/biographyActions.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 const panel = (page: Page) => page.locator('[data-biography]');
-const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true });
-/** 上一次点击留下的悬停提示会盖在分页栏上，等它收了再点，免得点到提示上 */
-async function clickTab(page: Page, name: string) {
-  await page.mouse.move(640, 700);
-  await expect(page.getByRole('tooltip')).toHaveCount(0);
-  await tab(page, name).click();
-}
 const toggle = (page: Page) => page.getByRole('switch', { name: '在线艺人简介' });
+// 只取简介正文与艺人页的请求。照片区在简介取完后随即请求相册页，
+// 相册页由 biography-gallery 的用例覆盖
+const textCalls = (calls: Parameters<typeof lastfmCalls>[0]) =>
+  lastfmCalls(calls).filter((call) => !String(call['url']).endsWith('/+images'));
 
 async function start(page: Page) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const player = await openPlayer(page, {
+    config: LASTFM_SOURCE_CONFIG,
     state: { track: makeTrack({ artist: 'Queen', title: 'One' }) },
   });
   player.host.answer(
@@ -60,8 +60,7 @@ async function start(page: Page) {
 }
 
 async function openBiography(page: Page) {
-  await page.locator('[data-right-card-key="queue"]').click();
-  await clickTab(page, '简介');
+  await openRightCardPage(page, 'bio');
   await expect(panel(page)).toBeVisible();
 }
 
@@ -97,7 +96,7 @@ test('主窗设置、简介分页与来源许可接通，重载恢复开关和�
   await expandBiographyArticle(page);
   await expect(panel(page).getByText('CC BY-SA 3.0')).toBeVisible();
   await settled(page);
-  expect(lastfmCalls(host.callsTo('http.get'))).toHaveLength(2);
+  expect(textCalls(host.callsTo('http.get'))).toHaveLength(2);
   await expect
     .poll(() => host.config.get(BIOGRAPHY_PREFS_KEY))
     .toEqual({
@@ -133,11 +132,11 @@ test('换曲后立即撤掉旧艺人，换页和收起期间不联网，停止�
   const held = player.host.hold('http.get');
   await confirm(page);
   await expect.poll(() => held.pending.length).toBe(1);
-  await clickTab(page, '队列');
+  await openRightCardPage(page, 'queue');
   held.respond(0);
   held.release();
   await expect(panel(page)).toHaveCount(0);
-  await clickTab(page, '简介');
+  await openRightCardPage(page, 'bio');
   await expect(panel(page).getByText('Other 的正文')).toBeVisible();
   await settled(page);
   const count = lastfmCalls(player.host.callsTo('http.get')).length;
@@ -168,6 +167,7 @@ test('界面语言决定来源语言，关闭在线设置使在途正文失效',
   await confirm(page);
   await expect(panel(page).getByText('Queen 的正文')).toBeVisible();
   await settled(page);
+  await showSection(page, '常规');
   const held = host.hold('http.get');
   await page.getByRole('combobox', { name: '界面语言' }).click();
   await page.getByRole('option', { name: 'English', exact: true }).click();
@@ -176,6 +176,7 @@ test('界面语言决定来源语言，关闭在线设置使在途正文失效',
     'https://www.last.fm/music/Queen/+wiki',
   );
   await expect(panel(page).getByText('Queen 的正文')).toHaveCount(0);
+  await page.locator('[data-settings-nav]').getByRole('button', { name: 'Online content' }).click();
   await page.getByRole('switch', { name: 'Online biographies' }).uncheck();
   held.respond(0);
   held.release();
@@ -214,12 +215,13 @@ test('沉浸视图或隐藏页面暂停采集；暂停期间落地的刷新只�
   // 在视图里时界面不采纳；落地的请求仍写了缓存，返回后读到的是它
   await expect(panel(page).getByText('刷新后落地的正文')).toBeVisible();
   await expect(panel(page).getByText('Queen 的正文')).toHaveCount(0);
-  const count = lastfmCalls(host.callsTo('http.get')).length;
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await expect(panel(page).getByText('刷新后落地的正文')).toHaveCount(0);
+  // 返回简介页时相册页的请求晚一拍才发；暂停生效之后再记数，只看暂停期间有没有新请求
+  const count = lastfmCalls(host.callsTo('http.get')).length;
   await page.waitForTimeout(400);
   expect(lastfmCalls(host.callsTo('http.get'))).toHaveLength(count);
   await page.evaluate(() => {
@@ -260,7 +262,7 @@ test('中文没有正文时显示纯英文，简介语言可独立切换日语�
   await expect(panel(page).getByText('Queen is a British rock band.')).toBeVisible();
   await expandBiographyArticle(page);
   await settled(page);
-  expect(lastfmCalls(host.callsTo('http.get')).map((call) => call['url'])).toEqual([
+  expect(textCalls(host.callsTo('http.get')).map((call) => call['url'])).toEqual([
     'https://www.last.fm/zh/music/Queen/+wiki',
     'https://www.last.fm/music/Queen/+wiki',
     'https://www.last.fm/music/Queen',
@@ -311,9 +313,50 @@ test('设置页统计与清理接入，关闭在线仍可清理，不清除身�
     });
   await toggle(page).check();
   await expect(panel(page).getByText('简介缓存已清理')).toBeVisible();
-  expect(lastfmCalls(host.callsTo('http.get'))).toHaveLength(2);
+  expect(textCalls(host.callsTo('http.get'))).toHaveLength(2);
   await panel(page).getByRole('button', { name: '刷新简介' }).click();
   await expect(panel(page).getByText('Queen 的正文')).toBeVisible();
   await expect(cache).toContainText('1 条');
   expect(errors).toEqual([]);
+});
+
+test('一首歌有多位艺人时可切换：默认取专辑艺人，选中的留到下一首，署名里没有他就回到默认', async ({
+  page,
+}) => {
+  const player = await start(page);
+  await toggle(page).check();
+  await openBiography(page);
+  const play = async (artists: string[], albumArtist: string) => {
+    const track = makeTrack({
+      title: `Song ${artists.join('+')}`,
+      path: `file://E:/Music/${artists.join('+')}.flac`,
+      artist: artists.join(', '),
+      artists,
+      albumArtist,
+      albumArtists: [albumArtist],
+    });
+    player.state.track = track;
+    await player.host.emit('playback:trackChanged', track);
+  };
+  const heading = (name: string) => panel(page).getByRole('heading', { name, exact: true });
+  const chip = (name: string) => page.locator(`[data-biography-artist="${name}"]`);
+  // 蔡依林署名在前，专辑是周杰伦的：简介与封面所属的专辑一致，先看周杰伦
+  await play(['蔡依林', '周杰伦'], '周杰伦');
+  await expect(heading('周杰伦')).toBeVisible();
+  await expect(chip('周杰伦')).toHaveAttribute('aria-pressed', 'true');
+  await expect(chip('蔡依林')).toHaveAttribute('aria-pressed', 'false');
+  await chip('蔡依林').click();
+  await expect(heading('蔡依林')).toBeVisible();
+  await expect(chip('蔡依林')).toHaveAttribute('aria-pressed', 'true');
+  // 下一首署名里还有蔡依林，选中的不变
+  await play(['周杰伦', '蔡依林'], '周杰伦');
+  await expect(heading('蔡依林')).toBeVisible();
+  // 只有一位时不出切换；回到两位的歌，之前的选择已经作废
+  await play(['周杰伦'], '周杰伦');
+  await expect(heading('周杰伦')).toBeVisible();
+  await expect(page.locator('[data-biography-artists]')).toHaveCount(0);
+  await play(['蔡依林', '周杰伦'], '周杰伦');
+  await expect(heading('周杰伦')).toBeVisible();
+  await expect(chip('周杰伦')).toHaveAttribute('aria-pressed', 'true');
+  expect(player.errors).toEqual([]);
 });

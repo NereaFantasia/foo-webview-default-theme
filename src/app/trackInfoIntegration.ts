@@ -1,7 +1,7 @@
 import type { Track } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom } from 'jotai/vanilla';
-import { historyAtom } from '../nav/navHistory.ts';
+import { mainHistoryAtom } from '../nav/navHistory.ts';
 import type { AppServices } from './services.ts';
 import { startTrackInfo, type TrackInfoHost } from '../shell/track-info/trackInfo.ts';
 import type { TrackInfoTarget } from '../shell/track-info/trackInfoTarget.ts';
@@ -43,7 +43,7 @@ export function startTrackInfoIntegration(
     const view = get(rightCard.card.view);
     return (
       get(visible) &&
-      get(historyAtom).place.id !== 'nowPlaying' &&
+      get(mainHistoryAtom).place.id !== 'nowPlaying' &&
       view.form !== 'none' &&
       view.prefs.page === 'info'
     );

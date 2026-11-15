@@ -33,6 +33,23 @@ describe('Progress', () => {
     expect(html).toMatch(/data-seek-clock="duration"[^>]*>2:55</);
   });
 
+  it('预览放在元素里（inline）：歌词浮在线上方、不占位，时间行照旧悬在线下；缺省仍是浮层', async () => {
+    const env = await startSceneEnv();
+    await startSceneLyrics(env, null);
+    env.play(makeTrack());
+    report(env, { position: 62, duration: 175, canSeek: true });
+    await flush();
+    const inline = env.render(<Progress preview="inline" />);
+    expect(inline).toContain('data-seek-lyrics');
+    expect(inline).toMatch(/data-seek-clock="position"[^>]*>1:02</);
+    expect(inline).toMatch(/data-seek-clock="duration"[^>]*>2:55</);
+    // 没在预览：不带预览标记，外框不会把上面的内容模糊
+    expect(inline).not.toContain('data-previewing');
+    const popover = env.render(<Progress />);
+    expect(popover).not.toContain('data-seek-lyrics');
+    expect(popover).toMatch(/data-seek-clock="position"[^>]*>1:02</);
+  });
+
   it('宿主说不能跳转（网络流）时滑块置灰，没有时长时右边不写总长', async () => {
     const env = await startSceneEnv();
     await startSceneLyrics(env, null);

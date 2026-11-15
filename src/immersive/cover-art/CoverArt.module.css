@@ -1,6 +1,7 @@
 /* 元素填满外框给的方形。圆角裁住换图时的擦除遮罩，投影画在外框外侧；占位是中性底加居中的音符。
-   投影的颜色取外框的 `--scene-shadow`，没有就用 Fluent 的阴影色。 */
+   投影的颜色取外框的 `--scene-shadow`，没有就用 Fluent 的阴影色 */
 .cover {
+  position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;

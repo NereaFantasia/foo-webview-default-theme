@@ -8,6 +8,7 @@ import { libraryAnswers } from '../../../fixtures/albumLibrary.ts';
 import { createMemoryConfigWriter } from '../../../fixtures/dataWriter.ts';
 import { albumRow, albumTrackRow } from '../../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
+import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
 import type { ConfigValue } from '../../../fixtures/hostAnswers.ts';
 
 const SORT_KEY = 'defaultTheme.browser.wallSort.v1';
@@ -70,7 +71,7 @@ it('曲目到达后按专辑采样率重排，无需切换排序字段', async (
     albumTrackRow('Old', 'Artist', 'A', { sampleRate: 192000 }),
     albumTrackRow('New', 'Artist', 'B', { sampleRate: 44100 }),
   ];
-  env.host.answer('library.getAll', { success: true, tracks, items: tracks, total: 2, offset: 0 });
+  env.host.answer('library.search', wholeLibrary(tracks));
   env.prefs.setWallSort({ field: 'sampleRate', descending: true });
   const library = startLibraryTracks(env.store, () => 0, env.host.fb);
   const release = library.want();

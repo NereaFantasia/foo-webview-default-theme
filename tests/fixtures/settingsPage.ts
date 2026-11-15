@@ -14,13 +14,36 @@ const SETTINGS_ANSWERS: AnswerTable = {
   shell: { openExternal: { success: true } },
 };
 
+/** 设置页的分区名，与目录中的文字一致。页面一次只显示一个分区，操作某分区的控件前须先切换到该分区 */
+export type SettingsSectionName =
+  '常规' | '外观' | '播放' | '沉浸视图' | '歌词' | '在线音乐' | '在线内容' | '快捷键' | '关于';
+
+const settingsNav = (page: Page): Locator => page.getByRole('navigation', { name: '设置分类' });
+
+/** 切换到指定分区 */
+export async function showSection(page: Page, name: SettingsSectionName): Promise<void> {
+  const nav = settingsNav(page);
+  if ((await nav.getAttribute('data-settings-nav')) === 'menu') {
+    const trigger = nav.getByRole('button');
+    if ((await trigger.textContent())?.trim() !== name) {
+      await trigger.click();
+      await page.getByRole('menuitemradio', { name, exact: true }).click();
+    }
+  } else {
+    await nav.getByRole('button', { name, exact: true }).click();
+  }
+  await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+}
+
 export interface SettingsPage {
   readonly host: PageHost;
   readonly errors: string[];
   /** 自己滚动的卡列。 */
   readonly scroller: Locator;
-  /** 分类导航，目录或分类条。 */
+  /** 分类导航：宽页为目录，窄页为页顶的分区名 */
   readonly nav: Locator;
+  /** 切换到指定分区 */
+  show(name: SettingsSectionName): Promise<void>;
   /** 标题是这个名字的那张设置卡，或卡头标题是这个名字的可展开卡。 */
   card(title: string): Locator;
   /** 卡头标题是这个名字的那张可展开卡。 */
@@ -51,6 +74,7 @@ export const backgroundSources = (page: Page): Locator =>
 
 /** 展开窗口背景卡；已展开就不动。 */
 export async function openBackground(page: Page): Promise<void> {
+  await showSection(page, '外观');
   const toggle = backgroundCard(page).locator('[data-settings-toggle]');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -161,7 +185,8 @@ function handle(page: Page): Omit<SettingsPage, 'host' | 'errors'> {
       .or(expander(title));
   return {
     scroller: page.locator('[data-settings-scroller]'),
-    nav: page.getByRole('navigation', { name: '设置分类' }),
+    nav: settingsNav(page),
+    show: (name) => showSection(page, name),
     card,
     expander,
     row: (title) =>
@@ -187,34 +212,45 @@ export async function waitFrames(page: Page): Promise<void> {
   );
 }
 
-/** 从侧边栏点「设置」进设置页；窗口要宽到侧边栏看得见。 */
-export async function enterSettings(page: Page): Promise<void> {
+/**
+ * 从侧边栏进入设置页，窗口宽度须足以显示侧边栏。页面停在上次访问的分区（保存于浏览器偏好），
+ * 传入 `section` 时再切换到该分区
+ */
+export async function enterSettings(page: Page, section?: SettingsSectionName): Promise<void> {
   await expect(page.getByRole('navigation', { name: '侧边栏' })).toBeVisible({ timeout: 15_000 });
   await page
     .getByRole('navigation', { name: '侧边栏' })
     .getByRole('button', { name: '设置', exact: true })
     .click();
   await expect(page.getByRole('heading', { level: 1, name: '设置' })).toBeVisible();
+  if (section) await showSection(page, section);
 }
 
-/** 装上宿主替身并进设置页。`options.answers` 按命名空间盖在设置页的几条缺省应答上。 */
+/**
+ * 装上宿主替身并进入设置页。`options.answers` 按命名空间覆盖设置页的几条缺省应答；
+ * `section` 指定要操作的分区，不传则停在页面进入时的分区（缺省为「常规」）
+ */
 export async function openSettings(
   page: Page,
   options: FakeHostOptions = {},
+  section?: SettingsSectionName,
 ): Promise<SettingsPage> {
   const errors = collectPageErrors(page);
   const host = await installPageHost(page, options);
   host.answerAll(SETTINGS_ANSWERS);
   host.answerAll(options.answers ?? {});
   await page.goto('/');
-  await enterSettings(page);
+  await enterSettings(page, section);
   return { host, errors, ...handle(page) };
 }
 
 /** 不装宿主替身进设置页：普通浏览器里打开的样子。等宿主超时要几秒，断言时自己放宽时限。 */
-export async function openSettingsWithoutHost(page: Page): Promise<Omit<SettingsPage, 'host'>> {
+export async function openSettingsWithoutHost(
+  page: Page,
+  section?: SettingsSectionName,
+): Promise<Omit<SettingsPage, 'host'>> {
   const errors = collectPageErrors(page);
   await page.goto('/');
-  await enterSettings(page);
+  await enterSettings(page, section);
   return { errors, ...handle(page) };
 }

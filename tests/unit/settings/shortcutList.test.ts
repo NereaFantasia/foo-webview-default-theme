@@ -1,18 +1,20 @@
 import { createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
 import { en } from '../../../src/i18n/en.ts';
+import { BROWSER_KEYS } from '../../../src/nav/browserPanel.ts';
 import { startCommandRegistry } from '../../../src/nav/commandRegistry.ts';
 import { registerFullscreenCommand } from '../../../src/nav/fullscreenCommand.ts';
 import { registerNavCommands } from '../../../src/nav/navCommands.ts';
 import { startNavHistory } from '../../../src/nav/navHistory.ts';
 import { QUEUE_KEYS } from '../../../src/nav/queueKeys.ts';
+import { registerPlayPauseCommand } from '../../../src/playback/playPauseCommand.ts';
 import {
   chordKeys,
   SHORTCUT_SECTIONS,
   type ShortcutInput,
 } from '../../../src/settings/shortcutList.ts';
 
-/** 一览里某一条列的键盘按法。 */
+/** 一览里某一条列的键盘按法 */
 function chordsOf(label: string) {
   const entry = SHORTCUT_SECTIONS.flatMap((section) => section.entries).find(
     (candidate) => candidate.label === label,
@@ -49,6 +51,11 @@ describe('SHORTCUT_SECTIONS', () => {
     expect(chordsOf('queue.undo')).toEqual(QUEUE_KEYS.undo);
     expect(chordsOf('queue.redo')).toEqual(QUEUE_KEYS.redo);
   });
+  it('沉浸视图一节里的浏览键与实际按键共用声明', () => {
+    expect(chordsOf('immersive.browse')).toEqual(BROWSER_KEYS.toggle);
+    expect(chordKeys(BROWSER_KEYS.toggle[0] ?? { key: '' })).toEqual(['Ctrl', 'B']);
+  });
+
   it('后退、前进列的按键就是登记处里那两条命令的按键', () => {
     const commands = startCommandRegistry(null);
     registerNavCommands(commands, startNavHistory(createStore()));
@@ -62,6 +69,13 @@ describe('SHORTCUT_SECTIONS', () => {
     registerFullscreenCommand(commands);
     const keys = commands.list().find((spec) => spec.id === 'window.fullscreen')?.keys;
     expect(chordsOf('settings.shortcutFullscreen')).toEqual(keys);
+  });
+
+  it('播放 / 暂停列的按键就是登记处里播放命令的按键', () => {
+    const commands = startCommandRegistry(null);
+    registerPlayPauseCommand(commands, { playOrPause: async () => {} });
+    const keys = commands.list().find((spec) => spec.id === 'playback.playPause')?.keys;
+    expect(chordsOf('tray.playPause')).toEqual(keys);
   });
 
   it('每一条至少有一种按法，名字都在语言包里', () => {

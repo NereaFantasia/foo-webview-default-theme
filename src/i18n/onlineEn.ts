@@ -145,6 +145,9 @@ export const onlineEn = {
   'online.defaultQuality': 'Default quality',
   'online.defaultQualityDetail':
     'When a track lacks the selected quality, the next lower quality plays',
+  'online.searchInclude': 'Include online music in search',
+  'online.searchIncludeDetail':
+    'Search terms are sent to the online music source as you type. When off, only the library is searched, and the results page can still switch to online music',
   'online.qualityOption.128k': 'Standard (128k)',
   'online.qualityOption.320k': 'High (320k)',
   'online.qualityOption.flac': 'Lossless',

@@ -47,6 +47,19 @@ export const presetIdAtoms: Readonly<Record<PresetOrientation, Atom<string>>> = 
   portrait: PRESET_PREFS.portrait.atom,
 };
 
+/**
+ * 直接写某个方向的预设，不走场景过渡：设置编辑点「取消」、而此刻不在预设场景里时用；
+ * 在预设场景里换预设走 `SceneActions.switchPreset`
+ */
+export function choosePresetId(
+  store: Store,
+  orientation: PresetOrientation,
+  id: string,
+  storage?: PrefStorage | null,
+): void {
+  PRESET_PREFS[orientation].set(store, id, storage);
+}
+
 /** 加载横竖屏预设持久化记录 */
 export function loadPresetChoices(store: Store, storage?: PrefStorage | null): void {
   PRESET_PREFS.landscape.load(store, storage);

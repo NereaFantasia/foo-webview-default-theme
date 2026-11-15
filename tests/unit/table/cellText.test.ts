@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bitDepthText,
   bitrateText,
   dayText,
+  discText,
   discTrackText,
   durationText,
+  fileNameText,
+  folderNameText,
   trackNumberText,
   yearText,
 } from '../../../src/table/cellText.ts';
@@ -61,5 +65,32 @@ describe('年份、日期与码率', () => {
     expect(bitrateText(1411.2)).toBe('1411 kbps');
     expect(bitrateText(0)).toBe('');
     expect(bitrateText(undefined)).toBe('');
+  });
+});
+
+describe('碟号、文件名、文件夹与位深', () => {
+  it('碟号没有（宿主答 0）时留空', () => {
+    expect(discText({ discNumber: 2 })).toBe('2');
+    expect(discText({ discNumber: 0 })).toBe('');
+  });
+
+  it('文件名取路径最后一段，反斜杠与斜杠都认', () => {
+    expect(fileNameText('E:\\Music\\Album\\01 Intro.flac')).toBe('01 Intro.flac');
+    expect(fileNameText('/mnt/music/a.mp3')).toBe('a.mp3');
+    expect(fileNameText('')).toBe('');
+  });
+
+  it('文件夹取倒数第二段；直接在盘根、只有文件名时留空', () => {
+    expect(folderNameText('E:\\Music\\Album\\01.flac')).toBe('Album');
+    expect(folderNameText('\\\\nas\\share\\a.flac')).toBe('share');
+    expect(folderNameText('E:\\a.flac')).toBe('');
+    expect(folderNameText('a.flac')).toBe('');
+  });
+
+  it('位深写成 bit；不是整数（有损格式答空）时留空', () => {
+    expect(bitDepthText('24')).toBe('24 bit');
+    expect(bitDepthText('')).toBe('');
+    expect(bitDepthText('?')).toBe('');
+    expect(bitDepthText(undefined)).toBe('');
   });
 });

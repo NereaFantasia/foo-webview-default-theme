@@ -2,7 +2,6 @@ import type { artistAlbumsEn } from './artistAlbumsEn.ts';
 
 /** 在线艺人页专辑页签的简体中文文案，供主中文包合入 */
 export const artistAlbumsZhCN: Record<keyof typeof artistAlbumsEn, string> = {
-  'artistAlbums.tabs': '艺人页内容',
   'artistAlbums.tab.songs': '热门歌曲',
   'artistAlbums.tab.albums': '专辑',
   'artistAlbums.tab.singles': '单曲与 EP',
@@ -24,13 +23,13 @@ export const artistAlbumsZhCN: Record<keyof typeof artistAlbumsEn, string> = {
   'artistAlbums.countOne': '共 1 张',
   'artistAlbums.count': '共 {count} 张',
   'artistAlbums.noMatches': '没有匹配的专辑',
-  'artistAlbums.failed': '没能读取这位艺人的专辑',
+  'artistAlbums.failed': '无法读取艺人专辑',
   'artistAlbums.openAll': '查看全部{section}',
   'artistAlbums.loaded': '已加载 {count} 张',
   'artistAlbums.loadMore': '加载更多',
   'artistAlbums.loading': '加载中',
   'place.onlineAlbums': '艺人专辑',
   'place.onlineAlbumsName': '{artist} {section}',
-  'artistAlbums.searchFailed': '没能搜到更多专辑',
+  'artistAlbums.searchFailed': '无法检索更多专辑',
   'artistAlbums.truncated': '仅显示最近发行的 {count} 张',
 };

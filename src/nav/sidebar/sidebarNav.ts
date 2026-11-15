@@ -8,6 +8,7 @@ import type { Place, PlaceId } from '../places.ts';
  */
 export type SidebarItemId =
   | 'home'
+  | 'favorites'
   | 'recent'
   | 'artists'
   | 'albums'
@@ -26,7 +27,7 @@ export interface SidebarEntry {
 
 const item = (id: SidebarItemId, ready = false): SidebarEntry => ({ id, place: id, ready });
 
-export const TOP_ITEMS: readonly SidebarEntry[] = [item('home', true)];
+export const TOP_ITEMS: readonly SidebarEntry[] = [item('home', true), item('favorites', true)];
 
 export const LIBRARY_ITEMS: readonly SidebarEntry[] = [
   item('recent'),

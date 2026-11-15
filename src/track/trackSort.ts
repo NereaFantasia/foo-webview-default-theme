@@ -1,6 +1,7 @@
 import type { ColumnId } from '../table/columns/columns.ts';
 import type { TableTrack } from '../table/tableItems.ts';
 import type { TableSort } from '../table/TrackTableHeader.tsx';
+import { fileNameText, folderNameText } from '../table/cellText.ts';
 import { trackDisplayTitle } from './trackDisplayTitle.ts';
 
 const COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -34,6 +35,9 @@ export const TRACK_COMPARE: Readonly<Partial<Record<ColumnId, Compare>>> = {
   channels: number((track) => track.channels ?? 0),
   fileSize: number((track) => track.fileSize ?? 0),
   path: (a, b) => COLLATOR.compare(a.absolutePath, b.absolutePath) || a.subsong - b.subsong,
+  disc: number((track) => track.discNumber),
+  fileName: text((track) => fileNameText(track.absolutePath)),
+  folder: text((track) => folderNameText(track.absolutePath)),
 };
 
 /** 值越大越有用的列：年份、评分，以及添加时间、播放次数、最近播放这类统计，换到它们时从大的、新的在前起 */
@@ -79,7 +83,7 @@ export function sortFlatTracks<T extends TableTrack>(
 
 /**
  * 曲目按列排序时交给宿主的 Title Formatting 串。宿主按它排 `library.query` 的命中，填专用列表时也用同一串，
- * 表格第 n 行才对得上列表第 n 行。都接同一条稳定化的尾缀（专辑艺术家、年份、专辑、碟号、曲号、标题），同值的
+ * 表格第 n 行才对得上列表第 n 行。都接同一条稳定化的尾缀（专辑艺人、年份、专辑、碟号、曲号、标题），同值的
  * 曲目按专辑本来的顺序排；数字补成定宽，按字符串比也是数的大小。只有升序，降序由调用方把结果反过来
  */
 const TAIL =
@@ -104,6 +108,9 @@ export const TRACK_SORT: Readonly<Partial<Record<ColumnId, string>>> = {
   channels: `$num($info(channels),3) | ${TAIL}`,
   fileSize: `$num(%filesize%,16) | ${TAIL}`,
   path: '%path% | $num(%subsong%,4)',
+  disc: `$num(%discnumber%,4) | ${TAIL}`,
+  fileName: `%filename_ext% | ${TAIL}`,
+  folder: `%directoryname% | ${TAIL}`,
 };
 
 /** 这几列要 foo_playcount 的统计：显示时才取数，没装时排序菜单里不给选 */

@@ -43,3 +43,11 @@
   padding: var(--spacingVerticalXXL) var(--spacingHorizontalS);
   color: var(--text-secondary);
 }
+/* 筛选浮层底栏右端：当前命中数与清除条件 */
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase200);
+  color: var(--text-secondary);
+}

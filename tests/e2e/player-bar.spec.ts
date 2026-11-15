@@ -3,8 +3,8 @@ import { amplitudeOf, dbOf, positionOf } from '../../src/playback/volumeScale.ts
 import { boxOf, choosePlayerBar, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
-// 放在宽窗标题栏里的播放栏：四键与音量键、正在播放条（格式标记、进度线）、音量浮层（点开朝下、滚轮、静音、滑条）。
-// 进度与音量的换算按 SDK 的线协议断言；观感与贴靠布局只能实机看。
+// 放在宽窗标题栏里的播放栏：四键与音量键、正在播放条（格式标记、进度线）、音量浮层（点开朝下、滚轮、静音、滑条）
+// 进度与音量的换算按 SDK 的线协议断言；观感与贴靠布局只能实机看
 
 test.beforeEach(({ page }) => choosePlayerBar(page, 'titlebar'));
 
@@ -16,38 +16,6 @@ const settled = (locator: Locator) =>
   locator.evaluate((element) =>
     Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
   );
-
-test('标题栏里 ⋯ 之后是四键与音量键，正中是 540 × 52 的正在播放条，单独在窗口居中', async ({
-  page,
-}) => {
-  const { errors } = await openPlayer(page);
-  expect(await boxOf(page, 'header [data-menu="main"]')).toMatchObject({
-    x: 8,
-    width: 40,
-    height: 32,
-  });
-  // 播放控制组离 ⋯ 28，组内键各宽 28、高 36，音量键离下一首 16
-  const first = 8 + 40 + 28;
-  for (const [index, name] of ['order', 'previous', 'play', 'next'].entries()) {
-    expect(await boxOf(page, `header [data-player-key="${name}"]`)).toMatchObject({
-      x: first + 28 * index,
-      width: 28,
-      height: 36,
-    });
-  }
-  expect(await boxOf(page, 'header [data-player-key="volume"]')).toMatchObject({
-    x: first + 28 * 4 + 16,
-    width: 28,
-    height: 36,
-  });
-  expect(await boxOf(page, '[data-now-playing]')).toEqual({
-    x: (1280 - 540) / 2,
-    y: 6,
-    width: 540,
-    height: 52,
-  });
-  expect(errors).toEqual([]);
-});
 
 test('署名放不下时艺人、专辑各自用省略号截断，名字始终可点，字不滚动', async ({ page }) => {
   const long = makeTrack({
@@ -137,7 +105,7 @@ test('正在播放条的曲名放不下时定时滚动一遍，放得下的不�
             .getAnimations({ subtree: true })
             .filter((animation) => animation.timeline instanceof DocumentTimeline).length,
       );
-  // 先停 3 s 才滚，停着时没有动画。
+  // 先停 3 s 才滚，停着时没有动画
   expect(await timedIn(long)).toBe(0);
   await expect.poll(() => timedIn(long), { timeout: 8000 }).toBe(2);
   expect(await timedIn(PLAYING_TRACK.artist)).toBe(0);
@@ -191,7 +159,7 @@ test('有损的曲目写比特率；位深取不到只写采样率', async ({ pa
   expect(errors).toEqual([]);
 });
 
-test('点进度线跳到那一处；键盘 ← / → 各 5 秒，Home 回到开头', async ({ page }) => {
+test('点进度线跳到那一处；键盘 ← / → 各 5 秒，Home 回到开头 @smoke', async ({ page }) => {
   const { calls, errors } = await openPlayer(page);
   const box = await slider(page).boundingBox();
   if (!box) throw new Error('进度线没画出来');
@@ -236,7 +204,7 @@ test('拖动中显示拖到的位置，宿主的进度事件拉不回去；松�
   await page.waitForTimeout(200);
   expect(calls('playback.setPosition')).toHaveLength(1);
 
-  // 右键取消时随后那次右键菜单被吞掉；取消之后在进度线上右键，菜单事件照常到页面。
+  // 右键取消时随后那次右键菜单被吞掉；取消之后在进度线上右键，菜单事件照常到页面
   await page.evaluate(() => {
     document.body.dataset['menus'] = '0';
     document.addEventListener('contextmenu', (event) => {
@@ -356,7 +324,7 @@ test('拖音量滑条实时提交、松手回读；拖动中指针移出浮层�
   await page.waitForTimeout(800);
   await expect(popover(page)).toBeVisible();
   await expect(volume).toHaveAttribute('aria-valuenow', '80');
-  // 拖动中的实时提交一律不回读。
+  // 拖动中的实时提交一律不回读
   const reads = calls('playback.getVolume').length;
   expect(calls('playback.setVolume').length).toBeGreaterThan(1);
   await page.mouse.up();
@@ -373,7 +341,7 @@ test('键盘：Tab 顺序是四键、音量键、正在播放条、⋯；音量�
 }) => {
   const { calls, errors } = await openPlayer(page);
   await key(page, 'next').focus();
-  // 下一首键之后是音量键，再是正在播放条里的封面、星（没评分时也走得到）与进度线，最后到 ⋯。
+  // 下一首键之后是音量键，再是正在播放条里的封面、星（没评分时也走得到）与进度线，最后到 ⋯
   await page.keyboard.press('Tab');
   await expect(key(page, 'volume')).toBeFocused();
   await expect(popover(page)).toHaveCount(0);

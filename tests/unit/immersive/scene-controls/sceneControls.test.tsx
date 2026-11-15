@@ -57,7 +57,7 @@ describe('Tabs', () => {
     const waiting = env.render(
       createElement(
         ControlSlotsContext,
-        { value: { tabs: null, views: null } },
+        { value: { tabs: null, views: null, edit: null } },
         inScene(actions, <Tabs />),
       ),
     );

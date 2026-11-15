@@ -20,7 +20,7 @@ interface QueueQueuedRowsProps {
  * 该区块未使用虚拟滚动，通过 memo 拦截「接下来播放」等其他区域引起的页面重渲染；在队列内容、选中态、键盘焦点与拖拽状态未变时复用已有 DOM 节点
  */
 export const QueueQueuedRows = memo(function QueueQueuedRows(props: QueueQueuedRowsProps) {
-  return props.rows.map((row) => (
+  return props.rows.map((row, index) => (
     <QueueRow
       key={row.key}
       kind={row.kind}
@@ -30,6 +30,7 @@ export const QueueQueuedRows = memo(function QueueQueuedRows(props: QueueQueuedR
       selected={props.selected.has(row.key)}
       current={props.tabKey === row.key}
       lifted={props.lifted?.has(row.key) ?? false}
+      edge={index === props.rows.length - 1 ? 'end' : undefined}
       onPointerDown={props.onPointerDown}
       onPlay={props.onPlay}
       onMenu={props.onMenu}

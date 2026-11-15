@@ -1,6 +1,6 @@
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { SeekLyricsPopover } from '../../lyrics/SeekLyrics.tsx';
+import { SeekLyrics, SeekLyricsPopover } from '../../lyrics/SeekLyrics.tsx';
 import { CURVE, DURATION_MS } from '../../motion/timing.ts';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import { playbackAtom } from '../../playback/playback.ts';
@@ -10,28 +10,34 @@ import { trackSwapAtom } from '../../playback/now-playing/trackSwap.ts';
 import styles from './Progress.module.css';
 
 /**
- * 当前曲目的进度：一条 6 高的线，线下左边写播到的时间、右边写总长。点哪跳哪，拖动松手才跳，拖动中 Esc 或右键放弃，
- * ← → 各 5 秒、Home 回开头；不能 seek 的（网络流等）不接指针与键。手势、播放头逐帧插值与无障碍值都在
- * `SeekBar`，这里只摆线与时间。没有曲目时画一条空轨，高度不变，换曲时下面的件不上下跳
+ * 当前曲目播放进度展示与控制组件：包含 6px 进度槽线及下方已播放/总时长文本。
+ * 点击即时跳转至目标进度，拖拽交互于释放指针时提交跳转，拖拽过程中支持 Esc 键或右键取消，
+ * 方向键每次 5 秒，Home 回到开头。不能 seek 的（网络流等）不接收指针与键盘。
+ * 交互手势识别、播放头逐帧插值与无障碍属性由底层 `SeekBar` 驱动，本组件负责槽线与时间排版。
+ * 无活动曲目时保持空轨占位高度以避免换曲引发界面抖动。
  *
- * 悬停、拖动与键盘移动时预览要去的位置：线上画一条竖标，线不变粗；竖标上方弹出那一刻的时间与歌词
- * （`SeekLyricsPopover`，没有带时间轴的歌词时只有时间）
+ * 悬停、拖拽或键盘寻道时提供进度预览指示：在槽线上渲染垂直位置标线。
+ * 目标时间与歌词预览模式由 `preview` 属性决定：
+ * - `popover`（缺省）：于标线上方弹出气泡浮层（`SeekLyricsPopover`），没有带时间轴的歌词时仅显示时间
+ * - `inline`：不弹浮层，歌词直接浮在槽线上方，压在上面的内容上、不占位，与标题栏、胶囊态播放栏的预览是同一套（`SeekLyrics`）
  *
- * 宽度由外面给；`SeekBar` 的命中区只有线上下各 8，下面的时间行不接指针，元素的高度含它们
+ * 内联预览激活时由外层容器对上方内容施加模糊弱化效果，本组件提供 `data-previewing` 状态属性。
+ * 宽度由外层容器决定。`SeekBar` 的命中区在槽线上下各延伸 8px，下面的时间行不接收指针，组件高度包含命中区
  */
-export function Progress() {
+export function Progress({ preview = 'popover' }: ProgressProps) {
   const { track } = useAtomValueRawSync(playbackAtom);
   const root = useRef<HTMLDivElement>(null);
   useFadeOnSwap(root);
+  const inline = preview === 'inline';
   return (
     <div ref={root} className={styles.progress} data-scene-element="progress">
       {track ? (
         <SeekBar
           interactive
           thickness={6}
-          preview={(target) => <SeekLyricsPopover target={target} />}
+          preview={inline ? undefined : (target) => <SeekLyricsPopover target={target} />}
         >
-          {(display) => <Line display={display} />}
+          {(display) => <Line display={display} inline={inline} />}
         </SeekBar>
       ) : (
         <div className={styles.rest}>
@@ -43,15 +49,33 @@ export function Progress() {
   );
 }
 
-function Line({ display }: { readonly display: SeekBarDisplay }) {
+export interface ProgressProps {
+  /** 预览时间与歌词的呈现模式：`popover` 采用线上方弹出气泡（缺省），`inline` 采用直接悬浮于槽线上方覆盖 */
+  readonly preview?: 'popover' | 'inline';
+}
+
+/**
+ * 进度槽线与时间排版子组件。
+ * `inline` 模式下额外渲染内联歌词预览层（`SeekLyrics`），浮动覆盖上方内容并通过 `data-previewing` 通知外层淡化。
+ * 预览时左侧的已播时间换成预览位置的时间，取主文字色（`--text-primary`）
+ */
+function Line({ display, inline }: { readonly display: SeekBarDisplay; readonly inline: boolean }) {
+  const previewing = display.preview !== null;
   return (
     <>
+      {inline && (
+        <div className={styles.overlay} data-previewing={previewing || undefined}>
+          <SeekLyrics target={display.preview} />
+        </div>
+      )}
       <div className={styles.rail}>
         {display.track}
         <PreviewMarker fraction={display.preview?.fraction ?? null} />
       </div>
       <div className={`${styles.times} ${styles.hanging}`} aria-hidden>
-        <span data-seek-clock="position">{clockText(display.position)}</span>
+        <span data-seek-clock="position" data-previewing={(inline && previewing) || undefined}>
+          {clockText(inline && display.preview ? display.preview.seconds : display.position)}
+        </span>
         <span data-seek-clock="duration">
           {display.duration > 0 ? clockText(display.duration) : ''}
         </span>
@@ -60,7 +84,7 @@ function Line({ display }: { readonly display: SeekBarDisplay }) {
   );
 }
 
-/** 预览位置的竖标：不预览时淡出，淡出期间留在原处；跟着指针移动时不加过渡 */
+/** 预览目标位置标线：非预览状态执行平滑淡出并保持停靠，指针移动过程中跳过过渡动画 */
 function PreviewMarker({ fraction }: { readonly fraction: number | null }) {
   const [shown, setShown] = useState(0);
   if (fraction !== null && fraction !== shown) setShown(fraction);

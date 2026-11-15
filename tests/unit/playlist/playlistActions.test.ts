@@ -39,7 +39,7 @@ async function start(host: UnitHost, source: Pick<PlaybackSourceService, 'record
   return { fake, store, places, actions, failure: () => store.get(playlistActionFailureAtom) };
 }
 
-/** 宿主自己建的两张夹在中间，清单里的位置与宿主序号错开：A、B、C 的序号是 1、3、4。 */
+/** 宿主自己建的两张夹在中间，清单里的位置与宿主序号错开：A、B、C 的序号是 1、3、4 */
 async function startWithHostLists(host: UnitHost) {
   const fake = new FakePlaylists(
     host,
@@ -204,6 +204,25 @@ describe('createPlaylistActions', () => {
     expect(failure()).toBe('convert');
   });
 
+  it('编辑自动播放列表：只对自动播放列表发，宿主没收下记一笔失败', async () => {
+    const host = installFakeHost();
+    const { actions, failure } = await start(host);
+    host.answer('playlist.showAutoplaylistUI', {
+      success: true,
+      accepted: true,
+      operationId: 'op',
+      playlistGuid: guidOf(3),
+    });
+    expect(await actions.editAutoplaylist(guidOf(2))).toBe(false);
+    expect(host.callsTo('playlist.showAutoplaylistUI')).toEqual([]);
+    expect(await actions.editAutoplaylist(guidOf(3))).toBe(true);
+    expect(host.callsTo('playlist.showAutoplaylistUI')).toEqual([{ playlistGuid: guidOf(3) }]);
+    expect(failure()).toBeNull();
+    host.answer('playlist.showAutoplaylistUI', hostFailure('NOT_SUPPORTED'));
+    expect(await actions.editAutoplaylist(guidOf(3))).toBe(false);
+    expect(failure()).toBe('command');
+  });
+
   it('去重、去无效、保存只作用于活动列表：别的列表上不发，也不替用户切过去', async () => {
     const host = installFakeHost();
     const { actions } = await start(host);
@@ -259,7 +278,7 @@ describe('createPlaylistActions', () => {
     held.release();
     expect(await first).toBe(true);
     expect(host.callsTo('playlist.reorderPlaylists')).toEqual([{ newOrder: [1, 0, 2, 3, 4] }]);
-    // 读回之后再挪一位，按新清单算：Default 此刻在第 1 位。
+    // 读回之后再挪一位，按新清单算：Default 此刻在第 1 位
     expect(await actions.reorder(guidOf(0), 3)).toBe(true);
     expect(fake.names()).toEqual(['New Playlist', 'Locked', 'Default', 'Smart', 'Empty']);
   });
@@ -343,7 +362,7 @@ describe('createPlaylistActions', () => {
   it('清单里记的活动列表过期了（宿主那边已切走、事件还没到）：去重、去无效、保存都不发，记一笔失败', async () => {
     const host = installFakeHost();
     const { fake, actions, failure } = await start(host);
-    // 宿主那边悄悄切到了 New Playlist，清单还没读回，这边仍以为 Default 是活动的。
+    // 宿主那边悄悄切到了 New Playlist，清单还没读回，这边仍以为 Default 是活动的
     fake.items = fake.items.map((item) => ({ ...item, isActive: item.index === 1 }));
     expect(await actions.removeDuplicates(guidOf(0))).toBe(false);
     expect(await actions.removeDeadEntries(guidOf(0))).toBe(false);

@@ -1,14 +1,21 @@
-/* 页标题按内容高，余下的高度给目录与卡列；卡列自己滚动，目录不跟着滚 */
+/* 高度全给目录与卡列；卡列自己滚动，目录不跟着滚。页上不另写「设置」，分区名是卡列顶上的大标题 */
 .root {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  padding-top: var(--spacingVerticalXL);
 }
 
-.header {
-  flex: none;
-  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL) var(--spacingVerticalS);
+/* 只给读屏的页标题：裁成看不见，但仍在无障碍树里 */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* 左边 168 的目录，右边是卡列 */
@@ -22,7 +29,7 @@
   padding-left: var(--spacingHorizontalXXL);
 }
 
-/* 页面窄：目录收成上面的一行，卡列占满宽 */
+/* 页面窄：目录收成上面的一行分区名，卡列占满宽；内容边距收到 12 */
 .narrow {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -37,7 +44,7 @@
 }
 
 .narrow .nav {
-  padding: 0 var(--spacingHorizontalXXL);
+  padding: 0 var(--spacingHorizontalM);
   overflow-y: visible;
 }
 
@@ -48,11 +55,14 @@
   padding: var(--spacingVerticalS) var(--spacingHorizontalXXL)
     calc(var(--spacingVerticalXXL) + var(--player-inset, 0px)) 0;
   overflow-y: auto;
+  /* 键盘焦点滚入视野时，控件与滚动区边缘之间留出焦点环的位置（焦点环画在控件外 2px） */
+  scroll-padding-block: var(--spacingVerticalXS);
 }
 
 .narrow .scroller {
-  padding-top: var(--spacingVerticalL);
-  padding-left: var(--spacingHorizontalXXL);
+  padding-top: var(--spacingVerticalS);
+  padding-right: var(--spacingHorizontalM);
+  padding-left: var(--spacingHorizontalM);
 }
 
 /* 卡列最宽 760，额外宽度分到两侧，保持在目录右侧的内容区居中 */

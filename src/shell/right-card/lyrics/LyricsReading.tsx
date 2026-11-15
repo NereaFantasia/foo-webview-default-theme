@@ -6,7 +6,7 @@ import { useService } from '../../../kit/useService.ts';
 import {
   DEFAULT_LYRICS_DISPLAY,
   lyricsDisplayKey,
-  lyricsFontFamily,
+  lyricsFontStyle,
 } from '../../../lyrics/lyricsDisplay.ts';
 import type { LyricsContent } from '../../../lyrics/lyricsText.ts';
 import { clockText } from '../../../playback/seekDraft.ts';
@@ -45,7 +45,7 @@ export function LyricsReading({
   const controls = useViewControlStyles();
   const timeId = useId();
   const style: CSSProperties & Record<`--${string}`, string | number> = {
-    fontFamily: lyricsFontFamily(display.fontFamily),
+    ...lyricsFontStyle(display.fontFamily, display.fontWeight),
     '--lyrics-preview-font-size': `${display.fontSize * PREVIEW_SCALE}px`,
     '--lyrics-preview-spacing-scale': display.fontSize / DEFAULT_LYRICS_DISPLAY.fontSize,
     ...(display.translationFontSize === null

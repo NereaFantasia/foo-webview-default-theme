@@ -1,7 +1,9 @@
 import { useLayoutEffect, useState } from 'react';
 import type { ContextMenuViewport } from './contextMenuGeometry.ts';
 
+/** 服务端渲染没有 `window`，视口取零。菜单关闭时不绘制内容，用不上 */
 function readViewport(): ContextMenuViewport {
+  if (typeof window === 'undefined') return { width: 0, height: 0, left: 0, top: 0 };
   const viewport = window.visualViewport;
   return {
     width: viewport?.width ?? window.innerWidth,

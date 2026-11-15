@@ -7,6 +7,7 @@ import {
   startSongsRows,
   type SongsRequest,
 } from '../../../../src/library/songs/songsRows.ts';
+import type { LibraryMirrorSource } from '../../../../src/library/mirror/mirrorSource.ts';
 import { hostFailure, stringParam } from '../../../fixtures/hostAnswers.ts';
 import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
 
@@ -160,5 +161,77 @@ describe('按查询取顺序', () => {
     rows.acquire();
     await vi.advanceTimersByTimeAsync(0);
     expect(host.callsTo('library.query')).toHaveLength(3);
+  });
+});
+
+describe('读镜像', () => {
+  function withMirror(order: (sort: string) => string[] | null) {
+    const host = hostAnswering();
+    const store = createStore();
+    const mirror = {
+      order: vi.fn<LibraryMirrorSource['order']>((sort) => {
+        const handles = order(sort);
+        return Promise.resolve(handles && { handles, paths: [], subsongs: [] });
+      }),
+    };
+    const rows = startSongsRows(store, host.fb, undefined, mirror);
+    onTestFinished(() => rows.dispose());
+    return { host, mirror, rows, state: () => store.get(songsRowsAtom) };
+  }
+
+  it('无过滤的次序由镜像给，不问宿主；降序是镜像的升序反过来', async () => {
+    const { host, mirror, rows, state } = withMirror(() => ['x', 'y', 'z']);
+    rows.acquire();
+    rows.request(ALL);
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state().handles).toEqual(['x', 'y', 'z']);
+    expect(state().answered).toEqual(ALL);
+    expect(mirror.order).toHaveBeenCalledWith('%artist%', false);
+    rows.request({ ...ALL, sort: '%title%', descending: true });
+    await vi.waitFor(() => expect(state().handles).toEqual(['z', 'y', 'x']));
+    expect(host.callsTo('library.query')).toEqual([]);
+  });
+
+  it('带条件的查询不走镜像', async () => {
+    const { host, mirror, rows, state } = withMirror(() => ['x']);
+    rows.acquire();
+    rows.request({ ...ALL, query: 'artist HAS "a"' });
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(mirror.order).not.toHaveBeenCalled();
+    expect(host.callsTo('library.query')).toHaveLength(1);
+  });
+
+  it('镜像读不到（统计列、没建好、落后）就问宿主', async () => {
+    const { host, rows, state } = withMirror(() => null);
+    rows.acquire();
+    rows.request(ALL);
+    await vi.waitFor(() => expect(state().status).toBe('ready'));
+    expect(state().handles).toEqual(['a', 'b', 'c']);
+    expect(host.callsTo('library.query')).toHaveLength(1);
+  });
+
+  it('镜像读取期间请求又换了，旧的结果不落地', async () => {
+    let release: (handles: string[]) => void = () => {};
+    const host = hostAnswering();
+    const store = createStore();
+    const mirror = {
+      order: vi.fn(
+        () =>
+          new Promise<{ handles: string[]; paths: string[]; subsongs: number[] } | null>(
+            (resolve) => {
+              release = (handles) => resolve({ handles, paths: [], subsongs: [] });
+            },
+          ),
+      ),
+    };
+    const rows = startSongsRows(store, host.fb, undefined, mirror);
+    onTestFinished(() => rows.dispose());
+    rows.acquire();
+    rows.request(ALL);
+    await vi.waitFor(() => expect(mirror.order).toHaveBeenCalledTimes(1));
+    rows.request({ ...ALL, query: 'title HAS "b"' });
+    release(['old']);
+    await vi.waitFor(() => expect(store.get(songsRowsAtom).status).toBe('ready'));
+    expect(store.get(songsRowsAtom).handles).toEqual(['b']);
   });
 });

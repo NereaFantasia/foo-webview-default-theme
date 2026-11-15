@@ -2,6 +2,7 @@ import {
   BIOGRAPHY_TEXT_LIMIT,
   biographyArtist,
   lastfmArtistFromUrl,
+  lastfmAttribution,
   lastfmArtistUrl,
   lastfmBiographyUrl,
   type BiographyDocument,
@@ -143,6 +144,8 @@ export function readLastfmArtistInfo(
   return {
     document: paragraphs.length
       ? {
+          source: 'lastfm',
+          sourceId: artist,
           artist,
           language,
           paragraphs,
@@ -157,6 +160,7 @@ export function readLastfmArtistInfo(
             lastfmArtistUrl(artist, language),
           ),
           url: lastfmBiographyUrl(artist, language),
+          attribution: lastfmAttribution(artist, language, LICENSE),
           licenseUrl: LICENSE.url,
           license: LICENSE.name,
         }

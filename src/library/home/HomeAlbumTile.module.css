@@ -1,0 +1,33 @@
+/* 封面块：边长由外面的 --tile-size 给（平铺格由封面网格传入，候选卡固定 128px） */
+.cover {
+  position: relative;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+.open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: var(--borderRadiusMedium);
+  cursor: pointer;
+  outline: none;
+}
+
+.open:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+}
+
+/* 无指针悬停支持的触控设备上常驻显示操作按钮 */
+@media (hover: none) {
+  .cover [data-home-keys][data-hidden] {
+    display: block;
+    opacity: 1;
+  }
+}

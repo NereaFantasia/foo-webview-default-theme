@@ -94,37 +94,41 @@ function line(raw: unknown): LyricLine | null {
 /** 存档保留逐字、译文、音译、注音与人声角色，不经过文本格式转换 */
 export function readSavedLyrics(text: string): LyricsReady | null {
   try {
-    const raw: unknown = JSON.parse(text);
-    const key = field(raw, 'key');
-    const source = ['file', 'embedded', ...LYRICS_SOURCE_IDS].find(
-      (id) => id === field(raw, 'source'),
-    );
-    const body = field(raw, 'content');
-    const lines = field(body, 'lines');
-    if (typeof key !== 'string' || !source || !Array.isArray(lines)) return null;
-    let content: LyricsContent;
-    if (field(body, 'kind') === 'plain' && lines.every((item: unknown) => typeof item === 'string'))
-      content = {
-        kind: 'plain',
-        lines: lines.filter((item: unknown): item is string => typeof item === 'string'),
-      };
-    else if (field(body, 'kind') === 'synced') {
-      const parsed = lines.map((item: unknown) => line(item));
-      if (parsed.some((item) => !item)) return null;
-      content = { kind: 'synced', lines: parsed.filter((item) => item !== null) };
-    } else return null;
-    const knownSource = LYRICS_SOURCE_IDS.find((id) => id === source);
-    const sourcePath = field(raw, 'sourcePath');
-    return {
-      status: 'ready',
-      key,
-      source: knownSource ?? (source === 'file' ? 'file' : 'embedded'),
-      content,
-      ...(typeof sourcePath === 'string' ? { sourcePath } : {}),
-    };
+    return readSavedLyricsValue(JSON.parse(text));
   } catch {
     return null;
   }
+}
+
+/** 已解析成对象的存档；联网取到的歌词写进缓存前后也走这套校验 */
+export function readSavedLyricsValue(raw: unknown): LyricsReady | null {
+  const key = field(raw, 'key');
+  const source = ['file', 'embedded', ...LYRICS_SOURCE_IDS].find(
+    (id) => id === field(raw, 'source'),
+  );
+  const body = field(raw, 'content');
+  const lines = field(body, 'lines');
+  if (typeof key !== 'string' || !source || !Array.isArray(lines)) return null;
+  let content: LyricsContent;
+  if (field(body, 'kind') === 'plain' && lines.every((item: unknown) => typeof item === 'string'))
+    content = {
+      kind: 'plain',
+      lines: lines.filter((item: unknown): item is string => typeof item === 'string'),
+    };
+  else if (field(body, 'kind') === 'synced') {
+    const parsed = lines.map((item: unknown) => line(item));
+    if (parsed.some((item) => !item)) return null;
+    content = { kind: 'synced', lines: parsed.filter((item) => item !== null) };
+  } else return null;
+  const knownSource = LYRICS_SOURCE_IDS.find((id) => id === source);
+  const sourcePath = field(raw, 'sourcePath');
+  return {
+    status: 'ready',
+    key,
+    source: knownSource ?? (source === 'file' ? 'file' : 'embedded'),
+    content,
+    ...(typeof sourcePath === 'string' ? { sourcePath } : {}),
+  };
 }
 
 /** 内容本身参与版本身份；来源返回同一编号的新正文不会继承旧校正 */

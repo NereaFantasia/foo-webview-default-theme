@@ -1,11 +1,4 @@
-import {
-  Button,
-  MessageBar,
-  MessageBarActions,
-  MessageBarBody,
-  Spinner,
-} from '@fluentui/react-components';
-import { ErrorCircle48Regular, Search48Regular } from '@fluentui/react-icons';
+import { Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { CoverTheme } from '../../covers/CoverTheme.tsx';
@@ -28,32 +21,28 @@ import { DetailFrame } from '../detail/DetailFrame.tsx';
 import { DetailTools } from '../detail/DetailTools.tsx';
 import { playbackPausedAtom } from '../playingAlbum.ts';
 import { SearchResultList } from '../search/SearchResultList.tsx';
-import { NcmSetupPanel, OnlineMessage, OnlineUnavailable } from '../search/online/OnlineEmpty.tsx';
+import { ONLINE_COLUMN_LABELS, type OnlineTrackSort } from '../search/online/onlineColumns.ts';
 import {
   blockedTrack,
-  ONLINE_COLUMN_LABELS,
   OnlineTrackHeader,
   OnlineTrackRow,
   useUnblock,
-  type OnlineTrackSort,
 } from '../search/online/OnlineItems.tsx';
 import { OnlineObjectMenu, objectTargetOf } from '../search/online/OnlineObjectMenu.tsx';
 import { onlineListSource, onlinePlayKey } from '../search/online/onlinePlay.ts';
 import { OnlineMore } from '../search/online/OnlineMore.tsx';
 import { OnlineTrackMenu } from '../search/online/OnlineTrackMenu.tsx';
-import { ArtistReleasePane } from './ArtistReleasePane.tsx';
-import { ArtistReleaseTools, ArtistTabs } from './ArtistTools.tsx';
+import { OnlineArtistPage } from './OnlineArtistPage.tsx';
 import { OnlineListHeader, ownerCover, ownerName } from './OnlineListHeader.tsx';
-import { failureDetail } from './onlineFailure.ts';
-import { useArtistReleases, type ArtistSnapshot } from './useArtistReleases.ts';
+import { OnlineFailureView, OnlineNotice } from './OnlineListStatus.tsx';
 import {
   nextOnlineSort,
   onlineListRows,
   onlineSort,
   onlineSortFields,
+  shuffled,
   type OnlineSortField,
 } from './onlineListRows.ts';
-import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './OnlineListPage.module.css';
 
 const ORDER_LABELS = {
@@ -83,19 +72,8 @@ interface ListSnapshot {
   readonly query: string;
   /** 离开时已取到的曲目数：歌单的缓存被丢掉时，回来先补到这么多再恢复滚动 */
   readonly loaded: number;
-  /** 艺人页的页签与各页签的查找、排序、版本筛选 */
-  readonly artist?: ArtistSnapshot;
 }
 const SLOT = createSnapshotSlot<ListSnapshot>();
-
-function shuffled<T>(items: readonly T[]): T[] {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index--) {
-    const other = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[other]] = [copy[other] as T, copy[index] as T];
-  }
-  return copy;
-}
 
 /**
  * 在线列表页：在线专辑、歌单（含榜单）与艺人的热门曲目共用。页头照本地专辑详情页，工具行的查找与排序只作用于
@@ -105,12 +83,13 @@ export function OnlineListPage({ place }: PageProps) {
   const list = useMemo(() => readOnlineListSubject(place.subject ?? ''), [place.subject]);
   // 主体只由地点表写入；读不出时（存下的来源被改坏）不画内容，后退照常可用
   if (!list) return null;
+  // 艺人页的骨架与专辑、歌单页不同（单栏、没有页签与曲目表），单独一个页面
+  if (list.kind === 'artist') return <OnlineArtistPage key={onlineListKey(list)} list={list} />;
   return <OnlineList key={onlineListKey(list)} list={list} />;
 }
 
 function OnlineList({ list }: { readonly list: OnlineListSubject }) {
   const t = useAtomValueRawSync(translateAtom);
-  const viewControls = useViewControlStyles();
   const { active: locale } = useAtomValueRawSync(localeAtom);
   const lists = useService(onlineListsKey);
   const player = useService(onlinePlayKey);
@@ -137,9 +116,6 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
   } | null>(null);
   const [objectMenu, setObjectMenu] = useState<TablePoint | null>(null);
   const [restoring, setRestoring] = useState<ListSnapshot | null>(null);
-  const artistName = state?.owner ? ownerName(state.owner) : list.title;
-  const releases = useArtistReleases(list.kind === 'artist' ? list.ref : null, artistName, locale);
-  const releaseTab = list.kind === 'artist' && releases.tab !== 'songs';
 
   const owner = state?.owner ?? null;
   const items = state?.items ?? NO_TRACKS;
@@ -184,13 +160,11 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
         sort,
         query,
         loaded: items.length,
-        ...(list.kind === 'artist' ? { artist: releases.capture() } : {}),
       }),
       restore: (snapshot) => {
         setRestoring(snapshot);
         setSort(snapshot.sort);
         setQuery(snapshot.query);
-        if (snapshot.artist) releases.restore(snapshot.artist);
       },
     },
     ready && scroller !== null && narrow !== null,
@@ -198,10 +172,6 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
   // 返回时先补回离开时已取到的条数，再恢复滚动与焦点行
   useLayoutEffect(() => {
     if (!restoring || state?.phase !== 'ready' || !scroller) return;
-    // 回到专辑页签时，等专辑取到再恢复滚动：页高要等网格画出来才定
-    const wanted = restoring.artist?.tab;
-    if (wanted && wanted !== 'songs' && (!releases.state || releases.state.phase === 'loading'))
-      return;
     if (restoring.loaded > state.items.length && state.cursor !== null && !state.moreFailed) {
       if (!state.loadingMore) void lists.more(list);
       return;
@@ -209,12 +179,14 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
     setRestoring(null);
     setActive(restoring.active);
     scroller.scrollTop = restoring.top;
-  }, [restoring, state, releases.state, scroller, lists, list]);
+  }, [restoring, state, scroller, lists, list]);
 
   const failure = state?.phase === 'failed' ? state.failure : null;
   const retry = () => lists.retry(list);
   const sortField: OnlineSortField =
-    sort && sort.column !== 'cover' && sort.column !== 'menu' ? sort.column : 'number';
+    sort && sort.column !== 'cover' && sort.column !== 'menu' && sort.column !== 'favorite'
+      ? sort.column
+      : 'number';
   const orderLabel = t(ORDER_LABELS[list.kind]);
 
   return (
@@ -238,56 +210,26 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
                 onQueue={() => queue(items, false)}
                 onMenu={setObjectMenu}
               />
-              {notice && (
-                <MessageBar className={styles.notice} intent="warning" data-online-list-notice>
-                  <MessageBarBody>{t(notice)}</MessageBarBody>
-                  <MessageBarActions>
-                    <Button
-                      className={viewControls.field}
-                      size="small"
-                      onClick={() => setNotice(null)}
-                    >
-                      {t('album.dismiss')}
-                    </Button>
-                  </MessageBarActions>
-                </MessageBar>
-              )}
-              {releaseTab ? (
-                <ArtistReleaseTools releases={releases} />
-              ) : (
-                <DetailTools
-                  query={query}
-                  onQuery={setQuery}
-                  fields={onlineSortFields(layout)}
-                  field={sortField}
-                  descending={sort?.descending ?? false}
-                  sorted={sort !== null}
-                  label={(field) =>
-                    field === 'number' ? orderLabel : t(ONLINE_COLUMN_LABELS[field])
-                  }
-                  onSort={(field, descending) => setSort(onlineSort(field, descending))}
-                  start={
-                    list.kind !== 'artist' ? undefined : releases.tabs.length > 1 ? (
-                      <ArtistTabs releases={releases} />
-                    ) : (
-                      t('onlineList.top', { count: items.length })
-                    )
-                  }
-                />
-              )}
+              {notice && <OnlineNotice notice={notice} onDismiss={() => setNotice(null)} />}
+              <DetailTools
+                query={query}
+                onQuery={setQuery}
+                fields={onlineSortFields(layout)}
+                field={sortField}
+                descending={sort?.descending ?? false}
+                sorted={sort !== null}
+                label={(field) =>
+                  field === 'number' ? orderLabel : t(ONLINE_COLUMN_LABELS[field])
+                }
+                onSort={(field, descending) => setSort(onlineSort(field, descending))}
+              />
             </>
-          ) : failure === 'not-installed' ? (
-            <NcmSetupPanel onReady={retry} />
-          ) : failure === 'backend-unavailable' ? (
-            <OnlineUnavailable onRetry={retry} />
-          ) : failure === 'not-found' ? (
-            <OnlineMessage icon={<Search48Regular />} title={t(MISSING[list.kind])} />
           ) : failure ? (
-            <OnlineMessage
-              icon={<ErrorCircle48Regular />}
+            <OnlineFailureView
+              failure={failure}
+              retry={retry}
               title={t(FAILED[list.kind])}
-              detail={failureDetail(failure, t)}
-              action={{ label: t('album.retry'), run: retry }}
+              missing={t(MISSING[list.kind])}
             />
           ) : (
             <Spinner className={styles.spinner} aria-label={t('album.loading')} />
@@ -320,17 +262,7 @@ function OnlineList({ list }: { readonly list: OnlineListSubject }) {
         onScroller={setScroller}
         onNarrow={setNarrow}
       >
-        {owner && releaseTab && (
-          <ArtistReleasePane
-            releases={releases}
-            scroller={scroller}
-            setNotice={setNotice}
-            preview={releases.tab === 'albums'}
-            artist={list.ref}
-            name={artistName}
-          />
-        )}
-        {owner && !releaseTab && (
+        {owner && (
           <>
             <SearchResultList
               items={rows}

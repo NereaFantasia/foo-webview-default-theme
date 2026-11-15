@@ -5,7 +5,8 @@
   min-width: 0;
 }
 
-/* 弹出与浮动：盖在页面上的覆盖层，复用主视图背景色调与磨砂质感，缺省宽度放得下三栏分面；栏数少的页面经 --filter-flyout-width 收窄 */
+/* 弹出与浮动：盖在页面上的覆盖层，底是不透明的浮层底，不读阅读面的浓度、不模糊下方正文，
+   否则窗口背景不透明时把浓度调低，表格的字会从浮层里透出来；缺省宽度放得下三栏分面，栏数少的页面经 --filter-flyout-width 收窄 */
 .flyout {
   position: absolute;
   z-index: 3;
@@ -17,9 +18,7 @@
   padding: var(--spacingVerticalS) var(--spacingHorizontalL) var(--spacingVerticalM);
   border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAlpha);
   border-radius: var(--radius-overlay);
-  background-color: color-mix(in srgb, var(--bg-panel-overlay) 35%, var(--bg-pane));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background-color: var(--bg-panel-overlay);
   box-shadow: var(--shadow16);
   /* 出场时从筛选键一侧往下移入，方向变量与 Fluent 定位层写的同名 */
   --fui-positioning-slide-direction-x: 0px;
@@ -93,7 +92,5 @@
   .flyout {
     background-color: Canvas;
     border-color: CanvasText;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 }

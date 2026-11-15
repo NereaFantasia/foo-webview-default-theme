@@ -1,15 +1,21 @@
 import { createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
+import { backdropFlowSpeed } from '../../../../src/immersive/backdrop/backdropOptions.ts';
 import {
+  BACKDROP_OPTIONS_KEY,
   BACKDROP_PREF_KEY,
   backdropChoiceAtom,
   backdropDegradedAtom,
+  backdropOptionsAtom,
   backdropUnavailableAtom,
   chooseBackdrop,
+  chooseBackdropFlowSpeed,
+  chooseBackdropOption,
   clearBackdropDegraded,
   loadBackdropPrefs,
   markBackdropDegraded,
   markBackdropUnavailable,
+  resetBackdropOptions,
 } from '../../../../src/immersive/backdrop/backdropState.ts';
 import type { PrefStorage } from '../../../../src/kit/localPref.ts';
 
@@ -65,5 +71,78 @@ describe('这次运行里的状态', () => {
     expect(store.get(backdropDegradedAtom)).toBe(true);
     clearBackdropDegraded(store);
     expect(store.get(backdropDegradedAtom)).toBe(false);
+  });
+});
+
+describe('背景可调项的存档', () => {
+  const OPTIONS_KEY = 'default-theme.immersive.backdropOptions.v1';
+
+  it('键名固定，没有存档时是空存档，流动速度是原速', () => {
+    expect(BACKDROP_OPTIONS_KEY).toBe(OPTIONS_KEY);
+    const store = createStore();
+    loadBackdropPrefs(store, memoryStorage().storage);
+    expect(store.get(backdropOptionsAtom)).toEqual({
+      titanium: {},
+      isolation: {},
+      mesh: {},
+      flow: {},
+    });
+    expect(backdropFlowSpeed(store.get(backdropOptionsAtom))).toBe(100);
+  });
+
+  it('读得到存档，坏存档与不合法的项丢掉', () => {
+    const store = createStore();
+    loadBackdropPrefs(
+      store,
+      memoryStorage({ [OPTIONS_KEY]: '{"flowSpeed":130,"titanium":{"grain":50,"palette":"pixi"}}' })
+        .storage,
+    );
+    expect(store.get(backdropOptionsAtom)).toEqual({
+      flowSpeed: 130,
+      titanium: { grain: 50 },
+      isolation: {},
+      mesh: {},
+      flow: {},
+    });
+    loadBackdropPrefs(store, memoryStorage({ [OPTIONS_KEY]: '{broken' }).storage);
+    expect(store.get(backdropOptionsAtom)).toEqual({
+      titanium: {},
+      isolation: {},
+      mesh: {},
+      flow: {},
+    });
+  });
+
+  it('改一项立即生效并写回；改回缺省不再写那一项；同值不重写', () => {
+    const store = createStore();
+    const { storage, map } = memoryStorage();
+    expect(chooseBackdropOption(store, 'titanium', 'grain', 50, storage)).toBe(true);
+    expect(map.get(OPTIONS_KEY)).toBe('{"titanium":{"grain":50}}');
+    expect(chooseBackdropOption(store, 'titanium', 'grain', 50, storage)).toBe(false);
+    expect(chooseBackdropFlowSpeed(store, 150, storage)).toBe(true);
+    expect(map.get(OPTIONS_KEY)).toBe('{"flowSpeed":150,"titanium":{"grain":50}}');
+    expect(chooseBackdropOption(store, 'titanium', 'grain', 70, storage)).toBe(true);
+    expect(map.get(OPTIONS_KEY)).toBe('{"flowSpeed":150}');
+    expect(chooseBackdropOption(store, 'titanium', 'lightWave', true, storage)).toBe(false);
+  });
+
+  it('恢复默认清掉所选渲染器的项与流动速度，别的渲染器的项留着', () => {
+    const store = createStore();
+    const { storage, map } = memoryStorage();
+    chooseBackdropOption(store, 'titanium', 'grain', 50, storage);
+    chooseBackdropOption(store, 'isolation', 'lightWave', true, storage);
+    chooseBackdropFlowSpeed(store, 150, storage);
+    expect(resetBackdropOptions(store, 'titanium', storage)).toBe(true);
+    expect(map.get(OPTIONS_KEY)).toBe('{"isolation":{"lightWave":true}}');
+    expect(resetBackdropOptions(store, 'titanium', storage)).toBe(false);
+  });
+
+  it('可调项与所选渲染器分开存，换渲染器不丢', () => {
+    const store = createStore();
+    const { storage, map } = memoryStorage();
+    chooseBackdropOption(store, 'titanium', 'grain', 50, storage);
+    chooseBackdrop(store, 'isolation', storage);
+    expect(map.get('default-theme.immersive.backdrop.v1')).toBe('isolation');
+    expect(store.get(backdropOptionsAtom).titanium).toEqual({ grain: 50 });
   });
 });

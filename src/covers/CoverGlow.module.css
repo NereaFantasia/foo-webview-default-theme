@@ -4,14 +4,34 @@
   inset: 0 0 auto;
   height: 300px;
   pointer-events: none;
+  /* 色块与颗粒的不透明度乘它：跟着头图出的光晕，自己的图就位之前是 0，就位后淡入 */
+  --glow-on: 1;
 }
 
+.root[data-hold] {
+  --glow-on: 0;
+}
+
+/* 跟着头图出的光晕不按时间等：挂上就在，不透明度随 --glow-on 过渡，与头图同时显现 */
+.root[data-synced] > * {
+  animation: none;
+  transition: opacity var(--motion-slow) var(--curveLinear);
+}
+
+/* 进入等待（切到头图模式、换成头图）时当场隐去，位置的变化藏在这一下里；等到了才淡入 */
+.root[data-hold] > * {
+  transition: none;
+}
+
+/* 延后挂上的整块光晕淡入：大面积的进场取 slow，纯透明度用线性；终态的不透明度仍是各自的取值 */
 .bloom {
+  position: relative;
   width: 100%;
   height: min(300px, 100%);
   background: var(--accent);
   filter: blur(128px);
-  opacity: 0.33;
+  opacity: calc(0.33 * var(--glow-on));
+  animation: arrive var(--motion-slow) var(--curveLinear);
 }
 
 .image {
@@ -22,8 +42,14 @@
   filter: saturate(8) brightness(1.6);
 }
 
+/* 视频的画面叠在静图上，同样的滤镜与模糊；画出后淡入 */
+.frame {
+  position: absolute;
+  inset: 0;
+}
+
 .root[data-scheme='dark'] .bloom {
-  opacity: 1;
+  opacity: calc(1 * var(--glow-on));
 }
 
 .root[data-scheme='dark'] .image {
@@ -36,9 +62,10 @@
   inset: 0 0 auto;
   height: 100%;
   background-image: url('/cover-grain.png');
-  opacity: 0.045;
+  opacity: calc(0.045 * var(--glow-on));
   mix-blend-mode: soft-light;
   mask-image: linear-gradient(var(--colorNeutralForeground1), transparent);
+  animation: arrive var(--motion-slow) var(--curveLinear);
 }
 
 .image[data-ready] {
@@ -52,5 +79,12 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* 只写起点：终点取元素自己的不透明度（浅色 0.33，深色 1，颗粒 0.045） */
+@keyframes arrive {
+  from {
+    opacity: 0;
   }
 }

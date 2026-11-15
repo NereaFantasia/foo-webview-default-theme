@@ -77,6 +77,8 @@ export function createLastfmSource(
         ok: true,
         store: result.store,
         entry: {
+          source: 'lastfm',
+          sourceId: artist,
           artist,
           language,
           fetchedAt: now,
@@ -111,6 +113,7 @@ export function createLastfmSource(
         ok: true,
         store: result.store,
         details: {
+          source: 'lastfm',
           artist,
           language,
           url: lastfmArtistUrl(artist, language),

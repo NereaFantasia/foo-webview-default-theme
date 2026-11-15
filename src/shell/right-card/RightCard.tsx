@@ -1,12 +1,12 @@
 import { Menu } from '../../motion/Surfaces.tsx';
 import { MenuSurface as MenuPopover } from '../../theme/MenuSurface.tsx';
 import { createSnapshotSlot } from '../../nav/historyStack.ts';
+import { mainHistoryAtom } from '../../nav/navHistory.ts';
 import {
   Button,
   MenuItem,
   MenuList,
   MenuTrigger,
-  Tab,
   makeStyles,
   mergeClasses,
   tokens,
@@ -22,11 +22,9 @@ import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import { CURVE, DURATION_MS, motionDuration } from '../../motion/timing.ts';
 import { translateAtom } from '../../i18n/locale.ts';
-import type { MessageKey } from '../../i18n/en.ts';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
 import { QueueList } from '../../playback/queue/QueueList.tsx';
 import { RightCardHead } from './RightCardHead.tsx';
-import { READY_PAGES, RIGHT_CARD_PAGES, type RightCardPage } from './rightCard.ts';
 import styles from './RightCard.module.css';
 import {
   RightCardBiographyContext,
@@ -37,7 +35,6 @@ import {
 } from './rightCardContext.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { LyricsPreviewContext, useLyricsPreview } from './lyrics/useLyricsPreview.ts';
-import { TabList } from '../../motion/Surfaces.tsx';
 import { RightCardNavigation } from './RightCardNavigation.tsx';
 
 const SNAPSHOT = createSnapshotSlot<{
@@ -46,23 +43,13 @@ const SNAPSHOT = createSnapshotSlot<{
   focusedRow: string | null;
 }>();
 
-const PAGE_LABELS: Readonly<Record<RightCardPage, MessageKey>> = {
-  queue: 'rightCard.page.queue',
-  lyrics: 'rightCard.page.lyrics',
-  info: 'rightCard.page.info',
-  bio: 'rightCard.page.bio',
-};
-
 const useStyles = makeStyles({
-  tab: { paddingInline: tokens.spacingHorizontalS, minHeight: '32px' },
-  tabText: { fontSize: tokens.fontSizeBase200, lineHeight: tokens.lineHeightBase200 },
   more: { minWidth: '28px', width: '28px', height: '28px', color: tokens.colorNeutralForeground3 },
 });
 
 /**
- * 工具条、分页栏固定；信息页在内容区内单独管理固定身份与滚动分组
- * 未启用的页面在分页栏里置灰，读屏时念作即将推出。队列页的播放历史挂在分页栏与内容区之间的插槽里，
- * 不随内容区滚动
+ * 工具条固定；信息页在内容区内单独管理固定身份与滚动分组。换页的入口是标题栏或导航行里的四个键，
+ * 卡里不再有分页栏。队列页的播放历史挂在工具条与内容区之间的插槽里，不随内容区滚动
  */
 export function RightCard() {
   const t = useAtomValueRawSync(translateAtom);
@@ -77,6 +64,8 @@ export function RightCard() {
   const source = useAtomValueRawSync(deps.source);
   const playbackState = useAtomValueRawSync(deps.playbackState);
   const reduced = useAtomValueRawSync(reducedMotionAtom);
+  // 沉浸视图盖在主窗上时，它的队列页独占读取窗口，这里的队列不去抢
+  const covered = useAtomValueRawSync(mainHistoryAtom).place.id === 'nowPlaying';
   const status = useRef<HTMLSpanElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const { entry, arrival } = useAtomValueRawSync(card.navigation);
@@ -163,47 +152,11 @@ export function RightCard() {
       onFocusCapture={preview.focus}
       onBlurCapture={preview.blur}
     >
-      <div
-        ref={preview.tabs}
-        className={styles.tabs}
-        data-lyrics-preview-controls
-        inert={!preview.visible}
-        aria-hidden={!preview.visible || undefined}
-      >
-        <RightCardNavigation scope={preview.root} />
-        <TabList
-          size="small"
-          selectedValue={page}
-          aria-label={t('rightCard.pages')}
-          onTabSelect={(_, data) => {
-            const next = RIGHT_CARD_PAGES.find((candidate) => candidate === data.value);
-            if (next) card.select(next);
-          }}
-        >
-          {RIGHT_CARD_PAGES.map((value) => {
-            const label = t(PAGE_LABELS[value]);
-            const ready = READY_PAGES.has(value);
-            return (
-              <Tab
-                key={value}
-                className={classes.tab}
-                content={{ className: classes.tabText }}
-                value={value}
-                disabled={!ready}
-                aria-label={ready ? undefined : t('common.comingSoon', { name: label })}
-                data-right-card-page={value}
-              >
-                {label}
-              </Tab>
-            );
-          })}
-        </TabList>
-      </div>
+      <RightCardNavigation scope={preview.root} />
       {page === 'info' && information ? (
         information.toolbar
       ) : page === 'lyrics' ? null : (
         <div
-          ref={preview.toolbar}
           className={styles.toolbar}
           data-lyrics-preview-controls
           inert={!preview.visible}
@@ -257,11 +210,12 @@ export function RightCard() {
       )}
       <div ref={setHistorySlot} className={styles.history} />
       <div ref={content} className={styles.content} data-page={page}>
-        {/* 插槽就位后才挂队列页：历史区挂上时就要拿得到自己的列表，滚动监听与按键才接得上。 */}
+        {/* 插槽就位后才挂载队列页：历史区挂载时要能获取到自己的列表，滚动监听与按键才能接上 */}
         {page === 'queue' && historySlot && (
           <QueueList
             review={{ toggle: reviewSlot, history: historySlot }}
             head={(onMenu) => <RightCardHead onMenu={onMenu} />}
+            active={!covered}
           />
         )}
         {page === 'bio' && biography}

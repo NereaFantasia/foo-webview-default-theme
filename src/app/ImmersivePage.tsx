@@ -1,8 +1,10 @@
 import { atom, type Atom } from 'jotai/vanilla';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useContext, useEffect, useState } from 'react';
-import { hostFullRatePcm, hostPcmSource } from '../immersive/analysis/hostPcmSource.ts';
+import { fb } from 'foo-webview-sdk/bridge';
+import { createHostFullRatePcm, createHostPcmSource } from '../immersive/analysis/hostPcmSource.ts';
 import { startTrackAnalysis } from '../immersive/analysis/trackAnalysis.ts';
+import { backdropDegradedAtom } from '../immersive/backdrop/backdropState.ts';
 import { immersiveCoverKey, startImmersiveCover } from '../covers/immersiveCover.ts';
 import { trackArtworkKey } from '../covers/trackArtwork.ts';
 import { startTrackExtras } from '../immersive/fields/trackExtras.ts';
@@ -17,6 +19,7 @@ import { NowPlayingPage } from '../immersive/page/NowPlayingPage.tsx';
 import {
   immersiveSceneAtom,
   immersiveTerrainAtom,
+  onlineAnalysisAtom,
   waveformModeAtom,
   type ImmersiveScene,
 } from '../immersive/page/immersivePrefs.ts';
@@ -31,9 +34,10 @@ import { startFullWaveform } from '../immersive/waveform/fullWaveform.ts';
 import { needsBands } from '../immersive/waveform/waveformModes.ts';
 import type { Store } from '../kit/store.ts';
 import { useService } from '../kit/useService.ts';
-import { historyAtom } from '../nav/navHistory.ts';
+import { mainHistoryAtom } from '../nav/navHistory.ts';
 import { PageEntryContext } from '../nav/usePageSnapshot.ts';
 import { playbackKey } from '../playback/playbackContract.ts';
+import { BrowserPanel } from '../shell/browser/BrowserPanel.tsx';
 import { immersiveIntegrationKey } from './immersiveIntegration.ts';
 import { initializeImmersivePrefs } from './immersivePrefs.ts';
 
@@ -64,14 +68,15 @@ function startPaperResources(store: Store, active: Atom<boolean>) {
   });
   const terrain = startTerrainHistory(store, spectrum);
   const stereo = startStereoSamples(store, { spectrumStatus: spectrumStatusAtom, active });
+  const online = { mode: () => store.get(onlineAnalysisAtom) };
   const resources = [
     spectrum,
     terrain,
     stereo,
-    startFullWaveform(store, { active }),
-    startTrackDynamics(store, { source: hostFullRatePcm, active }),
+    startFullWaveform(store, { active, ...online }),
+    startTrackDynamics(store, { source: createHostFullRatePcm(fb, online), active }),
     startLiveLoudness(store, { active }),
-    startTrackAnalysis(store, { wanted, source: hostPcmSource }),
+    startTrackAnalysis(store, { wanted, source: createHostPcmSource(fb, online) }),
   ];
   return {
     view: { spectrum, terrain, stereo },
@@ -98,13 +103,14 @@ function startPaperResources(store: Store, active: Atom<boolean>) {
 export function ImmersivePage() {
   const store = useStore();
   const entry = useContext(PageEntryContext);
-  const current = useAtomValueRawSync(historyAtom).entry === entry;
+  const current = useAtomValueRawSync(mainHistoryAtom).entry === entry;
   const integration = useService(immersiveIntegrationKey);
   const playback = useService(playbackKey);
   const artwork = useService(trackArtworkKey);
   // 场景偏好在解析场景前同步加载至 store（单次幂等初始化）
   initializeImmersivePrefs(store);
   const scene = useAtomValueRawSync(immersiveSceneAtom);
+  const degraded = useAtomValueRawSync(backdropDegradedAtom);
   const [running, setRunning] = useState<RunningView | null>(null);
 
   useEffect(() => {
@@ -150,22 +156,26 @@ export function ImmersivePage() {
     };
   }, [current, entry, scene, store, integration, playback, artwork]);
 
+  // 浏览面板只在这一页是当前页时挂：退场过渡里页面还挂着，那时面板已随沉浸视图的这一次打开收了
   return (
-    <NowPlayingPage
-      current={current}
-      shell={current ? (running?.shell ?? null) : null}
-      leases={current && running?.scene === scene ? running.leases : null}
-      services={
-        running?.services ?? {
-          active: INACTIVE,
-          visible: integration.visible,
-          playback,
-          cover: null,
-          spectrum: null,
-          terrain: null,
-          stereo: null,
+    <>
+      <NowPlayingPage
+        current={current}
+        shell={current ? (running?.shell ?? null) : null}
+        leases={current && running?.scene === scene ? running.leases : null}
+        services={
+          running?.services ?? {
+            active: INACTIVE,
+            visible: integration.visible,
+            playback,
+            cover: null,
+            spectrum: null,
+            terrain: null,
+            stereo: null,
+          }
         }
-      }
-    />
+      />
+      {current && <BrowserPanel solid={degraded} />}
+    </>
   );
 }

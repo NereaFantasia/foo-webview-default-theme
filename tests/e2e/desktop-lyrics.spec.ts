@@ -6,6 +6,7 @@ import {
   parseDesktopLyricsMessage,
   type DesktopLyricsView,
 } from '../../src/lyrics/desktop/desktopLyricsLink.ts';
+import { DEFAULT_LYRICS_DISPLAY } from '../../src/lyrics/lyricsDisplay.ts';
 import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
 
 test.use({ screenshot: 'off' });
@@ -31,6 +32,12 @@ const VIEW: DesktopLyricsView = {
   mode: 'multi',
   multilineSize: null,
   fontSize: 34,
+  translationFontSize: 20,
+  motionCustom: { blur: true, scale: true, hidePassedLines: false, alignPosition: 0.5 },
+  font: '',
+  fontWeight: null,
+  uiFont: '',
+  cjkFont: '',
   sung: '#78d7ce',
   unsung: null,
   tint: null,
@@ -43,6 +50,11 @@ const VIEW: DesktopLyricsView = {
   title: '窗口尺寸',
   artist: '示例艺人',
   hidden: false,
+  process: {
+    optimize: DEFAULT_LYRICS_DISPLAY.optimize,
+    maskMode: DEFAULT_LYRICS_DISPLAY.maskMode,
+    maskChar: DEFAULT_LYRICS_DISPLAY.maskChar,
+  },
 };
 
 const LINES = {
@@ -63,6 +75,24 @@ const LINES = {
 const players = (page: Page) => page.locator('.amll-lyric-player');
 const running = (page: Page) => page.locator('.amll-lyric-player[class*="_playing"]');
 const windowRoot = (page: Page) => page.locator('[data-align]');
+
+/**
+ * 改视口并等组件收到这次尺寸通知，再推进假时钟。尺寸通知在下一轮渲染才送达；没等到就推进时钟，
+ * 上一次通知设下的计时会先到期。这里的观察者晚于组件的创建，同一轮渲染里在组件之后送达
+ */
+async function resizeViewport(page: Page, width: number, height: number) {
+  await page.evaluate(() => {
+    if (Reflect.get(window, '__viewportObserved') !== undefined) return;
+    const root = document.querySelector('[data-align]');
+    if (!root) throw new Error('缺少桌面歌词的根节点');
+    Reflect.set(window, '__viewportObserved', 0);
+    new ResizeObserver(() => Reflect.set(window, '__viewportObserved', innerWidth)).observe(root);
+  });
+  await page.setViewportSize({ width, height });
+  await expect
+    .poll(() => page.evaluate(() => Reflect.get(window, '__viewportObserved')))
+    .toBe(width);
+}
 
 async function dimensions(page: Page) {
   return players(page).evaluateAll((elements) =>
@@ -136,12 +166,12 @@ test('连续改尺寸时两层保留旧布局并停帧，稳定后只采用最�
   const { errors } = await openPopup(page);
   const original = await players(page).elementHandles();
   const before = await dimensions(page);
-  await page.setViewportSize({ width: 1000, height: 600 });
+  await resizeViewport(page, 1000, 600);
   await expect(windowRoot(page)).toHaveAttribute('data-resizing', 'true');
   await expect(running(page)).toHaveCount(0);
   expect(await dimensions(page)).toEqual(before);
   await page.clock.runFor(100);
-  await page.setViewportSize({ width: 900, height: 160 });
+  await resizeViewport(page, 900, 160);
   await expect(windowRoot(page)).toHaveCSS('width', '900px');
   await page.clock.runFor(100);
   await expect(windowRoot(page)).toHaveAttribute('data-resizing', 'true');
@@ -369,8 +399,8 @@ async function switchToSingle(page: Page, host: Awaited<ReturnType<typeof openPo
 test('单行：一句放不下换成两行时窗高多出一行主句，背景行不显示，文字不被裁', async ({ page }) => {
   const { host, errors } = await openPopup(page, LONG_LINES);
   await switchToSingle(page, host);
-  // 工具栏 48 + 主句与译文各一行 116 + 多出的一行主句 41
-  await expect.poll(() => page.viewportSize()?.height).toBe(48 + 116 + 41);
+  // 工具栏 48 + 主句与译文各一行 115 + 多出的一行主句 41
+  await expect.poll(() => page.viewportSize()?.height).toBe(48 + 115 + 41);
   await page.clock.runFor(800);
   await expect(page.locator('[class*="bgWrapper"]').first()).toHaveCSS('display', 'none');
   const room = await page.evaluate(() => {
@@ -401,6 +431,6 @@ test('单行：一句放不下换成两行时窗高多出一行主句，背景�
 test('单行：每句都放得下一行时窗高不变', async ({ page }) => {
   const { host, errors } = await openPopup(page);
   await switchToSingle(page, host);
-  await expect.poll(() => page.viewportSize()?.height).toBe(48 + 116);
+  await expect.poll(() => page.viewportSize()?.height).toBe(48 + 115);
   expect(errors).toEqual([]);
 });

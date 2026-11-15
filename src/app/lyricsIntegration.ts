@@ -3,10 +3,11 @@ import { atom } from 'jotai/vanilla';
 import { serviceKey } from '../kit/serviceKey.ts';
 import { trackAbilities } from '../host/trackOrigin.ts';
 import { startLyricLog } from '../immersive/lyrics/lyricLog.ts';
-import { historyAtom } from '../nav/navHistory.ts';
+import { mainHistoryAtom } from '../nav/navHistory.ts';
 import { startLocalLyrics } from '../lyrics/lyricsLocal.ts';
 import { startLyricsMotion } from '../lyrics/lyricsMotion.ts';
 import { startLyricsArchive } from '../lyrics/lyricsArchive.ts';
+import { startLyricsCache } from '../lyrics/lyricsCache.ts';
 import { startLyricsDisplay } from '../lyrics/lyricsDisplay.ts';
 import { startLyricsPrefs } from '../lyrics/lyricsPrefs.ts';
 import { startLyrics, type LyricsTarget } from '../lyrics/lyricsService.ts';
@@ -31,9 +32,12 @@ export function startLyricsIntegration(
     rightCard,
     playback,
     configWriter,
+    backend,
   }: Pick<AppServices, 'store' | 'configWriter'> & {
     readonly rightCard: Pick<AppServices['rightCard'], 'card'>;
     readonly playback: Pick<AppServices['playback'], 'seek'>;
+    /** 没有时歌词缓存不可用，取词照常 */
+    readonly backend?: AppServices['backend'];
   },
   host: typeof fb = fb,
 ) {
@@ -65,12 +69,14 @@ export function startLyricsIntegration(
     return (
       get(visible) &&
       get(playbackConnectedAtom) &&
-      get(historyAtom).place.id !== 'nowPlaying' &&
+      get(mainHistoryAtom).place.id !== 'nowPlaying' &&
       view.form !== 'none' &&
       view.prefs.page === 'lyrics'
     );
   });
-  const immersiveActive = atom((get) => get(visible) && get(historyAtom).place.id === 'nowPlaying');
+  const immersiveActive = atom(
+    (get) => get(visible) && get(mainHistoryAtom).place.id === 'nowPlaying',
+  );
   // 取词需求包含沉浸视图与开着的桌面歌词，但被沉浸视图遮住的预览播放器仍使用自己的可见状态
   const wanted = atom(
     (get) =>
@@ -82,6 +88,7 @@ export function startLyricsIntegration(
   const display = startLyricsDisplay(store, host, configWriter);
   const local = startLocalLyrics(store, { host, track, connected: playbackConnectedAtom });
   const archive = startLyricsArchive(store, track, host, configWriter);
+  const cache = startLyricsCache(store, backend, host, configWriter);
   const service = startLyrics(store, {
     host,
     track,
@@ -91,6 +98,7 @@ export function startLyricsIntegration(
     prefs,
     local,
     archive,
+    cache,
   });
   const immersive = startLyricLog(store, {
     lyrics: service,
@@ -127,6 +135,7 @@ export function startLyricsIntegration(
     motion,
     display,
     archive,
+    cache,
     clock,
     active,
     immersiveActive,
@@ -151,6 +160,7 @@ export function startLyricsIntegration(
       immersive.dispose();
       service.dispose();
       archive.dispose();
+      cache.dispose();
       local.dispose();
       prefs.dispose();
       motion.dispose();

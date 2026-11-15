@@ -17,12 +17,12 @@ function keyTag(html: string, name: string): string {
 const disabled = (tag: string) => /\sdisabled(=|\s|>)/.test(tag);
 
 describe('Transport', () => {
-  it('连上了但没有曲目（停止）：上一首与下一首置灰，播放键可点', async () => {
+  it('连上了但没有曲目（停止）：三个键都能点，与播放栏及宿主快捷键一致（宿主在停止时也会起播）', async () => {
     const env = await startSceneEnv();
     const html = env.render(<Transport />);
     expect(html).toContain('data-scene-element="transport"');
-    expect(disabled(keyTag(html, 'previous'))).toBe(true);
-    expect(disabled(keyTag(html, 'next'))).toBe(true);
+    expect(disabled(keyTag(html, 'previous'))).toBe(false);
+    expect(disabled(keyTag(html, 'next'))).toBe(false);
     expect(disabled(keyTag(html, 'play'))).toBe(false);
   });
 

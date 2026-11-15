@@ -7,7 +7,7 @@ import {
   type InfoSize,
 } from '../../../../src/immersive/track-info/trackInfoLayout.ts';
 
-const SIZES: readonly InfoSize[] = ['large', 'medium', 'small'];
+const SIZES: readonly InfoSize[] = ['large', 'medium', 'small', 'compact'];
 
 describe('收起点', () => {
   it('三档各自的位深、星级、编码框收起点与任务单一致', () => {
@@ -15,6 +15,14 @@ describe('收起点', () => {
     expect(points('large')).toEqual([209, 186, 163, 0]);
     expect(points('medium')).toEqual([174, 162, 132, 0]);
     expect(points('small')).toEqual([166, 156, 124, 0]);
+  });
+
+  it('浮在封面上的小胶囊那一档按同一套算法推出，位深、星级、编码框的次序不变', () => {
+    const [full = 0, noDetail = 0, noRating = 0] = COLLAPSE_TIERS.compact.map((step) => step.min);
+    const [, , smallNoRating = 0] = COLLAPSE_TIERS.small.map((step) => step.min);
+    expect(full).toBeGreaterThan(noDetail);
+    expect(noDetail).toBeGreaterThan(noRating);
+    expect(noRating).toBeLessThan(smallNoRating);
   });
 
   it('阶梯降序排列，每档的点都比下一档大', () => {
@@ -63,5 +71,6 @@ describe('字号档', () => {
     expect(INFO_SIZES.large).toMatchObject({ title: 28, sub: 16 });
     expect(INFO_SIZES.medium).toMatchObject({ title: 22, sub: 14 });
     expect(INFO_SIZES.small).toMatchObject({ title: 20, sub: 13 });
+    expect(INFO_SIZES.compact).toMatchObject({ title: 16, sub: 12 });
   });
 });

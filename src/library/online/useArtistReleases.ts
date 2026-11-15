@@ -23,10 +23,7 @@ import {
   type VersionOption,
 } from './artistReleases.ts';
 
-export type ArtistTab = 'songs' | 'albums' | 'singles';
-type ReleaseTab = Exclude<ArtistTab, 'songs'>;
-
-/** 专辑页签与「单曲与 EP」页签各自维护检索、排序、种类与版本过滤状态 */
+/** 专辑墙页里检索、排序、种类与版本过滤的状态 */
 export interface ReleaseView {
   readonly query: string;
   readonly sort: ReleaseSort;
@@ -41,7 +38,7 @@ const FRESH: ReleaseView = {
   versions: new Set(),
 };
 
-/** 页签内小节定义：专辑页签包含正文、合集与参与专辑，「单曲与 EP」仅单节 */
+/** 艺人发行的一节：专辑、合集、参与的专辑或「单曲与 EP」 */
 export interface ReleaseSection {
   readonly key: 'albums' | 'compilations' | 'featured' | 'singles';
   readonly albums: readonly MusicAlbum[];
@@ -62,22 +59,56 @@ export interface ReleaseSearch {
   readonly more: boolean;
 }
 
-/** 页面切换现场快照，离开时保存、返回时恢复 */
+/** 专辑墙页的现场快照，离开时保存、返回时恢复 */
 export interface ArtistSnapshot {
-  readonly tab: ArtistTab;
-  readonly views: Readonly<Record<ReleaseTab, ReleaseView>>;
+  readonly view: ReleaseView;
+}
+
+/** 一位艺人的发行列表与它的分组，概览页与专辑墙页共用 */
+export interface ArtistLayout {
+  /** 平台与艺人 ID 都有才有；没有时不取 */
+  readonly ref: MusicRef | null;
+  readonly state: ArtistAlbumsState | undefined;
+  /** 已获取专辑的分组布局；未取完时为 null */
+  readonly layout: ReleaseLayout | null;
+  retry(): void;
+  /** 续取后续分页 */
+  more(): void;
+}
+
+/** 请求这位艺人的发行列表并分组；挂载时立即请求，artist 为 null 时不请求 */
+export function useArtistLayout(artist: MusicRef | null): ArtistLayout {
+  const service = useService(artistAlbumsKey);
+  const platform = artist?.platform;
+  const id = artist?.id;
+  const ref = useMemo(() => (platform && id ? { platform, id } : null), [platform, id]);
+  useEffect(() => (ref ? service.want(ref) : undefined), [service, ref]);
+  const states = useAtomValueRawSync(service.artists);
+  const state = ref ? states.get(artistAlbumsKeyOf(ref)) : undefined;
+  const ready = state?.phase === 'ready';
+  const albums = state?.albums;
+  const layout = useMemo(
+    () => (ready && ref && albums ? layoutReleases(albums, ref) : null),
+    [ready, ref, albums],
+  );
+  return {
+    ref,
+    state,
+    layout,
+    retry() {
+      if (ref) service.retry(ref);
+    },
+    more() {
+      if (ref) service.more(ref);
+    },
+  };
 }
 
 export interface ArtistReleases {
   readonly state: ArtistAlbumsState | undefined;
-  /** 已获取专辑的分组布局；未完成初始化时为 null */
-  readonly layout: ReleaseLayout | null;
-  /** 当前可用页签列表；加载阶段全部展示，完成后移除无数据页签 */
-  readonly tabs: readonly ArtistTab[];
-  readonly tab: ArtistTab;
-  /** 当前激活页签的检索、排序、种类与版本过滤状态 */
+  readonly section: ReleaseSection['key'];
   readonly view: ReleaseView;
-  /** 当前页签应用过滤与排序后的展示小节列表；空节自动剔除 */
+  /** 应用过滤与排序后的这一节；空节自动剔除 */
   readonly sections: readonly ReleaseSection[];
   /**
    * 筛选面板各栏目选项与计数
@@ -87,12 +118,11 @@ export interface ArtistReleases {
     readonly kinds: { readonly shown: boolean; readonly options: readonly KindOption[] };
     readonly versions: { readonly shown: boolean; readonly options: readonly VersionOption[] };
   };
-  /** 当前页签过滤后的匹配专辑总数 */
+  /** 过滤后的匹配专辑总数 */
   readonly count: number;
   /** 有查找词或种类、版本筛选：筛出来的结果不靠滚动自动续取，由用户点加载更多 */
   readonly filtering: boolean;
   readonly search: ReleaseSearch;
-  setTab(tab: ArtistTab): void;
   setQuery(query: string): void;
   setSort(field: ReleaseSortField, descending: boolean): void;
   toggleKind(kind: ReleaseKind): void;
@@ -107,60 +137,22 @@ export interface ArtistReleases {
   restore(snapshot: ArtistSnapshot): void;
 }
 
-/** 只看艺人专辑页签里的一节（专辑墙页）：页签固定在专辑，只留这一节，查找、排序与版本筛选从概览带来 */
+/** 专辑墙页只看艺人发行的一节，查找、排序与版本筛选从概览带来 */
 export interface ReleaseFocus {
   readonly section: ReleaseSection['key'];
   readonly initial: Pick<ReleaseView, 'query' | 'sort' | 'versions'>;
 }
 
-/**
- * 在线艺人专辑页签数据与交互状态 hook
- * 挂载时立即请求艺人专辑以推断可用页签；artist 为 null 时不执行请求
- */
+/** 专辑墙页的数据与交互状态：只看 `focus` 那一节，在它上面检索、排序与筛选 */
 export function useArtistReleases(
   artist: MusicRef | null,
   name: string,
   locale: string,
-  focus?: ReleaseFocus,
+  focus: ReleaseFocus,
 ): ArtistReleases {
-  const service = useService(artistAlbumsKey);
-  const platform = artist?.platform;
-  const id = artist?.id;
-  const ref = useMemo(() => (platform && id ? { platform, id } : null), [platform, id]);
-  useEffect(() => (ref ? service.want(ref) : undefined), [service, ref]);
-  const states = useAtomValueRawSync(service.artists);
-  const state = ref ? states.get(artistAlbumsKeyOf(ref)) : undefined;
-  const ready = state?.phase === 'ready';
+  const { ref, state, layout, retry, more } = useArtistLayout(artist);
   const albums = state?.albums;
-  const layout = useMemo(
-    () => (ready && ref && albums ? layoutReleases(albums, ref) : null),
-    [ready, ref, albums],
-  );
-
-  const [tab, setTabState] = useState<ArtistTab>(focus ? 'albums' : 'songs');
-  const [views, setViews] = useState<Readonly<Record<ReleaseTab, ReleaseView>>>(() => ({
-    albums: focus ? { ...FRESH, ...focus.initial } : FRESH,
-    singles: FRESH,
-  }));
-  const offered = !!ref && !(state?.phase === 'failed' && state.failure === 'unsupported');
-  const tabs = useMemo<readonly ArtistTab[]>(() => {
-    if (!offered) return ['songs'];
-    if (!layout) return ['songs', 'albums', 'singles'];
-    const hasAlbums =
-      layout.albums.length + layout.compilations.length + layout.featured.length > 0;
-    return [
-      'songs',
-      ...(hasAlbums ? ['albums' as const] : []),
-      ...(layout.singles.length > 0 ? ['singles' as const] : []),
-    ];
-  }, [offered, layout]);
-  const active: ArtistTab = tabs.includes(tab)
-    ? tab
-    : tab === 'singles' && tabs.includes('albums')
-      ? 'albums'
-      : 'songs';
-  const releaseTab = active === 'songs' ? null : active;
-  const view = releaseTab ? views[releaseTab] : FRESH;
+  const [view, setView] = useState<ReleaseView>(() => ({ ...FRESH, ...focus.initial }));
   const collator = useMemo(
     () => new Intl.Collator(locale, { numeric: true, sensitivity: 'base' }),
     [locale],
@@ -171,7 +163,6 @@ export function useArtistReleases(
   const searchStates = useAtomValueRawSync(searchService.searches);
   const text = view.query.trim();
   const online =
-    releaseTab !== null &&
     ref !== null &&
     name !== '' &&
     text !== '' &&
@@ -204,20 +195,12 @@ export function useArtistReleases(
     [layout, extras, ref],
   );
 
-  const parts = useMemo<readonly ReleaseSection[]>(() => {
-    if (!merged || !releaseTab) return [];
-    const all: readonly ReleaseSection[] =
-      releaseTab === 'albums'
-        ? [
-            { key: 'albums', albums: merged.albums },
-            { key: 'compilations', albums: merged.compilations },
-            { key: 'featured', albums: merged.featured },
-          ]
-        : [{ key: 'singles', albums: merged.singles }];
-    return focus ? all.filter((part) => part.key === focus.section) : all;
-  }, [merged, releaseTab, focus]);
+  const part = useMemo<ReleaseSection | null>(
+    () => (merged ? { key: focus.section, albums: merged[focus.section] } : null),
+    [merged, focus.section],
+  );
   const facets = useMemo(() => {
-    const all = parts.flatMap((part) => part.albums);
+    const all = part?.albums ?? [];
     const { kinds, versions } = view;
     return {
       kinds: {
@@ -229,33 +212,21 @@ export function useArtistReleases(
         options: versionOptions(withKinds(all, kinds), versions),
       },
     };
-  }, [parts, view]);
-  const sections = useMemo(
-    () =>
-      parts
-        .map((part) => ({
-          key: part.key,
-          albums: sortReleases(
-            withKinds(
-              withVersions(findReleases(part.albums, view.query), view.versions),
-              view.kinds,
-            ),
-            view.sort,
-            collator,
-          ),
-        }))
-        .filter((section) => section.albums.length > 0),
-    [parts, view, collator],
-  );
+  }, [part, view]);
+  const sections = useMemo(() => {
+    if (!part) return [];
+    const shown = sortReleases(
+      withKinds(withVersions(findReleases(part.albums, view.query), view.versions), view.kinds),
+      view.sort,
+      collator,
+    );
+    return shown.length > 0 ? [{ key: part.key, albums: shown }] : [];
+  }, [part, view, collator]);
 
-  const update = (change: (current: ReleaseView) => ReleaseView) => {
-    if (releaseTab) setViews((all) => ({ ...all, [releaseTab]: change(all[releaseTab]) }));
-  };
+  const update = (change: (current: ReleaseView) => ReleaseView) => setView(change);
   return {
     state,
-    layout,
-    tabs,
-    tab: active,
+    section: focus.section,
     view,
     sections,
     facets,
@@ -273,7 +244,6 @@ export function useArtistReleases(
         !remote.loadingMore &&
         !remote.moreFailed,
     },
-    setTab: setTabState,
     setQuery(query) {
       update((current) => ({ ...current, query }));
     },
@@ -303,22 +273,17 @@ export function useArtistReleases(
     clearFacets() {
       update((current) => ({ ...current, kinds: new Set(), versions: new Set() }));
     },
-    retry() {
-      if (ref) service.retry(ref);
-    },
-    loadMore() {
-      if (ref) service.more(ref);
-    },
+    retry,
+    loadMore: more,
     searchMore() {
       if (query) searchService.more(query);
     },
     searchRetry() {
       if (query) searchService.retry(query);
     },
-    capture: () => ({ tab: active, views }),
+    capture: () => ({ view }),
     restore(snapshot) {
-      setTabState(snapshot.tab);
-      setViews(snapshot.views);
+      setView(snapshot.view);
     },
   };
 }

@@ -217,6 +217,7 @@ export function AlbumList({ onAlbumMenu }: AlbumListProps) {
         tracks,
         item?.kind === 'row' ? orders.trackAt(item.order) : undefined,
         loaded.stamp,
+        item?.kind === 'row' ? () => play(target.index) : undefined,
       );
       setTrackMenuAt(point);
       return;

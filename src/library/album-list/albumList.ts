@@ -20,6 +20,7 @@ import {
   type LibraryTracksFace,
   type LibraryTracksService,
 } from '../libraryTracks.ts';
+import type { LibraryMirrorSource } from '../mirror/mirrorSource.ts';
 import { createListFolding, type ListFolding } from './listFolding.ts';
 import {
   listPrefsAtom,
@@ -89,6 +90,8 @@ export interface AlbumListDeps {
   readonly updateCollapsed: (change: (value: CollapsedSections) => CollapsedSections) => void;
   /** 整页起播走页面共用的起播，失败与忙碌的提示挂在那里 */
   readonly play: Pick<TrackActionsService, 'playLoaded'>;
+  /** 整库曲目优先读镜像，没给或读不到就问宿主 */
+  readonly mirror?: Pick<LibraryMirrorSource, 'tracks'>;
 }
 
 export type AlbumListFace = LibraryTracksFace & PlayStatsFace & TrackMenuFace & ConfigPrefFace;
@@ -122,7 +125,7 @@ export function startAlbumList(
   writer?: Pick<ConfigWriter, 'set'>,
 ): AlbumListServices {
   const prefs = startListPrefs(store, host, undefined, writer);
-  const tracks = startLibraryTracks(store, deps.stamp, host);
+  const tracks = startLibraryTracks(store, deps.stamp, host, deps.mirror);
   const stats = startPlayStats(store, host);
   const menu = startTrackMenu(store, host);
   const selection = createRowSelection(store, { total: 0 });

@@ -1,5 +1,6 @@
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom } from 'jotai/vanilla';
+import { log } from '../diagnostics/eventLog.ts';
 import { hostCommand, settle } from '../host/hostCall.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 import type { Store } from '../kit/store.ts';
@@ -40,6 +41,8 @@ export type PluginUpdateStatus =
       readonly sha256: string;
       /** 两份 DLL 已下载并校验，安装时不必再下载 */
       readonly staged?: true;
+      /** 上一次安装没有完成的原因，直到下一次安装开始才清除 */
+      readonly failure?: string;
     }
   | { readonly phase: 'downloading' | 'preparing' | 'restarting'; readonly version: string }
   | { readonly phase: 'blocked'; readonly reason: 'backend' | 'pending' | 'compatibility' }
@@ -104,9 +107,31 @@ export function startPluginUpdater(
   let refreshing: Promise<void> | null = null;
   let transaction: PluginTransactionStatus | null = null;
   let poll: ReturnType<typeof setTimeout> | undefined;
+  let failure: string | null = null;
+  let loggedTransaction = '';
   const show = (value: PluginUpdateStatus) => {
     if (!disposed) store.set(status, value);
   };
+  const offered = (selected: PluginOffer, ready = false): PluginUpdateStatus => ({
+    phase: 'available',
+    version: selected.release.version,
+    sha256: selected.candidate.sha256,
+    ...(ready ? { staged: true as const } : {}),
+    ...(failure === null ? {} : { failure }),
+  });
+  /** 事务失败或取消时记一条日志，并留下原因，让之后的「可更新」状态带上它 */
+  function noteTransaction(value: PluginTransactionStatus): void {
+    if (value.phase === 'committed') failure = null;
+    const cancelled = value.phase === 'cancelled' && value.error;
+    if (cancelled) failure = value.error;
+    if (!cancelled && value.phase !== 'rolledBack' && value.phase !== 'needsRepair') return;
+    if (loggedTransaction === `${value.id}:${value.phase}`) return;
+    loggedTransaction = `${value.id}:${value.phase}`;
+    (cancelled ? log.warn : log.error)('update', `plugin.${value.phase}`, {
+      version: value.version,
+      ...(value.error ? { error: value.error } : {}),
+    });
+  }
   function current(startup: ConfirmedStartup, turn: number): void {
     if (disposed || generation !== turn || store.get(confirmedStartupAtom) !== startup)
       throw new Error('插件更新操作已取消');
@@ -142,17 +167,18 @@ export function startPluginUpdater(
         { atomic: true },
       );
   }
-  function schedule(): void {
+  /** 定时轮询更新状态，驱动事务状态机流转与结果刷新 */
+  function schedule(delay = 2000): void {
     if (poll !== undefined) clearTimeout(poll);
     if (!disposed)
       poll = setTimeout(() => {
         poll = undefined;
         void refresh();
-      }, 2000);
+      }, delay);
   }
   /**
-   * 把候选的两份 DLL 下载并校验到 `state/plugin-<发行清单哈希前 16 位>/`，同一个发行总用同一个目录：
-   * 已经在那里且哈希对得上的不再下载，所以提前下载与安装时补下载共用这一段。
+   * 将候选的两份 DLL 下载并校验至 `state/plugin-<发行清单哈希前 16 位>/`，同一发行版本共用同一目录
+   * 若目标文件已存在且哈希校验匹配则跳过下载，由提前下载与安装阶段补齐下载共用此段逻辑
    */
   async function ensurePayload(
     selected: PluginOffer,
@@ -203,18 +229,15 @@ export function startPluginUpdater(
         throw new Error('插件提前下载已取消');
       if (store.get(updater.status).phase === 'shared') throw new Error('主题目录被其他实例共用');
     };
-    const version = selected.release.version;
     staging = (async () => {
       try {
-        show({ phase: 'downloading', version });
+        show({ phase: 'downloading', version: selected.release.version });
         await ensurePayload(selected, templateFiles(host.file, startup.directory, check), check);
         staged = sha;
-        if (offer?.candidate.sha256 === sha)
-          show({ phase: 'available', version, sha256: sha, staged: true });
+        if (offer?.candidate.sha256 === sha) show(offered(selected, true));
       } catch {
         stageFailed = sha;
-        if (!disposed && offer?.candidate.sha256 === sha)
-          show({ phase: 'available', version, sha256: sha });
+        if (!disposed && offer?.candidate.sha256 === sha) show(offered(selected));
       }
     })().finally(() => {
       staging = null;
@@ -272,6 +295,7 @@ export function startPluginUpdater(
       if (transaction) {
         await rememberFailure(files, transaction);
         check();
+        noteTransaction(transaction);
         if (!['committed', 'rolledBack', 'cancelled', 'prepared'].includes(transaction.phase)) {
           show({ phase: 'transaction', transaction });
           schedule();
@@ -295,13 +319,7 @@ export function startPluginUpdater(
       check();
       if (publication !== store.get(updater.publication)) return;
       if (offer) {
-        const sha = offer.candidate.sha256;
-        show({
-          phase: 'available',
-          version: offer.release.version,
-          sha256: sha,
-          ...(staged === sha ? { staged: true as const } : {}),
-        });
+        show(offered(offer, staged === offer.candidate.sha256));
         stage(offer, startup);
         return;
       }
@@ -332,6 +350,7 @@ export function startPluginUpdater(
     if (!selected || selected.candidate.sha256 !== expected)
       return show({ phase: 'failed', detail: '插件候选已变化，请重新检查' });
     installing = true;
+    failure = null;
     if (poll !== undefined) clearTimeout(poll);
     const turn = ++generation;
     const startup = store.get(confirmedStartupAtom);
@@ -423,8 +442,13 @@ export function startPluginUpdater(
         check();
         show({ phase: 'restarting', version: selected.release.version });
         if (!(await hostCommand(() => host.misc.exit()))) throw new Error('无法退出 foobar2000');
+        // 宿主没有按时退出时，复查事务才能读到执行器的结果；正常退出时页面在这之前就已经关了
+        schedule(10_000);
       });
     } catch (error) {
+      const detail = error instanceof Error ? error.message : '插件安装失败';
+      failure = detail;
+      log.error('update', 'plugin.failed', { detail });
       if (prepared) {
         const ref: PluginTransactionStatus = prepared;
         await connection.request('/plugin/cancel', ref).catch(() => {});
@@ -433,7 +457,7 @@ export function startPluginUpdater(
       if (!disposed)
         show({
           phase: 'failed',
-          detail: error instanceof Error ? error.message : '插件安装失败',
+          detail,
           ...(prepared ? { directory: (prepared as PluginTransactionStatus).directory } : {}),
         });
     } finally {

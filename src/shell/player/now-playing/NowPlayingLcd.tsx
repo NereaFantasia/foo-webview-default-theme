@@ -26,6 +26,7 @@ import { TrackByline } from '../../../track/TrackByline.tsx';
 import { TruncatedText } from '../../../kit/TruncatedText.tsx';
 import { useTextSwap } from '../../../playback/now-playing/useTextSwap.ts';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
+import { NowPlayingFavorite } from './NowPlayingFavorite.tsx';
 
 const useStyles = makeStyles({
   more: {
@@ -41,12 +42,12 @@ const useStyles = makeStyles({
 const COVER = 52;
 
 /**
- * 宽窗标题栏正中的正在播放条（540 × 52）：左端封面（按下进沉浸视图），曲名一行、右上是格式标记，第二行是艺人与专辑（`TrackByline`）、右端是星级，
- * 贴底一条能点能拖的进度线，悬停它进悬停态（`ScrubSeek`），封面以外的东西模糊变淡；右端 ⋯ 打开当前曲目菜单
- * 在线曲目在格式标记的位置放音质标记（`QualityButton`），点开换音质
- * 停止时封面换占位图标、曲名写「未在播放」、进度线不画。过长的曲名截断、右缘渐隐、定时滚动一遍，悬停出全文；
- * 过长的署名艺人与专辑各自用省略号截断，名字始终可点；星与格式标记不让位。
- * 换曲时两行字先退后进（`useTextSwap`，悬停态里直接换），封面擦除（`NowPlayingCover`）
+ * 宽窗标题栏正中的正在播放条（540 × 52）：左端封面（按下进沉浸视图），第一行显示曲名与右上角格式标记，第二行显示艺人与专辑（`TrackByline`）与右端星级（在线曲目没有星级，换成收藏键）
+ * 贴底提供可点击拖动的进度条，悬停时进入划动寻轨态（`ScrubSeek`）并将非封面区域模糊淡化，右端操作按钮打开当前曲目菜单
+ * 在线曲目在格式标记位置展示音质标记（`QualityButton`），支持点击切换音质
+ * 停止状态下封面显示占位图标，曲名显示「未在播放」且不绘制进度线；播放中曲名超出时截断右缘并定时滚动，悬停可查看完整文本；
+ * 署名艺人与专辑超出时通过省略号截断且保持点击链接，星级与格式标记固定展示不让位
+ * 切换曲目时文本执行退出与进入过渡（`useTextSwap`，寻轨态下直接替换），封面配合擦除动画（`NowPlayingCover`）
  */
 export function NowPlayingLcd() {
   const t = useAtomValueRawSync(translateAtom);
@@ -97,8 +98,9 @@ export function NowPlayingLcd() {
           )}
         </div>
         <div ref={subRow} className={`${styles.subRow} ${styles.soft}`}>
-          <TrackByline ellipsis className={styles.byline} track={track} />
+          <TrackByline pointerOnly className={styles.byline} track={track} />
           <NowPlayingRating size="compact" track={track} />
+          <NowPlayingFavorite path={track?.path} />
         </div>
         <ScrubSeek form="lcd" onScrubChange={setScrub} />
       </div>

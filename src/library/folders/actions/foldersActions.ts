@@ -12,14 +12,7 @@ import { foldersWrite, type FoldersWrite } from './foldersWrites.ts';
 import { createFoldersAutoplaylist, foldersQuery } from './foldersQuery.ts';
 
 export type FoldersNotice =
-  | 'busy'
-  | 'failed'
-  | 'limited'
-  | 'queueLimit'
-  | 'queryUnavailable'
-  | 'tracksFailed'
-  | 'autoplaylistFailed'
-  | null;
+  'busy' | 'failed' | 'limited' | 'queryUnavailable' | 'tracksFailed' | 'autoplaylistFailed' | null;
 const noticeAtom = atom<FoldersNotice>(null);
 export const foldersNoticeAtom: Atom<FoldersNotice> = atom((get) => get(noticeAtom));
 export interface FoldersTarget {
@@ -97,13 +90,9 @@ export function startFoldersActions(
       const mine = serial;
       const current = () => !disposed && mine === serial;
       try {
-        const result = await exclusive(store, async () => {
+        const step = async () => {
           const tracks = await collect(target);
           if (!current() || !tracks?.length) return false;
-          if ((action === 'next' || action === 'queue') && tracks.length > 256) {
-            notice('queueLimit');
-            return false;
-          }
           const first = target.nodes[0];
           const ok = await foldersWrite(
             host,
@@ -119,7 +108,10 @@ export function startFoldersActions(
               target.nodes.map((node) => node.name).join(' · '),
             );
           return ok;
-        });
+        };
+        // 入队按路径插进播放队列，不碰专用列表，不受专用列表那把忙碌锁挡；起播与建列表要独占
+        const result =
+          action === 'next' || action === 'queue' ? await step() : await exclusive(store, step);
         if (current() && result !== true && store.get(noticeAtom) === null)
           notice(result === 'busy' ? 'busy' : 'failed');
         return current() && result === true;

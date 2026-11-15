@@ -25,6 +25,11 @@ export const onlineTracksAtom: Atom<ReadonlyMap<string, MusicTrack | null>> = at
   get(infoAtom),
 );
 
+/** 占位地址里的曲目引用；不是在线曲目时为 null */
+export function onlineRefOf(path: string): MusicRef | null {
+  return readOnlineAddress(path)?.ref ?? null;
+}
+
 /** 占位地址对应的展示信息；不是在线曲目、还没取到或后端答没有时为 null */
 export function onlineInfoOf(
   path: string,
@@ -127,7 +132,7 @@ export function startOnlineTracks(
           }),
         );
     } catch {
-      // 后端暂不可用之类：不记成没有，后端连上或下次再要时重取
+      // 后端暂不可用之类的失败：不记为没有结果，后端连上或下次再请求时重取
       if (!lifetime.signal.aborted)
         for (const id of ids) missed.set(onlineKey({ platform, id }), { platform, id });
     } finally {

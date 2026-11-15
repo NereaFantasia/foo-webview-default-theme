@@ -6,11 +6,10 @@ import type { HostReadyFace } from '../host/waitForHost.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 import type { Store } from '../kit/store.ts';
+import { enqueuePaths } from '../host/queueCommands.ts';
 import { exclusive, replaceAndPlay } from '../playback/libraryView.ts';
 import type { PlaybackSource, PlaybackSourceService } from '../playback/playbackSource.ts';
 import {
-  queueLast,
-  queueNext,
   sendToNewPlaylist,
   sendToPlaylist,
   type SendTarget,
@@ -32,7 +31,8 @@ export interface TrackActionsFace
 
 /**
  * 手上已有的一批曲目（`paths` 按显示顺序，由 `trackPathOf` 拼好）怎么起播、入队、发送与执行宿主命令
- * 起播与入队动到专用列表，整页同一时刻只跑一串，正忙时不跑、挂忙碌提示，免得用户以为没点中
+ * 起播动到专用列表，整页同一时刻只跑一串，正忙时不跑、挂忙碌提示，免得用户以为没点中；入队按路径插进播放队列，
+ * 不碰专用列表，不受忙碌挡，与别处的入队、起播一起在队列命令里排队
  * 失败都挂横幅；没连上宿主时一律不发、答 false
  *
  * 起播必须带上来源，宿主收下后在这里记下：专用列表里换成了什么只有起播的一方知道，漏记的话播放来源会
@@ -47,7 +47,7 @@ export interface TrackActionsService {
     index: number,
     source: PlaybackSource,
   ): Promise<boolean>;
-  /** `next` 插到队首（下一首播放），否则接在队尾 */
+  /** `next` 插到队首（下一首播放），否则接在队尾；不论多少首都分批插入 */
   queuePaths(paths: readonly string[], next: boolean): Promise<boolean>;
   /** 发到「发送到」子菜单里点的那一项；那张列表已经删了或锁着时宿主拒收，同样挂命令失败 */
   sendPathsTo(paths: readonly string[], target: SendTarget): Promise<boolean>;
@@ -105,8 +105,7 @@ export function startTrackActions(
         const paths = await load();
         return !!paths && replaceAndPlay(host, paths, index);
       }, source),
-    queuePaths: (paths, next) =>
-      onLibraryView(() => (next ? queueNext : queueLast)(host, paths), COMMAND_FAILED),
+    queuePaths: (paths, next) => command(() => enqueuePaths(host, paths, next ? 'next' : 'last')),
     sendPathsTo: (paths, target) => command(() => sendToPlaylist(host, paths, target)),
     sendPathsToNew: (paths, name) => command(() => sendToNewPlaylist(host, paths, name)),
     runCommandIn: (tree, node) => command(() => runContextCommand(host, tree, node)),

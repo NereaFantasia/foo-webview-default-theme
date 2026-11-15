@@ -26,7 +26,7 @@ function setup() {
   const host = installFakeHost();
   host.answer('library.getAlbumTracks', albumTracksAnswer);
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const seeded: { album: Album; tracks: readonly LibraryTrack[]; stamp: number }[] = [];
   let stamps = 0;
   const kind = albumKind(

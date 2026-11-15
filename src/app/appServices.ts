@@ -3,6 +3,7 @@ import { startColorIntegration } from './colorIntegration.ts';
 import { startBaseAccent } from '../theme/baseAccent.ts';
 import { loadPlayButtonStyle } from '../theme/playButtonStyle.ts';
 import { loadWindowBackground } from '../theme/background/windowBackground.ts';
+import { fontChoiceAtom, loadFontChoice } from '../theme/fontChoice.ts';
 import { loadSurfaceTint } from '../theme/surfaceTint.ts';
 import { startBackgroundImage } from '../theme/background/backgroundImage.ts';
 import { startBrowserDataWriter } from '../kit/browserDataStorage.ts';
@@ -40,6 +41,7 @@ export async function startAppServices(): Promise<AppServices> {
   loadPlayButtonStyle(services.store);
   loadWindowBackground(services.store);
   loadSurfaceTint(services.store);
+  loadFontChoice(services.store);
   const backgroundImage = startBackgroundImage(services.store);
   const baseAccent = startBaseAccent(services.store);
   const colors = startColorIntegration(services.store, { artwork: services.artwork });
@@ -53,6 +55,11 @@ export async function startAppServices(): Promise<AppServices> {
     shown: atom(
       (get) => get(windowShellAtom).active && (get(lyrics.active) || get(lyrics.immersiveActive)),
     ),
+    process: atom((get) => {
+      const { optimize, maskMode, maskChar } = get(lyrics.display.display);
+      return { optimize, maskMode, maskChar };
+    }),
+    font: fontChoiceAtom,
     translate: translateAtom,
     writer: services.configWriter,
   });

@@ -29,10 +29,17 @@ import type { MusicbrainzClient } from './musicbrainzApi.ts';
 import type { MusicbrainzCandidate } from './musicbrainzArtist.ts';
 import type { BiographyResources } from '../biographyResources.ts';
 
+/**
+ * 换了艺人之后至少停这么久才去认定，右侧卡跟着播放走，连续切歌不能每首都发请求。从艺人变化的那一刻
+ * 起算，媒体库、专辑名单读完这类同一位艺人的后续变化不重新起算
+ */
 const DEBOUNCE_MS = 300;
 
 export interface BiographyIdentityDeps {
+  /** 身份的键：缓存、手选与状态都按它存取；本地艺人是艺人名 */
   readonly artist: Atom<string | null>;
+  /** 搜索用的艺人名，缺省取 `artist` */
+  readonly term?: Atom<string | null>;
   /** 本地专辑艺术家是他的那些专辑的标题；媒体库还没读完时为 null，等读完再认定 */
   readonly albums: Atom<readonly string[] | null>;
   readonly manual: Atom<BiographyIdentity | null>;
@@ -78,6 +85,9 @@ export function startBiographyIdentity(
   let disposed = false;
   let generation = 0;
   let signature = '';
+  // 艺人（连同搜索名、手选）最近一次变化的时刻，防抖从这里算起
+  let subjectKey = '';
+  let subjectSince = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let pending = false;
@@ -144,20 +154,16 @@ export function startBiographyIdentity(
     if (waiting && !force) return publish({ artist, status: 'failed', problem: waiting.problem });
     publish({ artist, status: 'resolving' });
     const locale = store.get(deps.locale);
-    const outcome = await resolveIdentity(
-      client,
-      artist,
-      albums,
-      locale,
-      rejected !== artist,
-      alive,
-    );
+    const term = (deps.term ? store.get(deps.term) : null) ?? artist;
+    const outcome = await resolveIdentity(client, term, albums, locale, rejected !== artist, alive);
     if (outcome.kind === 'cancelled' || !alive()) return;
     if (outcome.kind === 'failed') return fail(artist, outcome);
     failures.delete(artist);
     if (rejected === artist) rejected = null;
-    publish(identityStateOf(outcome.entry));
-    await cache.save(artist, outcome.entry);
+    // 认定器按搜索名写记录；缓存与状态按键存取，键不是名字时要改回来
+    const entry = outcome.entry.artist === artist ? outcome.entry : { ...outcome.entry, artist };
+    publish(identityStateOf(entry));
+    await cache.save(artist, entry);
   }
 
   async function pump(): Promise<void> {
@@ -180,9 +186,24 @@ export function startBiographyIdentity(
     const artist = store.get(deps.artist);
     const enabled = store.get(deps.enabled) && store.get(deps.active) && !!artist;
     const waiting = store.get(deps.albums) === null;
-    const next = JSON.stringify([enabled, artist, store.get(deps.manual), waiting]);
+    const next = JSON.stringify([
+      enabled,
+      artist,
+      store.get(deps.manual),
+      waiting,
+      deps.term ? store.get(deps.term) : null,
+    ]);
     if (next === signature && !refresh) return;
     signature = next;
+    const subject = JSON.stringify([
+      artist,
+      store.get(deps.manual),
+      deps.term ? store.get(deps.term) : null,
+    ]);
+    if (subject !== subjectKey) {
+      subjectKey = subject;
+      subjectSince = Date.now();
+    }
     generation += 1;
     clearTimeout(timer);
     pending = false;
@@ -216,13 +237,18 @@ export function startBiographyIdentity(
         pending = true;
         void pump();
       },
-      refresh ? 0 : DEBOUNCE_MS,
+      refresh ? 0 : Math.max(0, DEBOUNCE_MS - (Date.now() - subjectSince)),
     );
   }
 
-  const stops = [deps.artist, deps.albums, deps.manual, deps.enabled, deps.active].map((source) =>
-    store.sub(source, () => schedule()),
-  );
+  const stops = [
+    deps.artist,
+    ...(deps.term ? [deps.term] : []),
+    deps.albums,
+    deps.manual,
+    deps.enabled,
+    deps.active,
+  ].map((source) => store.sub(source, () => schedule()));
   function forgetCurrent(): void {
     generation += 1;
     clearTimeout(timer);

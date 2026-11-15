@@ -1,24 +1,28 @@
-import { Button, Field, makeStyles, tokens } from '@fluentui/react-components';
+import { Button, Field, Switch, makeStyles, tokens } from '@fluentui/react-components';
 import {
   ArrowMinimize20Regular,
   DismissSquare20Regular,
   Folder16Regular,
   FolderOpen20Regular,
+  Globe20Regular,
   Open16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useContext, useEffect, useId, useRef, useState } from 'react';
-import { translateAtom } from '../../i18n/locale.ts';
+import { localeAtom, translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom, type PluralPick } from '../../i18n/plural.ts';
 import type { Translate } from '../../i18n/translate.ts';
 import { openLibraryPreferences } from '../../host/libraryContract.ts';
 import { useService } from '../../kit/useService.ts';
+import { LYRICS_PREFS_KEY, lyricsPrefsKey } from '../../lyrics/lyricsPrefs.ts';
 import { choosePlayerBarStyle, playerBarStyleAtom } from '../../theme/playerBarStyle.ts';
-import { ColorModeCard, CoverAccentCard, usePlayerBarOptions } from '../AppearanceSection.tsx';
+import { ColorModeCard, CoverAccentCard } from '../AppearanceSection.tsx';
+import { usePlayerBarOptions } from '../PlayerBarCard.tsx';
 import { TraySwitchCard } from '../GeneralSection.tsx';
 import { LanguageCard } from '../LanguageCard.tsx';
 import { SettingsCard } from '../SettingsCard.tsx';
 import { SettingsChoice } from '../SettingsChoice.tsx';
+import { SettingsSaveNotice } from '../SettingsSaveNotice.tsx';
 import { useSettingsLayout } from '../useSettingsLayout.ts';
 import { onboardingKey } from './onboarding.ts';
 import type { OnboardingLibrary } from './onboardingLibrary.ts';
@@ -177,13 +181,39 @@ export function TrayStep() {
   );
 }
 
-/** 第 4 步：更新方式与主题更新卡、在线艺人简介，都由装配层放进来 */
+/** 在线歌词开关，偏好与设置页共用。说明行写明数据发给谁 */
+function OnlineLyricsCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const locale = useAtomValueRawSync(localeAtom).active;
+  const service = useService(lyricsPrefsKey);
+  const pref = useAtomValueRawSync(service.pref);
+  return (
+    <SettingsCard
+      icon={<Globe20Regular />}
+      title={t('lyrics.online')}
+      description={t('lyrics.privacy')}
+      feedback={<SettingsSaveNotice persistence={service.persistence} keys={[LYRICS_PREFS_KEY]} />}
+    >
+      {({ labelId, descriptionId }) => (
+        <Switch
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          checked={pref.enabled}
+          onChange={(_, data) => void service.setEnabled(data.checked, locale)}
+        />
+      )}
+    </SettingsCard>
+  );
+}
+
+/** 第 4 步：更新方式与主题更新卡、在线艺人简介由装配层放进来。在线歌词是下层的偏好，直接使用 */
 export function UpdateStep() {
   const update = useContext(OnboardingUpdateContext);
   const online = useContext(OnboardingOnlineContext);
   return (
     <>
       {update}
+      <OnlineLyricsCard />
       {online}
     </>
   );

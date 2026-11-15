@@ -152,6 +152,26 @@ it('浏览视频：打开文件夹页并只看视频，文件在库根下就落�
   await env.service.browseVideo('D:\\Elsewhere\\clip.mp4');
   expect(env.store.get(historyAtom).place).toEqual({ id: 'folders' });
 });
+it('只看视频只在这次停留里有效：文件夹页全部离开后复位，下次进入从全部开始', async () => {
+  const env = setup();
+  const release = env.service.want();
+  env.service.results.setMedia('video');
+  release();
+  await Promise.resolve();
+  expect(env.store.get(foldersMediaAtom)).toBe('all');
+});
+it('浏览视频带进来的筛选不被旧页的卸载清掉：同一次提交里旧页先卸载、新页后挂上', async () => {
+  const env = setup();
+  const release = env.service.want();
+  await env.service.browseVideo(null);
+  release();
+  const next = env.service.want();
+  await Promise.resolve();
+  expect(env.store.get(foldersMediaAtom)).toBe('video');
+  next();
+  await Promise.resolve();
+  expect(env.store.get(foldersMediaAtom)).toBe('all');
+});
 it('两个页面交接时，旧使用者释放不能清掉新页的预览', async () => {
   const env = setup();
   const releaseOld = env.service.want();

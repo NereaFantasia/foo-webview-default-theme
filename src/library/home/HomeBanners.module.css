@@ -1,0 +1,119 @@
+.banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 小标题、标题与图合成一个打开键；播放键另起一个，压在图的左下角，不套在打开键里 */
+.link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.link:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+.label,
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label {
+  min-height: var(--lineHeightBase200);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
+}
+
+.title {
+  min-height: var(--lineHeightBase400);
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+}
+
+.by {
+  color: var(--text-secondary);
+}
+
+/* 编辑图是 16 : 9 的成稿，铺满不留边；读不到时露出占位底 */
+.art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  margin-top: var(--spacingVerticalS);
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-view-control);
+}
+
+.art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter var(--motion-faster) var(--curveLinear);
+}
+
+.link:hover .art img {
+  filter: brightness(1.06);
+}
+
+.link:active .art img {
+  filter: brightness(0.94);
+}
+
+/* 播放键下面垫一段渐暗，图什么颜色都看得清键；随播放键一起出 */
+.scrim {
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(transparent, var(--colorBackgroundOverlay));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.play {
+  position: absolute;
+  bottom: var(--spacingVerticalM);
+  left: var(--spacingHorizontalM);
+  opacity: 0;
+  transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.banner:hover .scrim,
+.banner:focus-within .scrim,
+.banner:hover .play,
+.banner:focus-within .play {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .scrim,
+  .play {
+    opacity: 1;
+  }
+}
+
+/* 载入中：两行字与图各占一块骨架，间距与读到后一致 */
+.banner[data-skeleton] {
+  gap: var(--spacingVerticalXXS);
+}

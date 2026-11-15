@@ -1,4 +1,5 @@
-import { makeStyles, mergeClasses, Option, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, Option, OptionGroup, tokens } from '@fluentui/react-components';
+import type { ReactNode } from 'react';
 import { ScrollDropdown as Dropdown } from '../kit/ScrollDropdown.tsx';
 import type { SettingsCardIds } from './SettingsCard.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
@@ -10,6 +11,8 @@ export interface SettingsOption<T extends string> {
   /** 一句说明，显示在下拉列表里选项名的下面；输入框里只显示选项名 */
   readonly description?: string;
   readonly disabled?: boolean;
+  /** 所属的组名，相邻几项同名就收进同一组、组名写在列表里；不给就不分组。输入框里只显示选项名 */
+  readonly group?: string;
 }
 
 export interface SettingsSelectProps<T extends string> extends SettingsCardIds {
@@ -48,6 +51,36 @@ export function SettingsSelect<T extends string>({
   const { compact } = useSettingsLayout();
   const classes = useStyles();
   const selected = options.find((option) => option.value === value);
+  const renderOption = (option: SettingsOption<T>) => (
+    <Option key={option.value} value={option.value} text={option.label} disabled={option.disabled}>
+      {option.description ? (
+        <span className={classes.option}>
+          <span>{option.label}</span>
+          <span className={classes.description}>{option.description}</span>
+        </span>
+      ) : (
+        option.label
+      )}
+    </Option>
+  );
+  const rows: ReactNode[] = [];
+  for (let at = 0; at < options.length;) {
+    const first = options[at];
+    if (!first) break;
+    if (first.group === undefined) {
+      rows.push(renderOption(first));
+      at += 1;
+      continue;
+    }
+    let end = at;
+    while (options[end]?.group === first.group) end += 1;
+    rows.push(
+      <OptionGroup key={`group:${at}`} label={first.group}>
+        {options.slice(at, end).map(renderOption)}
+      </OptionGroup>,
+    );
+    at = end;
+  }
   return (
     <Dropdown
       className={mergeClasses(classes.root, compact && classes.fill, controls.field)}
@@ -61,23 +94,7 @@ export function SettingsSelect<T extends string>({
         if (next && !next.disabled && next.value !== value) onChange(next.value);
       }}
     >
-      {options.map((option) => (
-        <Option
-          key={option.value}
-          value={option.value}
-          text={option.label}
-          disabled={option.disabled}
-        >
-          {option.description ? (
-            <span className={classes.option}>
-              <span>{option.label}</span>
-              <span className={classes.description}>{option.description}</span>
-            </span>
-          ) : (
-            option.label
-          )}
-        </Option>
-      ))}
+      {rows}
     </Dropdown>
   );
 }

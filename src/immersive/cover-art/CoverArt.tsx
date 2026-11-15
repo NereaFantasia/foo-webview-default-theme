@@ -1,6 +1,7 @@
 import { MusicNote224Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { CSSProperties } from 'react';
+import { AnimatedCoverImage } from '../../covers/AnimatedCoverImage.tsx';
 import { immersiveCoverAtom, immersiveCoverKey } from '../../covers/immersiveCover.ts';
 import type { ImmersiveCoverState } from '../../covers/immersiveCover.ts';
 import { CoverLayers } from '../../playback/now-playing/CoverLayers.tsx';
@@ -10,7 +11,7 @@ import { useCoverHolder } from '../scene/useCoverHolder.ts';
 import styles from './CoverArt.module.css';
 
 export interface CoverArtProps {
-  /** 圆角，CSS 像素；缺省 12 */
+  /** 圆角半径（CSS 像素，默认 12） */
   readonly radius?: number;
   /** 外部投影效果开关（默认开启） */
   readonly shadow?: boolean;
@@ -22,11 +23,11 @@ export function coverTarget(cover: Pick<ImmersiveCoverState, 'url' | 'status'>):
 }
 
 /**
- * 沉浸视图当前曲目大封面组件
+ * 沉浸视图当前曲目的大尺寸封面组件
  *
- * 填充容器指定的正方形区域；封面资源由 immersiveCoverKey 托管（512px 规格，与背景共享缓存）；
- * 切歌时保留旧图直至新图解码完成，按切曲方向滑块擦除转场（同专辑或延迟过长回退渐变过渡）；
- * 明确无图时呈现占位图标，加载中仅展示中性底色以避免闪烁；通过 useCoverHolder 持有共享过渡命名，纯装饰呈现
+ * 填充容器约束的正方形区域，封面资源由 `immersiveCoverKey` 托管（512px 规格，与背景共享缓存），
+ * 切换曲目时保留旧图直至新图解码完成，按切歌方向执行滑动擦除转场（同专辑或延迟过长时回退为渐变过渡）。
+ * 明确无图时展示占位图标，加载中仅显示中性底色以避免闪烁。通过 `useCoverHolder` 持有共享过渡命名，仅作装饰呈现
  */
 export function CoverArt({ radius = 12, shadow = true }: CoverArtProps) {
   const cover = useAtomValueRawSync(immersiveCoverAtom);
@@ -50,12 +51,13 @@ export function CoverArt({ radius = 12, shadow = true }: CoverArtProps) {
       <CoverLayers
         className={styles.layers}
         url={coverTarget(cover)}
-        // 擦除：换曲的方向感最强，小封面的推入与转入在大封面上会冲出外框
+        // 擦除转场：换曲的方向感最强，小封面用的推入与转入放到大封面上会冲出外框
         shape="lcd"
         placeholder={waiting ? null : <MusicNote224Regular className={styles.placeholder} />}
         onLoaded={(url) => report(url, (token) => service?.markLoaded(token))}
         onBroken={(url) => report(url, (token) => service?.markFailed(token))}
       />
+      <AnimatedCoverImage layout="fill" fit="cover" />
     </div>
   );
 }

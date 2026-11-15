@@ -14,9 +14,17 @@ import type { CoverProfile } from '../theme/coverPalette.ts';
 import { ROLE_VALUES, roleProperties } from '../theme/roles.ts';
 import { useCoverProfile } from './useCoverProfile.ts';
 
-export const CoverVisualContext = createContext<{ url: string; profile: CoverProfile | null }>({
+export interface CoverVisual {
+  readonly url: string;
+  readonly profile: CoverProfile | null;
+  /** 页里的视频：光晕取它的画面，播放时跟着取样，主题色仍取自 `url` 的静图 */
+  readonly video: HTMLVideoElement | null;
+}
+
+export const CoverVisualContext = createContext<CoverVisual>({
   url: '',
   profile: null,
+  video: null,
 });
 const useStyles = makeStyles({
   root: {
@@ -36,16 +44,18 @@ const useStyles = makeStyles({
 });
 
 /**
- * 页内封面优先，灰图与失败继承全局；Portal 只继承颜色，不继承布局。取到封面色之前一直是全局色。
- * `reuse` 见 `useCoverProfile`。
+ * 封面颜色优先采用页内提取结果，封面就绪前、提取失败或为灰图时沿用全局强调色；Portal 仅继承主题颜色而不继承布局结构
+ * `reuse` 参见 `useCoverProfile`；传入 `video` 视频元素时，光晕层随播放实时对视频画面取样，主题色仍取自 `url`
  */
 export function CoverTheme({
   url,
   reuse = false,
+  video = null,
   children,
 }: {
   readonly url: string;
   readonly reuse?: boolean;
+  readonly video?: HTMLVideoElement | null;
   readonly children: ReactNode;
 }) {
   const profile = useCoverProfile(url, { reuse });
@@ -61,7 +71,7 @@ export function CoverTheme({
     () => (scheme === 'dark' ? createDarkTheme(ramp) : createLightTheme(ramp)),
     [ramp, scheme],
   );
-  const visual = useMemo(() => ({ url, profile }), [url, profile]);
+  const visual = useMemo(() => ({ url, profile, video }), [url, profile, video]);
   return (
     <FluentProvider theme={theme} className={classes.root} style={{ display: 'contents' }}>
       <AccentContext value={profile?.accent ?? globalTone}>

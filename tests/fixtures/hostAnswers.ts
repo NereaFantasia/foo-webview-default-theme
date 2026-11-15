@@ -16,7 +16,7 @@ import type { AnswerTable, HostParams, HostResponse } from './fakeHost.ts';
 export type ConfigValue = Extract<HostResponse<'config.get'>, { success: true }>['value'];
 
 /** 缺省应答报的组件版本，与 package.json 的 hostRequirements 下限一致。 */
-export const HOST_VERSION = '2.1.0';
+export const HOST_VERSION = '2.2.0';
 
 /**
  * 一像素透明 PNG。普通浏览器打不开宿主的 fb2k:// 地址，缺省的封面地址换成它，`<img>` 才能真的加载完。
@@ -423,6 +423,7 @@ export function defaultAnswers(config: Map<string, ConfigValue>): AnswerTable {
         dynamicCount: 0,
       }),
     },
+    keyboard: { setReservedKeys: OK },
     tray: {
       create: OK,
       destroy: OK,

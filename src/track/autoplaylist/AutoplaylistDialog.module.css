@@ -1,0 +1,91 @@
+/* 对话框用 Fluent 自带的不透明表面，里面的控件沿用默认外观；宽度给足两栏，窄窗收成一栏
+   参考栏的宽度同时是底部按钮组的总宽上限 */
+.surface {
+  --reference-width: 320px;
+  width: min(880px, calc(100vw - 32px));
+  max-width: none;
+}
+.content {
+  min-height: 0;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--reference-width);
+  column-gap: var(--spacingHorizontalL);
+  height: min(500px, calc(100vh - 240px));
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--spacingVerticalM);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  /* 左右留出内边距：`overflow-y: auto` 使横向同样裁切，开关的焦点环画在控件外，需要这段空间 */
+  padding-inline: var(--spacingHorizontalXS);
+}
+/* 右侧常驻的语法参考栏：贴着表单的高度；里面分组标题粘顶的底色换成对话框的实底，不用浮层的底 */
+.column {
+  --bg-panel-overlay: var(--colorNeutralBackground1);
+  min-height: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+}
+/* 查询与排序：标题在左、复制键在右，编辑框在下面 */
+.field {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+.fieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+}
+/* 预览条：留出一行的高，写什么都不让表单上下跳 */
+.preview {
+  min-height: var(--lineHeightBase300);
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+.error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+  color: var(--colorPaletteRedForeground1);
+}
+/* 没提交成的说明：在按钮组左边，按钮组加高之后与它垂直居中 */
+.failure {
+  flex: 1 1 auto;
+  align-self: center;
+  min-width: 0;
+  color: var(--colorPaletteRedForeground1);
+  font-size: var(--fontSizeBase300);
+}
+/* 标题行右端的一组：窄窗的语法参考键与复制键，靠右 */
+.headTools {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+}
+/* 底部的键并成一组靠右，总宽不超过右侧参考栏；每个键的宽见组件里的 `action`。新建时只有两个键，仍靠右 */
+.buttons {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalS);
+  width: min(var(--reference-width), 100%);
+}
+/* 窄窗：参考栏收掉，语法参考收成查询标题右端的一个键，点开成弹出面板 */
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .column {
+    display: none;
+  }
+}

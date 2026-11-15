@@ -1,0 +1,8 @@
+/* 窄窗允许换行 */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacingHorizontalS);
+  color: var(--colorPaletteRedForeground1);
+}

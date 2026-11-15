@@ -8,7 +8,9 @@ import {
   onLibraryChanged,
   type LibraryEventsFace,
 } from '../../host/libraryContract.ts';
+import { ALL_QUERY } from '../../track/trackQuery.ts';
 import { TRACK_LIMIT } from '../libraryTracks.ts';
+import type { LibraryMirrorSource } from '../mirror/mirrorSource.ts';
 
 /** 歌曲页要宿主排的一次：哪串查询、按哪个排序串、要不要反过来 */
 export interface SongsRequest {
@@ -75,6 +77,7 @@ export function startSongsRows(
   store: Store,
   host: SongsRowsFace = fb,
   target: PrimitiveAtom<SongsRowsState> = stateAtom,
+  mirror?: Pick<LibraryMirrorSource, 'order'>,
 ): SongsRowsService {
   store.set(target, EMPTY_SONGS_ROWS);
   let disposed = false;
@@ -102,6 +105,20 @@ export function startSongsRows(
     const mine = ++generation;
     stale = false;
     update({ status: 'loading', invalid: false });
+    // 无过滤的整库次序，镜像追平了宿主就由镜像给；有条件或镜像读不到时问宿主
+    const ordered =
+      mirror && request.query === ALL_QUERY ? await mirror.order(request.sort, false) : null;
+    if (disposed || mine !== generation) return;
+    if (ordered) {
+      store.set(target, {
+        status: 'ready',
+        invalid: false,
+        handles: request.descending ? ordered.handles.reverse() : ordered.handles,
+        answered: request,
+        generation: store.get(target).generation + 1,
+      });
+      return;
+    }
     const answer = await settle(() =>
       host.library.query(request.query, request.sort, TRACK_LIMIT, ['handle']),
     );

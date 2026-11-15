@@ -3,6 +3,7 @@ import { PLAYER_BAR_STORAGE_KEY } from '../../src/theme/playerBarStyle.ts';
 import { trackRow } from '../fixtures/libraryRows.ts';
 import { openSongs } from '../fixtures/songsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 const TRACKS = Array.from({ length: 200 }, (_, index) =>
   trackRow('Album', `Track ${String(index + 1).padStart(4, '0')}`, { index }),
@@ -30,7 +31,7 @@ for (const scenario of [
     });
     const songs = await openSongs(page, {
       configure(host) {
-        // 宿主正放着一首：没有当前曲目时胶囊不出。
+        // 宿主正放着一首：没有当前曲目时胶囊不出
         host.answer('playback.getState', {
           success: true,
           state: 'playing',
@@ -42,13 +43,7 @@ for (const scenario of [
           found: true,
           track: makeTrack(),
         });
-        host.answer('library.getAll', {
-          success: true,
-          tracks: TRACKS,
-          items: TRACKS,
-          total: TRACKS.length,
-          offset: 0,
-        });
+        host.answer('library.search', wholeLibrary(TRACKS));
         host.answer('library.query', {
           success: true,
           tracks: TRACKS.map(({ handle, index }) => ({ handle, index })),
@@ -79,7 +74,7 @@ for (const scenario of [
       await expect(songs.row('Track 0001')).toHaveAttribute('data-row-focus', 'true');
       await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
 
-      // 滚动区一直伸到页面底边（差的 1 是卡的边线），页面底边距在它的内边距里，末尾预留不从可见高度扣掉。
+      // 滚动区一直伸到页面底边（差的 1 是卡的边线），页面底边距在它的内边距里，末尾预留不从可见高度扣掉
       await expect
         .poll(async () => Math.round((await bottom(songs.view)) - (await bottom(scroller))))
         .toBe(1);

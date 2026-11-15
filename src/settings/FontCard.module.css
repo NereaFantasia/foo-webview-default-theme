@@ -1,0 +1,14 @@
+/* 预览的样句直接继承界面字体，选了新字体它就跟着换 */
+.sample {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL);
+  border-radius: var(--borderRadiusMedium);
+  background-color: color-mix(in srgb, var(--colorNeutralForeground1) 5%, transparent);
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+}
+
+.sample p {
+  margin: 0;
+}

@@ -54,6 +54,8 @@ function fakeTitanium(random: () => number) {
     setRenderScale: () => undefined,
     setLowFreqVolume: () => undefined,
     setFPS: () => undefined,
+    setFlowSpeed: (speed) => void calls.push(`flow:${speed}`),
+    setOptions: (patch) => void calls.push(`options:${JSON.stringify(patch)}`),
     setStaticMode: () => undefined,
     setHasLyric: () => undefined,
     dispose: () => void calls.push('dispose'),
@@ -102,6 +104,14 @@ describe('createTitaniumBackdrop', () => {
     expect([...second.fields.crestTo]).toStrictEqual(seen.crest);
     expect([...second.fields.crestMotion]).toStrictEqual(seen.crest);
     expect(second.fields.crestShiftElapsed, '不再从零点慢慢挪过去').toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('流速与选项原样转给上游，包装不吞掉', () => {
+    const { open } = session();
+    const { backdrop, calls } = open();
+    backdrop.setFlowSpeed(1.5);
+    backdrop.setOptions({ grain: 0.2, paletteAlgorithm: 'octtree' });
+    expect(calls).toEqual(['flow:1.5', 'options:{"grain":0.2,"paletteAlgorithm":"octtree"}']);
   });
 
   it('视图里换过曲再退场：记的是退场时那张封面的构图', async () => {
@@ -203,6 +213,8 @@ describe('createTitaniumBackdrop', () => {
       setRenderScale: () => undefined,
       setLowFreqVolume: () => undefined,
       setFPS: () => undefined,
+      setFlowSpeed: () => undefined,
+      setOptions: () => undefined,
       setStaticMode: () => undefined,
       setHasLyric: () => undefined,
       dispose: () => undefined,

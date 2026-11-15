@@ -66,6 +66,7 @@ export function sameTrackFilter(a: TrackFilter, b: TrackFilter): boolean {
     sameSet(a.presets, b.presets) &&
     sameSet(a.facets.genre, b.facets.genre) &&
     sameSet(a.facets.decade, b.facets.decade) &&
-    sameSet(a.facets.artist, b.facets.artist)
+    sameSet(a.facets.artist, b.facets.artist) &&
+    sameSet(a.facets.album, b.facets.album)
   );
 }

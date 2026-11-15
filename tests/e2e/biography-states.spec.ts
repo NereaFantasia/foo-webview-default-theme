@@ -4,6 +4,7 @@ import {
   biographyLocalTracks,
   biographyOverviewHtml,
 } from '../fixtures/biographySamples.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 import { lastfmCalls, withoutMusicbrainz } from '../fixtures/musicbrainzSamples.ts';
@@ -12,11 +13,16 @@ import {
   openBiographyLink,
   openBiographySettings,
 } from '../fixtures/biographyActions.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 const panel = (page: Page) => page.locator('[data-biography]');
 
 async function start(page: Page, width = 1280) {
-  const env = await openPlayer(page, { width, state: { track: makeTrack({ artist: 'Queen' }) } });
+  const env = await openPlayer(page, {
+    width,
+    state: { track: makeTrack({ artist: 'Queen' }) },
+    config: LASTFM_SOURCE_CONFIG,
+  });
   env.host.answer('library.getArtistTracks', (params) => {
     const artist = String(params['artist']);
     const tracks = biographyLocalTracks(artist);
@@ -42,8 +48,7 @@ async function start(page: Page, width = 1280) {
       body: String(params['url']).endsWith('/+wiki') ? biographyHtml() : biographyOverviewHtml(),
     })),
   );
-  await page.locator('[data-right-card-key="queue"]').click();
-  await page.getByRole('tab', { name: '简介', exact: true }).click();
+  await openRightCardPage(page, 'bio');
   await expect(panel(page)).toBeVisible();
   return env;
 }
@@ -64,8 +69,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await expect(panel(page).locator('[data-biography-photos]')).toHaveCount(0);
     expect(lastfmCalls(env.host.callsTo('http.get'))).toEqual([]);
     await openBiographySettings(page);
-    const toggle = page.getByRole('switch', { name: '在线艺人简介' });
-    await expect(toggle).toBeFocused();
+    await expect(page.getByRole('heading', { level: 2, name: '在线内容' })).toBeFocused();
     await expect(
       page.locator('[data-settings-nav]').getByRole('button', { name: '在线内容' }),
     ).toHaveAttribute('aria-current', 'page');
@@ -120,13 +124,13 @@ test('无资料和网络错误分开，保留本地统计，重选与刷新可�
   expect(env.errors).toEqual([]);
 });
 
-test('窄窗直达设置时收起覆盖层，焦点落到在线开关，不横向溢出', async ({ page }) => {
+test('窄窗直达设置时收起覆盖层，焦点落到分区标题，不横向溢出', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const env = await start(page, 390);
   await expect(panel(page).locator('[data-biography-library]')).toContainText('3 首');
   await openBiographySettings(page);
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByRole('switch', { name: '在线艺人简介' })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 2, name: '在线内容' })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(env.errors).toEqual([]);
 });
@@ -141,8 +145,7 @@ for (const [colorScheme, width] of [
     await openBiographySettings(page);
     await page.getByRole('switch', { name: '在线艺人简介' }).check();
     if (width < 1008) {
-      await page.locator('[data-right-card-key="queue"]').click();
-      await page.getByRole('tab', { name: '简介', exact: true }).click();
+      await openRightCardPage(page, 'bio');
     }
     const details = panel(page).locator('[data-biography-link]');
     const summary = details.locator('summary');

@@ -87,6 +87,11 @@ export const useTrackTableStyles = makeStyles({
   // 两层叠成内外两个框。根换成状态层（浅深两档与表面无关），排序键始终透明
   headerCell: {
     minWidth: 0,
+    // 焦点环收进列头格内：列头容器裁切溢出，Fluent 缺省画在格外的焦点环会被截去
+    ...createCustomFocusIndicatorStyle(
+      { outlineOffset: `calc(${tokens.strokeWidthThick} * -1)` },
+      { selector: 'focus-within' },
+    ),
     '@media (forced-colors: none)': {
       '& .fui-TableHeaderCell__button': { backgroundColor: 'transparent' },
     },

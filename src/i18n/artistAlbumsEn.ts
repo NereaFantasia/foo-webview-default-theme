@@ -1,6 +1,5 @@
 /** 在线艺人页专辑页签的英文文案，供主英文包合入 */
 export const artistAlbumsEn = {
-  'artistAlbums.tabs': 'Artist sections',
   'artistAlbums.tab.songs': 'Top songs',
   'artistAlbums.tab.albums': 'Albums',
   'artistAlbums.tab.singles': 'Singles & EPs',

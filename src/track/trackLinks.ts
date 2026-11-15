@@ -57,6 +57,19 @@ export function albumArtistLink(album: Pick<Album, 'albumArtist' | 'artist'>): L
   return text.trim() ? { text, ref: { kind: 'artist', name: text } } : null;
 }
 
+/**
+ * 一首曲目的专辑艺术家署名：按多值标签逐位给引用，署名原样作身份；没有多值标签时整串只显示，不当成一位艺人
+ * 署名为空时没有。与 `albumArtistLink` 不同，它读曲目的数组，不读专辑行里只有首值的 `albumArtist`
+ */
+export function trackAlbumArtistLinks(
+  track: Partial<Pick<Track, 'albumArtist' | 'albumArtists'>>,
+): readonly LinkedName[] {
+  const names = unique(track.albumArtists ?? []);
+  return names.length > 0
+    ? names.map((name) => ({ text: name, ref: { kind: 'artist', name } }))
+    : plain(track.albumArtist ?? '');
+}
+
 /** 专辑的流派：标签原值，没有或不是单个流派（见 `isPlainGenre`）时没有，不生成引用 */
 export function albumGenreLink(album: Pick<Album, 'genre'>): LinkedName | null {
   const text = album.genre;

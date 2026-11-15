@@ -17,7 +17,7 @@ import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
 /**
  * 正在播放全屏页的壳：静止计时、全屏记账与离开。宿主是接在真实 SDK 上的替身，全屏三条命令按
  * 替身里记着的全屏态作答，`stateChanged` 由用例推，不改替身的全屏态；历史是真的，页面在「专辑 → 正在播放」
- * 这条路上。
+ * 这条路上
  */
 const NOW_PLAYING: Place = { id: 'nowPlaying' };
 
@@ -37,15 +37,15 @@ function stateOf(fullscreen: boolean): WindowStateChangedPayload {
 
 interface HostSetup {
   available?: boolean;
-  /** 进视图前宿主已经全屏。 */
+  /** 进视图前宿主已经全屏 */
   fullscreenAtStart?: boolean;
-  /** `isFullscreen` 答失败：面板模式、这扇窗不支持全屏。 */
+  /** `isFullscreen` 答失败：面板模式、这扇窗不支持全屏 */
   unsupported?: boolean;
-  /** `enterFullscreen` 应答成功却没进全屏。 */
+  /** `enterFullscreen` 应答成功却没进全屏 */
   enterNoop?: boolean;
-  /** `enterFullscreen` 答失败信封。 */
+  /** `enterFullscreen` 答失败信封 */
   enterRefused?: boolean;
-  /** 不给 `enterFullscreen` 配应答：调用 reject，服务收成 null。 */
+  /** 不给 `enterFullscreen` 配应答：调用 reject，服务收成 null */
   enterThrows?: boolean;
 }
 
@@ -57,7 +57,7 @@ function fakeHost(setup: HostSetup = {}) {
       ? hostFailure('NOT_SUPPORTED', 'panel mode')
       : { success: true, fullscreen, isFullscreen: fullscreen, windowId: 'main' },
   );
-  // 与宿主一样：已经全屏时再进、不在全屏时退，都答 OPERATION_FAILED。
+  // 与宿主一样：已经全屏时再进、不在全屏时退，都答 OPERATION_FAILED
   if (!setup.enterThrows) {
     host.answer('window.enterFullscreen', () => {
       if (setup.enterRefused) return hostFailure('OPERATION_FAILED', 'refused');
@@ -80,7 +80,7 @@ function fakeHost(setup: HostSetup = {}) {
   return { host, calls };
 }
 
-/** 让排着的微任务与 setImmediate 回调跑完几轮；只假 setTimeout 时不会卡住。 */
+/** 让排着的微任务与 setImmediate 回调跑完几轮；只假 setTimeout 时不会卡住 */
 async function flush(rounds = 6): Promise<void> {
   for (let index = 0; index < rounds; index += 1) {
     await new Promise<void>((resolve) => setImmediate(resolve));
@@ -89,7 +89,7 @@ async function flush(rounds = 6): Promise<void> {
 
 async function mount(host: UnitHost, options: { fullscreen?: boolean } = {}) {
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   history.navigate(NOW_PLAYING);
   const shell = startImmersiveShell(store, {
     history,
@@ -113,7 +113,7 @@ describe('静止计时', () => {
     const store = createStore();
     const active = atom(false);
     const shell = startImmersiveShell(store, {
-      history: startNavHistory(store),
+      history: startNavHistory(store, { id: 'albums' }),
       host: fakeHost({ available: false }).host.fb,
       fullscreenOnEnter: () => false,
       active,
@@ -130,6 +130,33 @@ describe('静止计时', () => {
     shell.dispose();
     store.set(active, true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test('hold 为真（浏览面板开着）时控件层不藏，转假后从头计时', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const store = createStore();
+    const hold = atom(false);
+    const shell = startImmersiveShell(store, {
+      history: startNavHistory(store, { id: 'albums' }),
+      host: fakeHost({ available: false }).host.fb,
+      fullscreenOnEnter: () => false,
+      hold,
+    });
+    vi.advanceTimersByTime(IDLE_HIDE_MS);
+    expect(visible(store)).toBe(false);
+
+    store.set(hold, true);
+    expect(visible(store)).toBe(true);
+    shell.touch();
+    vi.advanceTimersByTime(IDLE_HIDE_MS * 2);
+    expect(visible(store)).toBe(true);
+
+    store.set(hold, false);
+    vi.advanceTimersByTime(IDLE_HIDE_MS - 1);
+    expect(visible(store)).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(visible(store)).toBe(false);
+    shell.dispose();
   });
 
   test('静止 3 s 藏控件层；touch() 立刻回来并重新计时', async () => {
@@ -161,7 +188,7 @@ describe('静止计时', () => {
     vi.advanceTimersByTime(IDLE_HIDE_MS);
     expect(visible(store)).toBe(false);
     shell.leave();
-    expect(place()).toBe(START_PLACE.id);
+    expect(place()).toBe('albums');
     expect(calls()).toStrictEqual([]);
   });
 });
@@ -172,7 +199,7 @@ describe('进入与离开', () => {
     const store = createStore();
     let managed = true;
     const shell = startImmersiveShell(store, {
-      history: startNavHistory(store),
+      history: startNavHistory(store, { id: 'albums' }),
       host: host.fb,
       fullscreenOnEnter: () => true,
       fullscreenManaged: () => managed,
@@ -191,7 +218,7 @@ describe('进入与离开', () => {
   test('进入全屏应答在迷你切换中返回时保留记账，不补发窗口命令', async () => {
     const { host, calls } = fakeHost();
     const store = createStore();
-    const history = startNavHistory(store);
+    const history = startNavHistory(store, { id: 'albums' });
     history.navigate(NOW_PLAYING);
     let managed = false;
     const held = host.hold('window.enterFullscreen');
@@ -348,7 +375,7 @@ describe('进入与离开', () => {
 describe('同一页先后两个壳', () => {
   function sameEntry(host: UnitHost, fullscreen: boolean) {
     const store = createStore();
-    const history = startNavHistory(store);
+    const history = startNavHistory(store, { id: 'albums' });
     history.navigate(NOW_PLAYING);
     const start = () =>
       startImmersiveShell(store, { history, host: host.fb, fullscreenOnEnter: () => fullscreen });

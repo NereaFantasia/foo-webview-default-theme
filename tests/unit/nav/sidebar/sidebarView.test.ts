@@ -17,7 +17,7 @@ function start(width: 'wide' | 'tight' | 'hidden' = 'wide') {
   const media = fakeMedia({ [WIDE]: width === 'wide', [TIGHT]: width !== 'hidden' });
   const store = createStore();
   const prefs = startSidebarPrefs(store, null);
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const view = startSidebarView(store, media.matchMedia);
   const resize = (next: 'wide' | 'tight' | 'hidden') => {
     // 真窗口跨档时两条查询按先后各报一次，这里也分两次报。
@@ -84,7 +84,7 @@ describe('startSidebarView', () => {
     expect(start('hidden').state().tier).toBe('hidden');
     const store = createStore();
     startSidebarPrefs(store, null);
-    startNavHistory(store);
+    startNavHistory(store, { id: 'albums' });
     startSidebarView(store, null);
     expect(store.get(sidebarViewAtom).tier).toBe('wide');
   });

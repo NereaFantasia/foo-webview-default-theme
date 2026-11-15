@@ -1,45 +1,32 @@
 import { Checkmark16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
+import { moveRowFocus } from '../../../kit/rowFocus.ts';
 import styles from './OutputDeviceList.module.css';
 import {
   deviceKeyOf,
   outputDevicesAtom,
   outputGroupsOf,
   outputDevicesKey,
-} from './outputDevices.ts';
+} from '../../../playback/outputDevices.ts';
 import { useService } from '../../../kit/useService.ts';
 
 export interface OutputDeviceListProps {
-  /** 切换成了：宿主收下并已回读，勾已经挪到新设备上；外面据此收起列表。没成时不调，列表留着写原因 */
+  /** 切换成功后调用：宿主已接受并回读，勾已移到新设备上，外部据此收起列表。切换没有成功时不调用，列表保留，并在其中显示原因 */
   onPicked?(): void;
 }
 
 const ROW = '[data-output-device]';
 
-/** 上下键、Home、End 在各行之间挪焦点；到头停住，不绕回 */
-function moveFocus(event: KeyboardEvent<HTMLDivElement>): void {
-  const rows = [...event.currentTarget.querySelectorAll<HTMLElement>(ROW)];
-  const at = rows.findIndex((row) => row === document.activeElement);
-  let next = -1;
-  if (event.key === 'ArrowDown') next = Math.min(rows.length - 1, at + 1);
-  else if (event.key === 'ArrowUp') next = Math.max(0, at - 1);
-  else if (event.key === 'Home') next = 0;
-  else if (event.key === 'End') next = rows.length - 1;
-  if (next < 0 || at < 0) return;
-  event.preventDefault();
-  rows[next]?.focus();
-}
-
 /**
- * 输出设备的完整列表：按输出模块分组，组名只是标题、不能折叠；当前设备打勾、铺选中底。最高 384（约 12 行），
- * 超出在列表里滚动，当前设备滚到中间，用户动过列表就不再替他滚。挂上时现读一次清单（插拔设备时宿主不发
- * 事件），并收起上一次切换留下的失败。名字过长截断，悬停出全名
+ * 输出设备的完整列表：按输出模块分组，组名只是标题，不能折叠。当前设备打勾并铺选中底。最高 384（约 12 行），
+ * 超出部分在列表里滚动，当前设备滚到中间，用户操作过列表后不再自动滚动。
+ * 挂上时读取一次清单（插拔设备时宿主不发事件），并清除上一次切换留下的失败提示。名字过长时截断，悬停显示全名
  *
- * 只有一行接 Tab：当前设备那一行，没有当前设备时是第一行；弹出层打开时自动聚焦的也就是它，不会把列表滚回
- * 顶上。行与行之间用上下键、Home、End 挪。选一行就发切换，不乐观更新：宿主回读之后勾才挪；切换没成时列表
- * 留着，顶上写一行原因
+ * 只有一行接受 Tab：当前设备那一行，没有当前设备时是第一行。弹出层打开时自动聚焦的也是它，不会把列表滚回顶部。
+ * 行与行之间用上下键、Home、End 移动。选一行就发起切换，不做乐观更新：宿主回读之后，勾才移动。
+ * 切换失败时列表保持不变，顶部显示一行原因
  */
 export function OutputDeviceList({ onPicked }: OutputDeviceListProps) {
   const t = useAtomValueRawSync(translateAtom);
@@ -47,9 +34,9 @@ export function OutputDeviceList({ onPicked }: OutputDeviceListProps) {
   const outputDevices = useService(outputDevicesKey);
   const store = useStore();
   const list = useRef<HTMLDivElement>(null);
-  // 用户动过列表（滚、按键、按下指针）之后不再替他居中
+  // 用户操作过列表（滚动、按键、按下指针）之后不再自动居中
   const touched = useRef(false);
-  // 焦点在列表里。拿着焦点的那一行被现读回来的清单换掉时，焦点落到 body，据此接回来
+  // 焦点是否在列表里。持有焦点的那一行被重新读回的清单换掉时，焦点会落到 body，据此把焦点接回来
   const focusedInside = useRef(false);
   const mounted = useRef(true);
   const prefix = useId();
@@ -64,8 +51,8 @@ export function OutputDeviceList({ onPicked }: OutputDeviceListProps) {
       mounted.current = false;
     };
   }, [outputDevices]);
-  // 打开时手上的清单可能是旧的，现读回来当前设备换了位置，照样再居中一次。行的位置按列表自己量：列表外面
-  // 还有别的东西（浮层里的音量栏、设备栏），offsetTop 会把它们算进去
+  // 打开时手上的清单可能是旧的，重新读回后当前设备换了位置，也要再居中一次。
+  // 行的位置按列表自身量取：列表外面还有别的内容（浮层里的音量栏、设备栏），offsetTop 会把它们算进去
   useLayoutEffect(() => {
     const element = list.current;
     if (!element) return;
@@ -98,13 +85,13 @@ export function OutputDeviceList({ onPicked }: OutputDeviceListProps) {
       aria-label={t('player.outputDevice')}
       onKeyDown={(event) => {
         touched.current = true;
-        moveFocus(event);
+        moveRowFocus(event, ROW);
       }}
       onWheel={() => (touched.current = true)}
       onPointerDown={() => (touched.current = true)}
       onFocus={() => (focusedInside.current = true)}
       onBlur={(event) => {
-        // 焦点去了别处才算离开；拿着焦点的行被卸掉时去向为空，不算
+        // 焦点去了别处才算离开。持有焦点的行被卸掉时，焦点去向为空，不算离开
         const next = event.relatedTarget;
         if (next instanceof Node && !event.currentTarget.contains(next)) {
           focusedInside.current = false;

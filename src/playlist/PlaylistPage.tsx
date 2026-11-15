@@ -1,3 +1,4 @@
+import { Button } from '@fluentui/react-components';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
@@ -11,16 +12,28 @@ import type { TableArtwork, TableGroupItem, TablePoint, TableTrack } from '../ta
 import { TrackTable, type TableGroupState, type TrackTableHandle } from '../table/TrackTable.tsx';
 import { useTableSnapshot, type TableView } from '../table/useTableSnapshot.ts';
 import type { TableMenuTarget } from '../table/useTrackTableInput.ts';
-import { PlaylistConditions } from './filter/PlaylistConditions.tsx';
+import { trackFilterOf } from './filter/playlistFilter.ts';
 import { PlaylistGroupHead } from './groups/PlaylistGroupHead.tsx';
 import { PlaylistMoreMenu } from './PlaylistMoreMenu.tsx';
 import { fb } from 'foo-webview-sdk/bridge';
+import { ConditionEditor } from '../track/ConditionEditor.tsx';
+import { FilterConditions } from '../track/FilterConditions.tsx';
+import { FilterSurface, useFilterSurface } from '../track/FilterSurface.tsx';
+import { filterConditions } from '../track/filterLabels.ts';
+import { PresetChips } from '../track/PresetChips.tsx';
+import { queryInputText } from '../track/queryInput.ts';
+import { trackFacetCount } from '../track/trackFacets.ts';
+import { sameTrackFilter, type TrackFilter } from '../track/trackFilter.ts';
+import { PlaylistFacets } from './filter/PlaylistFacets.tsx';
 import { SelectionBar } from '../track/SelectionBar.tsx';
 import { trackActionsKey } from '../track/trackActions.ts';
 import { LIBRARY_SOURCE } from '../playback/playbackSource.ts';
 import { playPlaylistSelection } from './playPlaylistSelection.ts';
-import { sameConditions, type PlaylistCondition } from './filter/playlistMatch.ts';
 import styles from './PlaylistPage.module.css';
+import { COMMAND_BAR_TIERS, type CommandBarTier } from '../kit/CommandBar.tsx';
+import { useWidthTier } from '../kit/useWidthTier.ts';
+import { useViewControlStyles } from '../theme/controlStyles.ts';
+import { AutoplaylistEditButton } from './PlaylistAutoplaylistEdit.tsx';
 import { PlaylistPageHeader } from './PlaylistPageHeader.tsx';
 import { PlaylistViewPanel } from './PlaylistViewPanel.tsx';
 import { PlaylistPageNotices } from './PlaylistPageNotices.tsx';
@@ -35,11 +48,8 @@ import { playlistPageKey } from './playlistPageServices.ts';
 import { playlistActionsKey } from './playlistActions.ts';
 import { playlistRowsKey } from './playlistRows.ts';
 
-/** 离开时记下滚动、焦点行、过滤词与条件 */
-const PLAYLIST_SLOT =
-  createSnapshotSlot<
-    TableView<{ readonly query: string; readonly conditions: readonly PlaylistCondition[] }>
-  >();
+/** 离开时记下滚动、焦点行与筛选（搜索框的输入含模式与两份草稿，以及预设与条件）；筛选只活在这条历史记录里 */
+const PLAYLIST_SLOT = createSnapshotSlot<TableView<TrackFilter>>();
 /** 序号格：有碟号写「碟.曲」，没有只写两位曲号。列表里的曲目来自不同专辑，不按碟数定写法 */
 const numberText = (track: TableTrack) => {
   const padded = discTrackText(track, 1);
@@ -52,12 +62,14 @@ const ALBUM_MODES = new Set([0, 1]);
 export interface PlaylistPageProps extends PageProps {
   /** 不分组时缩略图列每行的画法；不给就不画 */
   readonly artwork?: TableArtwork;
+  /** 装没装 foo_playcount，由装配层告知；null 是还没探出来 */
+  readonly playcount?: boolean | null;
 }
 
 /** 播放列表页：主体是列表的 GUID。换一张列表就是另一页，里面的状态从头来 */
-export function PlaylistPage({ place, artwork }: PlaylistPageProps) {
+export function PlaylistPage({ place, artwork, playcount = null }: PlaylistPageProps) {
   const guid = place.subject ?? '';
-  return <PlaylistPageBody key={guid} guid={guid} artwork={artwork} />;
+  return <PlaylistPageBody key={guid} guid={guid} artwork={artwork} playcount={playcount} />;
 }
 
 /**
@@ -68,9 +80,11 @@ export function PlaylistPage({ place, artwork }: PlaylistPageProps) {
 function PlaylistPageBody({
   guid,
   artwork,
+  playcount,
 }: {
   readonly guid: string;
   readonly artwork: TableArtwork | undefined;
+  readonly playcount: boolean | null;
 }) {
   const t = useAtomValueRawSync(translateAtom);
   const plural = useAtomValueRawSync(pluralAtom);
@@ -81,6 +95,18 @@ function PlaylistPageBody({
   const trackActions = useService(trackActionsKey);
   const model = usePlaylistPage(guid);
   const { view, rows, filter, entry } = model;
+  const controls = useViewControlStyles();
+  const [measure, tier] = useWidthTier<CommandBarTier, HTMLDivElement>(COMMAND_BAR_TIERS);
+  const surfacePrefs = useAtomValueRawSync(page.filter.surface.atom);
+  const surface = useFilterSurface({
+    docked: surfacePrefs.docked,
+    expanded: surfacePrefs.expanded,
+    narrow: tier === 'narrow',
+    onDock: page.filter.surface.setDocked,
+    onExpand: page.filter.surface.setExpanded,
+  });
+  const trackFilter = trackFilterOf(filter);
+  const conditionCount = filterConditions(trackFilter, t).length;
   const selected = useAtomValueRawSync(model.selection.state);
   const [menu, setMenu] = useState<PlaylistMenuTarget | null>(null);
   const [selectionPlayFailed, setSelectionPlayFailed] = useState(false);
@@ -114,16 +140,21 @@ function PlaylistPageBody({
     handle,
     items: view.items,
     ready: rows.status === 'ready' && view.shape !== 'waiting',
-    extra: () => ({ query: filter.query, conditions: filter.conditions }),
-    apply({ query, conditions }) {
-      if (query.trim() !== '' || conditions.length > 0)
-        page.filter.restore(guid, query, conditions);
+    extra: () => trackFilter,
+    apply(saved) {
+      if (
+        queryInputText(saved).trim() !== '' ||
+        saved.presets.size > 0 ||
+        trackFacetCount(saved.facets) > 0 ||
+        saved.conditions.length > 0
+      )
+        page.filter.restore(guid, saved);
     },
-    // 扫描落地了、落的正是快照里的那一份，行才排好
-    matches: ({ query, conditions }) =>
+    // 求值落地了、落的正是快照里的那一份，行才排好
+    matches: (saved) =>
       !filter.scanning &&
-      filter.term === query.trim() &&
-      sameConditions(filter.conditions, conditions),
+      filter.term === queryInputText(saved).trim() &&
+      sameTrackFilter(trackFilter, saved),
   });
 
   const groupAt = (index: number) => {
@@ -255,6 +286,7 @@ function PlaylistPageBody({
         {t('playlistPage.autoEmpty')}
       </div>
     ) : undefined;
+  const hits = filter.hits.length;
   const gone = rows.status === 'gone' || rows.status === 'disconnected';
   // 过滤时眼前第一行是第一个命中，从它起播
   const first = view.items.find((item) => item.kind === 'row');
@@ -270,7 +302,7 @@ function PlaylistPageBody({
       data-page="playlist"
     >
       <div className={styles.body}>
-        <div className={styles.top} data-playlist-toolbar>
+        <div ref={measure} className={styles.top} data-playlist-toolbar>
           <PlaylistPageHeader
             guid={guid}
             entry={entry}
@@ -278,17 +310,68 @@ function PlaylistPageBody({
             filter={filter}
             play={play}
             selection={selection}
+            tier={tier}
+            surface={surface}
+            conditions={conditionCount}
+            playcount={playcount}
             view={(labelled) => (
               <PlaylistViewPanel
                 groups={model.listMenu.groups}
                 columns={model.columns}
                 labelled={labelled}
+                filtering={filter.active}
               />
             )}
           >
-            <PlaylistMoreMenu guid={guid} model={model} sort={model.listMenu.sort} />
+            <AutoplaylistEditButton entry={entry} />
+            <PlaylistMoreMenu guid={guid} model={model} reorder={model.listMenu.reorder} />
           </PlaylistPageHeader>
-          <PlaylistConditions guid={guid} conditions={filter.conditions} />
+          <FilterSurface
+            id="playlist"
+            state={surface}
+            footer={
+              <>
+                <ConditionEditor
+                  playcount={playcount}
+                  onAdd={(condition) => page.filter.addCondition(guid, condition)}
+                />
+                <span className={styles.result}>
+                  {filter.active &&
+                    t(plural(hits, 'playlistPage.matchCountOne', 'playlistPage.matchCount'), {
+                      count: hits,
+                    })}
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    className={controls.icon}
+                    disabled={conditionCount === 0}
+                    onClick={() => page.filter.clearConditions(guid)}
+                  >
+                    {t('playlistPage.conditionsClear')}
+                  </Button>
+                </span>
+              </>
+            }
+          >
+            <PresetChips
+              checked={filter.presets}
+              playcount={playcount}
+              onToggle={(id) => page.filter.togglePreset(guid, id)}
+            />
+            <PlaylistFacets guid={guid} filter={trackFilter} tabs={surface.narrow} />
+          </FilterSurface>
+          <FilterConditions
+            filter={trackFilter}
+            playcount={playcount}
+            hideWhenEmpty={!(surface.docked && surface.open)}
+            onAdd={(condition) => page.filter.addCondition(guid, condition)}
+            onClear={() => page.filter.clearConditions(guid)}
+            onRemove={({ ref }) => {
+              if (ref.kind === 'preset') page.filter.togglePreset(guid, ref.id);
+              else if (ref.kind === 'condition') page.filter.removeCondition(guid, ref.key);
+              else page.filter.toggleFacet(guid, ref.facet, ref.name);
+            }}
+          />
           <PlaylistPageNotices
             guid={guid}
             model={model}

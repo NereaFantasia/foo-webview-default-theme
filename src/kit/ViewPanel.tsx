@@ -145,6 +145,8 @@ export interface ViewGroupingProps<T extends string> {
   readonly fold?: { readonly disabled: boolean; expand(): void; collapse(): void };
   /** 组与组的先后能升降时给出；没有分组或组序固定时不给 */
   readonly order?: { readonly descending: boolean; onChange(descending: boolean): void };
+  /** 分组此刻不起作用（如页面在筛选态、只列命中）：依据下拉与展开、折叠都置灰，设置原样留着 */
+  readonly disabled?: boolean;
 }
 
 /** 分组或分节先后的升序、降序两段，与排序方向无关 */
@@ -180,6 +182,7 @@ export function ViewGrouping<T extends string>({
   onChange,
   fold,
   order,
+  disabled = false,
 }: ViewGroupingProps<T>) {
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
@@ -193,6 +196,7 @@ export function ViewGrouping<T extends string>({
         className={controls.field}
         value={current?.label ?? ''}
         selectedOptions={[value]}
+        disabled={disabled}
         onOptionSelect={(_, data) => {
           const next = options.find((option) => option.value === data.optionValue);
           if (next) onChange(next.value);
@@ -211,7 +215,7 @@ export function ViewGrouping<T extends string>({
           <Button
             className={controls.field}
             icon={<ChevronUpDown16Regular />}
-            disabled={fold.disabled}
+            disabled={fold.disabled || disabled}
             onClick={fold.expand}
             data-action="expand"
           >
@@ -220,7 +224,7 @@ export function ViewGrouping<T extends string>({
           <Button
             className={controls.field}
             icon={<ChevronDownUp16Regular />}
-            disabled={fold.disabled}
+            disabled={fold.disabled || disabled}
             onClick={fold.collapse}
             data-action="collapse"
           >

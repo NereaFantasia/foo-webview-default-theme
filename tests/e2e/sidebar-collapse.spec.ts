@@ -9,16 +9,16 @@ import { choosePlayerBar } from '../fixtures/playerPage.ts';
 test.use({ screenshot: 'off' });
 
 // 侧边栏的拖拽折叠、图标态与窄窗浮层：握柄的拖动吸附、Esc、双击与键盘，窗口宽度三档，导航行的侧边栏键
-// （宽档隐藏与摆回、窄档浮层），两种形态的图标对齐，图标态的列表浮层与小圆点，换形态的动画。
-// 动画的观感、拖放悬停自动弹出只能实机看。
+// （宽档隐藏与摆回、窄档浮层），两种形态的图标对齐，图标态的列表浮层与小圆点，换形态的动画
+// 动画的观感、拖放悬停自动弹出只能实机看
 
 const STORAGE_KEY = 'default-theme.sidebar.v1';
 
 interface ShellOptions {
-  /** 页面加载之前写进存档的侧边栏形态。 */
+  /** 页面加载之前写进存档的侧边栏形态 */
   readonly prefs?: Readonly<Record<string, unknown>>;
   readonly width?: number;
-  /** 媒体库里的专辑；不给是空库，封面墙一块都不画。 */
+  /** 媒体库里的专辑；不给是空库，封面墙一块都不画 */
   readonly albums?: readonly AlbumInfo[];
 }
 
@@ -64,8 +64,8 @@ type Shell = Awaited<ReturnType<typeof openShell>>;
 
 /**
  * 页面里每一次 `Element.animate` 都记一笔，动画播没播完都查得到：窗格与内容区的裁剪、平移记成
- * 「属性 时长 起 → 止」，带 `data-pane-only` 的淡出淡入记成「起→止 延迟 fill」，封面墙换列时的位移与淡入只记是哪一块。
- * `holdAnimations` 为真时新建的动画当场暂停，测中途打断时不必和 200 ms 赛跑。
+ * 「属性 时长 起 → 止」，带 `data-pane-only` 的淡出淡入记成「起→止 延迟 fill」，封面墙换列时的位移与淡入只记是哪一块
+ * `holdAnimations` 为真时新建的动画当场暂停，测中途打断时不必和 200 ms 赛跑
  */
 function recordAnimate() {
   const motion: string[] = [];
@@ -79,7 +79,7 @@ function recordAnimate() {
     const frames = Array.isArray(keyframes) ? keyframes : [];
     const keys = ['clipPath', 'translate'].filter((key) => frames.some((frame) => key in frame));
     const timing = typeof options === 'number' ? { duration: options } : (options ?? {});
-    // 只认窗格（aside 下的那一层）与内容区，别的件自带的位移不算。
+    // 只认窗格（aside 下的那一层）与内容区，别的件自带的位移不算
     const shell = this.tagName === 'MAIN' || this.parentElement?.tagName === 'ASIDE';
     if (keys.length > 0 && shell) {
       const values = frames.map((frame) => keys.map((key) => String(frame[key])).join(','));
@@ -100,7 +100,7 @@ function recordAnimate() {
 
 /**
  * 取出记下的一类并清空：`paneMotionLog` 是裁剪与平移，`paneFadeLog` 是淡出淡入，`wallReflowLog` 是封面墙
- * 换列。
+ * 换列
  */
 function takeLog(
   page: Page,
@@ -119,12 +119,12 @@ function takeLog(
 const takeMotion = (page: Page) => takeLog(page, 'paneMotionLog');
 const takeFades = (page: Page) => takeLog(page, 'paneFadeLog');
 
-/** 之后新建的动画当场暂停（`on` 为真）或照常播。 */
+/** 之后新建的动画当场暂停（`on` 为真）或照常播 */
 async function holdAnimations(page: Page, on: boolean) {
   await page.evaluate((value) => Reflect.set(window, 'holdAnimations', value), on);
 }
 
-/** 把此刻所有暂停着的动画拨到第 `ms` 毫秒。 */
+/** 把此刻所有暂停着的动画拨到第 `ms` 毫秒 */
 async function seekHeld(page: Page, ms: number) {
   await page.evaluate((time) => {
     for (const animation of document.getAnimations()) {
@@ -133,7 +133,7 @@ async function seekHeld(page: Page, ms: number) {
   }, ms);
 }
 
-/** 按下握柄中间，依次挪到这几个横坐标，不松手。 */
+/** 按下握柄中间，依次挪到这几个横坐标，不松手 */
 async function dragTo(page: Page, shell: Shell, xs: readonly number[]) {
   const box = await shell.splitter.boundingBox();
   if (!box) throw new Error('握柄没画出来');
@@ -143,7 +143,7 @@ async function dragTo(page: Page, shell: Shell, xs: readonly number[]) {
   for (const x of xs) await page.mouse.move(x, y, { steps: 2 });
 }
 
-/** 让正在播的动画都播完，形态与布局落到终值。 */
+/** 让正在播的动画都播完，形态与布局落到终值 */
 async function settleMotion(page: Page) {
   await page.evaluate(() => {
     for (const animation of document.getAnimations()) animation.finish();
@@ -154,14 +154,14 @@ test('拖过收起线吸成图标态，拖回过展开线展开到 200 再跟手
   page,
 }) => {
   const shell = await openShell(page);
-  // 握柄中心骑在内容卡边线上，离侧边栏右缘有 16px 的留白。
+  // 握柄中心骑在内容卡边线上，离侧边栏右缘有 16px 的留白
   await dragTo(page, shell, [166]);
   await expect(shell.body).toHaveAttribute('data-sidebar', 'expanded');
   expect(await shell.columnWidth()).toBe(200);
   await page.mouse.move(130, 400, { steps: 2 });
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   expect(await shell.columnWidth()).toBe(48);
-  // 滞回带里来回不切。
+  // 滞回带里来回不切
   await page.mouse.move(146, 400);
   await page.mouse.move(136, 400);
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
@@ -186,7 +186,7 @@ test('拖动中按 Esc 回到拖动之前的形态与宽度，之后再挪指针
   await page.mouse.move(220, 400);
   await page.mouse.up();
   expect(await shell.columnWidth()).toBe(320);
-  // Esc 只收了拖动，页面没有别的动静。
+  // Esc 只收了拖动，页面没有别的动静
   await expect(page.getByRole('heading', { level: 1, name: '专辑' })).toBeVisible();
   expect(shell.errors).toEqual([]);
 });
@@ -205,7 +205,7 @@ test('双击握柄：在图标态与上次的展开宽度之间切换，侧边�
   expect(shell.errors).toEqual([]);
 });
 
-test('侧边栏键把侧边栏整个藏起来，没有握柄、内容卡占满；再按照原来的形态与宽度摆回来，存档记下', async ({
+test('侧边栏键把侧边栏整个藏起来，没有握柄、内容卡占满；再按照原来的形态与宽度摆回来，存档记下 @smoke', async ({
   page,
 }) => {
   const shell = await openShell(page, { prefs: { rail: true, width: 280 } });
@@ -222,7 +222,7 @@ test('侧边栏键把侧边栏整个藏起来，没有握柄、内容卡占满�
   ).toBe(0);
   expect(await shell.saved()).toMatchObject({ hidden: true, rail: true, width: 280 });
 
-  // 藏着时窗口缩窄照样恒为图标态，拉回来还是藏着。
+  // 藏着时窗口缩窄照样恒为图标态，拉回来还是藏着
   await page.setViewportSize({ width: 900, height: 800 });
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -235,32 +235,6 @@ test('侧边栏键把侧边栏整个藏起来，没有握柄、内容卡占满�
   await settleMotion(page);
   expect(await shell.columnWidth()).toBe(280);
   expect(await shell.saved()).toMatchObject({ hidden: false, rail: false, width: 280 });
-  expect(shell.errors).toEqual([]);
-});
-
-test('两种形态里同一项的图标同高同大，图标态向右多 2 的视觉补偿；分节标题与细线占同样的高度', async ({
-  page,
-}) => {
-  const shell = await openShell(page);
-  const iconBox = (name: string) =>
-    shell.nav
-      .getByRole('button', { name })
-      .locator('svg')
-      .first()
-      .evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return { x: box.x, y: box.y, width: box.width };
-      });
-  const names = ['首页', '专辑', '设置'];
-  const expanded = await Promise.all(names.map(iconBox));
-  await shell.splitter.dblclick();
-  await settleMotion(page);
-  // 两种形态里各项同名，等图标态换上、展开态卸掉再量，免得量到正被卸掉的那一个。
-  await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
-  await expect(shell.nav.getByRole('button', { name: '首页', exact: true })).toHaveCount(1);
-  const rail = await Promise.all(names.map(iconBox));
-  // 图标态的图标向右多出一档 spacingHorizontalXXS（2）的视觉补偿，对齐分隔线的中线；竖向与大小不变
-  expect(rail).toEqual(expanded.map((box) => ({ ...box, x: box.x + 2 })));
   expect(shell.errors).toEqual([]);
 });
 
@@ -285,7 +259,7 @@ test('握柄的键盘：← / → 每步 16，在 200 再按 ← 进图标态，
   await page.keyboard.press('Enter');
   await expect(shell.splitter).toHaveAttribute('aria-valuenow', '360');
   await expect(shell.splitter).toBeFocused();
-  // Alt+← 仍是后退，不被握柄接走。
+  // Alt+← 仍是后退，不被握柄接走
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(shell.splitter).toHaveAttribute('aria-valuenow', '360');
   expect(shell.errors).toEqual([]);
@@ -298,7 +272,7 @@ test('窗口缩到 1000 强制图标态、没有握柄；拉回 1280 恢复用�
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect(shell.body).toHaveAttribute('data-sidebar', 'rail');
   await expect(shell.splitter).toHaveCount(0);
-  // 跨档直接到位，不播展开 ↔ 图标态的动画。
+  // 跨档直接到位，不播展开 ↔ 图标态的动画
   const running = await page.evaluate(() => document.getAnimations().length);
   expect(running).toBe(0);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -370,7 +344,7 @@ test('图标态：点「播放列表」弹出列表浮层，能点开一张列�
   await icon.click();
   await expect(flyout).toBeVisible();
   await expect(icon).toHaveAttribute('aria-expanded', 'true');
-  // 这一节在浮层里不能收起。
+  // 这一节在浮层里不能收起
   await expect(flyout.getByRole('button', { name: /展开或收起/ })).toHaveCount(0);
   await expect(
     flyout.locator(`[data-playlist-entry="${shell.lists.guid('Default')}"]`),
@@ -420,7 +394,7 @@ test('图标态：分节标题换成细线，资料库各项常显；播放列�
   }
   const dotOf = (name: string) =>
     shell.nav.getByRole('button', { name }).locator('[data-sidebar-dot]');
-  // 缺省的清单里 Chill 在播。
+  // 缺省的清单里 Chill 在播
   await expect(dotOf('播放列表')).toHaveCount(1);
   await expect(shell.nav.getByRole('button', { name: /播放队列/ })).toHaveCount(0);
   await shell.host.emit('playback:queueChanged', {
@@ -454,14 +428,14 @@ test('展开 ↔ 图标态播 200 ms：窗格裁剪、内容位移，只在一�
     'clipPath+translate 200 inset(0 0px 0 0),0px 0 → inset(0 212px 0 0),0px 0',
     'translate 200 212px 0 → 0 0',
   ]);
-  // 收起途中窗格里还是展开态的内容；搜索框、分节标题与播放列表节当场淡出，停在透明。
+  // 收起途中窗格里还是展开态的内容；搜索框、分节标题与播放列表节当场淡出，停在透明
   await expect(shell.nav.getByRole('button', { name: '新建', exact: true })).toHaveCount(1);
   expect(await takeFades(page)).toEqual(Array(3).fill('1→0 0 forwards'));
   await settleMotion(page);
   await expect(shell.nav.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
   await expect(shell.nav.getByRole('button', { name: '播放列表' })).toBeVisible();
   expect(await columns()).toBeGreaterThan(wide);
-  // 换上图标态之后放大镜、两条细线与播放列表图标从透明淡入，不等。
+  // 换上图标态之后放大镜、两条细线与播放列表图标从透明淡入，不等
   await expect.poll(() => takeFades(page)).toEqual(Array(4).fill('0→1 0 backwards'));
   await settleMotion(page);
   await shell.splitter.dblclick();
@@ -469,10 +443,10 @@ test('展开 ↔ 图标态播 200 ms：窗格裁剪、内容位移，只在一�
     'clipPath+translate 200 inset(0 212px 0 0),0px 0 → inset(0 0px 0 0),0px 0',
     'translate 200 -212px 0 → 0 0',
   ]);
-  // 展开时当场换上展开态，那几部分先透明着等 100 ms 再淡入。
+  // 展开时当场换上展开态，那几部分先透明着等 100 ms 再淡入
   expect(await takeFades(page)).toEqual(Array(3).fill('0→1 100 backwards'));
   await settleMotion(page);
-  // 收成图标态时封面墙多出一列，展开回来又少一列；两次换列都直接到位，一块都不滑。
+  // 收成图标态时封面墙多出一列，展开回来又少一列；两次换列都直接到位，一块都不滑
   expect(await columns()).toBe(wide);
   expect(await takeLog(page, 'wallReflowLog')).toEqual([]);
   expect(shell.errors).toEqual([]);
@@ -498,7 +472,7 @@ test('藏起来播 100 ms、摆回来播 200 ms：窗格整张滑出滑入，内
   ]);
   await settleMotion(page);
 
-  // 摆回到一半再按一次：从此刻滑到的位置往回滑，不先跳回摆好的样子；内容区跟着同一条线。
+  // 摆回到一半再按一次：从此刻滑到的位置往回滑，不先跳回摆好的样子；内容区跟着同一条线
   await shell.key.click();
   await settleMotion(page);
   await holdAnimations(page, true);

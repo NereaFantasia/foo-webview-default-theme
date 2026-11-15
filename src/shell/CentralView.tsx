@@ -1,9 +1,15 @@
+import type { Atom } from 'jotai/vanilla';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { pageTransition, type LayerMotion } from '../motion/pageTransition.ts';
 import { reducedMotionAtom } from '../motion/reducedMotion.ts';
 import styles from './CentralView.module.css';
-import { historyAtom, type Arrival, type HistoryEntry } from '../nav/navHistory.ts';
+import {
+  mainHistoryAtom,
+  type Arrival,
+  type HistoryEntry,
+  type NavHistoryState,
+} from '../nav/navHistory.ts';
 import { dropExiting, showEntry, type PageLayer } from './pageLayers.ts';
 import { useShellSlots } from './shellSlots.ts';
 import { PlaceholderPage } from './PlaceholderPage.tsx';
@@ -30,10 +36,16 @@ function play(element: HTMLElement, motions: readonly LayerMotion[]): Promise<bo
 /**
  * 中央区域：显示历史当前记录的页面，跨页换记录时播页面切换动效。目录内导航复用页面，其他记录分别建层，
  * 离场的旧层留到动画播完才移走，期间不接指针与焦点
+ *
+ * `source` 是读哪个栈：缺省主栈；浏览面板里传面板栈自己的状态，面板收起的过程中它不会被切到主栈的 `nowPlaying`
  */
-export function CentralView() {
+export function CentralView({
+  source = mainHistoryAtom,
+}: {
+  readonly source?: Atom<NavHistoryState>;
+}) {
   const { pages } = useShellSlots();
-  const history = useAtomValueRawSync(historyAtom);
+  const history = useAtomValueRawSync(source);
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const [shown, setShown] = useState<Shown>(() => ({
     entry: history.entry,

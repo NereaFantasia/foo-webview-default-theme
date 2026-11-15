@@ -16,6 +16,33 @@ html[data-scene-transition]::view-transition-group(*) {
   animation-timing-function: var(--scene-glide-easing);
 }
 
+/* 快照组的叠放次序。组按名字出现的先后叠，只在新状态里才有名字的元素排在最后（退出 Coverflow 回满幅封面时的封面），
+   会盖住排在前面的页签、键与胶囊，所以次序用 `z-index` 定死：胶囊的玻璃面最低，往上依次是胶囊的头部与折叠部分、
+   页签与编辑槽、键、浮层。
+   带名字的毛玻璃元素自己的 `backdrop-filter` 由过渡搬到它的快照组上，组画在封面的快照之上、取得到封面，只是组不带圆角：
+   玻璃面的圆角由胶囊写进 `--scene-capsule-radius`，键都是圆或胶囊形 */
+html[data-scene-transition]::view-transition-group(scene-capsule-glass) {
+  z-index: 1;
+  border-radius: var(--scene-capsule-radius, 0);
+}
+
+html[data-scene-transition]::view-transition-group(*.scene-capsule-part) {
+  z-index: 2;
+}
+
+html[data-scene-transition]::view-transition-group(*.scene-top) {
+  z-index: 3;
+}
+
+html[data-scene-transition]::view-transition-group(*.scene-key) {
+  z-index: 4;
+  border-radius: 9999px;
+}
+
+html[data-scene-transition]::view-transition-group(scene-overlay) {
+  z-index: 5;
+}
+
 /* 信息行在居中与常规里对齐不同，新旧两份画面叠着淡变会同时出现两份字：缩成一次短淡变，位置照常点到点移动。
    默认的叠加混合（plus-lighter，两份的不透明度加起来始终是 1）是靠默认动画挂上的，换掉动画要自己补回 */
 html[data-scene-transition]::view-transition-old(scene-info),

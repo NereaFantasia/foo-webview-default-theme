@@ -1,0 +1,4 @@
+/* 模板外面的一层只为挂 `inert`，不参与排版：模板里的件仍按场景外框定位 */
+.template {
+  display: contents;
+}

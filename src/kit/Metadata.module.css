@@ -18,11 +18,10 @@
   vertical-align: middle;
 }
 
-/* 图标随字走的地方（沉浸视图的大字）设 `--metadata-icon-size` */
 .icon {
   display: inline-flex;
   flex: none;
-  font-size: var(--metadata-icon-size, var(--fontSizeBase300));
+  font-size: var(--fontSizeBase300);
 }
 
 .icon > svg {

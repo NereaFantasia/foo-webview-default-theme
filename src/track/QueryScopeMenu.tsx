@@ -3,8 +3,6 @@ import {
   mergeClasses,
   MenuButton,
   MenuDivider,
-  MenuGroup,
-  MenuGroupHeader,
   MenuItem,
   MenuItemRadio,
   MenuList,
@@ -13,15 +11,13 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { Code16Regular } from '@fluentui/react-icons';
+import { BookInformation20Regular, Code16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { Fragment } from 'react';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import { MENU_SURFACE_MOTION } from '../motion/MenuMotion.tsx';
 import { QUERY_SCOPES, type QueryScope } from './trackQuery.ts';
-import { SNIPPET_LABELS } from './queryLabels.ts';
-import { QUERY_SNIPPETS, type QuerySnippet } from './queryPresets.ts';
 import styles from './QueryScopeMenu.module.css';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 
@@ -55,23 +51,23 @@ const useStyles = makeStyles({
     lineHeight: 0,
   },
   invalid: { color: tokens.colorPaletteRedForeground1 },
-  snippet: { fontFamily: tokens.fontFamilyMonospace },
 });
 
-/** 搜索框支持 fb2k 查询时的模式切换；播放列表的页内过滤没有高级查询，不传 */
+/** 搜索框支持 fb2k 查询时的模式切换；不支持的搜索框不传 */
 export interface QueryModeMenu {
   readonly active: boolean;
   /** 宿主认不出框里这串查询 */
   readonly invalid: boolean;
-  /** 框里已有查询：「同时满足」「满足其一」这两条连接词才接得上 */
-  readonly connectable: boolean;
   onMode(advanced: boolean): void;
-  onSnippet(snippet: QuerySnippet): void;
+  /** 打开语法参考面板 */
+  onReference(): void;
 }
 
 export interface QueryScopeMenuProps {
   readonly scope: QueryScope;
   onScope(scope: QueryScope): void;
+  /** 普通搜索分不分字段；不分时（专辑页）普通搜索的键只剩一个图标，菜单只有切到高级查询这一项，默认分 */
+  readonly scopes?: boolean;
   readonly advanced?: QueryModeMenu;
   /** 受控开合：查询出错时页面的「查询帮助」直接打开这份菜单 */
   readonly open?: boolean;
@@ -80,11 +76,12 @@ export interface QueryScopeMenuProps {
 
 /**
  * 搜索框末尾的键。普通搜索时写当前范围，菜单是范围单选，末项切到高级查询；高级查询时写「高级」（出错写「查询有误」），
- * 菜单是语法示例与回到普通搜索。两种模式各自的草稿由页面持有，切换不互相转换
+ * 菜单是语法参考与回到普通搜索。两种模式各自的草稿由页面持有，切换不互相转换
  */
 export function QueryScopeMenu({
   scope,
   onScope,
+  scopes = true,
   advanced,
   open,
   onOpenChange,
@@ -93,10 +90,16 @@ export function QueryScopeMenu({
   const t = useAtomValueRawSync(translateAtom);
   const classes = useStyles();
   const active = advanced?.active ?? false;
+  // 不分字段又在普通搜索：键上没有范围可写，只用图标，提示写「高级查询」
+  const bare = !scopes && !active;
   const value = active
     ? t(advanced?.invalid ? 'query.modeInvalid' : 'query.advancedShort')
     : t(SCOPE_LABELS[scope]);
-  const name = active ? t('query.mode') : `${t('query.scope')}: ${value}`;
+  const name = bare
+    ? t('query.advanced')
+    : active
+      ? t('query.mode')
+      : `${t('query.scope')}: ${value}`;
   return (
     <Menu
       surfaceMotion={MENU_SURFACE_MOTION}
@@ -119,30 +122,24 @@ export function QueryScopeMenu({
             size="small"
             appearance="subtle"
             menuIcon={{ className: classes.arrow }}
+            icon={bare ? <Code16Regular /> : undefined}
             aria-label={name}
             data-query-scope={active ? 'advanced' : scope}
           >
-            <span className={styles.label}>{value}</span>
+            {!bare && <span className={styles.label}>{value}</span>}
           </MenuButton>
         </Tooltip>
       </MenuTrigger>
       <MenuPopover>
         {active && advanced ? (
-          <MenuList aria-label={t('query.snippets')}>
-            <MenuGroup>
-              <MenuGroupHeader>{t('query.snippets')}</MenuGroupHeader>
-              {QUERY_SNIPPETS.map((snippet) => (
-                <MenuItem
-                  key={snippet.id}
-                  disabled={(snippet.id === 'and' || snippet.id === 'or') && !advanced.connectable}
-                  secondaryContent={<span className={classes.snippet}>{snippet.text.trim()}</span>}
-                  onClick={() => advanced.onSnippet(snippet)}
-                  data-query-snippet={snippet.id}
-                >
-                  {t(SNIPPET_LABELS[snippet.id])}
-                </MenuItem>
-              ))}
-            </MenuGroup>
+          <MenuList aria-label={t('query.mode')}>
+            <MenuItem
+              icon={<BookInformation20Regular />}
+              onClick={advanced.onReference}
+              data-query-reference
+            >
+              {t('query.syntax.reference')}
+            </MenuItem>
             <MenuDivider />
             <MenuItem onClick={() => advanced.onMode(false)} data-query-mode="text">
               {t('query.backToText')}
@@ -150,17 +147,18 @@ export function QueryScopeMenu({
           </MenuList>
         ) : (
           <MenuList aria-label={t('query.scope')}>
-            {QUERY_SCOPES.map((one) => (
-              <Fragment key={one}>
-                {one === 'filename' && <MenuDivider />}
-                <MenuItemRadio name="scope" value={one}>
-                  {t(SCOPE_LABELS[one])}
-                </MenuItemRadio>
-              </Fragment>
-            ))}
+            {scopes &&
+              QUERY_SCOPES.map((one) => (
+                <Fragment key={one}>
+                  {one === 'filename' && <MenuDivider />}
+                  <MenuItemRadio name="scope" value={one}>
+                    {t(SCOPE_LABELS[one])}
+                  </MenuItemRadio>
+                </Fragment>
+              ))}
             {advanced && (
               <>
-                <MenuDivider />
+                {scopes && <MenuDivider />}
                 <MenuItem
                   icon={<Code16Regular />}
                   onClick={() => advanced.onMode(true)}

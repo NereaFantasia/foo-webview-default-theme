@@ -1,0 +1,39 @@
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: none;
+  color: var(--colorNeutralForeground2);
+  cursor: pointer;
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    background-color var(--motion-faster) var(--curveLinear);
+}
+
+.cell:hover:not(:disabled) {
+  background-color: var(--state-hover);
+}
+
+.cell:active:not(:disabled) {
+  background-color: var(--state-pressed);
+}
+
+.cell:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* 收藏了常驻实心；没收藏的只在行悬停、选中或键盘停在这一行时出空心，收藏页里（`data-always`）空心也常显 */
+.cell[data-favorite] {
+  color: var(--colorPaletteRedForeground1);
+}
+
+[role='option']:not(:hover, [data-selected], [data-focused])
+  .cell:not([data-favorite], [data-always]) {
+  opacity: 0;
+}

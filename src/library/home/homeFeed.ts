@@ -30,6 +30,12 @@ const INITIAL: HomeFeedState = {
   unreadCount: 0,
   failure: null,
 };
+
+/** 播放统计还在读，靠统计的几行先占骨架；没装播放统计组件的机器这几行本来就不出，不占 */
+export function feedLoading(state: Pick<HomeFeedState, 'status' | 'available'>): boolean {
+  return state.available !== false && (state.status === 'idle' || state.status === 'loading');
+}
+
 export const HOME_STATS_BATCH = 500;
 const MAX_RECOVERY_CALLS = 32;
 export type HomeFeedHost = Pick<typeof fb, 'config' | 'playcount' | 'on' | 'ready' | 'isAvailable'>;
@@ -123,7 +129,7 @@ export function startHomeFeed(
     )
       return;
     if (source.status === 'failed') {
-      report('library.getAll', '媒体库曲目读取失败');
+      report('library.search', '媒体库曲目读取失败');
       return patch({ status: 'failed', failure: 'library' });
     }
     if (catalog.status === 'failed') {

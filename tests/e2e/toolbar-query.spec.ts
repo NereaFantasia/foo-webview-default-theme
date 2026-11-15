@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openSongs, SONG_TRACKS } from '../fixtures/songsPage.ts';
 import { openFolders } from '../fixtures/foldersPage.ts';
 import { openPlaylist } from '../fixtures/playlistPage.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 async function expectPlaceholderFits(input: Locator) {
   await expect(input).toBeVisible();
@@ -22,20 +23,35 @@ async function expectPlaceholderFits(input: Locator) {
     .toBeGreaterThanOrEqual(0);
 }
 
-/** 经搜索框末尾的字段菜单切换普通搜索与高级查询。 */
+/** 经搜索框末尾的字段菜单切换普通搜索与高级查询 */
 async function setMode(page: Page, view: Locator, mode: 'advanced' | 'text') {
   await view.locator('[data-query-scope]').click();
   await page.locator(`[data-query-mode="${mode}"]`).click();
 }
 
-/** 输入框里留给文字的宽度，像素。 */
+/** 输入框里留给文字的宽度，像素 */
 const typingWidth = (input: Locator) =>
   input.evaluate((element) => {
     const style = getComputedStyle(element);
     return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   });
 
-/** 命令栏是一行：高不超过 40，栏里的键都在栏内。 */
+/**
+ * 播放列表页的命令栏档位，档位尚未跟上当前宽度时返回 null。命令栏按 `[data-playlist-toolbar]` 的内容宽分档，
+ * 阈值与 `COMMAND_BAR_TIERS` 相同。换宽后，档位要等尺寸监听与重新渲染完成才更新
+ */
+const settledTier = (view: Locator) =>
+  view.evaluate((root) => {
+    const top = root.querySelector('[data-playlist-toolbar]');
+    const bar = root.querySelector('[data-command-bar]');
+    if (!(top instanceof HTMLElement) || !bar) return null;
+    const style = getComputedStyle(top);
+    const width = top.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const tier = width >= 720 ? 'wide' : width >= 560 ? 'medium' : 'narrow';
+    return bar.getAttribute('data-tier') === tier ? tier : null;
+  });
+
+/** 命令栏是一行：高不超过 40，栏里的键都在栏内 */
 const barFits = (view: Locator) =>
   view.locator('[data-command-bar]').evaluate((bar) => {
     const bounds = bar.getBoundingClientRect();
@@ -86,14 +102,17 @@ test('模式保留两份草稿，清词不清常用条件，Esc 先关菜单再�
   expect(songs.errors).toEqual([]);
 });
 
-test('普通输入不猜测语法；语法示例写进高级草稿并选中参数，文字草稿保留', async ({ page }) => {
+test('普通输入不猜测语法；语法参考里的常用写法写进高级草稿并选中参数，文字草稿保留', async ({
+  page,
+}) => {
   const songs = await openSongs(page);
   await songs.box.fill('? 100%');
   await expect(songs.view.locator('[data-query-scope]')).toHaveAttribute('data-query-scope', 'all');
   await expect(page.getByRole('menu')).toHaveCount(0);
   await setMode(page, songs.view, 'advanced');
   await songs.view.locator('[data-query-scope]').click();
-  await page.locator('[data-query-snippet="format"]').click();
+  await page.locator('[data-query-reference]').click();
+  await page.locator('[data-syntax-row="%codec% IS flac"] > button').first().click();
   await expect(songs.box).toHaveValue('%codec% IS flac');
   expect(
     await songs.box.evaluate((input: HTMLInputElement) =>
@@ -114,7 +133,7 @@ test('组词期间不请求、不执行回车或 Esc，结束组词才发布最�
   await songs.box.press('Enter');
   await songs.box.press('Escape');
   await expect(songs.box).toHaveValue('mass');
-  // 超过查询去抖窗口仍不能发送组词中间态。
+  // 超过查询去抖窗口仍不能发送组词中间态
   await page.waitForTimeout(400);
   expect(songs.host.callsTo('library.query')).toHaveLength(before);
   await songs.box.fill('massive');
@@ -268,15 +287,12 @@ test('文件夹：中英文长字段在各宽度下不挤没输入区，命令�
 test('播放列表的过滤框各宽度可输入，视图键贴着命令栏右端', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const env = await openPlaylist(page, 'Mix');
-  const input = env.view.locator('input[data-playlist-filter]');
+  const input = env.view.locator('input[data-query-input]');
   await input.fill('a');
   for (const width of [1280, 1000, 900, 800, 640]) {
     await page.setViewportSize({ width, height: 800 });
-    await expect
-      .poll(() => env.view.locator('[data-command-bar]').getAttribute('data-tier'))
-      .toMatch(/wide|medium|narrow/);
-    const narrow =
-      (await env.view.locator('[data-command-bar]').getAttribute('data-tier')) === 'narrow';
+    await expect.poll(() => settledTier(env.view)).not.toBeNull();
+    const narrow = (await settledTier(env.view)) === 'narrow';
     if (narrow) await env.view.locator('[data-command-search-open]').click();
     await expect.poll(() => typingWidth(input)).toBeGreaterThanOrEqual(48);
     if (narrow) await env.view.locator('[data-command-search-close]').click();
@@ -327,13 +343,7 @@ test('分类选项超过十二项即可搜索，选项减少后仍可清空已�
   );
   const replace = async (count: number) => {
     const rows = tracks.slice(0, count);
-    songs.host.answer('library.getAll', {
-      success: true,
-      tracks: rows,
-      items: rows,
-      total: count,
-      offset: 0,
-    });
+    songs.host.answer('library.search', wholeLibrary(rows));
     songs.host.answer('library.query', {
       success: true,
       total: count,

@@ -1,3 +1,4 @@
+import type { ConfigWriter } from '../../host/configWrite.ts';
 import type { Store } from '../../kit/store.ts';
 import type { NavHistoryService } from '../../nav/navHistory.ts';
 import type { GenreValuesService } from '../genreValues.ts';
@@ -10,6 +11,7 @@ import { startGenresCatalog, type GenresCatalogService } from './genresCatalog.t
 import { startGenresPlaces, selectedGenreAtom, type GenresPlacesService } from './genresPlaces.ts';
 import { startGenresPrefs, genresPrefsAtom, type GenresPrefsService } from './genresPrefs.ts';
 import { startGenresRows, type GenresRowsService } from './genresRows.ts';
+import { startGenresTidyPrefs, type GenresTidyPrefsService } from './genresTidyPrefs.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
 import {
   startGenresTools,
@@ -22,8 +24,10 @@ import { QUERY_DEBOUNCE_MS } from '../../track/queryInput.ts';
 export interface GenresDeps extends GenresActionsDeps {
   readonly history: NavHistoryService;
   readonly genreValues: Pick<GenreValuesService, 'want' | 'retry'>;
+  readonly configWriter?: Pick<ConfigWriter, 'set'>;
 }
 export interface GenresServices {
+  readonly tidy: GenresTidyPrefsService;
   readonly catalog: GenresCatalogService;
   readonly places: GenresPlacesService;
   readonly prefs: GenresPrefsService;
@@ -34,7 +38,8 @@ export interface GenresServices {
 }
 export function startGenres(store: Store, deps: GenresDeps): GenresServices {
   const prefs = startGenresPrefs(store);
-  const catalog = startGenresCatalog(store, deps.genreValues);
+  const tidy = startGenresTidyPrefs(store, deps.configWriter);
+  const catalog = startGenresCatalog(store, deps.genreValues, tidy.ignored);
   const rows = startGenresRows(store);
   const places = startGenresPlaces(store, deps.history);
   const actions = startGenresActions(store, deps);
@@ -53,6 +58,7 @@ export function startGenres(store: Store, deps: GenresDeps): GenresServices {
   sync();
   return {
     prefs,
+    tidy,
     catalog,
     rows,
     places,
@@ -66,6 +72,7 @@ export function startGenres(store: Store, deps: GenresDeps): GenresServices {
       places.dispose();
       rows.dispose();
       catalog.dispose();
+      tidy.dispose();
     },
   };
 }

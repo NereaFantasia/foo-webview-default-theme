@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { enqueuePaths, playKeepingQueue, QUEUE_BATCH } from '../../../src/host/queueCommands.ts';
+import {
+  enqueuePaths,
+  playHandleNow,
+  playKeepingQueue,
+  QUEUE_BATCH,
+  QUEUE_LOCK_MS,
+  serializeQueue,
+} from '../../../src/host/queueCommands.ts';
 import { makePlaylist } from '../../fixtures/fakePlaylists.ts';
 import { installFakeQueue, queueTracks } from '../../fixtures/fakeQueue.ts';
 import { makeTrack } from '../../fixtures/tracks.ts';
@@ -218,5 +225,72 @@ describe('playKeepingQueue', () => {
     const host = installFakeHost({ available: false });
     expect(await enqueuePaths(host.fb, ['E:/Music/a.flac'], 'last')).toBe(false);
     expect(await playKeepingQueue(host.fb, GUID, 0)).toBe(false);
+  });
+});
+
+describe('serializeQueue', () => {
+  it('改队列的几步命令一次一串，后到的排在前一串之后，不拒绝', async () => {
+    const order: string[] = [];
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = serializeQueue(async () => {
+      order.push('first:start');
+      await gate;
+      order.push('first:end');
+      return 1;
+    });
+    const second = serializeQueue(async () => {
+      order.push('second');
+      return 2;
+    });
+    await Promise.resolve();
+    expect(order).toEqual(['first:start']);
+    release();
+    expect([await first, await second]).toEqual([1, 2]);
+    expect(order).toEqual(['first:start', 'first:end', 'second']);
+  });
+
+  it('前一串失败不堵后面；排在前面的一直不应答时，后面最多等一个上限就接着跑', async () => {
+    vi.useFakeTimers();
+    try {
+      await expect(serializeQueue(() => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
+      expect(await serializeQueue(async () => 'after-failure')).toBe('after-failure');
+      void serializeQueue(() => new Promise<never>(() => {}));
+      const later = serializeQueue(async () => 'later');
+      await vi.advanceTimersByTimeAsync(QUEUE_LOCK_MS + 1);
+      expect(await later).toBe('later');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('入队与起播不交错', () => {
+  it('起播是「插队首再取走队首」两步：同时到的「下一首播放」排在这一串之后，不会被当成要播的那一首', async () => {
+    const host = installFakeHost();
+    installFakeQueue(host);
+    const calls: string[] = [];
+    host.answer('queue.insertNext', (params) => {
+      calls.push(`insert:${JSON.stringify(params['paths'])}@${String(params['position'])}`);
+      return {
+        success: true,
+        insertedCount: 1,
+        movedCount: 0,
+        invalidCount: 0,
+        queueCount: 1,
+        contentVersion: '1',
+      };
+    });
+    host.answer('queue.playNow', () => {
+      calls.push('playNow');
+      return { success: true, playedIndex: 0, queueCount: 0, contentVersion: '1' };
+    });
+    const playing = playHandleNow(host.fb, 'a');
+    const queued = enqueuePaths(host.fb, ['b'], 'next');
+    expect(await playing).toBe(true);
+    expect(await queued).toBe(true);
+    expect(calls).toEqual(['insert:["a"]@0', 'playNow', 'insert:["b"]@0']);
   });
 });

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { albumsAnswer, libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { albumRow, albumTrackRow } from '../fixtures/libraryRows.ts';
 import { installPageHost, collectPageErrors } from '../fixtures/pageHost.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 test.use({ screenshot: 'off' });
 let errors: string[] = [];
@@ -176,7 +177,7 @@ test('长专辑只移动可见范围，滚动和重新载入不会触发折叠�
     answers: {
       library: {
         getAlbums: albumsAnswer([albumRow('Long album', 'Artist', { trackCount: tracks.length })]),
-        getAll: { success: true, tracks, items: tracks, total: tracks.length, offset: 0 },
+        search: wholeLibrary(tracks),
       },
     },
   });

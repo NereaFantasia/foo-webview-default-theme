@@ -108,23 +108,23 @@ export interface MusicStatus {
   readonly ncm: (typeof NCM_PHASES)[number];
   /** ready 仅表示配置与本地记录可用，尚未探测上游或音源脚本 */
   readonly lx: (typeof LX_PHASES)[number];
-  /** 已保存的自建 lxserver 连接，配置文件不存在或无效时为 null。令牌只说有没有设置 */
+  /** 已保存的自建 lxserver 连接，配置文件不存在或无效时为 null。令牌只表明是否已设置 */
   readonly lxServer: {
     readonly url: string;
     readonly username: string | null;
     readonly hasToken: boolean;
   } | null;
-  /** 走后端托管的 lxserver：没有自建配置、组件已装好。这时 `lxServer` 为 null */
+  /** 走后端托管的 lxserver：没有自建配置，且组件已安装好。此时 `lxServer` 为 null */
   readonly lxHosted: boolean;
-  /** 网易云账号，未登录时为 null。页面只拿到昵称，Cookie 不离开后端；登录时没取到昵称则为 null */
+  /** 网易云账号，未登录时为 null。页面只收到昵称，Cookie 不离开后端。登录时没有取到昵称则 `nickname` 为 null */
   readonly account: { readonly nickname: string | null } | null;
   /** 是否用第三方来源补全网易云里无法播放的曲目 */
   readonly unblock: boolean;
 }
 
 /**
- * 保存 lxserver 连接；`url` 为 null 时删除。`username` 为 null 表示不登录 lxserver
- * 省略 `userToken` 时沿用已保存的令牌，只在服务地址的源不变时可以省略，令牌不会发给另一台服务器
+ * 保存 lxserver 连接。`url` 为 null 时删除连接。`username` 为 null 表示不登录 lxserver。
+ * 省略 `userToken` 时沿用已保存的令牌。只有服务地址的源不变时才可以省略，令牌不会发给另一台服务器
  */
 export type MusicLxConfigRequest =
   | { readonly url: null }
@@ -148,8 +148,9 @@ export interface MusicLoginCode {
 export const MUSIC_FAILURE_LIMIT = 50;
 
 /**
- * 音频路由打开占位地址时的一次失败。入队时 fb2k 也会打开地址，有记录不代表这首已被跳过
- * `seq` 严格递增且不小于记录时的毫秒时间，后端重启后接着变大；页面记下最大的一个，下次只问它之后的
+ * 音频路由打开占位地址时的一次失败。入队时 fb2k 也会打开该地址，因此有记录不代表这首曲目已被跳过。
+ * `seq` 严格递增，且不小于记录时的毫秒时间，后端重启后序号也接着变大。
+ * 页面保存已收到的最大 `seq`，下次只请求它之后的记录
  */
 export interface MusicStreamFailure {
   readonly seq: number;
@@ -160,8 +161,8 @@ export interface MusicStreamFailure {
 }
 
 /**
- * 音频路由打开占位地址时取到的地址是不是第三方补全的。补全的每次打开都记；不是补全的只在这首上一次记成
- * 补全时记一条，序号与失败共用
+ * 音频路由打开占位地址时，取到的地址是否由第三方补全。补全的每次打开都记录一条。
+ * 不是补全的，只在这首曲目上一次被记为补全时才记一条。序号与失败记录共用
  */
 export interface MusicStreamSource {
   readonly seq: number;
@@ -176,7 +177,7 @@ export interface MusicStreamFailures {
   readonly latest: number;
   /** 序号大于请求里 `after` 的记录，从旧到新；后端只保留最近 `MUSIC_FAILURE_LIMIT` 条 */
   readonly items: readonly MusicStreamFailure[];
-  /** 同上，来源记录也只留最近 `MUSIC_FAILURE_LIMIT` 条 */
+  /** 同上，来源记录也只保留最近 `MUSIC_FAILURE_LIMIT` 条 */
   readonly sources: readonly MusicStreamSource[];
 }
 
@@ -192,15 +193,17 @@ export type MusicFailureCode =
   | 'timeout'
   | 'authentication'
   | 'upstream-unavailable'
-  /** 上游答「操作频繁」一类；冷却期间后端不再替元数据请求问上游 */
+  /** 上游答「操作频繁」一类的限流。冷却期间后端不再为元数据请求向上游发起查询 */
   | 'rate-limited'
   | 'invalid-upstream'
   | 'unplayable'
   | 'membership-required'
   | 'unblock-missing'
   | 'settings-unavailable'
-  /** 导入的音源脚本不合用：不支持网易云以外的平台、要放开 VM，或 lxserver 不收 */
+  /** 导入的音源脚本不可用：它不支持网易云以外的平台、需要放开 VM，或被 lxserver 拒收 */
   | 'source-rejected'
+  /** 本地收藏已满，需先取消一些收藏才能继续添加 */
+  | 'favorites-full'
   | 'unsupported';
 
 export type MusicReply<T> =
@@ -382,6 +385,7 @@ const FAILURE_CODES: readonly MusicFailureCode[] = [
   'unblock-missing',
   'settings-unavailable',
   'source-rejected',
+  'favorites-full',
   'unsupported',
 ];
 

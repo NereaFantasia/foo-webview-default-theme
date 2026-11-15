@@ -1,10 +1,17 @@
 import type { Track } from 'foo-webview-sdk';
+import {
+  albumFacetsQuery,
+  albumFacetValueOf,
+  withAlbumLabels,
+  type AlbumFacetTrack,
+} from './albumFacet.ts';
 import { anyIs, isQueryableValue } from './trackQuery.ts';
 
-// 歌曲页的分面：流派、年代、艺术家三栏，栏内或、跨栏与。取值与数目按整库的曲目算（一首有两个流派就在两个流派
-// 里各算一首），勾选拼成查询交给宿主，表格与填表起播都按那串查询。值写不进查询（带引号、通配符）的不列
+// 歌曲页的分面：流派、年代、艺人、专辑四栏，栏内或、跨栏与。取值与数目按整库的曲目算（一首有两个流派就在两个
+// 流派里各算一首），勾选拼成查询交给宿主，表格与填表起播都按那串查询。值写不进查询（带引号、通配符）的不列；
+// 专辑一栏的取值口径见 `albumFacet.ts`
 
-export const TRACK_FACETS = ['genre', 'decade', 'artist'] as const;
+export const TRACK_FACETS = ['genre', 'decade', 'artist', 'album'] as const;
 export type TrackFacet = (typeof TRACK_FACETS)[number];
 
 export type TrackFacetSelection = Readonly<Record<TrackFacet, ReadonlySet<string>>>;
@@ -13,6 +20,8 @@ export interface TrackFacetValue {
   readonly name: string;
   /** 带这个值的曲目数 */
   readonly count: number;
+  /** 显示名；取值本身不能直接给人看的栏（专辑）才有，其余的由取值得出 */
+  readonly label?: string;
 }
 
 export type TrackFacetOptions = Readonly<Record<TrackFacet, readonly TrackFacetValue[]>>;
@@ -21,12 +30,13 @@ export const EMPTY_TRACK_FACETS: TrackFacetSelection = {
   genre: new Set(),
   decade: new Set(),
   artist: new Set(),
+  album: new Set(),
 };
 
 /** 没写日期的那一档 */
 export const UNKNOWN_DECADE = 'unknown';
 
-export type FacetTrack = Pick<Track, 'genre' | 'date' | 'artist' | 'artists'>;
+export type FacetTrack = Pick<Track, 'genre' | 'date' | 'artist' | 'artists'> & AlbumFacetTrack;
 
 /**
  * 年代按日期开头的四位年份归：`1998-05-01`、`1998.05.01` 都归 `1990s`；没写日期的归「未知」。日期写了却不以
@@ -61,8 +71,8 @@ const bump = (counts: Map<string, number>, name: string) =>
   counts.set(name, (counts.get(name) ?? 0) + 1);
 
 /**
- * 三栏的取值：流派与艺术家按首数多的在前、同数按名字；年代新的在前，「未知」垫底。`valuesOf` 给每首的流派值，
- * 缺省按显示串拆
+ * 四栏的取值：流派、艺人与专辑按首数多的在前、同数按名字；年代新的在前，「未知」垫底。`valuesOf` 给每首的
+ * 流派值，缺省按显示串拆
  */
 export function trackFacetOptions<T extends FacetTrack>(
   tracks: Iterable<T>,
@@ -71,18 +81,36 @@ export function trackFacetOptions<T extends FacetTrack>(
   const genres = new Map<string, number>();
   const decades = new Map<string, number>();
   const artists = new Map<string, number>();
+  const albums = new Map<string, number>();
   for (const track of tracks) {
     for (const genre of new Set(valuesOf(track))) bump(genres, genre);
     const decade = decadeOf(track.date);
     if (decade !== null) bump(decades, decade);
     for (const artist of new Set(artistsOf(track))) bump(artists, artist);
+    const album = albumFacetValueOf(track);
+    if (album !== null) bump(albums, album);
   }
-  const decade = [...decades]
+  return facetOptionsOf({ genre: genres, decade: decades, artist: artists, album: albums });
+}
+
+/**
+ * 四栏已经数好的取值（名字到首数）排成清单，排法同 `trackFacetOptions`。取值不是逐首数出来、而是宿主按游程
+ * 给的页面用它：年代的名字要先按 `decadeOf` 的口径归成 `1990s` 这样的档；专辑的名字是 `albumFacet.ts` 的编码
+ */
+export function facetOptionsOf(
+  counts: Readonly<Record<TrackFacet, ReadonlyMap<string, number>>>,
+): TrackFacetOptions {
+  const decade = [...counts.decade]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) =>
       a.name === UNKNOWN_DECADE ? 1 : b.name === UNKNOWN_DECADE ? -1 : b.name.localeCompare(a.name),
     );
-  return { genre: byCount(genres), decade, artist: byCount(artists) };
+  return {
+    genre: byCount(counts.genre),
+    decade,
+    artist: byCount(counts.artist),
+    album: withAlbumLabels(byCount(counts.album)),
+  };
 }
 
 export function trackFacetCount(selection: TrackFacetSelection): number {
@@ -116,6 +144,7 @@ export function trackFacetQueries(selection: TrackFacetSelection): string[] {
     parts.push(terms.length > 1 ? terms.join(' OR ') : (terms[0] ?? ''));
   }
   if (selection.artist.size > 0) parts.push(anyIs('artist', [...selection.artist]));
+  if (selection.album.size > 0) parts.push(albumFacetsQuery([...selection.album]));
   return parts;
 }
 

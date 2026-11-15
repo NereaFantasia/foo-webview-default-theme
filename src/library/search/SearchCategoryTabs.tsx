@@ -12,21 +12,22 @@ import {
 } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { MessageKey } from '../../i18n/en.ts';
-import { translateAtom } from '../../i18n/locale.ts';
+import { localeAtom, translateAtom } from '../../i18n/locale.ts';
 import {
   ScrollMenu as Menu,
   ScrollMenuPopover as MenuPopover,
 } from '../../kit/ScrollMenuPopover.tsx';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
-import type { SearchCategory } from './searchServices.ts';
+import type { OnlineCategory } from './online/onlineSearch.ts';
 
-const CATEGORIES: readonly SearchCategory[] = ['all', 'artists', 'albums', 'tracks'];
-const LABELS: Readonly<Record<SearchCategory, MessageKey>> = {
+const CATEGORIES: readonly OnlineCategory[] = ['all', 'artists', 'albums', 'tracks', 'playlists'];
+const LABELS: Readonly<Record<OnlineCategory, MessageKey>> = {
   all: 'search.all',
   artists: 'search.artists',
   albums: 'search.albums',
   tracks: 'search.tracks',
+  playlists: 'online.playlists',
 };
 
 /** 检索分类选项定义 */
@@ -35,9 +36,17 @@ export interface CategoryOption<C extends string> {
   readonly label: string;
   /** 分类不可用提示文本；存在时呈现禁用样式，悬浮展示原因 */
   readonly unavailable?: string;
+  /** 写在名字后面的个数，灰色小字；没有或为 0 时不写 */
+  readonly count?: number;
 }
 
 const useStyles = makeStyles({
+  count: {
+    marginInlineStart: tokens.spacingHorizontalXS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    fontVariantNumeric: 'tabular-nums',
+  },
   // 使用自定义禁用样式而非原生 disabled，确保悬浮提示在不可用状态下正常触发
   unavailable: {
     color: tokens.colorNeutralForegroundDisabled,
@@ -70,6 +79,11 @@ export function CategoryTabs<C extends string>({
 }) {
   const controls = useViewControlStyles();
   const styles = useStyles();
+  const { active: locale } = useAtomValueRawSync(localeAtom);
+  const counted = (option: CategoryOption<C>) =>
+    option.count ? (
+      <span className={styles.count}>{new Intl.NumberFormat(locale).format(option.count)}</span>
+    ) : null;
   const current = options.find((option) => option.value === category);
   const choose = (value: unknown) => {
     const next = options.find((option) => option.value === value);
@@ -93,6 +107,7 @@ export function CategoryTabs<C extends string>({
             data-search-category={category}
           >
             {current?.label}
+            {current ? counted(current) : null}
           </MenuButton>
         </MenuTrigger>
         <MenuPopover>
@@ -106,6 +121,7 @@ export function CategoryTabs<C extends string>({
                   disabled={!!option.unavailable}
                 >
                   {option.label}
+                  {counted(option)}
                 </MenuItemRadio>
               );
               return option.unavailable ? (
@@ -135,6 +151,7 @@ export function CategoryTabs<C extends string>({
             className={mergeClasses(option.unavailable && styles.unavailable)}
           >
             {option.label}
+            {counted(option)}
           </Tab>
         );
         return option.unavailable ? (
@@ -149,21 +166,29 @@ export function CategoryTabs<C extends string>({
   );
 }
 
-/** 媒体库本地检索分类页签 */
+/**
+ * 搜索结果页的分类页签：媒体库与在线音乐两个范围共用一行，歌单只有在线音乐有。
+ * `unavailable` 是所选在线来源搜不了的分类与原因，只在在线音乐范围里给
+ */
 export function SearchCategoryTabs({
   category,
   narrow,
+  unavailable = {},
   onChoose,
 }: {
-  readonly category: SearchCategory;
+  readonly category: OnlineCategory;
   readonly narrow: boolean;
-  onChoose(category: SearchCategory): void;
+  readonly unavailable?: Readonly<Partial<Record<OnlineCategory, string>>>;
+  onChoose(category: OnlineCategory): void;
 }) {
   const t = useAtomValueRawSync(translateAtom);
   return (
     <CategoryTabs
       category={category}
-      options={CATEGORIES.map((value) => ({ value, label: t(LABELS[value]) }))}
+      options={CATEGORIES.map((value) => {
+        const reason = unavailable[value];
+        return { value, label: t(LABELS[value]), ...(reason ? { unavailable: reason } : {}) };
+      })}
       narrow={narrow}
       label={t('place.search')}
       onChoose={onChoose}

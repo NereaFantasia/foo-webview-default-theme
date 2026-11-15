@@ -13,6 +13,7 @@ import { useVideoElement, type VideoElementStatus } from './useVideoElement.ts';
 import { useDelayedFlag } from './useDelayedFlag.ts';
 import { useVideoWakeLock } from './useVideoWakeLock.ts';
 import type { VideoFit } from './VideoControls.tsx';
+import { VideoTheme } from './VideoTheme.tsx';
 import styles from './VideoStage.module.css';
 
 /** 卡住多久才显示「正在缓冲」，毫秒 */
@@ -22,11 +23,14 @@ export function VideoStage({
   bindings,
   active,
   fit,
+  dark,
   onStatus,
 }: {
   readonly bindings: VideoBindings;
   readonly active: boolean;
   readonly fit: VideoFit;
+  /** 盖住整个窗口时没有外壳可跟，占位也用深色 */
+  readonly dark: boolean;
   readonly onStatus: (status: VideoElementStatus) => void;
 }) {
   const state = useAtomValueRawSync(bindings.service.state);
@@ -77,47 +81,55 @@ export function VideoStage({
       },
     };
   }
-  return (
-    <div className={styles.root} data-video-status={message ?? 'ready'}>
-      <video
-        ref={video}
-        muted
-        playsInline
-        disablePictureInPicture
-        className={styles.picture}
-        data-fit={fit}
-        data-visible={picture || undefined}
-        aria-label={t('place.video')}
-      />
-      {!picture && (
-        <div
-          className={styles.poster}
-          role={prompt ? 'group' : undefined}
-          aria-label={prompt && message ? t(message) : undefined}
-        >
-          {playback.cover && playback.cover !== failedCover ? (
-            <img src={playback.cover} alt="" onError={() => setFailedCover(playback.cover)} />
-          ) : (
-            <VideoOff48Regular className={styles.posterIcon} />
-          )}
-          {message && !prompt && (
-            <div className={styles.status} role="status">
-              {message === 'video.loading' && <Spinner size="tiny" />}
-              <span>{t(message, state.format ? { format: state.format } : undefined)}</span>
-            </div>
-          )}
-          {action && (
-            <Button appearance="primary" size="large" icon={action.icon} onClick={action.run}>
-              {t(action.label)}
-            </Button>
-          )}
+  const poster = (
+    <div
+      className={styles.poster}
+      role={prompt ? 'group' : undefined}
+      aria-label={prompt && message ? t(message) : undefined}
+    >
+      {playback.cover && playback.cover !== failedCover ? (
+        <img src={playback.cover} alt="" onError={() => setFailedCover(playback.cover)} />
+      ) : (
+        <VideoOff48Regular className={styles.posterIcon} />
+      )}
+      {message && !prompt && (
+        <div className={styles.status} role="status">
+          {message === 'video.loading' && <Spinner size="tiny" />}
+          <span>{t(message, state.format ? { format: state.format } : undefined)}</span>
         </div>
       )}
-      {message === 'video.buffering' && (
-        <div className={styles.notice} role="status">
-          <Spinner size="tiny" />
-          <span>{t(message)}</span>
+      {action && (
+        <Button appearance="primary" size="large" icon={action.icon} onClick={action.run}>
+          {t(action.label)}
+        </Button>
+      )}
+    </div>
+  );
+  return (
+    <div className={styles.root} data-video-status={message ?? 'ready'}>
+      {/* 画面与它的黑边固定深色；没有画面时底透明，内嵌的占位坐在内容卡的阅读面上 */}
+      <VideoTheme>
+        <div className={styles.screen} data-solid={picture || dark || undefined}>
+          <video
+            ref={video}
+            muted
+            playsInline
+            disablePictureInPicture
+            className={styles.picture}
+            data-fit={fit}
+            data-visible={picture || undefined}
+            aria-label={t('place.video')}
+          />
         </div>
+      </VideoTheme>
+      {!picture && (dark ? <VideoTheme>{poster}</VideoTheme> : poster)}
+      {message === 'video.buffering' && (
+        <VideoTheme>
+          <div className={styles.notice} role="status">
+            <Spinner size="tiny" />
+            <span>{t(message)}</span>
+          </div>
+        </VideoTheme>
       )}
     </div>
   );

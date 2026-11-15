@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { LYRICS_PREFS_KEY } from '../../src/lyrics/lyricsPrefs.ts';
 import { ONBOARDING_KEY } from '../../src/settings/onboarding/onboarding.ts';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
-// 新人引导：第一次启动打开、四步走完写记录、Esc 跳过、点压暗层不关、已有记录时不打开。
-// 页面替身缺省带「已完成」记录，这里先删掉它。
+// 新人引导：第一次启动打开、四步走完写记录、Esc 跳过、点压暗层不关、已有记录时不打开
+// 页面替身缺省带「已完成」记录，这里先删掉它
 
 interface Library {
   enabled: boolean;
@@ -47,7 +48,9 @@ async function recordOf(host: PageHost): Promise<unknown> {
   return host.config.get(ONBOARDING_KEY);
 }
 
-test('第一次启动打开引导，停在第 1 步；添加文件夹之后「下一步」换成主按钮', async ({ page }) => {
+test('第一次启动打开引导，停在第 1 步；添加文件夹之后「下一步」换成主按钮 @smoke', async ({
+  page,
+}) => {
   const { host, errors, library, dialog } = await open(page);
   await expect(dialog).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByRole('heading', { name: '媒体库' })).toBeFocused();
@@ -86,6 +89,19 @@ test('四步走完写下「已完成」，关掉后不再出现', async ({ page 
   await dialog.getByRole('button', { name: '完成' }).click();
   await expect(dialog).toBeHidden();
   expect(await recordOf(host)).toEqual({ version: 1, outcome: 'completed' });
+  expect(errors).toEqual([]);
+});
+
+test('第 4 步的在线歌词开关缺省关，打开后写进歌词设置页读的那份偏好', async ({ page }) => {
+  const { host, errors, dialog } = await open(page, { enabled: true, count: 10 });
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  for (let step = 0; step < 3; step += 1)
+    await dialog.getByRole('button', { name: '下一步' }).click();
+  await expect(dialog.getByRole('heading', { name: '更新与联网' })).toBeVisible();
+  const lyrics = dialog.getByRole('switch', { name: '在线歌词' });
+  await expect(lyrics).not.toBeChecked();
+  await lyrics.check();
+  await expect.poll(() => host.config.get(LYRICS_PREFS_KEY)).toMatchObject({ enabled: true });
   expect(errors).toEqual([]);
 });
 

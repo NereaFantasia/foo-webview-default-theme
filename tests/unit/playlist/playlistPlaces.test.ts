@@ -22,7 +22,7 @@ async function start(names: readonly string[]) {
     (event, payload) => host.emit(event, payload),
   );
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const playlists = startPlaylists(store, host.fb);
   await playlists.ready;
   const objects = startObjectOpener(store, {
@@ -182,7 +182,7 @@ describe('startPlaylistPlaces', () => {
 
     const store = createStore();
     const idle = startObjectOpener(store, {
-      history: startNavHistory(store),
+      history: startNavHistory(store, { id: 'albums' }),
       kinds: {
         ...READY_KINDS,
         playlist: playlistKind(store, { activate: () => Promise.resolve(true) }),

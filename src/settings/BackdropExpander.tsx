@@ -26,6 +26,12 @@ import {
   type BackgroundParameters,
 } from '../theme/background/windowBackground.ts';
 import {
+  FLOW_SPEED_KEY,
+  FLOW_SPEED_LIMITS,
+  chooseFlowSpeed,
+  flowSpeedAtom,
+} from '../theme/background/flowSpeed.ts';
+import {
   APPEARANCE_LIMITS,
   BACKGROUND_APPEARANCE_KEY,
   backgroundAppearanceAtom,
@@ -43,6 +49,7 @@ import {
 import styles from './BackdropExpander.module.css';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
+import { SettingsSliderRow } from './SettingsSliderRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
 import { BackgroundSourceRows, useBackgroundTile } from './BackgroundSourceRows.tsx';
 import { BackgroundThumb } from './thumbnails/BackgroundThumb.tsx';
@@ -162,6 +169,24 @@ function ImageRow() {
         </div>
       )}
     </SettingsRow>
+  );
+}
+
+/** 流动色场的速度，深浅两档共用；不在「恢复当前模式默认值」管的数值里，拖回 100% 就是默认 */
+function FlowSpeedRow() {
+  const t = useAtomValueRawSync(translateAtom);
+  const speed = useAtomValueRawSync(flowSpeedAtom);
+  const store = useStore();
+  return (
+    <SettingsSliderRow
+      title={t('settings.backgroundFlowSpeed')}
+      min={FLOW_SPEED_LIMITS.min}
+      max={FLOW_SPEED_LIMITS.max}
+      step={FLOW_SPEED_LIMITS.step}
+      value={speed}
+      text={`${speed}%`}
+      onChange={(value) => chooseFlowSpeed(store, value)}
+    />
   );
 }
 
@@ -315,6 +340,7 @@ export function BackdropExpander() {
             WINDOW_BACKGROUND_KEY,
             BACKGROUND_APPEARANCE_KEY,
             THEME_BACKGROUND_KEY,
+            FLOW_SPEED_KEY,
           ]}
         />
       }
@@ -327,6 +353,7 @@ export function BackdropExpander() {
     >
       <BackgroundSourceRows />
       {source === 'image' && <ImageRow />}
+      {source === 'palette' && <FlowSpeedRow />}
       {(source !== 'material' || solid) && <ParameterRows />}
     </SettingsExpander>
   );

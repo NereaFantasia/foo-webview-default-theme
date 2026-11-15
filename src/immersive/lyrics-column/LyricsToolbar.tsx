@@ -1,8 +1,8 @@
 import { Button, Popover, PopoverTrigger, Tooltip, mergeClasses } from '@fluentui/react-components';
 import {
   ChevronLeft20Regular,
+  CommentText20Regular,
   MoreHorizontal20Regular,
-  Options20Regular,
   Search20Regular,
   Settings20Regular,
   TextFontSize20Regular,
@@ -29,7 +29,10 @@ import { FLYOUT_MOTION } from '../../motion/Surfaces.tsx';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import { DURATION_MS, motionDuration } from '../../motion/timing.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
-import { PopoverSurface } from '../../theme/PopoverSurface.tsx';
+import { PanelBackgroundContext, PopoverSurface } from '../../theme/PopoverSurface.tsx';
+import { useBarSurface } from '../scene/acrylic.ts';
+import { lyricsSearchOpenAtom, setLyricsSearchOpen } from '../scene/lyricsSearch.ts';
+import { toolbarCollapsedPref } from '../scene/scenePrefs.ts';
 import {
   AlignControl,
   DisplayToggle,
@@ -37,24 +40,26 @@ import {
   TimingControl,
 } from './LyricsToolbarControls.tsx';
 import { LyricsToolbarSearch } from './LyricsToolbarSearch.tsx';
-import { lyricsSearchOpenAtom, setLyricsSearchOpen } from '../scene/lyricsSearch.ts';
-import { toolbarCollapsedPref } from '../scene/scenePrefs.ts';
 import { toolbarFormOf, toolbarSubjectsOf } from './lyricsToolbar.ts';
 import styles from './LyricsToolbar.module.css';
-import { useBarSurface, usePanelSurface, useToolbarStyles } from './toolbarStyles.ts';
+import { usePanelSurface, useToolsStyles } from './toolsStyles.ts';
 
 type PanelName = 'font' | 'timing' | 'more';
 
-/** 收起后留下的那个图标：还没定，换图标只改这一处 */
-const CollapsedIcon = Options20Regular;
+/** 折叠收起状态下的图标展示：与右侧卡歌词页图标保持一致 */
+const CollapsedIcon = CommentText20Regular;
 
-/** 条上的一组控件：`className` 给这一组加样式，`node` 是内容 */
+/** 工具栏按钮分组配置 */
 interface Group {
   readonly node: ReactNode;
   readonly className?: string;
 }
 
-/** 一个点开小面板的图标键；面板里放的是同一份控件的竖排形态 */
+/**
+ * 弹出式子面板按钮：面板内展示对应控件的垂直排列形态
+ *
+ * 主题层把整窗算好的面板实底色经上下文交给浮层，浮层会写成行内变量，覆盖这里的 Acrylic 着色，因此这块面板不取该色
+ */
 function PanelKey({
   name,
   current,
@@ -68,42 +73,44 @@ function PanelKey({
   readonly current: PanelName | null;
   readonly label: string;
   readonly icon: ReactElement;
-  /** 没有对象时键置灰、不能点开，悬停提示仍出 */
+  /** 是否有可用操作对象：不可用时按钮置灰禁用，保持悬浮提示响应 */
   readonly available: boolean;
   onChange(panel: PanelName | null): void;
   readonly children: ReactNode;
 }) {
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const surface = usePanelSurface();
   return (
-    <Popover
-      open={current === name}
-      onOpenChange={(_, data) => onChange(data.open ? name : null)}
-      positioning={{ position: 'below', align: 'start', autoSize: 'height' }}
-      trapFocus
-      surfaceMotion={FLYOUT_MOTION}
-    >
-      <PopoverTrigger disableButtonEnhancement>
-        <Tooltip content={label} relationship="label">
-          <Button
-            appearance="subtle"
-            shape="rounded"
-            className={mergeClasses(classes.key, controls.icon)}
-            icon={icon}
-            disabledFocusable={!available}
-            data-lyrics-tool={name}
-          />
-        </Tooltip>
-      </PopoverTrigger>
-      <PopoverSurface className={mergeClasses(classes.panel, surface)} aria-label={label}>
-        <div className={styles.stack}>{children}</div>
-      </PopoverSurface>
-    </Popover>
+    <PanelBackgroundContext value={undefined}>
+      <Popover
+        open={current === name}
+        onOpenChange={(_, data) => onChange(data.open ? name : null)}
+        positioning={{ position: 'below', align: 'start', autoSize: 'height' }}
+        trapFocus
+        surfaceMotion={FLYOUT_MOTION}
+      >
+        <PopoverTrigger disableButtonEnhancement>
+          <Tooltip content={label} relationship="label">
+            <Button
+              appearance="subtle"
+              shape="rounded"
+              className={mergeClasses(classes.key, controls.icon)}
+              icon={icon}
+              disabledFocusable={!available}
+              data-lyrics-tool={name}
+            />
+          </Tooltip>
+        </PopoverTrigger>
+        <PopoverSurface className={mergeClasses(classes.panel, surface)} aria-label={label}>
+          <div className={styles.stack}>{children}</div>
+        </PopoverSurface>
+      </Popover>
+    </PanelBackgroundContext>
   );
 }
 
-/** 把几组控件排成一行，组与组之间一道分隔线 */
+/** 排布按钮分组并渲染分割线 */
 function joinGroups(groups: readonly Group[]): ReactNode {
   return groups.map((group, index) => (
     <Fragment key={index}>
@@ -116,15 +123,15 @@ function joinGroups(groups: readonly Group[]): ReactNode {
 /**
  * 歌词元素顶部工具栏：集成搜索、译文与音译开关、文字对齐、字号与时间轴校正、折叠收起及歌词设置
  *
- * 宽度与水平位置对齐歌词排版区域，根据可用宽度自适应排布为宽档（双行磁贴）、中档（图标按键加小面板）
- * 或窄档（折叠更多面板）；无可用操作对象时保持控件占位并禁用，避免界面跳变；
+ * 宽度与水平位置对齐歌词排版区域，按可用宽度排布为宽档（双行磁贴）、中档（图标按键加小面板）
+ * 或窄档（折叠更多面板）。无可用操作对象时保持控件占位并禁用，避免界面跳变
  *
- * 外壳尺寸基于状态平滑过渡，内部采用三层交叉淡变（按键层、折叠收起层与搜索输入层）；
- * 搜索展开时 Esc 优先收起搜索面板，键盘焦点在工具条内或下拉面板开启期间保持工具栏常驻
+ * 外壳尺寸随状态平滑过渡，内部包含三层交叉淡变（常规按键层、折叠收起层与搜索输入层），
+ * 搜索展开时 Esc 优先收起搜索面板。键盘焦点位于工具栏内部或下拉面板开启期间，工具栏保持常驻
  */
 export function LyricsToolbar({ active }: { readonly active: boolean }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const barSurface = useBarSurface();
   const store = useStore();
@@ -283,6 +290,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
       aria-label={t('lyrics.tools')}
       data-lyrics-toolbar
       data-pending={form === null || undefined}
+      data-collapsed={mode === 'collapsed' || undefined}
       data-open={openPanel !== null || searching || undefined}
       onKeyDown={(event) => {
         // 搜索展开时 Esc 优先收起搜索面板并阻止冒泡，避免误退沉浸视图

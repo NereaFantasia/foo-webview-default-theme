@@ -8,6 +8,7 @@ import {
   libraryQueryOf,
   startAlbumSearchHits,
 } from '../../../../src/library/albums/albumSearchHits.ts';
+import { TRACK_LIMIT } from '../../../../src/library/libraryTracks.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
 import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
 
@@ -109,7 +110,7 @@ describe('startAlbumSearchHits', () => {
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(state().hits?.size).toBe(1);
     service.search('blues');
-    expect(state()).toEqual({ hits: null, pending: true });
+    expect(state()).toEqual({ hits: null, pending: true, invalid: false });
   });
 
   it('只差空白或引号的词拼出同一个查询串：命中照旧，不撤也不重问', async () => {
@@ -122,7 +123,7 @@ describe('startAlbumSearchHits', () => {
     service.search('blue');
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     service.search(' blue "');
-    expect(state()).toEqual({ hits: new Set(['Blue\0A']), pending: false });
+    expect(state()).toEqual({ hits: new Set(['Blue\0A']), pending: false, invalid: false });
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(host.callsTo('library.search')).toHaveLength(1);
   });
@@ -148,11 +149,11 @@ describe('startAlbumSearchHits', () => {
     const { service, state } = setup(host);
     service.search('a');
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
-    expect(state()).toEqual({ hits: null, pending: false });
+    expect(state()).toEqual({ hits: null, pending: false, invalid: false });
     host.answer('library.search', hostFailure('INVALID_PARAMS'));
     service.search('ab');
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
-    expect(state()).toEqual({ hits: null, pending: false });
+    expect(state()).toEqual({ hits: null, pending: false, invalid: false });
   });
 
   it('词清空立即清掉命中，排着的那一发不再发', async () => {
@@ -160,7 +161,7 @@ describe('startAlbumSearchHits', () => {
     const { service, state } = setup(host);
     service.search('blue');
     service.search('   ');
-    expect(state()).toEqual({ hits: null, pending: false });
+    expect(state()).toEqual({ hits: null, pending: false, invalid: false });
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(host.callsTo('library.search')).toEqual([]);
   });
@@ -172,5 +173,118 @@ describe('startAlbumSearchHits', () => {
     expect(state().pending).toBe(false);
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(host.calls).toEqual([]);
+  });
+});
+
+describe('startAlbumSearchHits 的高级查询', () => {
+  const hit = (album: string) => ({ album, albumArtists: ['A'], artists: ['A'] });
+
+  it('去抖后把查询原样交宿主，不带排序，命中的曲目折成专辑键', async () => {
+    const host = installFakeHost();
+    host.answer('library.query', {
+      success: true,
+      tracks: [hit('Blue'), hit('Blue'), hit('Red')],
+      total: 3,
+    });
+    const { service, state } = setup(host);
+    service.query(' %rating% GREATER 3 ');
+    expect(state()).toEqual({ hits: null, pending: true, invalid: false });
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS - 1);
+    expect(host.callsTo('library.query')).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    // 空排序不上线，宿主按库序答
+    expect(host.callsTo('library.query')).toEqual([
+      {
+        query: '%rating% GREATER 3',
+        limit: TRACK_LIMIT,
+        fields: ['album', 'albumArtists', 'artists', 'albumId'],
+      },
+    ]);
+    expect([...(state().hits ?? [])]).toEqual(['Blue\0A', 'Red\0A']);
+    expect(state().pending).toBe(false);
+  });
+
+  it('命中多过普通搜索的上限也照用，不当词太宽丢掉', async () => {
+    const host = installFakeHost();
+    host.answer('library.query', {
+      success: true,
+      tracks: [hit('Blue')],
+      total: HIT_LIMIT + 1,
+    });
+    const { service, state } = setup(host);
+    service.query('ALL');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(state().hits?.size).toBe(1);
+  });
+
+  it('边写边问：新答复回来前留着上一份命中，免得整面墙闪一下', async () => {
+    const host = installFakeHost();
+    host.answer('library.query', {
+      success: true,
+      tracks: [hit('Blue')],
+      total: 1,
+    });
+    const { service, state } = setup(host);
+    service.query('ALL');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    service.query('ALL AND genre IS Jazz');
+    expect(state().pending).toBe(true);
+    expect([...(state().hits ?? [])]).toEqual(['Blue\0A']);
+  });
+
+  it('宿主认不出：留着上一份命中、标出错；下一份答复落地时撤掉标记', async () => {
+    const host = installFakeHost();
+    host.answer('library.query', {
+      success: true,
+      tracks: [hit('Blue')],
+      total: 1,
+    });
+    const { service, state } = setup(host);
+    service.query('ALL');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    host.answer('library.query', hostFailure('INVALID_PARAMS'));
+    service.query('ALL AND (');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(state().invalid).toBe(true);
+    expect(state().pending).toBe(false);
+    expect([...(state().hits ?? [])]).toEqual(['Blue\0A']);
+    host.answer('library.query', {
+      success: true,
+      tracks: [hit('Red')],
+      total: 1,
+    });
+    service.query('ALL AND artist IS A');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(state()).toEqual({ hits: new Set(['Red\0A']), pending: false, invalid: false });
+  });
+
+  it('别的失败不留命中，也不标出错', async () => {
+    const host = installFakeHost();
+    host.answer('library.query', hostFailure('OPERATION_FAILED'));
+    const { service, state } = setup(host);
+    service.query('ALL');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(state()).toEqual({ hits: null, pending: false, invalid: false });
+  });
+
+  it('普通词与高级查询互换时，上一种的命中不能留到新答复回来', async () => {
+    const host = installFakeHost();
+    host.answer('library.search', searchAnswer([hit('Blue')]));
+    const { service, state } = setup(host);
+    service.search('blue');
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(state().hits?.size).toBe(1);
+    service.query('ALL');
+    expect(state()).toEqual({ hits: null, pending: true, invalid: false });
+  });
+
+  it('查询清空立即撤掉命中，排着的那一发不再发', async () => {
+    const host = installFakeHost();
+    const { service, state } = setup(host);
+    service.query('ALL');
+    service.query('   ');
+    expect(state()).toEqual({ hits: null, pending: false, invalid: false });
+    await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+    expect(host.callsTo('library.query')).toEqual([]);
   });
 });

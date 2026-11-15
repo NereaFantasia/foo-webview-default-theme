@@ -43,7 +43,7 @@ export interface ContractPreset {
   readonly order?: readonly SceneElementName[];
 }
 
-/** 全部场景状态推出的版式，页、侧栏方式、模式、歌词状态、侧栏放不放得下各走一遍 */
+/** 由全部场景状态推导出的视图，逐一覆盖页、侧栏方式、模式、歌词状态与侧栏能否放下的各种取值 */
 export function allSceneViews(): SceneView[] {
   const views: SceneView[] = [];
   const lyricsStates: LyricsAvailability[] = ['pending', 'present', 'absent'];
@@ -52,15 +52,16 @@ export function allSceneViews(): SceneView[] {
     for (const sidebar of SIDEBAR_MODES)
       for (const mode of modes)
         for (const lyrics of lyricsStates)
-          for (const sidebarFits of [false, true]) {
-            views.push(
-              deriveSceneView(
-                { page, sidebar, mode, browsed: null },
-                { lyrics, sidebarFits, searching: false },
-                null,
-              ),
-            );
-          }
+          for (const sidebarFits of [false, true])
+            for (const autoCollapse of [false, true]) {
+              views.push(
+                deriveSceneView(
+                  { page, sidebar, mode, browsed: null },
+                  { lyrics, sidebarFits, searching: false, autoCollapse },
+                  null,
+                ),
+              );
+            }
   return views;
 }
 

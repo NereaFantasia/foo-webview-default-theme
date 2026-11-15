@@ -150,7 +150,8 @@ export function DetailCoverFrame({
   );
 }
 
-function DetailTitle({ name }: { readonly name: string }) {
+/** 详情页的名字：一行放不下时逐档缩小字号，最小一档仍放不下才截断 */
+export function DetailTitle({ name }: { readonly name: string }) {
   const title = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
     const element = title.current;

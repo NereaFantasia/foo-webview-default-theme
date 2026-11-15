@@ -34,7 +34,7 @@ for (const scheme of ['light', 'dark'] as const) {
         JSON.stringify({ light: 40, dark: 40 }),
       );
     });
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     const root = page.locator('#root > .fui-FluentProvider');
     const pane = page.locator('main [data-reading-fill]').first();
     const readingColor = await colorOf(pane);

@@ -50,8 +50,10 @@
 .crumb button:hover {
   color: var(--colorBrandForegroundLinkHover);
 }
+/* 焦点环内收：路径行与其中的按钮都裁切溢出，画在控件外的焦点环会被截去 */
 .crumb button:focus-visible {
   outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: calc(-1 * var(--strokeWidthThick));
 }
 .titles {
   display: flex;

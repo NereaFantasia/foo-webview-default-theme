@@ -20,6 +20,7 @@ import { useService } from '../kit/useService.ts';
 import { playbackKey } from '../playback/playbackContract.ts';
 import { failureReason, onlineFailuresKey, onlineSkipAtom } from '../playback/onlineFailures.ts';
 import { onlineKey, onlineTracksAtom } from '../playback/onlineTracks.ts';
+import { favoriteFailureKey, onlineFavoritesKey } from '../playback/onlineFavorites.ts';
 
 /** 提示上的那一个动作；没给就是「关闭」 */
 interface NoticeAction {
@@ -85,7 +86,7 @@ function useNoticeToast(
 }
 
 /**
- * 全应用共用的轻提示，挂在窗口右下角：写评分失败（评分可以在任何一张表里写，不属于哪一页），与播放的读取、
+ * 全应用共用的轻提示，挂在窗口右下角：写评分失败（评分可以在任何一张表里写，不属于哪一页）、收藏的写入失败，与播放的读取、
  * 命令失败（播放栏有三种形态，提示不跟着哪一种走）。读取失败带「重试」，只重新读、不重放命令
  * 在线曲目打不开、fb2k 已跳到下一首时说明曲名与原因，不给重试
  */
@@ -100,9 +101,17 @@ export function AppToasts() {
   const skip = useAtomValueRawSync(onlineSkipAtom);
   const onlineTracks = useAtomValueRawSync(onlineTracksAtom);
   const onlineFailures = useService(onlineFailuresKey);
+  const favorites = useService(onlineFavoritesKey);
+  const favoriteFailure = useAtomValueRawSync(favorites.notice);
   const toasterId = useId('app-toasts');
 
   useNoticeToast(toasterId, 'rating', notice ? t(notice) : null, () => ratings.dismissNotice());
+  useNoticeToast(
+    toasterId,
+    'favorites',
+    favoriteFailure ? t(favoriteFailureKey(favoriteFailure)) : null,
+    () => favorites.clearNotice(),
+  );
   useNoticeToast(toasterId, 'player-menu', menuFailure ? t('album.commandFailed') : null, () =>
     nowPlayingMenu.dismissFailure(),
   );

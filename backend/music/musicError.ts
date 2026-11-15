@@ -19,6 +19,7 @@ const MESSAGES: Readonly<Record<MusicFailureCode, string>> = {
   'unblock-missing': '第三方来源也没有这首曲目',
   'settings-unavailable': '无法保存音乐设置',
   'source-rejected': '这份音源脚本无法导入',
+  'favorites-full': '本地收藏已满，先取消一些再收',
   unsupported: '音源不支持这项操作',
 };
 

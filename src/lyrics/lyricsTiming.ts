@@ -17,6 +17,13 @@ export function prepareLyricsLines(source: readonly LyricLine[]): LyricLine[] | 
       if (!timestamp(word.startTime) || !timestamp(word.endTime)) return null;
       if (word.ruby?.some((ruby) => !validRange(ruby))) return null;
       if (validRange(word)) continue;
+      // AMLL 剥掉背景人声的括号后首尾会剩无字音节，没有可显示的内容，不必猜它的结束时间，收成零时长
+      if (!word.word.trim()) {
+        word.endTime = word.startTime;
+        if (wordIndex === line.words.length - 1)
+          line.endTime = Math.max(line.endTime, word.startTime);
+        continue;
+      }
       const next = source[index + 1];
       const nextStart = next?.words[0]?.startTime;
       // 缺少末词结束标记时，LRC 解析器会借用下一行行首；逐字起点可能晚于这个行首

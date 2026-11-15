@@ -90,6 +90,21 @@
 .card[data-with-nav-row] {
   --nav-inset: calc(36px + var(--spacingVerticalM));
   --header-background-scroll: 0;
+  /* 导航行两侧胶囊从卡片边缘起占的宽度，含与中间内容之间的间隔；页头条要和胶囊同一排时，
+     标题与操作键落在这两段之间。数字对应 NavRow.module.css：左边后退前进 91、侧边栏键 36，
+     右边四个入口 172 */
+  --nav-start-reserve: calc(
+    var(--spacingHorizontalXXL) + 91px + var(--spacingHorizontalS) + 36px +
+      var(--spacingHorizontalM)
+  );
+  --nav-end-reserve: calc(var(--spacingHorizontalXXL) + 172px + var(--spacingHorizontalM));
+}
+
+/* 窗口窄于 481 时右边只剩队列键与收着其余三页的菜单键，两个键 88 宽 */
+@media (max-width: 480px) {
+  .card[data-with-nav-row] {
+    --nav-end-reserve: calc(var(--spacingHorizontalXXL) + 88px + var(--spacingHorizontalM));
+  }
 }
 
 .card[data-capsule] {

@@ -13,9 +13,7 @@ const forms = [
 ] as const;
 
 for (const { style, selector } of forms) {
-  test(`${style} 曲名下面写艺人与专辑、各带图标，不随来源变；没写的那一项不出`, async ({
-    page,
-  }) => {
+  test(`${style} 曲名下面写艺人与专辑，不随来源变；没写的那一项不出`, async ({ page }) => {
     await choosePlayerBar(page, style);
     const { host, state, errors } = await openPlayer(page);
     host.config.set(KEY, { kind: 'artist', subject: '', name: '没写艺术家' });
@@ -30,18 +28,18 @@ for (const { style, selector } of forms) {
     });
     await page.reload();
     const player = page.locator(selector);
-    const artistIcon = player.getByRole('img', { name: '艺人', exact: true });
-    const albumIcon = player.getByRole('img', { name: '专辑', exact: true });
+    const artistField = player.getByRole('group', { name: '艺人', exact: true });
+    const albumField = player.getByRole('group', { name: '专辑', exact: true });
     await expect(player).toContainText(PLAYING_TRACK.artist);
     await expect(player).toContainText(PLAYING_TRACK.album);
-    await expect(artistIcon).toHaveCount(1);
-    await expect(albumIcon).toHaveCount(1);
+    await expect(artistField).toHaveCount(1);
+    await expect(albumField).toHaveCount(1);
     await expect(player).not.toContainText('没写艺术家');
     state.track = makeTrack({ title: '来源中的下一首', artist: '不同署名', album: '' });
     await host.emit('playback:trackChanged', state.track);
     await expect(player).toContainText('不同署名');
-    await expect(albumIcon).toHaveCount(0);
-    await expect(artistIcon).toHaveCount(1);
+    await expect(albumField).toHaveCount(0);
+    await expect(artistField).toHaveCount(1);
     expect(errors).toEqual([]);
   });
 }

@@ -13,10 +13,17 @@ export interface PlaylistViewPanelProps {
   readonly groups?: ListMenuGroups;
   readonly columns: ColumnsModel;
   readonly labelled: boolean;
+  /** 表格在筛选态：只列命中，不分组；分组的设置留着，筛选清掉后原样回来 */
+  readonly filtering: boolean;
 }
 
 /** 播放列表页的视图面板：分组依据（含「不分组」）与全部展开、折叠，以及列 */
-export function PlaylistViewPanel({ groups, columns, labelled }: PlaylistViewPanelProps) {
+export function PlaylistViewPanel({
+  groups,
+  columns,
+  labelled,
+  filtering,
+}: PlaylistViewPanelProps) {
   const t = useAtomValueRawSync(translateAtom);
   return (
     <ViewPanel labelled={labelled} buttonAttributes={{ 'data-playlist-view': '' }}>
@@ -24,6 +31,7 @@ export function PlaylistViewPanel({ groups, columns, labelled }: PlaylistViewPan
         <ViewGrouping
           label={t('table.groupBy')}
           value={groups.enabled ? groups.mode : NO_GROUPS}
+          disabled={filtering}
           options={[
             { value: NO_GROUPS, label: t('query.noGroups') },
             ...groups.modes.map((mode) => ({ value: mode.id, label: t(mode.label) })),
@@ -34,7 +42,7 @@ export function PlaylistViewPanel({ groups, columns, labelled }: PlaylistViewPan
               return;
             }
             if (!groups.enabled) groups.setEnabled(true);
-            if (id !== groups.mode) groups.setMode(id);
+            groups.setMode(id);
           }}
           fold={{
             disabled: !groups.canCollapse,

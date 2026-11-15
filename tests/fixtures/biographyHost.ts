@@ -1,10 +1,12 @@
 import { atom, createStore } from 'jotai/vanilla';
 import { onTestFinished } from 'vitest';
-import type { BiographyInput } from '../../src/library/biography/biographyModel.ts';
 import {
-  startBiography,
-  type BiographyDeps,
-} from '../../src/library/biography/biographyService.ts';
+  lastfmInput,
+  type BiographyFetchResult,
+  type BiographyInput,
+  type BiographyLanguage,
+} from '../../src/library/biography/biographyModel.ts';
+import { startBiography } from '../../src/library/biography/biographyService.ts';
 import type { readLastfmBiography } from '../../src/library/biography/lastfmBiography.ts';
 import type { fetchLastfmDetails } from '../../src/library/biography/details/fetchLastfmDetails.ts';
 import { biographyDocument } from './biographySamples.ts';
@@ -29,7 +31,12 @@ export function setupBiography(
     problem: 'invalid',
     retryAt: Date.now() + 300_000,
   }),
-  fetchText?: BiographyDeps['fetchText'],
+  /** 按 Last.fm 艺人名取正文的替身；服务收到的是带来源的身份，这里取其中的名字 */
+  fetchText?: (
+    artist: string,
+    language: BiographyLanguage,
+    fallback: boolean,
+  ) => Promise<BiographyFetchResult>,
 ) {
   const host = installFakeHost({ available });
   const files = new Map<string, string>(cached ? [[BIOGRAPHY_FILE, cached]] : []);
@@ -63,14 +70,19 @@ export function setupBiography(
   const store = createStore();
   const enabled = atom(false);
   const active = atom(true);
-  const input = atom<BiographyInput | null>({
-    artist: 'Queen',
-    sourceArtist: 'Queen',
-    language: 'zh',
-  });
+  const input = atom<BiographyInput | null>(lastfmInput('Queen', 'Queen', 'zh'));
   const service = startBiography(
     store,
-    { enabled, active, input, ...(fetchText ? { fetchText } : {}) },
+    {
+      enabled,
+      active,
+      input,
+      ...(fetchText
+        ? {
+            fetchText: (subject, language, fallback) => fetchText(subject.id, language, fallback),
+          }
+        : {}),
+    },
     host.fb,
     parseBiographySample,
     fetchDetails,

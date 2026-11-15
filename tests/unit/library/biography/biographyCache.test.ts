@@ -9,6 +9,8 @@ import { installFakeHost } from '../../../fixtures/unitHost.ts';
 function entry(artist: string, text = '正文') {
   const now = Date.now();
   return {
+    source: 'lastfm' as const,
+    sourceId: artist,
     artist,
     language: 'zh' as const,
     fetchedAt: now,
@@ -32,6 +34,67 @@ function setup() {
   onTestFinished(() => cache.dispose());
   return { host, writes, cache, stats: () => stats };
 }
+
+const APPLE_URL = (id: string) => `https://music.apple.com/cn/artist/nirvana/${id}`;
+
+function appleEntry(id: string, text: string) {
+  const now = Date.now();
+  return {
+    source: 'apple' as const,
+    sourceId: id,
+    artist: 'Nirvana',
+    language: 'en' as const,
+    fetchedAt: now,
+    expiresAt: now + 1000,
+    document: {
+      source: 'apple' as const,
+      sourceId: id,
+      artist: 'Nirvana',
+      language: 'en' as const,
+      paragraphs: [text],
+      url: APPLE_URL(id),
+      attribution: { name: 'Apple Music', url: APPLE_URL(id) },
+    },
+  };
+}
+
+describe('Apple 来源的简介缓存', () => {
+  it('写在自己的文件里，同名但 ID 不同的艺人各存一份，互不覆盖', async () => {
+    const host = installFakeHost();
+    const paths: string[] = [];
+    const writes: string[] = [];
+    host.answer('file.write', (params) => {
+      paths.push(String(params['path']));
+      writes.push(String(params['content']));
+      return { success: true, bytesWritten: 1 };
+    });
+    const cache = createBiographyCache(host.fb, Date.now, undefined, 'apple');
+    onTestFinished(() => cache.dispose());
+    await cache.ready;
+    await cache.save('112018', 'en', appleEntry('112018', 'Seattle grunge band.'));
+    await cache.save('256176428', 'en', appleEntry('256176428', 'A different Nirvana.'));
+    expect(paths.every((path) => path.endsWith('apple-v1.json'))).toBe(true);
+    expect(cache.get('112018', 'en')?.document?.paragraphs).toEqual(['Seattle grunge band.']);
+    expect(cache.get('256176428', 'en')?.document?.paragraphs).toEqual(['A different Nirvana.']);
+    expect(JSON.parse(writes.at(-1) ?? '').entries).toHaveLength(2);
+  });
+
+  it('读回时按 ID 重建键；Apple 的项不会出现在 Last.fm 的缓存里', async () => {
+    const host = installFakeHost();
+    const content = JSON.stringify({ version: 1, entries: [appleEntry('112018', 'x')] });
+    host.answer('file.read', { success: true, content, size: content.length });
+    const apple = createBiographyCache(host.fb, Date.now, undefined, 'apple');
+    const lastfm = createBiographyCache(host.fb, Date.now, undefined, 'lastfm');
+    onTestFinished(() => {
+      apple.dispose();
+      lastfm.dispose();
+    });
+    await Promise.all([apple.ready, lastfm.ready]);
+    expect(apple.get('112018', 'en')?.sourceId).toBe('112018');
+    expect(lastfm.get('Nirvana', 'en')).toBeUndefined();
+    expect(lastfm.get('112018', 'en')).toBeUndefined();
+  });
+});
 
 describe('简介缓存', () => {
   it.each(['{bad', '{"version":2,"entries":[]}'])(

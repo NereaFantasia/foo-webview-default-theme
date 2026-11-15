@@ -1,5 +1,5 @@
 import { useAtomValueRawSync } from 'jotai/react';
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
 import { textSwapMotion, type MotionTrack, type TextMotion } from './swapMotion.ts';
 import { trackSwapAtom, type TrackSwap } from './trackSwap.ts';
@@ -12,6 +12,9 @@ import { trackSwapAtom, type TrackSwap } from './trackSwap.ts';
 export type TextSwapSource = Pick<TrackSwap, 'serial' | 'kind' | 'direction'> & {
   readonly rapidMs?: number;
 };
+
+/** 保留上一首文字的最长时间，毫秒。退场动画被取消或节点过早卸载时，动画不会正常结束，超过该时间后强制改为显示新文字 */
+const HOLD_LIMIT_MS = 1000;
 
 function play(elements: readonly HTMLElement[], tracks: readonly MotionTrack[]): Animation[] {
   // 退场停在终态（透明）等换字，换字与进场在同一帧里接上，中间不露出旧字
@@ -121,6 +124,17 @@ export function useTextSwap<T>(
     },
     [state],
   );
+
+  useEffect(() => {
+    if (!held) return undefined;
+    const timer = setTimeout(() => {
+      // 退场动画停在透明终态，不取消的话新文字也看不见
+      for (const animation of state.running) animation.cancel();
+      state.running = [];
+      setHeld(null);
+    }, HOLD_LIMIT_MS);
+    return () => clearTimeout(timer);
+  }, [held, state]);
 
   return held ? held.value : live;
 }

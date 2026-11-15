@@ -8,7 +8,8 @@ import type { PlaybackSourceService } from '../playback/playbackSource.ts';
 import type { Store } from '../kit/store.ts';
 import type { PlaylistPlaces } from './playlistPlaces.ts';
 import { playlistsAtom, type PlaylistsService } from '../playback/playlists.ts';
-import { hostOrder, moveOrder } from './sidebar/playlistReorder.ts';
+import { moveOrder } from '../kit/listReorder.ts';
+import { hostOrder } from './sidebar/playlistReorder.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 
 /**
@@ -38,6 +39,7 @@ export interface PlaylistActionsFace {
     | 'clear'
     | 'playTrack'
     | 'removeAutoplaylist'
+    | 'showAutoplaylistUI'
     | 'reorderPlaylists'
   >;
   menu: Pick<typeof fb.menu, 'runMainMenuCommand'>;
@@ -84,32 +86,36 @@ export interface PlaylistActions {
   /** 新列表的缺省名：与此刻清单里的名字都不重 */
   newName(): string;
   /**
-   * 按这个名字新建一张（去掉两端空白；不给或空了就用缺省名），去它的地点并切成活动列表，等清单读回
-   * 再答新列表的 GUID。失败、上一次新建还没读回、读回的清单里没有它（读失败）时答 null。进行中再点
-   * 不接：缺省名按清单去重，清单没读回就会重名
+   * 按指定名称新建一张播放列表（去掉两端空白，没有给出或为空时使用缺省名），切换到它的地点并设为活动列表，等清单读回后返回新列表的 GUID。
+   * 失败、上一次新建还没读回、读回的清单里没有它（读失败）时返回 null。
+   * 进行中再次触发不受理：缺省名按清单去重，清单没读回就会重名
    */
   create(name?: string): Promise<string | null>;
-  /** 名字去掉两端空白；空名或没改都当取消，不发请求 */
+  /** 重命名，名称去掉两端空白。名称为空或没有改变都视为取消，不发请求 */
   rename(guid: string, name: string): Promise<boolean>;
-  /** 复制一张，名字由宿主起。不切过去 */
+  /** 复制一张，名称由宿主生成，不切换到副本 */
   duplicate(guid: string): Promise<boolean>;
   /**
-   * 宿主没有回收站，删了就没了；要不要先确认由调用方按曲目数定。删的是活动列表时，清单读回后切到落在
-   * 同一位的那张
+   * 宿主没有回收站，删除后无法恢复，是否先确认由调用方按曲目数决定。
+   * 删除的是活动列表时，清单读回后切换到落在同一位置的那张
    */
   remove(guid: string): Promise<boolean>;
   clear(guid: string): Promise<boolean>;
   /**
-   * 去它的地点、切成活动列表，从第 `row` 行（缺省第一首）播；没有那一行不发。宿主收下后把这张记成播放
-   * 来源；专用列表 `[Library View]` 不记，它装的是从媒体库起播的那一批，来源由播放来源服务按在播的表认
+   * 导航到该列表的地点并设为活动列表，从第 `row` 行（缺省第一首）开始播放。没有那一行时不发送。
+   * 宿主接受后，把这张列表记为播放来源。专用列表 `[Library View]` 不记：它装的是从媒体库起播的那一批，来源由播放来源服务按在播的表判断
    */
   play(guid: string, row?: number): Promise<boolean>;
-  /** 智能列表去掉查询、留下曲目，变成普通列表。别的组件管的智能列表放不开，记一笔 `convert` */
+  /** 自动播放列表去掉查询、保留曲目，变成普通列表。由其他组件管理的自动播放列表无法转换，记入 `convert` */
   convertToPlain(guid: string): Promise<boolean>;
   /**
-   * 把这张挪到插入位 `slot`（0…n），按此刻的完整清单算排列，一次发出；落在原位不发
-   * 上一次重排的结果还没读回时不接：排列是按清单算的，清单还是旧的，算出来的就是错的。读回失败时
-   * 一直不接，直到下一次读清单成功
+   * 打开自动播放列表在宿主里的编辑窗口，不切换活动列表。
+   * 宿主只答复已接受，窗口是否出现、用户是否保存都不回报，所以成功只表示请求已发出
+   */
+  editAutoplaylist(guid: string): Promise<boolean>;
+  /**
+   * 把这一张挪到插入位 `slot`（0…n），按此刻的完整清单计算排列，一次发出。落在原位时不发出。
+   * 上一次重排的结果还没读回时不受理：排列依据清单计算，清单还是旧的，算出的排列就是错的。读回失败时一直不受理，直到下一次读清单成功
    */
   reorder(guid: string, slot: number): Promise<boolean>;
   removeDuplicates(guid: string): Promise<boolean>;
@@ -258,6 +264,12 @@ export function createPlaylistActions(
       // 别的组件管的智能列表宿主放不开：照样答成功，只是 source 为 dui，什么都没改
       return answer.source === 'dui' ? fail('convert') : succeed();
     },
+    editAutoplaylist: (guid) =>
+      on(
+        guid,
+        (entry) => entry.isAutoplaylist,
+        () => host.playlist.showAutoplaylistUI(guid),
+      ),
     async reorder(guid, slot) {
       if (reordering || (staleAt !== null && lists().revision <= staleAt)) return false;
       const { items, hiddenIndices } = lists();

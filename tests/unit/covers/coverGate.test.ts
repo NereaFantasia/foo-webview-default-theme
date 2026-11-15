@@ -9,7 +9,7 @@ function setup(limit = 2, retryDelays = [5000, 5000]) {
   let frees = 0;
   let cooled = 0;
   const gate = new CoverGate({ limit, retryDelays, onCooled: () => (cooled += 1) });
-  // 一直排着的一位：每空出一个名额就被叫一次，它自己不要。
+  // 一直排着的一位：每空出一个名额就被叫一次，它自己不要
   gate.wait(() => (frees += 1));
   return { gate, frees: () => frees, cooled: () => cooled };
 }
@@ -179,6 +179,51 @@ describe('CoverGate', () => {
     gate.acquire('b');
     gate.restore('a');
     expect(gate.acquire('a')).toBe(true);
+  });
+
+  it('暂扣：没加载过也不在加载的不放行，已在加载的与加载过的照放；放开时叫一遍排队的', () => {
+    const { gate, frees } = setup(1);
+    gate.acquire('shown');
+    gate.settle('shown', 'load');
+    gate.acquire('loading');
+    gate.hold(true);
+    expect(gate.isHeld).toBe(true);
+    expect(gate.acquire('fresh')).toBe(false);
+    expect(gate.acquire('loading')).toBe(true);
+    expect(gate.acquire('shown')).toBe(true);
+    const before = frees();
+    gate.hold(false);
+    expect(frees()).toBe(before + 1);
+    gate.settle('loading', 'load');
+    gate.settle('loading', 'load');
+    gate.settle('shown', 'load');
+    expect(gate.acquire('fresh')).toBe(true);
+  });
+
+  it('暂扣不看名额：名额空着也不放新的；重复暂扣或放开不重复叫', () => {
+    const { gate, frees } = setup(5);
+    gate.hold(true);
+    gate.hold(true);
+    expect(gate.hasRoom).toBe(true);
+    expect(gate.acquire('fresh')).toBe(false);
+    const before = frees();
+    gate.hold(false);
+    gate.hold(false);
+    expect(frees()).toBe(before + 1);
+    expect(gate.acquire('fresh')).toBe(true);
+  });
+
+  it('预热（preloaded）：记作已显示、名额占满时照放，不动在途的借用', () => {
+    const { gate } = setup(1);
+    gate.acquire('busy');
+    gate.preloaded('warm');
+    expect(gate.isShown('warm')).toBe(true);
+    expect(gate.acquire('warm')).toBe(true);
+    expect(gate.loading).toBe(2);
+    gate.preloaded('busy');
+    expect(gate.loading).toBe(2);
+    expect(gate.settle('busy', 'load')).toBe('shown');
+    expect(gate.loading).toBe(1);
   });
 
   it('reset 清掉一切，连同凉却：定时器不再叫，失败次数归零', () => {

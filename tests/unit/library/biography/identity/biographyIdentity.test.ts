@@ -1,4 +1,4 @@
-import { atom, createStore } from 'jotai/vanilla';
+import { atom, createStore, type Atom } from 'jotai/vanilla';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { BiographyIdentity } from '../../../../../src/library/biography/biographyModel.ts';
 import { startBiographyIdentity } from '../../../../../src/library/biography/identity/biographyIdentity.ts';
@@ -42,7 +42,7 @@ const ANSWERS: Readonly<Record<string, MusicbrainzResult>> = {
   ),
 };
 
-function setup(files: Readonly<Record<string, string>> = {}) {
+function setup(files: Readonly<Record<string, string>> = {}, term?: Atom<string | null>) {
   const { host, files: stored } = installArtistFiles(files);
   const store = createStore();
   const artist = atom<string | null>('Nujabes');
@@ -58,7 +58,15 @@ function setup(files: Readonly<Record<string, string>> = {}) {
       return answers[key] ?? ({ kind: 'missing' } as const);
     },
   );
-  const deps = { artist, albums, manual, enabled, active, locale: atom('en') };
+  const deps = {
+    artist,
+    albums,
+    manual,
+    enabled,
+    active,
+    locale: atom('en'),
+    ...(term ? { term } : {}),
+  };
   const service = startBiographyIdentity(store, deps, { request }, host.fb);
   onTestFinished(() => service.dispose());
   return {
@@ -184,6 +192,25 @@ describe('身份认定服务', () => {
     await tick();
     expect(env.state().artist).toBe('Fat Jon');
     expect(env.state().status).not.toBe('resolved');
+  });
+
+  it('键与搜索名分开：按搜索名查 MusicBrainz，状态与缓存按键存取，同名的另一个键重新认定', async () => {
+    const env = setup({}, atom<string | null>('Nujabes'));
+    env.store.set(env.artist, 'online:ncm:100');
+    await tick();
+    expect(JSON.stringify(env.request.mock.calls[0]?.[1])).toContain('Nujabes');
+    expect(env.state()).toMatchObject({
+      artist: 'online:ncm:100',
+      status: 'resolved',
+      mbid: NUJABES,
+    });
+    expect(env.stored.get(FILE) ?? '').toContain('online:ncm:100');
+    const searches = () => env.paths().filter((path) => path === 'artist').length;
+    expect(searches()).toBe(1);
+    env.store.set(env.artist, 'online:ncm:200');
+    await tick();
+    expect(searches()).toBe(2);
+    expect(env.state().artist).toBe('online:ncm:200');
   });
 
   it('清理缓存后文件只剩空清单', async () => {

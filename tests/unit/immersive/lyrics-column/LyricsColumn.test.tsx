@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { act } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { LyricsColumn } from '../../../../src/immersive/lyrics-column/LyricsColumn.tsx';
 import { setLyricsSearchOpen } from '../../../../src/immersive/scene/lyricsSearch.ts';
+import { PanelBackgroundContext } from '../../../../src/theme/PopoverSurface.tsx';
 import { flush } from '../../../fixtures/playingTrack.ts';
 import { startSceneEnv } from '../../../fixtures/sceneEnv.ts';
 import { startSceneLyrics, type SceneLyricsAnswer } from '../../../fixtures/sceneLyrics.ts';
@@ -113,6 +115,68 @@ describe('LyricsColumn', () => {
     expect(toolTag(html, 'translation')).toContain('aria-disabled="true"');
     expect(toolTag(html, 'romanization')).toContain('aria-disabled="true"');
     expect(html).toContain('data-lyrics-status="ready"');
+  });
+
+  it('工具条小面板取自己的 Acrylic 着色：主题层交下来的面板实底不写到浮层上', async () => {
+    // jsdom 没有 ResizeObserver 与 matchMedia：条要量宽度定排法，浮层定位与动效也要用。量到的宽度给 400，
+    // 是一行图标键的那一档，字号在小面板里；这里只看浮层的变量，不看位置与动效
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      media,
+      matches: false,
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+    }));
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        readonly report: (entries: readonly { contentRect: { width: number } }[]) => void;
+        constructor(report: (entries: readonly { contentRect: { width: number } }[]) => void) {
+          this.report = report;
+        }
+        observe() {
+          this.report([{ contentRect: { width: 400 } }]);
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    // 浮层的进场动效走 Web Animations，jsdom 也没有：给一个立刻播完的
+    Object.defineProperty(Element.prototype, 'animate', {
+      configurable: true,
+      value: () => ({
+        finished: Promise.resolve(),
+        onfinish: null,
+        playState: 'finished',
+        cancel() {},
+        finish() {},
+        pause() {},
+        play() {},
+        persist() {},
+        commitStyles() {},
+        addEventListener() {},
+        removeEventListener() {},
+      }),
+    });
+    const env = await startSceneEnv();
+    await startSceneLyrics(env, { text: '[00:01]第一句', synced: true });
+    env.play(makeTrack());
+    await flush();
+    const root = env.mount(
+      <PanelBackgroundContext value="rgb(1, 2, 3)">
+        <LyricsColumn size="large" toolbarTop={64} />
+      </PanelBackgroundContext>,
+    );
+    const key = root.querySelector<HTMLButtonElement>('[data-lyrics-tool="font"]');
+    act(() => key?.click());
+    const surface = document.querySelector<HTMLElement>('.fui-PopoverSurface');
+    expect(surface).not.toBeNull();
+    expect(surface?.style.getPropertyValue('--bg-panel-overlay')).toBe('');
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(Element.prototype, 'animate');
   });
 });
 

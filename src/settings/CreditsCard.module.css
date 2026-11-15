@@ -68,7 +68,7 @@
   height: 28px;
   border: var(--strokeWidthThin) solid var(--line);
   border-radius: var(--borderRadiusLarge);
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-view-control);
   color: var(--text-secondary);
 }
 
@@ -117,7 +117,7 @@
   padding: 0 var(--spacingHorizontalSNudge);
   border: var(--strokeWidthThin) solid var(--line);
   border-radius: var(--radius-control);
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-view-control);
   color: var(--text-secondary);
   font-family: var(--fontFamilyMonospace);
   font-size: var(--fontSizeBase200);

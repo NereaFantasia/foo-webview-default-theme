@@ -1,5 +1,5 @@
 import { useService } from '../../kit/useService.ts';
-import { lyricsDisplayKey, lyricsFontFamily } from '../../lyrics/lyricsDisplay.ts';
+import { immersiveFont, lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import {
@@ -18,6 +18,7 @@ function SyncedRows() {
   const rows = useAtomValueRawSync(lyricRowsAtom);
   const service = useService(lyricsDisplayKey);
   const display = useAtomValueRawSync(service.display);
+  const { family, weight } = immersiveFont(display);
   return (
     <ol className={styles.rows}>
       {SLOTS.map((slot) => {
@@ -26,10 +27,7 @@ function SyncedRows() {
           <li key={slot} className={styles.row} data-slot={slot}>
             {slot === 'current' && line && <span className={styles['hot-square']} aria-hidden />}
             <span className={styles.time}>{line ? formatLyricTime(line.time) : ''}</span>
-            <span
-              className={styles.text}
-              style={{ fontFamily: lyricsFontFamily(display.fontFamily) }}
-            >
+            <span className={styles.text} style={lyricsFontStyle(family, weight)}>
               {line?.text ?? ''}
             </span>
           </li>

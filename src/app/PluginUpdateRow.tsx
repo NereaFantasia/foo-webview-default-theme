@@ -10,17 +10,23 @@ import {
 import {
   ArrowClockwise16Regular,
   ArrowSync16Regular,
+  Checkmark16Regular,
+  Copy16Regular,
   FolderOpen16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useId, useState } from 'react';
+import { diagnosticsAtom } from '../host/infoCenter.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import type { Translate } from '../i18n/translate.ts';
 import { useService } from '../kit/useService.ts';
+import { runtimeLogReport } from '../settings/about.ts';
 import { SettingsRow } from '../settings/SettingsRow.tsx';
+import { useCopyAction } from '../settings/useCopyAction.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { pluginUpdaterKey, type PluginUpdateStatus } from '../update/pluginUpdater.ts';
+import styles from './PluginUpdateRow.module.css';
 
 function description(status: PluginUpdateStatus, t: Translate): string | undefined {
   switch (status.phase) {
@@ -31,6 +37,8 @@ function description(status: PluginUpdateStatus, t: Translate): string | undefin
     case 'checking':
       return t('update.checking');
     case 'available':
+      if (status.failure !== undefined)
+        return t('update.pluginInstallFailed', { version: status.version });
       return t(status.staged ? 'update.pluginStaged' : 'update.available', {
         version: status.version,
       });
@@ -70,6 +78,8 @@ export function PluginUpdateRow() {
   const service = useService(pluginUpdaterKey);
   const status = useAtomValueRawSync(service.status);
   const controls = useViewControlStyles();
+  const diagnostics = useAtomValueRawSync(diagnosticsAtom);
+  const { outcome, copy } = useCopyAction();
   const buttonId = useId();
   const [confirmation, setConfirmation] = useState<{ version: string; sha256: string } | null>(
     null,
@@ -80,11 +90,13 @@ export function PluginUpdateRow() {
   const transaction = status.phase === 'transaction' ? status.transaction : null;
   const recovery =
     transaction !== null && !['committed', 'cancelled', 'prepared'].includes(transaction.phase);
+  const failure = status.phase === 'available' ? status.failure : undefined;
   const error =
     status.phase === 'failed' ||
+    failure !== undefined ||
     transaction?.phase === 'needsRepair' ||
     transaction?.phase === 'rolledBack';
-  const detail = status.phase === 'failed' ? status.detail : transaction?.error;
+  const detail = status.phase === 'failed' ? status.detail : (failure ?? transaction?.error);
   if (status.phase === 'off') return null;
   return (
     <>
@@ -95,10 +107,26 @@ export function PluginUpdateRow() {
         error={error || openFailed}
         feedback={
           detail ? (
-            <details>
-              <summary>{t('update.backendDetails')}</summary>
-              <div>{detail}</div>
-            </details>
+            <div className={styles.feedback}>
+              <details>
+                <summary>{t('update.backendDetails')}</summary>
+                <div>{detail}</div>
+              </details>
+              <Button
+                className={controls.field}
+                size="small"
+                icon={outcome === 'copied' ? <Checkmark16Regular /> : <Copy16Regular />}
+                onClick={() => void copy(runtimeLogReport(diagnostics))}
+              >
+                {t(
+                  outcome === 'copied'
+                    ? 'settings.copied'
+                    : outcome === 'failed'
+                      ? 'settings.copyFailed'
+                      : 'update.copyLog',
+                )}
+              </Button>
+            </div>
           ) : undefined
         }
       >

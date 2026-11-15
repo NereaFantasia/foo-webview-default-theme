@@ -1,6 +1,7 @@
 import { Record48Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import type { CSSProperties } from 'react';
+import { AnimatedCoverImage } from '../../covers/AnimatedCoverImage.tsx';
 import { immersiveCoverAtom } from '../../covers/immersiveCover.ts';
 import { FadeImage } from '../../kit/FadeImage.tsx';
 import { useViewServices } from '../page/viewServices.ts';
@@ -25,7 +26,7 @@ export function DialCover({ box, guard }: DialCoverProps) {
   return (
     <div className={styles.cover} style={box} data-decor-guard={guard} data-dial-cover>
       <Record48Regular />
-      {/* 按身份换元素：上一张图晚到的 load / error 带的是旧身份，进不了当前这一张。 */}
+      {/* 以身份为 key 换元素：上一张图晚到的 load / error 带的是旧身份，不会作用于当前这一张 */}
       {url && (
         <FadeImage
           key={token}
@@ -37,6 +38,7 @@ export function DialCover({ box, guard }: DialCoverProps) {
           onError={() => services.cover?.markFailed(token)}
         />
       )}
+      <AnimatedCoverImage layout="fill" fit="contain" />
     </div>
   );
 }

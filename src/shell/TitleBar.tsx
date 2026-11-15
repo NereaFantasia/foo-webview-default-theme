@@ -16,7 +16,7 @@ import { hasCurrentTrackAtom } from '../playback/playerAtoms.ts';
 import { CaptionButtons } from './CaptionButtons.tsx';
 import { HostStatus } from './HostStatus.tsx';
 import { InfoCenterButton } from './info-center/InfoCenterButton.tsx';
-import { LyricsKey, QueueKey } from './right-card/RightCardKeys.tsx';
+import { RightCardPageKeys } from './right-card/RightCardKeys.tsx';
 import styles from './TitleBar.module.css';
 import { useService } from '../kit/useService.ts';
 import { windowShellKey } from '../host/windowShell.ts';
@@ -45,8 +45,9 @@ const useStyles = makeStyles({
  * 且窗口是宽窗（与侧边栏同一条线，≥ 1008）时高 64，左起 ⋯、播放控制组与音量键（同胶囊里那一枚，浮层朝下开），
  * 正中是正在播放条（在窗口居中），右端窗口三键。音量不做悬停展开的面板：展开的那一截落在标题栏的拖动区上，指针移过去就被窗口当成标题栏
  * 没有当前曲目时正在播放条不出，那一块仍是拖动区；控制组与音量键留着，高度不变
- * 播放栏在底部或是胶囊时高 48，左段是 ⋯、后退、前进与侧边栏键，窗口三键左边是歌词与队列两个右侧卡的入口
- * （内容卡里没有导航行，入口放在这里），组内的键挨着，组离三键 16；窗口窄于 641 时歌词键收掉。播放栏在标题栏
+ * 播放栏在底部或是胶囊时高 48，左段是 ⋯、后退、前进与侧边栏键，窗口三键左边是队列、歌词、信息与简介四个
+ * 右侧卡页的入口（内容卡里没有导航行，入口放在这里），组内的键挨着，组离三键 16；窗口窄于 641 时歌词、信息、
+ * 简介收进一个菜单键，队列键照旧。播放栏在标题栏
  * 而窗口窄于 1008 时高 48，只有 ⋯ 与窗口三键，导航键与入口在内容卡的导航行里。键以外的地方是拖动区，宿主版本
  * 不满足时拖动区里出一行提示。不铺底，与侧边栏同在窗口材质上。渲染后把实测高度交给窗口壳，宿主据此认标题栏
  */
@@ -75,7 +76,12 @@ export function TitleBar() {
   }, [windowShell]);
 
   return (
-    <header ref={header} className={styles.root} data-player={withPlayer || undefined}>
+    <header
+      ref={header}
+      className={styles.root}
+      data-titlebar
+      data-player={withPlayer || undefined}
+    >
       <div className={styles.start}>
         <div className={styles.tools}>
           <Toolbar
@@ -95,7 +101,7 @@ export function TitleBar() {
           <div className={styles.player}>
             {videoEntry}
             <PlaybackControls />
-            {/* 窄到换成胶囊时这一枚随标题栏的播放部分一起卸下，焦点要跟走。 */}
+            {/* 窄到换成胶囊时这个元素随标题栏的播放部分一起卸下，焦点要随之交接 */}
             <span ref={handOffPlayerFocus} className={styles.volume}>
               <CapsuleVolume below />
             </span>
@@ -121,8 +127,12 @@ export function TitleBar() {
               aria-label={t('rightCard.region')}
               className={mergeClasses(classes.toolbar, classes.navTools)}
             >
-              {tier !== 'hidden' && <LyricsKey className={classes.navTool} />}
-              <QueueKey className={classes.navTool} />
+              {/* 窗口宽 360 以下时队列键也收进菜单：窗口三键与导航键占去宽度后，入口组会与左侧的侧边栏键重叠 */}
+              <RightCardPageKeys
+                className={classes.navTool}
+                foldWhen="(max-width: 640px)"
+                foldQueueWhen="(max-width: 360px)"
+              />
             </Toolbar>
           </div>
         )}

@@ -1,12 +1,17 @@
-/* 工具条、分页栏与播放历史按内容高；当前曲目与队列共用余下的滚动区 */
+/* 工具条与播放历史按内容高；当前曲目与队列共用余下的滚动区 */
 .root {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
 
-/* 工具条包含顶部 12 的留白，分页栏和内容区不随菜单开合移动 */
+/* 面板自身获得键盘焦点时，焦点环内收到面板边内：缺省位置在面板外，会被右侧卡的圆角裁切层截去 */
+.root:focus-visible {
+  outline-offset: calc(-1 * var(--strokeWidthThick));
+}
+
+/* 工具条包含顶部 12 的留白，内容区不随菜单开合移动 */
 .toolbar {
   display: flex;
   align-items: center;
@@ -37,26 +42,19 @@
   gap: var(--spacingHorizontalS);
 }
 
-/* 分页栏左右与头对齐，下面一道细线把它和内容区分开 */
-.tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--spacingHorizontalXS);
-  padding: 0 var(--spacingHorizontalS);
-  border-bottom: var(--strokeWidthThin) solid var(--line);
-}
-
 /* 播放历史的插槽：左右与队列页的内容对齐 */
 .history {
   min-width: 0;
   padding: 0 var(--spacingHorizontalS);
 }
 
+/* 滚动区走合成滚动（`will-change: scroll-position`）：透明底的容器浏览器不会自动合成，不写的话主线程一忙，队列的滚动就跟着停顿 */
 .content {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  will-change: scroll-position;
 }
 
 .content[data-page='info'],
@@ -73,41 +71,30 @@
   grid-column: 1;
 }
 
-/* 停靠的歌词页伸到了窗口右缘，分页栏退回原来的右缘 */
-.root[data-lyrics-preview] > .tabs {
-  margin-right: var(--edge-bleed, 0px);
-}
-
 .root > .toolbar {
-  grid-row: 2;
-}
-
-.root > .tabs {
   grid-row: 1;
 }
 
 .root > .history {
-  grid-row: 3;
+  grid-row: 2;
 }
 
 .root > .content {
-  grid-row: 4;
+  grid-row: 3;
 }
 
 .root[data-lyrics-preview] > .content {
   grid-row: 1 / -1;
 }
 
-.root[data-lyrics-preview] > .toolbar,
-.root[data-lyrics-preview] > .tabs {
+.root[data-lyrics-preview] > .toolbar {
   z-index: 2;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--motion-faster) var(--curveLinear);
 }
 
-.root[data-lyrics-preview][data-controls-visible] > .toolbar,
-.root[data-lyrics-preview][data-controls-visible] > .tabs {
+.root[data-lyrics-preview][data-controls-visible] > .toolbar {
   opacity: 1;
   pointer-events: auto;
 }

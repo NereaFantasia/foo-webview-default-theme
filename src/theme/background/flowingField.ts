@@ -10,6 +10,7 @@ import {
   backgroundTransportAtom,
 } from './windowBackground.ts';
 import { createFlowMotion } from './flowMotion.ts';
+import { flowSpeedAtom } from './flowSpeed.ts';
 import type { FlowInput, FlowMemory, FlowSurface } from './flowingSurface.ts';
 
 export interface FlowActivity {
@@ -53,6 +54,7 @@ export function startFlowingField({
         reduced: get(reducedMotionAtom),
         focused: window.focused,
         scheme: get(colorSchemeAtom),
+        rate: get(flowSpeedAtom) / 100,
       } satisfies FlowInput,
     };
   });

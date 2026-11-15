@@ -61,7 +61,12 @@ async function exists(host: LaunchHost, path: string): Promise<boolean> {
 }
 
 async function pickRuntime(host: LaunchHost, own: string): Promise<Runtime | null> {
-  const names = await listDirectories(host, `${own}\\rt`, /^node-\d+\.\d+\.\d+-/);
+  const listed = await listDirectories(host, `${own}\\rt`, /^node-\d+\.\d+\.\d+-/);
+  // 下载到一半的目录里只有 node.exe.partial，挑中它进程拉不起来
+  const names: string[] = [];
+  for (const name of listed) {
+    if (await exists(host, `${own}\\rt\\${name}\\node.exe`)) names.push(name);
+  }
   names.sort((left, right) => {
     const a = nodeVersion(left);
     const b = nodeVersion(right);

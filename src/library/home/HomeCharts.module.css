@@ -1,0 +1,100 @@
+/* 涨跌色按界面语言：中文红涨绿跌，其余绿涨红跌；方向另有箭头与数字 */
+.scope[data-rise='red'] {
+  --home-rank-up: var(--colorPaletteRedForeground1);
+  --home-rank-down: var(--colorPaletteGreenForeground1);
+}
+
+.scope[data-rise='green'] {
+  --home-rank-up: var(--colorPaletteGreenForeground1);
+  --home-rank-down: var(--colorPaletteRedForeground1);
+}
+
+.note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorBrandForeground1);
+}
+
+/* 名次变化的标签：底取方向色的一成多，字取方向色；持平用中性底 */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 34px;
+  height: 20px;
+  border-radius: var(--borderRadiusMedium);
+  padding: 0 var(--spacingHorizontalSNudge);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
+  white-space: nowrap;
+}
+
+.delta[data-large] {
+  min-width: 44px;
+  height: 24px;
+  padding: 0 var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.delta[data-kind='up'] {
+  background: color-mix(in srgb, var(--home-rank-up) 14%, transparent);
+  color: var(--home-rank-up);
+}
+
+.delta[data-kind='down'] {
+  background: color-mix(in srgb, var(--home-rank-down) 14%, transparent);
+  color: var(--home-rank-down);
+}
+
+.delta[data-kind='same'] {
+  background: var(--bg-view-control);
+  color: var(--text-secondary);
+}
+
+.delta[data-kind='new'] {
+  background: color-mix(in srgb, var(--colorBrandForeground1) 14%, transparent);
+  color: var(--colorBrandForeground1);
+}
+
+.trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacingHorizontalSNudge);
+}
+
+.slope {
+  flex: none;
+}
+
+.slope[data-kind='up'] {
+  color: var(--home-rank-up);
+}
+
+.slope[data-kind='down'] {
+  color: var(--home-rank-down);
+}
+
+.slope[data-kind='same'] {
+  color: var(--text-secondary);
+}
+
+.slope[data-kind='new'] {
+  color: var(--colorBrandForeground1);
+}
+
+/* 强制颜色模式下底色会被去掉，标签改用描边围住，文字仍是箭头与数字 */
+@media (forced-colors: active) {
+  .delta {
+    border: var(--strokeWidthThin) solid CanvasText;
+  }
+}

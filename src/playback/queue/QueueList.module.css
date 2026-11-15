@@ -1,11 +1,18 @@
 /* 内容区四周留 8，行自己的左右内边距再给 8，序号离卡片左缘 16，与头对齐。最小高度多出前面那一段
-   （--queue-earlier），后面几段再短也滚得到它的下缘，它整段藏在视口上方。 */
+   （--queue-earlier），后面几段再短也滚得到它的下缘，它整段藏在视口上方。行画成卡的外框用 `--queue-pad-top`、
+   `--queue-pad-inline` 把四周的留白收掉让卡与列同宽，`--queue-pad-bottom` 给悬浮在列底的工具条让位 */
 .root {
   position: relative;
   display: grid;
   align-content: start;
   min-height: calc(100% + var(--queue-earlier, 0px));
-  padding: var(--spacingVerticalS) var(--spacingHorizontalS) 0;
+  padding: var(--queue-pad-top, var(--spacingVerticalS))
+    var(--queue-pad-inline, var(--spacingHorizontalS)) var(--queue-pad-bottom, 0px);
+}
+
+/* 队列容器自身获得键盘焦点时，焦点环内收到容器边内：缺省位置在容器外，会被滚动区裁切 */
+.root:focus-visible {
+  outline-offset: calc(-1 * var(--strokeWidthThick));
 }
 
 /* 正在播的这一首前面那几行：DOM 在最后，排到最上面（见 `QueueEarlier`）；有内容时离当前曲目卡 8 */
@@ -14,15 +21,11 @@
   min-width: 0;
 }
 
+/* 下沿的内边距 `--queue-earlier-pad` 要不小于它前面的留白（列的上内边距加列表自己的上内边距）：置顶时视口上缘露出的就是
+   这一段的下沿，矮了前面的最后一行会露出来。已播的行降档落在行的子元素上（见队列行的样式），不在这一段整体上设
+   `opacity`：那样里面的行拿不到背后的内容，没有模糊 */
 .earlier[data-filled] {
   padding-bottom: var(--queue-earlier-pad, var(--spacingVerticalS));
-}
-
-/* 前面的曲目文字降一档（`--queue-earlier-dim`），不铺底、不画线。下沿的内边距 `--queue-earlier-pad` 要不小于它前面
-   的留白（列的上内边距加列表自己的上内边距）：置顶时视口上缘露出的就是这一段的下沿，矮了前面的最后一行会露出来。
-   右侧卡不给这两个变量，原样 */
-.earlier .list {
-  opacity: var(--queue-earlier-dim, 1);
 }
 
 /* 不画播放历史时内容的外层，与历史区包裹层同样不撑破网格列 */
@@ -35,18 +38,23 @@
 }
 
 .section + .section {
-  margin-top: var(--spacingVerticalS);
+  margin-top: var(--queue-section-gap, var(--spacingVerticalS));
 }
 
 /* 节头 32 高：左边是段名，旁边跟次要信息（数量或来源）；「已加入队列」的数量与清空在右边（`data-lead` 的节头不分左右）。
-   段名取 `--queue-head-size`，次要信息取 `--queue-head-sub-size`，沉浸视图给大一档的字，右侧卡取缺省 */
+   段名取 `--queue-head-size`，次要信息取 `--queue-head-sub-size`，沉浸视图给大一档的字，右侧卡取缺省。
+   沉浸视图把节头画成一张卡：`--queue-head-height`、`-pad`、`-radius`、`-bg` 给高、内边距、圆角与底，
+   `--queue-head-gap` 是它与第一行之间的缝 */
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacingHorizontalS);
-  height: 32px;
-  padding: 0 var(--spacingHorizontalS);
+  height: var(--queue-head-height, 32px);
+  margin-block-end: var(--queue-head-gap, 0px);
+  padding: 0 var(--queue-head-pad, var(--spacingHorizontalS));
+  border-radius: var(--queue-head-radius, 0);
+  background: var(--queue-head-bg, transparent);
 }
 
 .head[data-lead] {
@@ -127,33 +135,31 @@
   position: relative;
 }
 
+/* 行的竖向位置 `--row-y`（`rowOffset.ts`）：用 `transform` 平移。沉浸视图把行画成卡时改用 `top`（`immersive/scene/CardColumn` 的样式），
+   上下两端的渐隐靠滚动时间线，它按布局位置算行的进出，不认 `transform` */
 .virtualRow {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
+  transform: translateY(var(--row-y, 0px));
 }
 
-.viewport {
-  position: sticky;
-  top: 0;
-  overflow: hidden;
-}
-
-/* 行带不设 will-change：单独成合成层后按小数偏移摆放，125% 这类缩放下文字发虚 */
-.strip {
-  position: relative;
-}
-
+/* 占位行与读到的行同形：外框把行画成卡时，读取中的位置也是一张卡，滚动时不会一块块空洞再填上 */
 .placeholder {
-  --row-cover: calc(var(--queue-row-height, 48px) - 2 * var(--spacingVerticalXS));
+  --row-cover: var(
+    --queue-cover,
+    calc(var(--queue-row-height, 48px) - 2 * var(--spacingVerticalXS))
+  );
 
   display: grid;
   grid-template-columns: max(20px, var(--queue-number-width, 2ch)) var(--row-cover) minmax(0, 1fr);
   align-items: center;
   gap: var(--spacingHorizontalS);
-  height: 100%;
-  padding: 0 var(--spacingHorizontalS);
+  height: calc(100% - var(--queue-row-gap, 0px));
+  padding: 0 var(--queue-row-pad, var(--spacingHorizontalS));
+  border-radius: var(--queue-row-radius, 0);
+  background: var(--queue-card-bg, transparent);
   color: var(--text-muted);
   font-size: var(--fontSizeBase200);
 }
@@ -161,7 +167,7 @@
 .placeholderCover {
   width: var(--row-cover);
   height: var(--row-cover);
-  border-radius: var(--borderRadiusSmall);
+  border-radius: var(--queue-cover-radius, var(--borderRadiusSmall));
   background: var(--colorNeutralBackgroundAlpha);
 }
 
@@ -197,7 +203,7 @@
   position: fixed;
   z-index: 2;
   outline: var(--strokeWidthThin) solid var(--line);
-  border-radius: var(--radius-control);
+  border-radius: var(--queue-ghost-radius, var(--radius-control));
   background: var(--bg-menu);
   box-shadow: var(--shadow16);
   pointer-events: none;

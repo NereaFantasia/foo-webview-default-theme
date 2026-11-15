@@ -1,0 +1,138 @@
+/* 占满外框给的盒子，`overflow: hidden` 必须有：模糊层放大 1.06 的外扩要裁掉，羽化也必须在盒内归零。
+   取景与缩放（`--bleed-focus`、`--bleed-size`）、模糊半径、压暗带高度与浓度、两层 mask 的取值都由元素按外观参数写进变量（`feather.ts`、`BleedLook`）。
+   这里不写过渡：封面带着共享名字走视图过渡，层自己再过渡会让新快照取到半透明 */
+.cover {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+}
+
+/* 三层容器：遮罩与模糊层的放大都在容器上，整组只做一次；里面是一张张图，按换曲的先后叠放。
+   素层只在不羽化时显示；羽化时它在底下被另两层盖住，不画 */
+.plain,
+.blur,
+.sharp {
+  position: absolute;
+  inset: 0;
+}
+
+.plain {
+  opacity: 0;
+}
+
+.blur {
+  transform: scale(1.06);
+  mask-image: var(--bleed-mask-blur);
+}
+
+.sharp {
+  mask-image: var(--bleed-mask-sharp);
+}
+
+.cover:not([data-feather]) .plain {
+  opacity: 1;
+}
+
+.cover:not([data-feather]) .blur,
+.cover:not([data-feather]) .sharp {
+  opacity: 0;
+}
+
+/* 一张图：铺满容器，取景与缩放见变量。换曲时新一张从透明淡入，只填充到开始前，播完就不再有动画作用在它上面；
+   淡入发生在容器里、遮罩之前，两张图都是不透明的，叠起来总不透明度不变 */
+.image {
+  position: absolute;
+  inset: 0;
+  background-image: var(--bleed-image);
+  background-position: var(--bleed-focus);
+  background-size: var(--bleed-size, cover);
+}
+
+.image[data-fade] {
+  animation: bleed-in var(--motion-faster) var(--curveLinear) backwards;
+}
+
+.blur .image {
+  filter: blur(var(--bleed-blur));
+}
+
+/* 暂停滤镜：预设在暂停时启用，对封面整体施加去色、压暗、柔化滤镜，保持轮廓并呈现静止状态。
+   滤镜挂在封面根上，羽化带同步生效，避免叠加额外图层（`backdrop-filter` 作用于高频重绘背景开销较大）。
+   进入耗时 333 ms、退出耗时 167 ms；进退场使用关键帧动画，避免视图过渡期间采到中间态：
+   `data-veil` 标识当前状态，进入视图时已处于暂停状态则直接置为 `idle`，不播放动画 */
+.cover {
+  --bleed-veil: grayscale(0.2) brightness(0.8) contrast(0.92) blur(1px);
+}
+
+.cover[data-veil='idle'] {
+  filter: var(--bleed-veil);
+}
+
+.cover[data-veil='enter'] {
+  animation: bleed-veil var(--motion-slow) var(--curveLinear) forwards;
+}
+
+.cover[data-veil='leave'] {
+  animation: bleed-unveil var(--motion-fast) var(--curveLinear);
+}
+
+/* 设置的编辑开着时不蒙：调羽化、缩放、取景要看清封面 */
+:global([data-editing]) .cover[data-veil] {
+  filter: none;
+  animation: none;
+}
+
+/* 控制的衬底：底部 26% 高，压暗到封面最底下的 50%；右缘同样渐隐，不渐隐会在封面右界留一条竖的硬边 */
+.scrim {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--bleed-scrim-height);
+  background: linear-gradient(to top, var(--bleed-scrim), transparent);
+  mask-image: linear-gradient(to right, var(--colorNeutralForeground1) 72%, transparent 99%);
+  pointer-events: none;
+}
+
+/* 没有封面：背景退回中性，只留居中的音符，落在左半区的正中 */
+.placeholder {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note {
+  width: 96px;
+  height: 96px;
+  animation: bleed-in var(--motion-faster) var(--curveLinear);
+}
+
+@keyframes bleed-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bleed-veil {
+  from {
+    filter: grayscale(0) brightness(1) contrast(1) blur(0);
+  }
+
+  to {
+    filter: var(--bleed-veil);
+  }
+}
+
+@keyframes bleed-unveil {
+  from {
+    filter: var(--bleed-veil);
+  }
+
+  to {
+    filter: grayscale(0) brightness(1) contrast(1) blur(0);
+  }
+}

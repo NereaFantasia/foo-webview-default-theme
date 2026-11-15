@@ -1,6 +1,7 @@
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { LyricsPreferenceCard } from './LyricsPreferenceCard.tsx';
-import { Input, SpinButton, Switch, makeStyles, mergeClasses } from '@fluentui/react-components';
+import { Input, Switch, makeStyles, mergeClasses } from '@fluentui/react-components';
+import { FontPicker } from '../kit/FontPicker.tsx';
 import {
   TextDescription20Regular,
   Settings20Regular,
@@ -18,77 +19,28 @@ import {
   LYRICS_MASK_MODES,
   lyricsDisplayKey,
 } from '../lyrics/lyricsDisplay.ts';
-import {
-  LYRICS_ALIGN_ANCHORS,
-  LYRICS_MOTION_PRESETS,
-  lyricsMotionKey,
-} from '../lyrics/lyricsMotion.ts';
+import { LYRICS_ALIGN_ANCHORS, lyricsMotionKey } from '../lyrics/lyricsMotion.ts';
 import { AlignIcon } from './AlignIcon.tsx';
 import { DesktopLyricsExpander } from './DesktopLyricsExpander.tsx';
+import { FontWeightRow } from './FontWeightRow.tsx';
+import { LyricsRememberCard } from './LyricsCacheCards.tsx';
+import { LyricsMotionExpander } from './LyricsMotionExpander.tsx';
+import { NumberControl, NumberSetting } from './NumberSetting.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
-import { SettingsCard, type SettingsCardIds } from './SettingsCard.tsx';
+import { SettingsCard } from './SettingsCard.tsx';
 import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { SettingsSegmented } from './SettingsSegmented.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
+import { SettingsSubheading } from './SettingsSubheading.tsx';
 import { LyricsPositionThumb } from './thumbnails/LyricsPositionThumb.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
 import styles from './LyricsSection.module.css';
 
 const useStyles = makeStyles({
-  number: { width: '112px', minWidth: 0 },
   input: { width: '220px', maxWidth: '100%' },
   fill: { width: '100%' },
 });
-
-interface NumberSettingProps {
-  readonly label: string;
-  readonly value: number;
-  readonly min: number;
-  readonly max: number;
-  readonly step?: number;
-  readonly disabled?: boolean;
-  onChange(value: number): void;
-}
-
-function NumberControl({
-  value,
-  min,
-  max,
-  step = 1,
-  disabled = false,
-  onChange,
-  labelId,
-  descriptionId,
-}: Omit<NumberSettingProps, 'label'> & SettingsCardIds) {
-  const classes = useStyles();
-  const controls = useViewControlStyles();
-  const { compact } = useSettingsLayout();
-  return (
-    <SpinButton
-      className={mergeClasses(classes.number, compact && classes.fill, controls.field)}
-      aria-labelledby={labelId}
-      aria-describedby={descriptionId}
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      onChange={(_, data) => {
-        const next = data.value ?? Number(data.displayValue);
-        if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
-      }}
-    />
-  );
-}
-
-function NumberSetting({ label, ...control }: NumberSettingProps) {
-  return (
-    <SettingsRow title={label} field disabled={control.disabled}>
-      {(ids) => <NumberControl {...control} {...ids} />}
-    </SettingsRow>
-  );
-}
 
 export function LyricsSection({
   disabled,
@@ -100,7 +52,6 @@ export function LyricsSection({
   const t = useAtomValueRawSync(translateAtom);
   const service = useService(lyricsMotionKey);
   const displayService = useService(lyricsDisplayKey);
-  const pref = useAtomValueRawSync(service.pref);
   const motion = useAtomValueRawSync(service.motion);
   const display = useAtomValueRawSync(displayService.display);
   const classes = useStyles();
@@ -109,7 +60,10 @@ export function LyricsSection({
   return (
     <div className={styles.root} data-lyrics-settings>
       <fieldset className={styles.fields} disabled={disabled}>
+        <SettingsSubheading>{t('settings.subLyricsSources')}</SettingsSubheading>
         <LyricsPreferenceCard />
+        <LyricsRememberCard />
+        <SettingsSubheading>{t('settings.subLyricsDisplay')}</SettingsSubheading>
         <SettingsCard icon={<TextFont20Regular />} title={t('lyrics.fontSize')} field>
           {(ids) => (
             <NumberControl
@@ -142,17 +96,39 @@ export function LyricsSection({
           defaultOpen={false}
         >
           <SettingsRow title={t('lyrics.fontFamily')} field>
-            {({ labelId, descriptionId }) => (
-              <Input
-                className={mergeClasses(classes.input, compact && classes.fill, controls.field)}
-                aria-labelledby={labelId}
-                aria-describedby={descriptionId}
-                placeholder={t('lyrics.followInterface')}
+            {(ids) => (
+              <FontPicker
+                {...ids}
                 value={display.fontFamily}
-                onChange={(_, data) => void displayService.update({ fontFamily: data.value })}
+                defaultLabel={t('lyrics.followInterface')}
+                fill={compact}
+                onChange={(fontFamily) => void displayService.update({ fontFamily })}
               />
             )}
           </SettingsRow>
+          <FontWeightRow
+            family={display.fontFamily}
+            weight={display.fontWeight}
+            onChange={(fontWeight) => void displayService.update({ fontWeight })}
+          />
+          <SettingsRow title={t('lyrics.fontImmersive')} field>
+            {(ids) => (
+              <FontPicker
+                {...ids}
+                value={display.immersiveFontFamily}
+                defaultLabel={t('lyrics.followPanel')}
+                fill={compact}
+                onChange={(immersiveFontFamily) =>
+                  void displayService.update({ immersiveFontFamily })
+                }
+              />
+            )}
+          </SettingsRow>
+          <FontWeightRow
+            family={display.immersiveFontFamily}
+            weight={display.immersiveFontWeight}
+            onChange={(immersiveFontWeight) => void displayService.update({ immersiveFontWeight })}
+          />
           <SettingsRow title={t('lyrics.translationSizeMode')} field>
             {(ids) => (
               <SettingsSelect
@@ -194,44 +170,7 @@ export function LyricsSection({
             </SettingsRow>
           ))}
         </SettingsExpander>
-        <SettingsExpander
-          icon={<Settings20Regular />}
-          title={t('lyrics.preset')}
-          field
-          defaultOpen={false}
-          control={(ids) => (
-            <SettingsSelect
-              {...ids}
-              value={pref.preset}
-              options={LYRICS_MOTION_PRESETS.map((value) => ({
-                value,
-                label: t(`lyrics.preset.${value}`),
-              }))}
-              onChange={service.choosePreset}
-            />
-          )}
-        >
-          {(['spring', 'blur', 'scale', 'hidePassedLines'] as const).map((name) => (
-            <SettingsRow key={name} title={t(`lyrics.${name}`)}>
-              {({ labelId, descriptionId }) => (
-                <Switch
-                  aria-labelledby={labelId}
-                  aria-describedby={descriptionId}
-                  checked={motion[name]}
-                  onChange={(_, data) => service.customize({ [name]: data.checked })}
-                />
-              )}
-            </SettingsRow>
-          ))}
-          <NumberSetting
-            label={t('lyrics.wordFadeWidth')}
-            value={motion.wordFadeWidth}
-            min={0.0001}
-            max={2}
-            step={0.05}
-            onChange={(wordFadeWidth) => service.customize({ wordFadeWidth })}
-          />
-        </SettingsExpander>
+        <LyricsMotionExpander />
         <SettingsCard
           icon={<TextAlignCenter20Regular />}
           title={t('lyrics.position')}
@@ -259,69 +198,6 @@ export function LyricsSection({
             />
           )}
         </SettingsCard>
-        <SettingsExpander
-          icon={<Settings20Regular />}
-          title={t('lyrics.springSettings')}
-          defaultOpen={false}
-        >
-          <div className={styles.rows}>
-            {(['mass', 'damping', 'stiffness'] as const).map((name) => (
-              <NumberSetting
-                key={name}
-                label={t(`lyrics.${name}`)}
-                value={motion.scaleSpring[name]}
-                min={name === 'mass' ? 0.1 : 1}
-                max={name === 'mass' ? 10 : name === 'damping' ? 100 : 1000}
-                step={name === 'mass' ? 0.1 : 1}
-                disabled={!motion.spring || !motion.scale}
-                onChange={(value) =>
-                  service.customize({
-                    scaleSpring: { ...motion.scaleSpring, [name]: value },
-                  })
-                }
-              />
-            ))}
-          </div>
-        </SettingsExpander>
-        <SettingsExpander
-          icon={<Settings20Regular />}
-          title={t('lyrics.transitionSettings')}
-          defaultOpen={false}
-        >
-          <div className={styles.rows}>
-            <NumberSetting
-              label={t('lyrics.transitionMs')}
-              value={motion.transitionMs}
-              min={0}
-              max={2000}
-              step={10}
-              disabled={motion.spring}
-              onChange={(transitionMs) => service.customize({ transitionMs })}
-            />
-            {(['x1', 'y1', 'x2', 'y2'] as const).map((name, index) => (
-              <NumberSetting
-                key={name}
-                label={name}
-                value={motion.transitionCurve[index] ?? 0}
-                min={index % 2 ? -1 : 0}
-                max={index % 2 ? 2 : 1}
-                step={0.05}
-                disabled={motion.spring}
-                onChange={(value) => {
-                  const [x1, y1, x2, y2] = motion.transitionCurve;
-                  service.customize({
-                    transitionCurve: [
-                      index === 0 ? value : x1,
-                      index === 1 ? value : y1,
-                      index === 2 ? value : x2,
-                      index === 3 ? value : y2,
-                    ],
-                  });
-                }}
-              />
-            ))}
-          </div>
-        </SettingsExpander>
         <SettingsExpander
           icon={<TextDescription20Regular />}
           title={t('lyrics.processing')}
@@ -357,20 +233,21 @@ export function LyricsSection({
                 />
               )}
             </SettingsRow>
-            <SettingsRow title={t('lyrics.maskChar')} field disabled={!display.maskMode}>
-              {({ labelId, descriptionId }) => (
-                <Input
-                  className={mergeClasses(classes.input, compact && classes.fill, controls.field)}
-                  aria-labelledby={labelId}
-                  aria-describedby={descriptionId}
-                  value={display.maskChar}
-                  disabled={!display.maskMode}
-                  onChange={(_, data) =>
-                    void displayService.update({ maskChar: [...data.value].at(-1) ?? '*' })
-                  }
-                />
-              )}
-            </SettingsRow>
+            {display.maskMode && (
+              <SettingsRow title={t('lyrics.maskChar')} field nested>
+                {({ labelId, descriptionId }) => (
+                  <Input
+                    className={mergeClasses(classes.input, compact && classes.fill, controls.field)}
+                    aria-labelledby={labelId}
+                    aria-describedby={descriptionId}
+                    value={display.maskChar}
+                    onChange={(_, data) =>
+                      void displayService.update({ maskChar: [...data.value].at(-1) ?? '*' })
+                    }
+                  />
+                )}
+              </SettingsRow>
+            )}
           </div>
         </SettingsExpander>
         <SettingsExpander

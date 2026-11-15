@@ -6,6 +6,7 @@ import {
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { memo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { trackAlbumKeyOf } from '../../host/libraryContract.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { FadeImage } from '../../kit/FadeImage.tsx';
 import { QueueRating } from './QueueRating.tsx';
@@ -37,20 +38,15 @@ export interface QueueRowProps {
   readonly current: boolean;
   /** 正被拖着：原位变淡 */
   readonly lifted: boolean;
+  /**
+   * 这一行在一组里的位置：`start` 是首行、`end` 是末行、`only` 兼有；中段不传。外框把行画成卡时，
+   * 首尾行的外缘用大圆角（`--queue-edge-radius`），平铺的行不受影响
+   */
+  readonly edge?: 'start' | 'end' | 'only';
   onPointerDown(event: PointerEvent<HTMLDivElement>, key: string): void;
   onPlay(key: string): void;
   onMenu(key: string, at: RowPoint): void;
   onFocus(key: string): void;
-}
-
-/** 时长写成 m:ss，过一小时写 h:mm:ss；不知道时长（流）不写 */
-export function formatLength(seconds: number): string {
-  if (!(seconds > 0) || !Number.isFinite(seconds)) return '';
-  const total = Math.round(seconds);
-  const s = String(total % 60).padStart(2, '0');
-  const minutes = Math.floor(total / 60);
-  if (minutes < 60) return `${minutes}:${s}`;
-  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${s}`;
 }
 
 /** 封面；没有地址或加载出错时画占位图标 */
@@ -72,8 +68,8 @@ function RowCover({ url }: { readonly url: string | null }) {
 
 /**
  * 队列页的一行，高 48。左槽显示序号，「队列」段悬停时换成拖拽手柄；封面 36，悬停时压暗、
- * 出播放键；标题行右端悬停时出五颗星，标题在星前截断；副标题用图标区分艺人与专辑，艺人与专辑名可点；
- * 右槽平时写时长，悬停时换成 ⋯。单击选中，双击与封面上的播放键立即播放
+ * 出播放键；标题行右端悬停时出五颗星，标题在星前截断；副标题写艺人与专辑，中间隔一个「-」，名字可点；
+ * 右槽平时留空，悬停时出 ⋯。单击选中，双击与封面上的播放键立即播放
  *
  * 行里的键都不进 Tab 顺序：键盘用户在行上按 Enter 播放、按菜单键开菜单，菜单里有同样的几样
  *
@@ -85,7 +81,12 @@ export const QueueRow = memo(function QueueRow(props: QueueRowProps) {
   const { kind, rowKey } = props;
   const { track, title } = useDisplayTrack(props.track);
   const coverElement = useRef<HTMLSpanElement>(null);
-  const cover = useQueueCover(track.handle || track.path, false, coverElement);
+  const cover = useQueueCover(
+    track.handle || track.path,
+    false,
+    coverElement,
+    trackAlbumKeyOf(track),
+  );
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const menuAt = (event: MouseEvent<HTMLElement>) => {
@@ -106,6 +107,8 @@ export const QueueRow = memo(function QueueRow(props: QueueRowProps) {
       data-track-handle={track.handle}
       data-selected={props.selected || undefined}
       data-lifted={props.lifted || undefined}
+      data-edge-start={props.edge === 'start' || props.edge === 'only' || undefined}
+      data-edge-end={props.edge === 'end' || props.edge === 'only' || undefined}
       onPointerDown={(event) => props.onPointerDown(event, rowKey)}
       onDoubleClick={() => props.onPlay(rowKey)}
       onContextMenu={menuAt}
@@ -157,6 +160,7 @@ export const QueueRow = memo(function QueueRow(props: QueueRowProps) {
           )}
         </span>
         <TrackMetadata
+          share
           className={styles.subtitle}
           artist={track.artist}
           album={track.album}
@@ -165,7 +169,6 @@ export const QueueRow = memo(function QueueRow(props: QueueRowProps) {
         />
       </span>
       <span className={styles.tail}>
-        <span className={styles.length}>{formatLength(track.duration)}</span>
         <button
           type="button"
           className={styles.more}
@@ -189,7 +192,7 @@ export const QueueRow = memo(function QueueRow(props: QueueRowProps) {
 /** 拖动副本不包含按钮、焦点或列表身份，避免重复参与选择和命令 */
 export function QueueRowPreview(props: { readonly track: UpNextTrack }) {
   const { track, title } = useDisplayTrack(props.track);
-  const cover = useQueueCover(track.handle || track.path, false);
+  const cover = useQueueCover(track.handle || track.path, false, undefined, trackAlbumKeyOf(track));
   return (
     <div className={styles.row} data-preview>
       <span className={styles.lead}>
@@ -204,10 +207,12 @@ export function QueueRowPreview(props: { readonly track: UpNextTrack }) {
         <span className={styles.titleLine}>
           <span className={styles.title}>{title}</span>
         </span>
-        <TrackMetadata className={styles.subtitle} artist={track.artist} album={track.album} />
-      </span>
-      <span className={styles.tail}>
-        <span className={styles.length}>{formatLength(track.duration)}</span>
+        <TrackMetadata
+          share
+          className={styles.subtitle}
+          artist={track.artist}
+          album={track.album}
+        />
       </span>
     </div>
   );

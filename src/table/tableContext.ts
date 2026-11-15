@@ -1,10 +1,13 @@
 import type { Atom } from 'jotai/vanilla';
 import { createContext, useContext, type ComponentType } from 'react';
 import type { TableTrack } from './tableItems.ts';
+import type { TrackFieldsService } from '../track/trackFields.ts';
 import type { TrackRatingsService } from '../track/trackRatings.ts';
 
 export interface TableServices {
   readonly ratings: Pick<TrackRatingsService, 'watch' | 'ratingOf' | 'canRate' | 'setRating'>;
+  /** 按标签现算的列；没有时这些列的格子留空 */
+  readonly fields?: Pick<TrackFieldsService, 'ensure' | 'valuesOf' | 'version'>;
   readonly playingKey: Atom<string>;
   readonly audible: Atom<boolean>;
   readonly trackKey: (track: TableTrack) => string;

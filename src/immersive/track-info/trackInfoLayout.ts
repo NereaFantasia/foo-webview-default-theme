@@ -1,7 +1,10 @@
 import type { WidthTier } from '../../kit/useWidthTier.ts';
 
-/** 字号档位规格（由当前预设场景根据窗高评估判定） */
-export type InfoSize = 'large' | 'medium' | 'small';
+/**
+ * 字号档位规格：前三档由当前预设场景根据窗高评估判定，`compact` 是浮在封面上的小胶囊用的固定一档，
+ * 不随窗高变
+ */
+export type InfoSize = 'large' | 'medium' | 'small' | 'compact';
 
 /** 各档位字号与固定单行行高规格（像素），副标题缺省时保持占位以稳定垂直间距 */
 export const INFO_SIZES: Readonly<
@@ -10,6 +13,7 @@ export const INFO_SIZES: Readonly<
   large: { title: 28, titleLine: 34, sub: 16, subLine: 22 },
   medium: { title: 22, titleLine: 27, sub: 14, subLine: 20 },
   small: { title: 20, titleLine: 24, sub: 13, subLine: 18 },
+  compact: { title: 16, titleLine: 20, sub: 12, subLine: 16 },
 };
 
 /** 曲名行与副标题行垂直间距（像素） */
@@ -43,6 +47,13 @@ export const COLLAPSE_TIERS: Readonly<
     { tier: 'full', min: 166 },
     { tier: 'noDetail', min: 156 },
     { tier: 'noRating', min: 124 },
+    { tier: 'bare', min: 0 },
+  ],
+  // 按上面三档的算法推出来的（曲名至少 4 个字宽、艺人·专辑至少 6 个字宽，加间隔与标记宽），没有逐像素量过
+  compact: [
+    { tier: 'full', min: 152 },
+    { tier: 'noDetail', min: 148 },
+    { tier: 'noRating', min: 108 },
     { tier: 'bare', min: 0 },
   ],
 };

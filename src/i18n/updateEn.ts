@@ -5,6 +5,8 @@ export const updateEn = {
   'update.pluginStaged': 'Component {version} is downloaded and ready to install',
   'update.pluginRestarting': 'Closing foobar2000 to install the component…',
   'update.pluginFailed': 'Could not complete the component update',
+  'update.pluginInstallFailed': 'Component {version} could not be installed',
+  'update.copyLog': 'Copy runtime log',
   'update.pluginNeedsBackend': 'The local service must be ready before updating the component',
   'update.pluginNeedsTheme': 'Restart to apply the downloaded theme before updating the component',
   'update.pluginIncompatible':

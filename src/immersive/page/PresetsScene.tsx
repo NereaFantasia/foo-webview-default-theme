@@ -23,9 +23,14 @@ import {
   type SceneSnapshot,
 } from '../scene/sceneActions.ts';
 import { SceneActionsContext, SceneFrameContext, type SceneFrame } from '../scene/sceneContext.ts';
-import { startPagePref } from '../scene/scenePrefs.ts';
+import {
+  collapseWithoutLyricsPref,
+  presetOptionsPref,
+  startPagePref,
+} from '../scene/scenePrefs.ts';
 import { immersiveFpsCapAtom } from './immersivePrefs.ts';
 import { PresetLayers } from './PresetLayers.tsx';
+import { PresetsEdit } from './PresetsEdit.tsx';
 import styles from './PresetsScene.module.css';
 import { useSceneView } from './useSceneView.ts';
 import { useViewServices } from './viewServices.ts';
@@ -68,12 +73,14 @@ export function PresetsScene() {
   const [box, root] = useBox();
   const degraded = useAtomValueRawSync(backdropDegradedAtom);
   const searching = useAtomValueRawSync(lyricsSearchOpenAtom);
+  const autoCollapse = useAtomValueRawSync(collapseWithoutLyricsPref.atom);
+  const allStored = useAtomValueRawSync(presetOptionsPref.atom);
   const frame: SceneFrame = useMemo(
     () => ({ ...box, visible: shown, degraded }),
     [box, shown, degraded],
   );
   const orientation = box.width >= box.height ? 'landscape' : 'portrait';
-  const preset = presetFor(orientation, useAtomValueRawSync(presetIdAtoms[orientation]));
+  const preset = presetFor(orientation, useAtomValueRawSync(presetIdAtoms[orientation]), box);
   const state = useAtomValueRawSync(sceneStateAtom);
   const lyrics = useAtomValueRawSync(useService(lyricsKey).state);
   const backdropReleased = useEntryReached('backdrop');
@@ -85,6 +92,7 @@ export function PresetsScene() {
       lyrics: lyricsAvailability(lyrics, { hasTrack, connected }),
       sidebarFits: preset.sidebarFits(box),
       searching,
+      autoCollapse,
     },
     transition,
   );
@@ -107,7 +115,8 @@ export function PresetsScene() {
       {box.width > 0 && (
         <SceneActionsContext value={actions}>
           <SceneFrameContext value={frame}>
-            <PresetLayers Template={preset.Template} view={view} />
+            <PresetLayers Template={preset.Template} view={view} stored={allStored[preset.id]} />
+            <PresetsEdit preset={preset} centered={view.centered} />
           </SceneFrameContext>
         </SceneActionsContext>
       )}

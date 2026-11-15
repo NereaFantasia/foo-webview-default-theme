@@ -11,8 +11,7 @@
 /* 右边的 --edge-bleed 是页面伸到窗口右缘的那一段，头和脚退回原来的右缘 */
 .head {
   margin-right: var(--edge-bleed, 0px);
-  padding: calc(var(--lyrics-preview-top, 0px) + var(--spacingVerticalM)) var(--spacingHorizontalM)
-    0;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM) 0;
 }
 
 .identity {
@@ -172,7 +171,6 @@
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-  padding-top: var(--lyrics-preview-top, 0px);
 }
 .subpage > .body {
   grid-row: 1;

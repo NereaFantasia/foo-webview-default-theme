@@ -1,20 +1,34 @@
+/* 内嵌时整页从卡片上缘铺到下缘：页头条停靠在上，画面在下。绝对定位跳出中央区各层的上内边距，
+   页头条自己按导航行的占位留位置；全窗口时同一层改成盖住整个窗口 */
+.page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  container: video-stage / inline-size;
+  overflow: hidden;
+  outline: none;
+}
+.page[data-expanded] {
+  position: fixed;
+  z-index: 100;
+}
+.body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+}
+/* 画面、控制条与全窗口的标题条各自包在固定深色的主题里，不随整窗深浅；这一层本身不铺底 */
 .stage {
   position: absolute;
   inset: 0;
-  container: video-stage / inline-size;
   overflow: hidden;
-  background: var(--colorNeutralBackground4);
-  color: var(--colorNeutralForeground1);
-  outline: none;
-}
-.stage[data-expanded] {
-  position: fixed;
-  z-index: 100;
 }
 .stage:not([data-controls]) {
   cursor: none;
 }
-.heading {
+/* 全窗口时盖在画面上的标题条，窗口三键在它右端 */
+.overlay {
   position: absolute;
   inset: 0 0 auto;
   display: flex;
@@ -25,17 +39,11 @@
   padding-left: var(--spacingHorizontalL);
   background: var(--colorNeutralBackground1);
 }
-.title {
+.overlayTitle {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-.actions {
-  display: flex;
-  flex: none;
-  gap: var(--spacingHorizontalXS);
-  margin-inline-end: var(--spacingHorizontalS);
 }
 .controls {
   position: absolute;
@@ -54,10 +62,10 @@
   color: var(--colorNeutralForeground1);
   text-align: center;
 }
-.stage[data-expanded] .controls {
+.page[data-expanded] .controls {
   bottom: var(--spacingVerticalL);
 }
-.heading,
+.overlay,
 .controls {
   opacity: 1;
   transform: translateY(0);
@@ -66,7 +74,7 @@
     transform var(--motion-normal) var(--curveDecelerateMid),
     visibility 0s;
 }
-.stage:not([data-controls]) .heading,
+.stage:not([data-controls]) .overlay,
 .stage:not([data-controls]) .controls {
   opacity: 0;
   visibility: hidden;
@@ -76,7 +84,7 @@
     transform var(--motion-fast) var(--curveDecelerateMid),
     visibility 0s var(--motion-fast);
 }
-.stage:not([data-controls]) .heading {
+.stage:not([data-controls]) .overlay {
   transform: translateY(calc(-1 * var(--spacingVerticalM)));
 }
 .stage:not([data-controls]) .controls {

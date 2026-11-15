@@ -109,7 +109,7 @@ test('同页目录后退交还各自的筛选与树焦点，树 DOM 保持原对
   expect(env.errors).toEqual([]);
 });
 
-test('目录双击仍按该目录起播', async ({ page }) => {
+test('目录双击仍按该目录起播 @smoke', async ({ page }) => {
   const env = await openFolders(page);
   await env.folder('Alpha').dblclick();
   await expect

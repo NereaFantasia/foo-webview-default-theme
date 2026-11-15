@@ -14,11 +14,13 @@ export function useSceneActions(): SceneActions {
  * 控制层常驻挂载插槽
  *
  * 为预设场景提供顶栏中心页签区与左侧附加功能键插槽；元素通过 Portal 挂载至控制层以保持 DOM 顺序与焦点序列一致，
- * 并共享控制层的交互淡出遮罩；挂载点未就绪时保持空状态以避免原地闪烁
+ * 并共享控制层的交互淡出遮罩；挂载点未就绪时保持空状态以避免原地闪烁。`edit` 是编辑时编辑条的位置，
+ * 与页签同在顶部正中，编辑时页签藏起
  */
 export interface ControlSlots {
   readonly tabs: HTMLElement | null;
   readonly views: HTMLElement | null;
+  readonly edit: HTMLElement | null;
 }
 
 /** 控制层插槽上下文；缺省时降级为原地渲染 */

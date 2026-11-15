@@ -14,13 +14,9 @@ export interface GenreEntry {
   readonly albumCount: number;
   readonly duration: number;
   readonly artists: readonly string[];
-  readonly issue: 'duplicate' | 'combined' | null;
 }
 
 export type GenreSort = 'name' | 'tracks' | 'albums';
-
-const canonical = (name: string) =>
-  name.normalize('NFKC').toLocaleLowerCase().replace(/[\s-]/g, '');
 
 /** 每首在一个流派里只算一次；同张专辑属于几个流派时，各边都保留 */
 export function buildGenres(
@@ -37,11 +33,6 @@ export function buildGenres(
       if (rows) rows.push(track);
       else grouped.set(key, [track]);
     }
-  }
-  const spellings = new Map<string, number>();
-  for (const key of grouped.keys()) {
-    const name = canonical(key);
-    spellings.set(name, (spellings.get(name) ?? 0) + 1);
   }
   return [...grouped].map(([key, rows]) => {
     const counts = new Map<AlbumKey, number>();
@@ -64,22 +55,15 @@ export function buildGenres(
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
         .map(([name]) => name),
-      issue:
-        key === EMPTY_GENRE
-          ? null
-          : (spellings.get(canonical(key)) ?? 0) > 1
-            ? 'duplicate'
-            : /[/,;&]/.test(key)
-              ? 'combined'
-              : null,
     };
   });
 }
 
+/** `issues` 给出时只留有整理提示的流派，不给就是全部 */
 export function filterGenres(
   entries: readonly GenreEntry[],
   text: string,
-  tidy: boolean,
+  issues: ReadonlyMap<string, unknown> | undefined,
   sort: GenreSort,
   descending: boolean,
   locale: string,
@@ -89,7 +73,7 @@ export function filterGenres(
   return entries
     .filter(
       (entry) =>
-        (!tidy || entry.issue !== null) &&
+        (!issues || issues.has(entry.key)) &&
         (!needle || entry.key.toLocaleLowerCase().includes(needle)),
     )
     .sort((a, b) => {

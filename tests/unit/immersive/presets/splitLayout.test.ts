@@ -4,6 +4,7 @@ import {
   COVER_MIN,
   columnReachOf,
   coverSizeOf,
+  favoriteKeyFits,
   fitScale,
   gapsOf,
   isCompact,
@@ -60,6 +61,15 @@ describe('keyRowOf', () => {
     expect(keyRowOf(176)).toEqual({ order: false, volumeGap: true });
     expect(keyRowOf(175)).toEqual({ order: false, volumeGap: false });
     expect(keyRowOf(160)).toEqual({ order: false, volumeGap: false });
+  });
+});
+
+describe('favoriteKeyFits', () => {
+  it('信息行里的收藏键与播放顺序键同界：封面 216 以上才占这一格', () => {
+    expect(favoriteKeyFits(400)).toBe(true);
+    expect(favoriteKeyFits(216)).toBe(true);
+    expect(favoriteKeyFits(215)).toBe(false);
+    expect(favoriteKeyFits(COVER_MIN)).toBe(false);
   });
 });
 

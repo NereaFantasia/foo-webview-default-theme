@@ -113,7 +113,7 @@ function SendToButton({ album }: { readonly album: Album }) {
   const menu = useAtomValueRawSync(albumMenuAtom);
   const albums = useService(albumsKey);
   const classes = useDetailHeaderStyles();
-  // 按专辑键认：库一变，详情页拿到的是清单里新的那一行，对象换了、专辑还是这一张
+  // 按专辑键判断：库变更后，详情页收到的是清单里新的那一行，对象已换，专辑仍是这一张
   const only = menu.albums.length === 1 ? menu.albums[0] : undefined;
   const mine = !!only && albumKeyOf(only) === albumKeyOf(album) && menu.trackIndex === null;
   const usable = mine && !menu.loading && !menu.failed && menu.tracks.length > 0;
@@ -179,7 +179,7 @@ export function AlbumDetailHeader(props: AlbumDetailHeaderProps) {
     () => (artist ? [{ key: artist, name: artist, to: { kind: 'artist', name: artist } }] : []),
     [artist],
   );
-  const photo = useAlbumArtistPhoto(album.firstTrackAbsolutePath || album.firstTrackPath);
+  const photo = useAlbumArtistPhoto(artist, album.firstTrackAbsolutePath || album.firstTrackPath);
   const count = tracks.length || album.trackCount;
   const seconds = tracks.length
     ? tracks.reduce((sum, track) => sum + track.duration, 0)

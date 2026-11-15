@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { openSongs } from '../fixtures/songsPage.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 test('空媒体库读完显示空态与 0 首，不停留在骨架或读取中', async ({ page }) => {
   const songs = await openSongs(page, {
     waitForRows: false,
     configure(host) {
-      host.answer('library.getAll', { success: true, tracks: [], items: [], total: 0, offset: 0 });
+      host.answer('library.search', wholeLibrary([]));
       host.answer('library.query', { success: true, tracks: [], total: 0 });
     },
   });
@@ -84,15 +85,48 @@ test('去详情页再后退，过滤词、条件与焦点恢复，前进仍到�
   expect(songs.errors).toEqual([]);
 });
 
-test('曲目菜单命令失败在歌曲页可见并能关闭', async ({ page }) => {
+test('曲目菜单命令失败在歌曲页可见并能关闭：入队走菜单命令的横幅，单选「播放」与双击同一条、走起播的横幅', async ({
+  page,
+}) => {
   const songs = await openSongs(page);
-  songs.host.answer('playlist.clear', hostFailure('OPERATION_FAILED'));
+  songs.host.answer('queue.insertNext', hostFailure('OPERATION_FAILED'));
   await songs.row('Angel').click({ button: 'right' });
-  await page.locator('[data-track-menu] [data-action="play"]').click();
+  await page.locator('[data-track-menu] [data-action="play-next"]').click();
   const notice = songs.view.locator('[data-songs-notice="menu"]');
   await expect(notice).toBeVisible();
   await notice.getByRole('button').click();
   await expect(notice).toHaveCount(0);
+
+  songs.host.answer('playlist.clear', hostFailure('OPERATION_FAILED'));
+  await songs.row('Angel').click({ button: 'right' });
+  await page.locator('[data-track-menu] [data-action="play"]').click();
+  const playNotice = songs.view.locator('[data-songs-notice="command"]');
+  await expect(playNotice).toBeVisible();
+  await playNotice.getByRole('button').click();
+  await expect(playNotice).toHaveCount(0);
+  expect(songs.errors).toEqual([]);
+});
+
+test('右键单选「播放」与回车、双击同一条：沿整个结果从这一行往下播；多选「播放所选」只播选中的', async ({
+  page,
+}) => {
+  const songs = await openSongs(page);
+  await songs.row('Teardrop').click({ button: 'right' });
+  await page.locator('[data-track-menu] [data-action="play"]').click();
+  await expect.poll(() => songs.host.callsTo('playlist.playTrack')).toHaveLength(1);
+  expect(songs.host.callsTo('playlist.playTrack')[0]).toMatchObject({ index: 3 });
+  const whole = songs.host.callsTo('library.addToPlaylist').at(-1);
+  expect(Array.isArray(whole?.['paths']) && whole['paths'].length).toBeGreaterThan(1);
+
+  await songs.row('Angel').click();
+  await songs.row('Teardrop').click({ modifiers: ['Control'] });
+  await songs.row('Teardrop').click({ button: 'right' });
+  const play = page.locator('[data-track-menu] [data-action="play"]');
+  await expect(play).toContainText('播放所选');
+  await play.click();
+  await expect.poll(() => songs.host.callsTo('playlist.playTrack')).toHaveLength(2);
+  expect(songs.host.callsTo('playlist.playTrack')[1]).toMatchObject({ index: 0 });
+  expect(songs.host.callsTo('library.addToPlaylist').at(-1)?.['paths']).toHaveLength(2);
   expect(songs.errors).toEqual([]);
 });
 
@@ -105,7 +139,8 @@ test('查询有误时保留上次结果，页头播放与整批操作等待有�
   await expect(songs.view.locator('[data-songs-play]')).toBeDisabled();
   await expect(songs.view.locator('[data-songs-shuffle]')).toBeDisabled();
   await songs.view.locator('[data-songs-more]').click();
-  await expect(page.locator('[data-action="autoplaylist"]')).toHaveAttribute(
+  // 发送到新列表要有结果；创建自动播放列表的对话框自己数命中数，查询有误时也能进去改
+  await expect(page.locator('[data-action="autoplaylist"]')).not.toHaveAttribute(
     'aria-disabled',
     'true',
   );
@@ -113,8 +148,13 @@ test('查询有误时保留上次结果，页头播放与整批操作等待有�
     'aria-disabled',
     'true',
   );
+  await page.locator('[data-action="autoplaylist"]').click();
+  await expect(page.locator('[data-autoplaylist-dialog]')).toBeVisible();
+  await expect(page.locator('[data-autoplaylist-create]')).toBeDisabled();
+  await page.keyboard.press('Escape');
   expect(await songs.titles()).toHaveLength(8);
   expect(songs.host.callsTo('playlist.convertToAutoplaylist')).toEqual([]);
+  expect(songs.host.callsTo('playlist.createAutoplaylist')).toEqual([]);
   expect(songs.errors).toEqual([]);
 });
 
@@ -133,7 +173,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
       await expect(songs.grid.getByRole('columnheader', { name: '艺人', exact: true })).toHaveCount(
         1,
       );
-      // 播放在标题行右端，与标题同一行；窄档搜索框收成命令栏里的搜索键。
+      // 播放在标题行右端，与标题同一行；窄档搜索框收成命令栏里的搜索键
       const heading = await songs.view.getByRole('heading', { name: '歌曲' }).boundingBox();
       const play = await songs.view.locator('[data-songs-play]').boundingBox();
       expect(

@@ -28,6 +28,7 @@ export interface ContextMenuLayerProps {
   readonly items: readonly ContextMenuEntry[];
   readonly viewport: ContextMenuViewport;
   readonly backLabel: string;
+  readonly headless?: boolean;
   readonly surfaceMotion?: MenuProps['surfaceMotion'];
   readonly widthLimit?: number;
   readonly surfaceAttributes?: Readonly<Record<`data-${string}`, string | boolean>>;
@@ -141,7 +142,7 @@ export function ContextMenuLayer(props: ContextMenuLayerProps) {
         }
       }}
     >
-      {bounds.height >= 140 && header}
+      {!props.headless && bounds.height >= 140 && header}
       {(levels.length > 0 || props.onBack) && (
         <Button
           className={classes.back}
@@ -164,7 +165,7 @@ export function ContextMenuLayer(props: ContextMenuLayerProps) {
           if (target && list.current?.contains(target)) revealContextMenuItem(list.current, target);
         }}
       >
-        {bounds.height < 140 && header}
+        {!props.headless && bounds.height < 140 && header}
         {contextMenuItems(items).map((entry) => {
           if (entry.kind === 'separator') return <MenuDivider key={entry.id} />;
           if (entry.kind === 'status') {

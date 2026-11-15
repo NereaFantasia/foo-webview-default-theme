@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
+import { enterEdit } from '../../../../src/immersive/page/editSession.ts';
 import { PresetLayers } from '../../../../src/immersive/page/PresetLayers.tsx';
 import {
   createSceneActions,
@@ -74,6 +76,14 @@ describe('PresetLayers', () => {
     expect(html).toContain('data-scene-element="info"');
     expect(html).not.toContain('data-scene-element="cover"');
     expect(html.match(KEY)?.[0]).toContain('aria-pressed="true"');
+  });
+
+  it('设置的编辑开着时模板不接指针与焦点（外层挂 inert），关着时照常', async () => {
+    const env = await start();
+    const template = /<div[^>]*>(?=<div data-scene-element="cover")/;
+    expect(render(env, 'none').match(template)?.[0]).not.toContain('inert');
+    enterEdit(env.store);
+    expect(render(env, 'none').match(template)?.[0]).toContain('inert');
   });
 
   it('Coverflow 键有名字', async () => {

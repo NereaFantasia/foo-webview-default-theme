@@ -6,6 +6,7 @@ import {
   desktopLyricsViewJson,
   type DesktopLyricsView,
 } from '../../../../src/lyrics/desktop/desktopLyricsLink.ts';
+import { DEFAULT_LYRICS_DISPLAY } from '../../../../src/lyrics/lyricsDisplay.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 
 const VIEW: DesktopLyricsView = {
@@ -29,6 +30,12 @@ const VIEW: DesktopLyricsView = {
   motionPreset: 'amll',
   multilineSize: null,
   fontSize: 34,
+  translationFontSize: 20,
+  motionCustom: { blur: true, scale: true, hidePassedLines: false, alignPosition: 0.5 },
+  font: '',
+  fontWeight: null,
+  uiFont: '',
+  cjkFont: '',
   sung: null,
   unsung: null,
   tint: null,
@@ -41,6 +48,11 @@ const VIEW: DesktopLyricsView = {
   title: '曲名',
   artist: '艺人',
   hidden: false,
+  process: {
+    optimize: DEFAULT_LYRICS_DISPLAY.optimize,
+    maskMode: DEFAULT_LYRICS_DISPLAY.maskMode,
+    maskChar: DEFAULT_LYRICS_DISPLAY.maskChar,
+  },
 };
 
 async function setup() {

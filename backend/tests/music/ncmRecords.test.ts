@@ -12,7 +12,7 @@ import {
   readNcmTracks,
 } from '../../music/ncmRecords.ts';
 
-// 摘自 2026-10-12 不登录的 cloudsearch 应答：会员曲目，四档都有，另带 192k 的 m 与平台私有字段。
+// 摘自 2026-10-12 不登录的 cloudsearch 应答：会员曲目，四档都有，另带 192k 的 m 与平台私有字段
 const LEVEL = { br: 128000, fid: 0, size: 3493293, vd: 28526, sr: 48000 };
 const SONG = {
   id: 64317,
@@ -39,7 +39,7 @@ const SONG = {
   privilege: { id: 64317, fee: 1, st: 0, pl: 0, maxBrLevel: 'jymaster' },
 };
 
-// 摘自 2026-10-17 不登录的 cloudsearch 应答（专辑、艺人、歌单），只留转换用到的字段与几个私有字段。
+// 摘自 2026-10-17 不登录的 cloudsearch 应答（专辑、艺人、歌单），只留转换用到的字段与几个私有字段
 const ALBUM = {
   id: 2098348,
   name: 'modal soul',
@@ -85,6 +85,7 @@ describe('NCM 适配的转换', () => {
       ref: { platform: 'wy', id: '162138' },
       name: 'Nujabes',
       avatar: 'https://p4.music.126.net/k6EO07Tl1VeajQzs80uzsw==/109951165416860404.jpg',
+      aliases: ['瀬葉淳'],
       albumCount: 51,
       trackCount: 381,
     });
@@ -103,7 +104,7 @@ describe('NCM 适配的转换', () => {
       readNcmArtist(ARTIST),
       readNcmPlaylist(PLAYLIST),
     ]);
-    expect(all).not.toMatch(/Hydeout|img1v1|1426066590158496|瀬葉淳|PillowPhilia/);
+    expect(all).not.toMatch(/Hydeout|img1v1|1426066590158496|PillowPhilia/);
   });
 
   it('专辑种类只认专辑、Single、EP 与精选集；榜单按详情里的榜单代号认，简介与更新说明原样带上', () => {
@@ -219,9 +220,10 @@ describe('NCM 适配的转换', () => {
       ref: { platform: 'wy', id: '64317' },
       title: '因为爱情',
       subtitle: '电影《将爱情进行到底》主题曲',
+      aliases: ['电影《将爱情进行到底》主题曲'],
       artists: [
-        { ref: { platform: 'wy', id: '2116' }, name: '陈奕迅' },
-        { ref: { platform: 'wy', id: '9621' }, name: '王菲' },
+        { ref: { platform: 'wy', id: '2116' }, name: '陈奕迅', aliases: ['Eason Chan'] },
+        { ref: { platform: 'wy', id: '9621' }, name: '王菲', aliases: ['Faye Wong'] },
       ],
       album: { ref: { platform: 'wy', id: '6355' }, title: 'Stranger Under My Skin' },
       durationMs: 218277,
@@ -231,6 +233,39 @@ describe('NCM 适配的转换', () => {
       access: 'vip',
     });
     expect(JSON.stringify(track)).not.toMatch(/privilege|jymaster|14248855/);
+  });
+
+  it('别名与译名并成一份只用于查找：去掉重复与同名的，限条数与长度，不是数组的忽略', () => {
+    const track = readNcmTrack({
+      ...SONG,
+      name: '夜に駆ける',
+      alia: ['Yoru ni Kakeru', '夜に駆ける', ' '],
+      tns: [
+        '向夜晚奔去',
+        'Yoru ni Kakeru',
+        'x'.repeat(129),
+        ...Array.from({ length: 12 }, (_, i) => `译${i}`),
+      ],
+      ar: [
+        { id: 33927412, name: 'YOASOBI', tns: ['夜游'], alias: ['ヨアソビ'] },
+        { id: 1, name: '无别名', tns: '[0]', alias: '[0]' },
+      ],
+    });
+    expect(track?.aliases).toEqual([
+      'Yoru ni Kakeru',
+      '向夜晚奔去',
+      ...Array.from({ length: 6 }, (_, i) => `译${i}`),
+    ]);
+    expect(track?.subtitle).toBe('Yoru ni Kakeru');
+    expect(track?.artists[0]).toEqual({
+      ref: { platform: 'wy', id: '33927412' },
+      name: 'YOASOBI',
+      aliases: ['ヨアソビ', '夜游'],
+    });
+    expect(track?.artists[1]).toEqual({ ref: { platform: 'wy', id: '1' }, name: '无别名' });
+    expect(
+      readNcmArtist({ ...ARTIST, alias: ['Eason Chan'], transNames: ['宇多田光'] })?.aliases,
+    ).toEqual(['Eason Chan', '宇多田光']);
   });
 
   it('各档体积只记正整数；一档都没有时省略', () => {
@@ -269,6 +304,7 @@ describe('NCM 适配的转换', () => {
       ref: { platform: 'wy', id: '7' },
       title: '曲目',
       subtitle: '译名',
+      aliases: ['译名'],
       artists: [{ ref: null, name: '未收录' }],
       album: null,
       durationMs: null,

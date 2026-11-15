@@ -24,6 +24,9 @@ export const useContextMenuStyles = makeStyles({
     flex: '1 1 auto',
     // 局部主题的Portal不带外层Provider类，滚动区直接应用共用样式
     ...SCROLLBAR_STYLES,
+    // 菜单项的焦点环收进项内：Fluent 缺省把它画在项外 2px，滚动区的裁切线紧贴项的左缘与首末项的上下缘，会截去一部分
+    '& [role^="menuitem"][data-fui-focus-visible]::after, & [role="option"][data-fui-focus-visible]::after':
+      { top: 0, right: 0, bottom: 0, left: 0 },
   },
   item: {
     maxWidth: 'none',

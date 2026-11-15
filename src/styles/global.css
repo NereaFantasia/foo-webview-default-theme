@@ -26,6 +26,13 @@ textarea,
   user-select: text;
 }
 
+/* Fluent 的 Link 自带 user-select: text，会盖掉 body 上的 none，列表里的跳转文字就能被拖选
+   改成跟随父级：普通界面是 none，写了 text 的阅读区里照常能选。
+   类名写两遍是为了压过 Fluent 的单类原子样式，不依赖样式表的先后顺序 */
+.fui-Link.fui-Link {
+  user-select: inherit;
+}
+
 /* 主题根（FluentProvider）靠网格拉伸铺满窗口，而不是自己写 height: 100%：
    它的类会被抄到浮层的挂载节点上，那个节点带上整页高度就会盖住窗口、吞掉点击。
    行列都写成 minmax(0, 1fr)：缺省的 auto 轨道会随内容长高，内容一多整页就撑出窗口，
@@ -33,4 +40,11 @@ textarea,
 #root {
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+
+/* 菜单、Popover 开着时页面不接指针（`useBlockPage`）；`*` 加 `!important` 是为了连写了 pointer-events: auto 的
+   悬停键之类一并压住 */
+#root[data-outside-blocked],
+#root[data-outside-blocked] * {
+  pointer-events: none !important;
 }

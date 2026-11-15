@@ -5,12 +5,10 @@ import {
   Play24Filled,
   Previous24Regular,
 } from '@fluentui/react-icons';
-import { useAtomValueRawSync, useStore } from 'jotai/react';
+import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactElement } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { useService } from '../../kit/useService.ts';
-import { noteSkip } from '../../playback/now-playing/trackSwap.ts';
-import { currentTrackAtom } from '../../playback/playback.ts';
 import { playbackKey } from '../../playback/playbackContract.ts';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
 import { playingAudibleAtom } from '../../playback/playingTrack.ts';
@@ -27,19 +25,17 @@ export interface KeysProps {
 /**
  * 沉浸模式核心播控三键组（上一首、播放/暂停、下一首）
  *
- * 播放状态严格对齐宿主反馈而不采用乐观更新，上一首与下一首触发时记录跳曲方向以联动切歌翻转动效；
- * 未连接宿主时全组禁用，已连接但停止播放时上一首与下一首置灰
+ * 播放状态严格对齐宿主反馈而不采用乐观更新，上一首与下一首由播放服务记录跳曲方向以联动切歌翻转动效；
+ * 未连接宿主时全组禁用。停止播放时上一首与下一首仍可按：宿主的快捷键同样能在停止时起播
  */
 export function Transport({ size = 'regular' }: KeysProps) {
   const t = useAtomValueRawSync(translateAtom);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const audible = useAtomValueRawSync(playingAudibleAtom);
-  const track = useAtomValueRawSync(currentTrackAtom);
   const playback = useService(playbackKey);
-  const store = useStore();
   const classes = useKeyStyles();
   const controls = useViewControlStyles();
-  const skipDisabled = !connected || track === null;
+  const skipDisabled = !connected;
   const key = mergeClasses(keyClass(classes, size), controls.icon);
   return (
     <div
@@ -54,10 +50,7 @@ export function Transport({ size = 'regular' }: KeysProps) {
         icon={<Previous24Regular />}
         className={key}
         disabled={skipDisabled}
-        onClick={() => {
-          noteSkip(store, 'previous');
-          void playback.previous();
-        }}
+        onClick={() => void playback.previous()}
       />
       <Key
         name="play"
@@ -77,10 +70,7 @@ export function Transport({ size = 'regular' }: KeysProps) {
         icon={<Next24Regular />}
         className={key}
         disabled={skipDisabled}
-        onClick={() => {
-          noteSkip(store, 'next');
-          void playback.next();
-        }}
+        onClick={() => void playback.next()}
       />
     </div>
   );

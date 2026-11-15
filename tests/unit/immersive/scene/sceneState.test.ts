@@ -292,3 +292,45 @@ describe('搜索开着：歌词页不因为没有歌词而自动居中', () => {
     expect(closed.next.view.centered).toBe(true);
   });
 });
+
+describe('无歌词时收起侧栏的开关（autoCollapse）', () => {
+  const lyricsState = state('lyrics');
+  const withCollapse = (lyrics: 'pending' | 'present' | 'absent', autoCollapse?: boolean) => ({
+    ...env(lyrics, true, false),
+    autoCollapse,
+  });
+
+  it('没给就按开处理：没有歌词时自动居中（纯函数的缺省，旧调用不变）', () => {
+    expect(deriveSceneView(lyricsState, withCollapse('absent'), null).centered).toBe(true);
+  });
+
+  it('关着：没有歌词也不自动居中，侧栏留着，自动居中那一份也是假', () => {
+    const view = deriveSceneView(lyricsState, withCollapse('absent', false), null);
+    expect(view.centered).toBe(false);
+    expect(view.autoCentered).toBe(false);
+    expect(view.showTabs).toBe(true);
+  });
+
+  it('关着：歌词请求中、结果是没有，一直不居中，不会居中又弹回', () => {
+    const held = deriveSceneView(lyricsState, withCollapse('present', false), null);
+    expect(deriveSceneView(lyricsState, withCollapse('pending', false), held).centered).toBe(false);
+    expect(deriveSceneView(lyricsState, withCollapse('absent', false), held).centered).toBe(false);
+  });
+
+  it('关着：手动收起、窗太窄仍居中，开关只管没有歌词那一条', () => {
+    const closed = setSidebar(lyricsState, 'closed');
+    expect(deriveSceneView(closed, withCollapse('present', false), null).centered).toBe(true);
+    expect(
+      deriveSceneView(lyricsState, { ...withCollapse('present', false), sidebarFits: false }, null)
+        .centered,
+    ).toBe(true);
+  });
+
+  it('开着时开关切到关：状态与窗口没动、居中变成不居中，过渡着换（歌词那一条的做法）', () => {
+    const held = settleView(null, lyricsState, withCollapse('absent', true)).next;
+    expect(held.view.centered).toBe(true);
+    const off = settleView(held, lyricsState, withCollapse('absent', false));
+    expect(off.glide).toBe(true);
+    expect(off.next.view.centered).toBe(false);
+  });
+});

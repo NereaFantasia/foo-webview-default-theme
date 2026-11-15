@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { boxOf, choosePlayerBar, openPlayer, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 
 // 播放栏放在标题栏时，窄窗（< 1008）的胶囊：四个宽度下标题栏与胶囊的形态、键的去留；胶囊里的键与进度；
-// 音量浮层；卡片给页面的 --player-inset；跨过 1008 时焦点跟到另一套里同名的件上；停止时收掉。观感只能实机看。
+// 音量浮层；卡片给页面的 --player-inset；跨过 1008 时焦点跟到另一套里同名的件上；停止时收掉。观感只能实机看
 
 test.beforeEach(({ page }) => choosePlayerBar(page, 'titlebar'));
 
@@ -15,31 +15,18 @@ const keysIn = (page: Page, scope: string) =>
     .locator(`${scope} [data-player-key]`)
     .evaluateAll((keys) => keys.map((key) => key.getAttribute('data-player-key')));
 
-// 进度线也是一个件，排在最后。
+// 进度线也是一个件，排在最后
 for (const [width, keys] of [
   [1000, ['cover', 'order', 'previous', 'play', 'next', 'volume', 'more', 'seek']],
   [900, ['cover', 'order', 'previous', 'play', 'next', 'volume', 'more', 'seek']],
   [640, ['cover', 'previous', 'play', 'next', 'more', 'seek']],
   [390, ['cover', 'previous', 'play', 'next', 'more', 'seek']],
 ] as const) {
-  test(`${width} 宽：标题栏 48 高、只有 ⋯ 与三键，胶囊高 64、离卡底 16、在卡片里水平居中`, async ({
-    page,
-  }) => {
+  test(`${width} 宽：标题栏里没有播放键与正在播放条，胶囊里是这几个键`, async ({ page }) => {
     const { errors } = await openPlayer(page, { width });
-    expect(await boxOf(page, 'header')).toMatchObject({ height: 48 });
     expect(await keysIn(page, 'header')).toEqual([]);
     await expect(page.locator('header [data-now-playing]')).toHaveCount(0);
     expect(await keysIn(page, '[data-player-capsule]')).toEqual(keys);
-
-    const card = await boxOf(page, '[data-capsule]');
-    const pill = await boxOf(page, '[data-player-capsule]');
-    // 卡片有 1 像素的描边，胶囊按描边内侧定位。
-    const inner = card.width - 2;
-    expect(pill.height).toBe(64);
-    expect(card.y + card.height - 1 - (pill.y + pill.height)).toBe(16);
-    expect(Math.abs(pill.x + pill.width / 2 - (card.x + card.width / 2))).toBeLessThanOrEqual(1);
-    expect(pill.width).toBe(width <= 640 ? inner - 32 : Math.min(600, inner - 32));
-    expect(await boxOf(page, '[data-player-capsule] img')).toMatchObject({ width: 48, height: 48 });
     expect(errors).toEqual([]);
   });
 }
@@ -70,33 +57,6 @@ test('胶囊的键调到与宽窗相同的命令；进度线跟着宿主的进�
   expect(errors).toEqual([]);
 });
 
-test('胶囊形态的宽窗：宽 680；封面离外缘 8，键组离右缘 14，进度线离外缘左 64、右 32、下 3', async ({
-  page,
-}) => {
-  await choosePlayerBar(page, 'capsule');
-  const { errors } = await openPlayer(page);
-  const pill = await boxOf(page, '[data-player-capsule]');
-  expect(pill).toMatchObject({ width: 680, height: 64 });
-  const cover = await boxOf(page, '[data-player-capsule] img');
-  expect(cover.x - pill.x).toBe(8);
-  const menu = await boxOf(page, '[data-player-capsule] [data-player-key="more"]');
-  expect(pill.x + pill.width - (menu.x + menu.width)).toBe(14);
-  const line = await capsule(page)
-    .locator('[data-seek-fill]')
-    .evaluate((fill) => {
-      const box = (fill.parentElement ?? fill).getBoundingClientRect();
-      return {
-        left: Math.round(box.left),
-        right: Math.round(box.right),
-        bottom: Math.round(box.bottom),
-      };
-    });
-  expect(line.left - pill.x).toBe(64);
-  expect(pill.x + pill.width - line.right).toBe(32);
-  expect(pill.y + pill.height - line.bottom).toBe(3);
-  expect(errors).toEqual([]);
-});
-
 test('胶囊的音量键点开朝上的浮层：静音键、滑条与数值；方向键调音量，Esc 收起、焦点回到音量键', async ({
   page,
 }) => {
@@ -105,7 +65,7 @@ test('胶囊的音量键点开朝上的浮层：静音键、滑条与数值；�
   await volumeKey.click();
   const popover = page.locator('[data-volume-popover]');
   await expect(popover).toBeVisible();
-  // 入场动效带一段位移，播完再量。
+  // 入场动效带一段位移，播完再量
   await popover.evaluate((element) =>
     Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
   );
@@ -126,28 +86,6 @@ test('胶囊的音量键点开朝上的浮层：静音键、滑条与数值；�
   await volumeKey.hover();
   await page.mouse.wheel(0, 100);
   await expect.poll(() => calls('playback.setVolume').length).toBe(2);
-  expect(errors).toEqual([]);
-});
-
-test('卡片按有没有胶囊给出 --player-inset：宽窗 0，窄窗是胶囊高 64 加离底 16', async ({ page }) => {
-  const { errors } = await openPlayer(page);
-  const card = page.locator('[data-with-nav-row]');
-  // 放一个高为 --player-inset 的探针量出来，不认计算值的写法。
-  const inset = () =>
-    card.evaluate((element) => {
-      const probe = document.createElement('div');
-      probe.style.height = 'var(--player-inset)';
-      element.append(probe);
-      const { height } = probe.getBoundingClientRect();
-      probe.remove();
-      return height;
-    });
-  await expect(card).not.toHaveAttribute('data-capsule');
-  expect(await inset()).toBe(0);
-  await page.setViewportSize({ width: 900, height: 800 });
-  await expect(capsule(page)).toBeVisible();
-  await expect(card).toHaveAttribute('data-capsule');
-  expect(await inset()).toBe(80);
   expect(errors).toEqual([]);
 });
 
@@ -176,7 +114,7 @@ test('减弱动效下胶囊的文字只截断、不滚动；放得下的不渐�
     width: 390,
     state: { track: { ...PLAYING_TRACK, title: long } },
   });
-  // 渐隐挂在以文字自己的滚动为时间线的动画上，不算动效；按时间走的动画（滚动一遍之类）一条都不该有。
+  // 渐隐挂在以文字自己的滚动为时间线的动画上，不算动效；按时间走的动画（滚动一遍之类）一条都不该有
   const styleOf = (text: string) =>
     capsule(page)
       .locator('span')

@@ -1,0 +1,50 @@
+.heart {
+  color: var(--colorPaletteRedForeground1);
+}
+
+/* 艺人名字旁的关注键：加号未关注，勾已关注 */
+.follow {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.follow:hover:not(:disabled) {
+  background: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.follow:active:not(:disabled) {
+  background: var(--state-pressed);
+}
+
+.follow:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.follow[data-followed] {
+  color: var(--accent);
+}
+
+/* 艺人页头玻璃组里带字的关注键：覆盖组里图标键的固定宽度 */
+.heroLabelled {
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 0 var(--spacingHorizontalM) 0 var(--spacingHorizontalS) !important;
+  gap: var(--spacingHorizontalXS);
+  white-space: nowrap;
+}
+
+.heroFollowed {
+  color: var(--accent);
+}

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { PrefStorage } from '../../../../src/kit/localPref.ts';
 import {
   SCENE_PREF_KEYS,
+  collapseWithoutLyricsPref,
   loadScenePrefs,
   presetOptionsPref,
   startPagePref,
@@ -87,5 +88,19 @@ describe('新场景的偏好', () => {
     expect(startPagePref.set(store, 'queue', null)).toBe(true);
     expect(store.get(startPagePref.atom)).toBe('queue');
     expect(startPagePref.read(null)).toBe('lyrics');
+  });
+
+  it('无歌词时收起侧栏：缺省关，存 on 或 off，认不出的回缺省', () => {
+    const empty = fakeStorage();
+    const store = createStore();
+    loadScenePrefs(store, empty.storage);
+    expect(store.get(collapseWithoutLyricsPref.atom)).toBe(false);
+    expect(collapseWithoutLyricsPref.set(store, true, empty.storage)).toBe(true);
+    expect(empty.map.get(SCENE_PREF_KEYS.collapseWithoutLyrics)).toBe('on');
+    const next = createStore();
+    loadScenePrefs(next, empty.storage);
+    expect(next.get(collapseWithoutLyricsPref.atom)).toBe(true);
+    const odd = fakeStorage({ [SCENE_PREF_KEYS.collapseWithoutLyrics]: 'yes' });
+    expect(collapseWithoutLyricsPref.read(odd.storage)).toBe(false);
   });
 });

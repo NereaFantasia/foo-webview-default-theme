@@ -34,18 +34,18 @@ export function isFeatured(album: MusicAlbum, artist: MusicRef): boolean {
 }
 
 export interface ReleaseLayout {
-  /** 是否至少有一张专辑成功分组；无法分组时全部平铺于 `albums` 且不展示「单曲与 EP」页签 */
+  /** 是否至少有一张专辑成功分组；无法分组时全部平铺于 `albums`，「单曲与 EP」一节为空 */
   readonly split: boolean;
-  /** 专辑页签主体列表；包含无法识别分类的专辑 */
+  /** 专辑一节的主体列表；包含无法识别分类的专辑 */
   readonly albums: readonly MusicAlbum[];
-  /** 专辑页签末尾合集列表 */
+  /** 合集一节的列表 */
   readonly compilations: readonly MusicAlbum[];
-  /** 专辑页签末尾客串/参与专辑列表 */
+  /** 客串、参与的专辑一节的列表 */
   readonly featured: readonly MusicAlbum[];
   readonly singles: readonly MusicAlbum[];
 }
 
-/** 将艺人专辑列表按类型划分至对应页签与分组，保持组内原始先后顺序 */
+/** 将艺人专辑列表按类型划分为专辑、单曲与 EP、合集、参与四节，保持组内原始先后顺序 */
 export function layoutReleases(albums: readonly MusicAlbum[], artist: MusicRef): ReleaseLayout {
   const groups = albums.map((album) => [album, releaseGroup(album)] as const);
   const split = groups.some(([, group]) => group !== null);
@@ -124,7 +124,7 @@ export function withVersions(
   return albums.filter((album) => album.subType !== undefined && selected.has(album.subType));
 }
 
-/** 单曲与 EP 页签支持筛选的种类预设顺序 */
+/** 单曲与 EP 一节支持筛选的种类预设顺序 */
 export const KIND_ORDER = ['single', 'ep'] as const;
 export type ReleaseKind = (typeof KIND_ORDER)[number];
 

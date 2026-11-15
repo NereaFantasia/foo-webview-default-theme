@@ -1,5 +1,5 @@
 import { makeStyles } from '@fluentui/react-components';
-import { LyricsKey, QueueKey } from './right-card/RightCardKeys.tsx';
+import { RightCardPageKeys } from './right-card/RightCardKeys.tsx';
 import { NavButtons } from './NavButtons.tsx';
 import styles from './NavRow.module.css';
 import { SidebarKey } from '../nav/sidebar/SidebarKey.tsx';
@@ -24,7 +24,8 @@ const useStyles = makeStyles({
 });
 
 /**
- * 标题栏播放形态的悬浮导航键；页面切换不带着按钮移动。左边是后退、前进与侧边栏，右边是歌词与队列
+ * 标题栏播放形态的悬浮导航键；页面切换不带着按钮移动。左边是后退、前进与侧边栏，右边是队列、歌词、信息与简介，
+ * 窗口窄于 481 时放不下四个，只剩队列键和收着其余三页的菜单键
  * 整页滚动的内容在页首让位，滚动后可进入按钮下方；固定工具栏保持原位，按钮组之间的空白不拦截页面操作
  */
 export function NavRow() {
@@ -40,8 +41,12 @@ export function NavRow() {
         </div>
       </div>
       <div className={styles.capsule}>
-        <LyricsKey shape="circular" className={classes.key} marks={{ 'data-nav': 'lyrics' }} />
-        <QueueKey shape="circular" className={classes.key} marks={{ 'data-nav': 'queue' }} />
+        <RightCardPageKeys
+          shape="circular"
+          className={classes.key}
+          foldWhen="(max-width: 480px)"
+          navMarks
+        />
       </div>
     </div>
   );

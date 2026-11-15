@@ -18,11 +18,12 @@ import {
 } from '../../src/server/musicObjects.ts';
 import type { LxSourceBook } from './lxSourceBook.ts';
 import { MusicError } from './musicError.ts';
+import { createTrackHold, type HoldOpener } from './trackHold.ts';
 import { openUpstream } from './upstreamOpen.ts';
 
 const CONTENT_TYPES = { mp3: 'audio/mpeg', flac: 'audio/flac' } as const;
-// 播放器按 Content-Type 选解码器，不按内容识别：fb2k 收到 audio/mpeg 就当 MP3 解，FLAC 只放出开头一点就被跳过。
-// 网易云的 CDN 把 FLAC 也标成 audio/mpeg，所以不用上游的类型，按取地址报告的实际档位给。
+// 播放器按 Content-Type 选解码器，不按内容识别：fb2k 收到 audio/mpeg 就当 MP3 解，FLAC 只放出开头一点就被跳过
+// 网易云的 CDN 把 FLAC 也标成 audio/mpeg，所以不用上游的类型，按取地址报告的实际档位给
 const QUALITY_TYPES: Readonly<Record<MusicQuality, string>> = {
   '128k': 'audio/mpeg',
   '320k': 'audio/mpeg',
@@ -30,24 +31,24 @@ const QUALITY_TYPES: Readonly<Record<MusicQuality, string>> = {
   flac24bit: 'audio/flac',
 };
 
-// 网易云的地址取到后 10～30 分钟内失效；超过 2 分钟就重取，暂停或拖动后再读也拿到新地址。
+// 网易云的地址取到后 10～30 分钟内失效。超过 2 分钟就重新取，暂停或拖动后再读也能拿到新地址
 const FRESH_MS = 2 * 60_000;
 const MAX_RESOLVING = 4;
-// 一首歌最多换几个音源
+// 一首歌最多尝试几个音源
 const MAX_ATTEMPTS = 4;
-// 上游中途断开后，等这么久再续传；连续失败超过这几次就结束响应，转发出数据后重新计数。
+// 上游中途断开后，等这么久再续传，毫秒。连续失败超过这几次就结束响应，转发出数据后重新计数
 const RESUME_DELAYS_MS = [500, 1000, 2000];
 const ROUTE = /^\/music\/stream\/([a-z]{2})\/([A-Za-z0-9_-]{1,64})\.(mp3|flac)$/;
 const CONTENT_RANGE = /^bytes (\d+)-(\d+)\/(\d+|\*)$/;
 
-/** 上游一次应答覆盖的字节段，两端都含；长度未知时 `end` 与 `total` 为 null。 */
+/** 上游一次应答覆盖的字节段，两端都含。长度未知时 `end` 与 `total` 为 null */
 interface Span {
   readonly start: number;
   readonly end: number | null;
   readonly total: number | null;
 }
 
-/** 416 和没有可读 Content-Range 的 206 答 null：不知道从哪接着要，不能续传。 */
+/** 416 和没有可读 Content-Range 的 206 返回 null：不知道从哪里接着要，不能续传 */
 function spanOf(response: IncomingMessage): Span | null {
   if (response.statusCode === 200) {
     const length = Number(response.headers['content-length']);
@@ -72,7 +73,7 @@ export interface MusicStreamOptions {
     signal: AbortSignal,
     exclude?: readonly string[],
   ) => Promise<MusicResource>;
-  /** 用户配置的 lxserver 的源；它可能经自己转发音频，也可能装在内网，与它同源的地址不受内网限制。 */
+  /** 用户配置的 lxserver 的源。它可能经自己转发音频，也可能装在内网，与它同源的地址不受内网限制 */
   readonly trustedOrigin: () => string | null;
   /** 地址能不能打开的结果记进这里，取地址时据此先排除连续打不开的音源 */
   readonly book?: Pick<LxSourceBook, 'failed' | 'succeeded'>;
@@ -80,6 +81,7 @@ export interface MusicStreamOptions {
 
 export function startMusicStream(options: MusicStreamOptions) {
   const lifetime = new AbortController();
+  const hold = createTrackHold();
   const cache = new Map<
     string,
     { readonly at: number; readonly resource: Promise<MusicResource> }
@@ -88,7 +90,7 @@ export function startMusicStream(options: MusicStreamOptions) {
   const waiting: (() => void)[] = [];
   const failureLog: MusicStreamFailure[] = [];
   const sourceLog: MusicStreamSource[] = [];
-  /** 最近一次打开时取到的是第三方补全地址的曲目，键是 `平台/ID`。 */
+  /** 最近一次打开时取到的是第三方补全地址的曲目，键是 `平台/ID` */
   const unblocked = new Set<string>();
   let latest = 0;
 
@@ -103,7 +105,7 @@ export function startMusicStream(options: MusicStreamOptions) {
     if (failureLog.length > MUSIC_FAILURE_LIMIT) failureLog.shift();
   }
 
-  /** 补全的每次都记，页面刷新后再放也认得出；不是补全的只在它上次是补全时记，免得入队时每首都记一条。 */
+  /** 补全的每次都记，页面刷新后再播放也能认出。不是补全的，只在它上次是补全时才记，避免入队时每首都记一条 */
   function logSource(ref: MusicRef, isUnblocked: boolean): void {
     const key = `${ref.platform}/${ref.id}`;
     if (!isUnblocked && !unblocked.delete(key)) return;
@@ -112,7 +114,10 @@ export function startMusicStream(options: MusicStreamOptions) {
     if (sourceLog.length > MUSIC_FAILURE_LIMIT) sourceLog.shift();
   }
 
-  /** fb2k 每入队一首就打开一次地址；限制同时取地址的数量，免得一次入队很多首时被平台限流。 */
+  /**
+   * fb2k 每入队一首就打开一次地址。限制同时取地址的数量，避免一次入队很多首时被平台限流。
+   * 排队的后到先取：刚点的曲目排在批量入队的探测之前
+   */
   async function limited<T>(task: () => Promise<T>): Promise<T> {
     if (resolving >= MAX_RESOLVING) await new Promise<void>((resume) => waiting.push(resume));
     resolving += 1;
@@ -120,7 +125,7 @@ export function startMusicStream(options: MusicStreamOptions) {
       return await task();
     } finally {
       resolving -= 1;
-      waiting.shift()?.();
+      waiting.pop()?.();
     }
   }
 
@@ -128,7 +133,7 @@ export function startMusicStream(options: MusicStreamOptions) {
     JSON.stringify([ref.platform, ref.id, quality]);
 
   /**
-   * 同一首同一档位同时打开多次只取一次；取地址失败的不留在缓存里。
+   * 同一首同一档位同时打开多次只取一次；取地址失败的不留在缓存里
    * `stale` 是续传时已经断过的那次结果，缓存里还是它就重取
    */
   function resolve(
@@ -201,12 +206,45 @@ export function startMusicStream(options: MusicStreamOptions) {
     }
   }
 
+  /** 整首进内存用的打开：从 `offset` 起读，应答没从 `offset` 接上或总长未知时答 null */
+  async function openFrom(
+    ref: MusicRef,
+    quality: MusicQuality,
+    offset: number,
+    signal: AbortSignal,
+  ): ReturnType<HoldOpener> {
+    const { upstream, found } = await openSource(
+      ref,
+      quality,
+      offset > 0 ? `bytes=${offset}-` : undefined,
+      signal,
+    );
+    const span = spanOf(upstream);
+    if (
+      span?.start !== offset ||
+      span.total === null ||
+      upstream.statusCode !== (offset > 0 ? 206 : 200)
+    ) {
+      upstream.destroy();
+      return null;
+    }
+    const { actualQuality } = found;
+    return {
+      body: upstream,
+      total: span.total,
+      type: actualQuality === null ? null : QUALITY_TYPES[actualQuality],
+    };
+  }
+
   async function serve(
     request: IncomingMessage,
     response: ServerResponse,
     ref: MusicRef,
     quality: MusicQuality,
   ): Promise<void> {
+    // 页面通知过要分析或预取的曲目：已下载进内存的从内存给出，没留住的才逐次向上游取
+    const key = cacheKey(ref, quality);
+    if (hold.has(key) && (await hold.serve(key, request, response))) return;
     const client = new AbortController();
     const stop = () => client.abort();
     response.once('close', stop);
@@ -216,7 +254,7 @@ export function startMusicStream(options: MusicStreamOptions) {
       const { upstream } = opened;
       let { resource } = opened;
       const status = upstream.statusCode ?? 502;
-      // 实际档位未知（解灰、音源脚本没报）时不给类型，播放器按内容识别。
+      // 实际档位未知（解灰、音源脚本没报）时不给类型，播放器按内容识别
       const { actualQuality } = opened.found;
       const contentType = actualQuality === null ? null : QUALITY_TYPES[actualQuality];
       response.writeHead(status, {
@@ -235,7 +273,7 @@ export function startMusicStream(options: MusicStreamOptions) {
         await pipeline(upstream, response, { signal });
         return;
       }
-      // 上游中途断开时重新取地址，从已转发的字节处接着要；新应答必须正好接上，否则算一次失败。
+      // 上游中途断开时重新取地址，从已转发的字节处接着要；新应答必须正好接上，否则算一次失败
       let body: IncomingMessage | null = upstream;
       let sent = 0;
       for (let failures = 0; ;) {
@@ -284,7 +322,11 @@ export function startMusicStream(options: MusicStreamOptions) {
   }
 
   return {
-    /** 只认 GET 与 HEAD；路径形如 `/music/stream/<平台>/<曲目 ID>.<扩展名>?q=<档位>`。 */
+    /**
+     * 只认 GET 与 HEAD；路径形如 `/music/stream/<平台>/<曲目 ID>.<扩展名>?q=<档位>`
+     * HEAD 再加 `hold=1` 是页面通知后端：这首要做整轨分析或接下来要播放，整首下载进内存，之后对这个地址的读取共用这一份，
+     * 见 `trackHold.ts`
+     */
     handle(request: IncomingMessage, response: ServerResponse): void {
       request.resume();
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -293,13 +335,25 @@ export function startMusicStream(options: MusicStreamOptions) {
       const quality = MUSIC_QUALITIES.find((item) => item === url.searchParams.get('q'));
       const extension = match?.[3] === 'flac' ? 'flac' : 'mp3';
       const id = match?.[2];
-      if (!id || !platform || !quality || [...url.searchParams.keys()].length !== 1) {
+      const notice = request.method === 'HEAD' && url.searchParams.get('hold') === '1';
+      if (
+        !id ||
+        !platform ||
+        !quality ||
+        [...url.searchParams.keys()].length !== (notice ? 2 : 1)
+      ) {
         response.writeHead(404, { 'Cache-Control': 'no-store' });
         response.end();
         return;
       }
       const type = CONTENT_TYPES[extension];
       if (request.method === 'HEAD') {
+        if (notice) {
+          const ref = { platform, id };
+          hold.prepare(cacheKey(ref, quality), (offset, signal) =>
+            openFrom(ref, quality, offset, signal),
+          );
+        }
         response.writeHead(200, {
           'Content-Type': type,
           'Accept-Ranges': 'bytes',
@@ -310,9 +364,10 @@ export function startMusicStream(options: MusicStreamOptions) {
       }
       void serve(request, response, { platform, id }, quality);
     },
-    /** 已取到的地址都不再复用，下次打开时重取。 */
+    /** 每次播放重新解析地址与流，内存音频与地址不跨次复用 */
     clear(): void {
       cache.clear();
+      hold.clear();
     },
     failures(after: number): MusicStreamFailures {
       return {
@@ -324,6 +379,7 @@ export function startMusicStream(options: MusicStreamOptions) {
     dispose(): void {
       lifetime.abort();
       cache.clear();
+      hold.dispose();
     },
   };
 }

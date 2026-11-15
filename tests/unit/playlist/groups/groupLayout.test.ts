@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildGroupLayout, type GroupRun } from '../../../../src/playlist/groups/groupLayout.ts';
+import {
+  buildGroupLayout,
+  hasSplitGroups,
+  type GroupRun,
+} from '../../../../src/playlist/groups/groupLayout.ts';
 
 /**
  * 显示空间映射：组头与曲目行混排后的位置换算。覆盖空列表、单组、每行一组的
- * 最坏形态、折叠、首尾边界、单子组不出子组头而多子组出，以及行的往返一致性。
+ * 最坏形态、折叠、首尾边界、单子组不出子组头而多子组出，以及行的往返一致性
  */
 
-/** 遍历整个显示空间，逐条验 `displayOf(itemAt(d).index) === d`。 */
+/** 遍历整个显示空间，逐条验 `displayOf(itemAt(d).index) === d` */
 function assertRoundTrip(
   runs: readonly GroupRun[],
   collapsed?: Set<string>,
@@ -21,6 +25,20 @@ function assertRoundTrip(
     if (item.kind === 'row') expect(layout.displayOf(item.index)).toBe(display);
   }
 }
+
+describe('hasSplitGroups', () => {
+  const run = (start: number, key: string): GroupRun => ({ start, count: 1, key });
+
+  it('同一个键隔着别的组再出现一次，就是被拆成了几段', () => {
+    expect(hasSplitGroups([run(0, 'A'), run(1, 'B'), run(2, 'A')])).toBe(true);
+  });
+
+  it('键各不相同、空列表都不算；空串照常是一个键', () => {
+    expect(hasSplitGroups([])).toBe(false);
+    expect(hasSplitGroups([run(0, 'A'), run(1, 'B')])).toBe(false);
+    expect(hasSplitGroups([run(0, ''), run(1, 'A'), run(2, '')])).toBe(true);
+  });
+});
 
 describe('buildGroupLayout', () => {
   it('空列表没有显示位，任何查询都落空', () => {
@@ -112,7 +130,7 @@ describe('buildGroupLayout', () => {
   });
 
   it('两个及以上子组才出子组头，且子组头的起点是绝对行号', () => {
-    // 第二个父组是鉴别用例：它的子组起点是 2 与 4，不是父内偏移 0 与 2。
+    // 第二个父组是鉴别用例：它的子组起点是 2 与 4，不是父内偏移 0 与 2
     const runs: GroupRun[] = [
       { start: 0, count: 2, key: 'A' },
       {
@@ -368,10 +386,10 @@ describe('buildGroupLayout', () => {
 
 /**
  * 显示区间到真实行号的换算（Shift 扩选用）。重点在三件事：组头与占位空位不换出行号、
- * 折叠组内的行一个都不收、行号相接的段合并成一段。
+ * 折叠组内的行一个都不收、行号相接的段合并成一段
  */
 
-/** 三组各自展开后的显示空间：0 组头 / 1-2 行 / 3 组头 / 4-6 行 / 7 组头 / 8-9 行。 */
+/** 三组各自展开后的显示空间：0 组头 / 1-2 行 / 3 组头 / 4-6 行 / 7 组头 / 8-9 行 */
 const THREE: GroupRun[] = [
   { start: 0, count: 2, key: 'A' },
   { start: 2, count: 3, key: 'B' },
@@ -387,7 +405,7 @@ describe('buildGroupLayout 的 rowsBetween', () => {
 
   it('两端都落在组头上：组头自己不换出行号，中间的行照收', () => {
     const layout = buildGroupLayout(THREE);
-    // 显示位 3 与 7 都是组头，中间是 B 组的三行。
+    // 显示位 3 与 7 都是组头，中间是 B 组的三行
     expect(layout.rowsBetween(3, 7)).toStrictEqual([{ start: 2, end: 5 }]);
   });
 
@@ -398,13 +416,13 @@ describe('buildGroupLayout 的 rowsBetween', () => {
 
   it('跨组的一段把两侧的行并成连续区间', () => {
     const layout = buildGroupLayout(THREE);
-    // 显示位 2 是 A 的末行（行 1），4 是 B 的首行（行 2）；行号相接，合并成一段。
+    // 显示位 2 是 A 的末行（行 1），4 是 B 的首行（行 2）；行号相接，合并成一段
     expect(layout.rowsBetween(2, 4)).toStrictEqual([{ start: 1, end: 3 }]);
   });
 
   it('跨过折叠的组时，折叠组内的行一个都不收，结果因此断成两段', () => {
     const layout = buildGroupLayout(THREE, new Set(['B']));
-    // 折叠后：0 组头A / 1-2 行 / 3 组头B（折叠）/ 4 组头C / 5-6 行。
+    // 折叠后：0 组头A / 1-2 行 / 3 组头B（折叠）/ 4 组头C / 5-6 行
     expect(layout.displayTotal).toBe(7);
     expect(layout.rowsBetween(0, 6)).toStrictEqual([
       { start: 0, end: 2 },
@@ -441,10 +459,10 @@ describe('buildGroupLayout 的 rowsBetween', () => {
       },
     ];
     const layout = buildGroupLayout(runs);
-    // 0 组头A / 1 子组头1 / 2-3 行 / 4 子组头2 / 5-6 行。
+    // 0 组头A / 1 子组头1 / 2-3 行 / 4 子组头2 / 5-6 行
     expect(layout.displayTotal).toBe(7);
     expect(layout.rowsBetween(0, 6)).toStrictEqual([{ start: 0, end: 4 }]);
-    // 显示位 3 是行 1、4 是子组头、5 是行 2：中间的子组头不该把区间截断。
+    // 显示位 3 是行 1、4 是子组头、5 是行 2：中间的子组头不该把区间截断
     expect(layout.rowsBetween(3, 5)).toStrictEqual([{ start: 1, end: 3 }]);
   });
 
@@ -454,7 +472,7 @@ describe('buildGroupLayout 的 rowsBetween', () => {
       { start: 1, count: 1, key: 'B' },
     ];
     const layout = buildGroupLayout(runs, undefined, 3);
-    // 每组补两个占位：0 组头 / 1 行 / 2-3 占位 / 4 组头 / 5 行 / 6-7 占位。
+    // 每组补两个占位：0 组头 / 1 行 / 2-3 占位 / 4 组头 / 5 行 / 6-7 占位
     expect(layout.displayTotal).toBe(8);
     expect(layout.rowsBetween(2, 3)).toStrictEqual([]);
     expect(layout.rowsBetween(0, 7)).toStrictEqual([{ start: 0, end: 2 }]);

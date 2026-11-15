@@ -2,26 +2,26 @@ English | [中文](./GUIDE.zh-CN.md)
 
 # Default Theme User Guide
 
-Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.3.0.
+Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.4.0.
 
 ## Installation
 
 ### Install the component
 
-Requires foo_ui_webview2 **2.1.0 or later**. Older component versions cannot run this theme. Follow the [component installation guide](https://nereafantasia.github.io/foo_ui_webview2/how-to/install).
+Requires foo_ui_webview2 **2.2.0 or later**. Older component versions cannot run this theme. Follow the [component installation guide](https://nereafantasia.github.io/foo_ui_webview2/how-to/install).
 
 After installing the component, select `Webview2 UI` as the user interface in foobar2000's display preferences. The theme cannot run inside Default UI (DUI) or Columns UI (CUI) panels.
 
 ### Install the theme
 
-1. Download `foo-webview-default-theme-0.3.0.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
+1. Download `foo-webview-default-theme-0.4.0.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
 2. Open `File > Preferences > Display > WebView2 UI`. Use template management to create a new template for the theme, then open its folder.
 3. Extract the installation package into that folder, replacing the new template's placeholder page. Keep `index.html` directly inside the template folder, not an extra subfolder.
 4. Select that template in preferences, apply the settings and restart foobar2000.
 
 Template folders are stored under `<profile>\webview-ui\<template>\`. Opening the folder from the component preferences helps avoid placing files in another foobar2000 installation's profile.
 
-`fe-0.3.0.zip` contains the frontend update, `be-0.3.0.zip` contains the local service, and runtime parts provide its execution environment. The updater handles these files; they are not first-install packages. GitHub's `Source code` archives are not installable themes either.
+`fe-0.4.0.zip` contains the frontend update, `be-0.4.0.zip` contains the local service, and runtime parts provide its execution environment. The updater handles these files; they are not first-install packages. GitHub's `Source code` archives are not installable themes either.
 
 ## First Launch
 
@@ -32,22 +32,22 @@ The setup dialog has four steps:
 | Library | Open foobar2000 preferences to add music folders |
 | Appearance | Choose the player bar position, color mode and whether to follow cover colors |
 | System tray | Choose whether minimizing or closing the window sends it to the tray |
-| Updates and online content | Choose the update mode and whether to enable online artist biographies |
+| Updates and online content | Choose the update mode and whether to enable online lyrics and online artist biographies; also shows the local service status |
 
-You can skip setup and change these options later in Settings. Online lyrics are enabled separately on the lyrics page, not by the online biographies switch.
+You can skip setup and change these options later in Settings. Online lyrics and online artist biographies have separate switches.
 
 ## Finding Your Way Around
 
 | Area | Common controls |
 | --- | --- |
 | Navigation area | Main menu, back, forward, sidebar toggle, lyrics and queue |
-| Sidebar | Global search, Home, library pages, Video, playlists and Settings |
+| Sidebar | Global search, Home, Favorites, library pages, Video, playlists and Settings |
 | Right panel | Queue, lyrics, track information and artist biography |
 | Player bar | Playback, progress, volume, output device, mini player and immersive view |
 
-Navigation and right-panel controls may appear in the title bar or in a row above the content, depending on the player bar position and window width. In a narrow window, open the queue first to access the other right-panel tabs.
+Navigation and right-panel controls may appear in the title bar or in a row above the content, depending on the player bar position and window width. In a narrow window, the right-panel controls collapse into a single menu button.
 
-Mouse side buttons navigate back and forward. See **Settings > Shortcuts** for the keyboard and mouse controls.
+Mouse side buttons navigate back and forward. See **Settings > Shortcuts** for the keyboard and mouse controls. When the theme and foobar2000 bind the same shortcut, the theme takes priority.
 
 ## Browsing and Playback
 
@@ -59,6 +59,32 @@ To add or manage music folders, open **Settings > General > Media library folder
 
 Choose **Video** in the sidebar to browse videos and open their folder. In Folders, right-click a video and choose **Play and watch**. Some formats cannot be played yet; the interface says why.
 
+Adjust ReplayGain, the DSP preset and the output buffer under **Settings > Playback**.
+
+### Home
+
+Home gathers quick entries, local statistics and recommendations, plus NetEase banners, new songs, charts, playlists and new albums. Click **Edit Home** to drag rows into a new order or turn off the ones you do not want.
+
+The theme opens on Home at startup by default. Change this with **Open at startup** under **Settings > General**.
+
+### Artists
+
+Artists appear as round portraits. Open an artist to see a page with a header image, top tracks and albums; **Singles & EPs** are listed separately.
+
+### Autoplaylists and advanced queries
+
+Set the filter conditions on the Songs page, then open **More options** and choose **Create autoplaylist from these conditions**. To change the rules, choose **Edit autoplaylist** on the playlist page or in the sidebar context menu.
+
+The query box offers syntax coloring and completion, and **Syntax reference** lists the available syntax. The search boxes on the Albums and playlist pages accept **Advanced query** too.
+
+### Track table columns
+
+Open **Columns** in the **View** panel of Songs, playlists, Folders and search results, then select the columns to show. The optional columns include disc number, file name, folder and composer.
+
+### Library cache
+
+Songs, albums and the whole-library track list are read from a local cache first, and from foobar2000 when the cache cannot answer. Under **Data** in **Settings > General**, turn the cache off, check its size or rebuild it. Lyrics lookups are cached locally as well and are managed in the same place.
+
 ## Appearance and Player Bar
 
 Open **Settings > Appearance**:
@@ -67,6 +93,7 @@ Open **Settings > Appearance**:
 - **Accent color**: Expand this section and enable **Follow the playing cover color**. When it is off, **Base accent color** supplies the color, with Default teal, Windows accent and Custom color options.
 - **Window background**: Choose **Playing cover** to follow the current cover, or use Mica, Acrylic, Flowing palette or Image.
 - **Player bar position**: Choose Bottom of the window, Title bar or Capsule.
+- **Fonts**: Customize the interface font and the CJK font. Lyrics fonts and font weight are under **Settings > Lyrics**.
 
 Cover-based accent colors and the window background are independent. When no cover color is available, the accent uses your selected base color.
 
@@ -98,7 +125,7 @@ Use **Timing adjustment** to move lyrics earlier or later, replay the current li
 
 ### Desktop lyrics
 
-Desktop lyrics show the current lyrics in a separate always-on-top window that you can lock, in single-line or multi-line layout. Turn them on or off from the player bar, the title bar menu or the tray menu. Record shortcuts for showing or hiding and for locking or unlocking under **Desktop lyrics (system-wide)** in **Settings > Shortcuts**; they work while other programs are in front. Alignment, size, colors, background, translation and romanization, and window position are under **Desktop lyrics** in **Settings > Lyrics**. With **Hide while the main window shows lyrics** selected, the desktop window hides whenever the main window already shows lyrics.
+Desktop lyrics show the current lyrics in a separate always-on-top window that you can lock, in single-line or multi-line layout. Turn them on or off from the player bar, the title bar menu or the tray menu. Record shortcuts for showing or hiding and for locking or unlocking under **Desktop lyrics (system-wide)** in **Settings > Shortcuts**; they work while other programs are in front and must include Ctrl, Alt or Win. Alignment, size, colors, background, translation and romanization, and window position are under **Desktop lyrics** in **Settings > Lyrics**. With **Hide while the main window shows lyrics** selected, the desktop window hides whenever the main window already shows lyrics.
 
 ## Immersive View
 
@@ -107,7 +134,13 @@ Click **Immersive view** in the player bar to show it across the window. Use Bac
 The view has two styles. Choose one under **Settings > Immersive view > View style**, or switch with the view key at the top of the immersive view:
 
 - **Blueprint**: album art, spectrum, stereo field, the full-track waveform and lyrics.
-- **Lyrics**: centered on the lyrics, with track information, the queue and history. The Coverflow key at the top opens a cover flow: browse earlier tracks, the queue and upcoming tracks with the arrow keys, the mouse wheel or a click, press Enter or click the center cover to play the selected track, and press Esc to return to the playing track.
+- **Lyrics**: centered on the lyrics, with track information, the queue and history, in two presets, **Split** and **Cover bleed**. The Coverflow key at the top opens a cover flow: browse earlier tracks, the queue and upcoming tracks with the arrow keys, the mouse wheel or a click, press Enter or click the center cover to play the selected track, and press Esc to return to the playing track.
+
+Click **Settings** in the immersive view to adjust the layout directly on screen; in the Lyrics style you can also switch presets there. Click **Done** when you finish.
+
+Choose the background under **Settings > Immersive view > View background**. The options include Mesh gradient, Titanium and Flowing palette; Mesh gradient and Titanium can turn on **React to music**.
+
+Press Ctrl+B or click **Browse library** to open the browse panel and browse the library without leaving the immersive view.
 
 The immersive view and right panel share the current track's lyrics, the online lyrics switch and lyric settings.
 
@@ -122,13 +155,20 @@ Click **Mini player** in the player bar or open it from the main menu.
 
 ## Artist Biographies
 
-The right panel's **Biography** tab shows artist information. Online biographies are off by default. Enable them under **Settings > Online content**; this is separate from online lyrics.
+The right panel's **Biography** tab shows artist information. Online biographies are off by default. Enable them under **Settings > Online content**; this is separate from online lyrics. Biographies come from Apple Music by default; switch to Last.fm with **Biography source** in the same place.
 
 If several artists have the same name, confirm the artist when prompted. Use **Change linked artist** to correct a wrong match.
 
-Data comes from MusicBrainz, Last.fm and its image CDN. Requests include the artist name, MusicBrainz ID or image identifier, not track titles, album names or local paths. These services can see your IP address.
+Who receives requests depends on the source:
 
-A Last.fm API key is not required to read biographies from web pages. You can enter your own key in the online content settings; leaving it blank uses Last.fm web pages.
+- **Apple Music**: Apple (iTunes search and Apple Music artist pages) and its image and video servers. Requests include the artist name or artist ID.
+- **Last.fm**: MusicBrainz, Last.fm and its image CDN. Requests include the artist name, MusicBrainz ID or image identifier.
+
+Requests never include track titles, album names or local paths. These services can see your IP address.
+
+**Use Last.fm when Apple Music has no biography** is off by default. When on, artists without an Apple Music biography also send the artist name and MusicBrainz ID to MusicBrainz and Last.fm.
+
+A Last.fm API key is not required to read biographies from web pages. When Last.fm is in use, you can enter your own key in the online content settings; leaving it blank uses Last.fm web pages.
 
 ## Online Music
 
@@ -153,6 +193,10 @@ Under **Other platforms** in **Settings > Online music**, download the lxserver 
 - **Check** and **Check all** show whether each source works on each platform and when it was last checked; a script that fails to load shows the reason.
 - Sources come from third parties and can stop working at any time; a source that has stopped working cannot play tracks. The theme ships no sources, so import only scripts you trust.
 
+### Favorites
+
+NetEase tracks can be saved as local favorites. **Favorite** buttons appear in online track tables, the player bar, page headers and menus. Find saved tracks on the **Favorites** page in the sidebar.
+
 ### Privacy and limits
 
 Online music uses third-party interfaces: requests go to NetEase Cloud Music or to the service your imported sources point to, and those services can see your IP address. Signing in to a NetEase Cloud Music account carries a risk of restrictions, and availability depends on the upstream service. The origins and licenses of the components are listed in `THIRD_PARTY_NOTICES.md` in the repository.
@@ -175,7 +219,7 @@ Do not share one theme folder between multiple foobar2000 instances. Automatic u
 
 ### Local service
 
-After 0.3.0 starts, it downloads the Node runtime and matching local-service files from CNB as needed, verifies them and starts the service. You do not need to install Node or npm yourself. Installed files that pass verification can be reused offline. The NetEase Cloud Music and lxserver components are not part of them; they download separately the first time you use online music (see Online Music). Preparing these components is separate from checking for theme updates; **Check manually** does not disable component preparation.
+After the theme starts, it downloads the Node runtime and matching local-service files from CNB as needed, verifies them and starts the service. You do not need to install Node or npm yourself. Installed files that pass verification can be reused offline. The NetEase Cloud Music and lxserver components are not part of them; they download separately the first time you use online music (see Online Music). Preparing these components is separate from checking for theme updates; **Check manually** does not disable component preparation.
 
 Check the status under **Settings > About > Local service**. If it is not ready, view diagnostic details or retry; music playback and the theme remain available. When a new component version is available, **Component update** under **Settings > About** offers **Restart and install**; after you confirm, foobar2000 exits and restarts. The theme does not replace the component or foobar2000 on its own.
 
@@ -183,7 +227,7 @@ Check the status under **Settings > About > Local service**. If it is not ready,
 
 ### The component version is too old
 
-Install foo_ui_webview2 2.1.0 or later and restart foobar2000. Do not try to load the theme with an older component.
+Install foo_ui_webview2 2.2.0 or later and restart foobar2000. Do not try to load the theme with an older component.
 
 ### A message says panels are not supported
 
@@ -226,3 +270,13 @@ Check **Online music service** under **Settings > About**:
 - The backend is **Not connected** or the service is **Unavailable**: see Local service above. The library keeps working.
 - You chose another platform and see "No enabled source supports" it: import or enable a source script under **Settings > Online music**.
 - A single track will not play: tracks marked **Unavailable** or **Paid** cannot play; for other platforms it also depends on your sources, so try **Check all** in the source list.
+
+## Reporting a Problem
+
+Click **Copy** on **Runtime log** under **Settings > About**, and paste the text into your report together with what you did and what you expected to see.
+
+The text has the theme and component versions, the window size and scale, the color scheme and language, and the most recent failures. It does not contain tracks, paths, tokens or cookies.
+
+The runtime log lives only in the page and is gone once you close or reload it, so copy it before closing.
+
+If the theme fails to start, the startup failure page has the same **Copy runtime log** button. If the page cannot start at all (a blank window, or stuck on the startup page), attach `webview_lifecycle.log` and `webview_crash.log` from the foobar2000 profile folder instead.

@@ -5,7 +5,7 @@ import { collectPageErrors, installPageHost } from '../fixtures/pageHost.ts';
 import { SONG_ALBUMS } from '../fixtures/songsPage.ts';
 
 // 在线音乐第一批：结果页的在线音乐范围在试验页里配音乐客户端替身跑；整个主窗里没有后端，
-// 只核对入口、范围切换与连不上服务时的空态。
+// 只核对入口、范围切换与连不上服务时的空态
 
 test.use({ screenshot: 'off' });
 
@@ -13,7 +13,7 @@ const results = (page: Page) => page.locator('[data-online-results]');
 const rows = (page: Page) => results(page).locator('[data-online-track]');
 
 for (const colorScheme of ['light', 'dark'] as const)
-  test(`全部：最佳匹配、各分类一节，页签写个数，曲目可起播（${colorScheme}）`, async ({ page }) => {
+  test(`全部：最佳匹配、各分类一节，曲目可起播（${colorScheme}） @smoke`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     const errors = collectPageErrors(page);
     await openOnlineHarness(page);
@@ -22,7 +22,7 @@ for (const colorScheme of ['light', 'dark'] as const)
     await expect(view.locator('[data-online-best]')).toContainText('Nujabes');
     for (const name of ['艺人', '专辑', '曲目', '歌单'])
       await expect(view.getByRole('heading', { name, exact: true })).toBeVisible();
-    for (const name of ['艺人 12', '专辑 12', '曲目 45', '歌单 9'])
+    for (const name of ['艺人', '专辑', '曲目', '歌单'])
       await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
     await expect(rows(page)).toHaveCount(5);
     await expect(rows(page).nth(1)).toContainText('会员');
@@ -39,7 +39,10 @@ for (const colorScheme of ['light', 'dark'] as const)
 test('曲目分类滚到底接着取，右键入队，多选时播放所选', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { category: 'tracks' });
-  await expect(page.getByRole('tab', { name: '曲目 45' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: '曲目', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(rows(page).first()).toBeVisible();
   const cursors = async () =>
     (await onlineLog(page)).flatMap((entry) =>
@@ -47,11 +50,13 @@ test('曲目分类滚到底接着取，右键入队，多选时播放所选', as
         ? [Reflect.get(entry, 'cursor')]
         : [],
     );
-  for (let round = 0; round < 6 && (await cursors()).length < 3; round += 1) {
-    await results(page).evaluate((element) => element.scrollTo(0, element.scrollHeight));
-    await page.waitForTimeout(150);
-  }
-  await expect.poll(cursors).toEqual([null, '20', '40']);
+  await expect
+    .poll(async () => {
+      const seen = await cursors();
+      if (seen.length < 3) await results(page).evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      return seen;
+    })
+    .toEqual([null, '20', '40']);
   await expect(page.locator('[data-online-more]')).toHaveCount(0);
 
   await results(page).evaluate((element) => element.scrollTo(0, 0));
@@ -95,7 +100,7 @@ test('「全部」里的图块只画一行，分类页放不下才换行，块�
   expect(new Set(boxes.map(([top]) => top)).size).toBe(1);
 
   // 块间距照封面墙的算法：边长固定，余量先补进间距、最多补到 gap × stretch。读第一行相邻两块的间距与算式的差，
-  // 差在取整的一像素之内；一行不足两块、或位移还在播读不准时，轮询到排好为止。
+  // 差在取整的一像素之内；一行不足两块、或位移还在播读不准时，轮询到排好为止
   const spacingError = (name: string, shape: { size: number; gap: number; stretch: number }) =>
     results(page)
       .getByRole('list', { name })
@@ -113,9 +118,9 @@ test('「全部」里的图块只画一行，分类页放不下才换行，块�
           perRow > 1 ? Math.min(gap * stretch, (width - perRow * size) / (perRow - 1)) : gap;
         return Math.abs(second.left - first.right - expected);
       }, shape);
-  // 艺人的间距不随窗宽变，余量全去两侧；专辑的间距最多补到两倍。
+  // 艺人的间距不随窗宽变，余量全去两侧；专辑的间距最多补到两倍
   await page.setViewportSize({ width: 1400, height: 900 });
-  await page.getByRole('tab', { name: '艺人 12', exact: true }).click();
+  await page.getByRole('tab', { name: '艺人', exact: true }).click();
   await expect(
     results(page).getByRole('list', { name: '艺人' }).locator('[data-online-tile]'),
   ).toHaveCount(12);
@@ -130,7 +135,7 @@ test('「全部」里的图块只画一行，分类页放不下才换行，块�
     .locator('[data-online-tile]')
     .evaluateAll((tiles) => new Set(tiles.map((tile) => tile.getBoundingClientRect().top)).size);
   expect(artistTops).toBeGreaterThan(1);
-  await page.getByRole('tab', { name: '专辑 12', exact: true }).click();
+  await page.getByRole('tab', { name: '专辑', exact: true }).click();
   for (const width of [2400, 2600]) {
     await page.setViewportSize({ width, height: 900 });
     await expect
@@ -138,9 +143,9 @@ test('「全部」里的图块只画一行，分类页放不下才换行，块�
       .toBeLessThan(1);
   }
 
-  // 侧边栏换形态挤出来的换列直接到位，所以先换到同一档侧边栏的宽度，再在这一档里拉窄。
+  // 侧边栏换形态挤出来的换列直接到位，所以先换到同一档侧边栏的宽度，再在这一档里拉窄
   await page.setViewportSize({ width: 1000, height: 900 });
-  await page.getByRole('tab', { name: '专辑 12', exact: true }).click();
+  await page.getByRole('tab', { name: '专辑', exact: true }).click();
   await expect(results(page).getByRole('list', { name: '专辑' })).toBeVisible();
   await page.waitForTimeout(500);
   await page.setViewportSize({ width: 800, height: 900 });
@@ -160,7 +165,7 @@ test('悬停专辑图块出播放与更多两枚键：播放起播整张专辑�
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors = collectPageErrors(page);
   await openOnlineHarness(page);
-  await page.getByRole('tab', { name: '专辑 12', exact: true }).click();
+  await page.getByRole('tab', { name: '专辑', exact: true }).click();
   const albums = results(page).getByRole('list', { name: '专辑' }).locator('[data-online-tile]');
   await expect(albums.first()).toBeVisible();
   const play = results(page).locator('[data-tile-play]');
@@ -182,7 +187,7 @@ test('悬停专辑图块出播放与更多两枚键：播放起播整张专辑�
   await page.mouse.move(0, 0);
   await expect(play).toHaveCount(0);
 
-  await page.getByRole('tab', { name: '艺人 12', exact: true }).click();
+  await page.getByRole('tab', { name: '艺人', exact: true }).click();
   await results(page)
     .getByRole('list', { name: '艺人' })
     .locator('[data-online-tile]')
@@ -220,7 +225,7 @@ test('搜索失败用整页空态，重试后出结果', async ({ page }) => {
   await expect(results(page).getByRole('heading', { name: '最佳匹配' })).toBeVisible();
 });
 
-test('主窗：侧边栏没有在线音乐项；搜索框进结果页的在线音乐范围，连不上服务时如实写', async ({
+test('主窗：侧边栏没有在线音乐项；搜索下拉与结果页的在线音乐范围，连不上服务时如实写', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -233,18 +238,17 @@ test('主窗：侧边栏没有在线音乐项；搜索框进结果页的在线�
   const input = page.locator('[data-search-input="sidebar"]:visible');
   await input.click();
   const flyout = page.locator('[data-search-flyout]');
-  await flyout.getByRole('tab', { name: '在线音乐' }).click();
   await input.fill('Nujabes');
   await expect(flyout).toContainText('在线音乐暂不可用');
   await input.press('Enter');
   const search = page.locator('[data-page="search"]');
-  await expect(search.getByRole('tab', { name: '在线音乐' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  // 「全部」里媒体库与在线音乐合在一页，在线那一区如实写连不上；分类页才有范围切换
+  await expect(search.locator('[data-online-section]')).toContainText('在线音乐暂不可用');
+  await search.getByRole('tab', { name: '专辑', exact: true }).click();
+  await search.getByRole('tab', { name: /^在线音乐/ }).click();
   await expect(search).toContainText('在线音乐暂不可用');
-  await search.getByRole('tab', { name: '媒体库' }).click();
-  await expect(search.getByRole('tab', { name: '全部' })).toBeVisible();
+  await search.getByRole('tab', { name: /^媒体库/ }).click();
+  await expect(search.getByRole('tab', { name: '全部', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -261,7 +265,7 @@ test('专辑图块副标题里的艺人名可点，进这位艺人的在线列�
   const tile = results(page).locator('[data-online-tile]').first();
   await tile.getByRole('button', { name: 'Nujabes', exact: true }).click();
   await expect(list.getByRole('heading', { name: 'Nujabes' })).toBeVisible();
-  await expect(list.locator('[data-detail-facts]')).toContainText('艺人');
+  await expect(list.locator('[data-artist-header]')).toBeVisible();
 
   await page.evaluate(() => {
     const back: unknown = Reflect.get(window, '__onlineBack');
@@ -269,4 +273,62 @@ test('专辑图块副标题里的艺人名可点，进这位艺人的在线列�
   });
   await results(page).locator('[data-online-tile]').first().getByText('专辑 2000').click();
   await expect(list.getByRole('heading', { name: '专辑 2000' })).toBeVisible();
+});
+
+test('结果页「全部」分媒体库、在线音乐两区；分类页的范围切换写两边的数，歌单只有在线音乐', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openOnlineHarness(page, { view: 'page' });
+  const search = page.locator('[data-page="search"]');
+  const online = search.locator('[data-online-section]');
+  await expect(search.getByRole('heading', { name: '媒体库', exact: true })).toBeVisible();
+  for (const name of ['艺人', '专辑', '曲目', '歌单'])
+    await expect(online.getByRole('heading', { name, exact: true })).toBeVisible();
+  // 最佳匹配只出在媒体库一区；「全部」不分范围
+  await expect(online.locator('[data-online-best]')).toHaveCount(0);
+  await expect(search.getByRole('tab', { name: /^在线音乐/ })).toHaveCount(0);
+
+  await online
+    .locator('section', { has: page.getByRole('heading', { name: '专辑', exact: true }) })
+    .getByRole('button', { name: '查看全部结果' })
+    .click();
+  await expect(search.getByRole('tab', { name: '专辑', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(search.getByRole('tab', { name: '在线音乐 12' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(results(page)).toContainText('专辑 2000');
+  await search.getByRole('tab', { name: /^媒体库/ }).click();
+  await expect(search.locator('[data-search-scroller]')).toBeVisible();
+  await expect(results(page)).toHaveCount(0);
+
+  await search.getByRole('tab', { name: '歌单', exact: true }).click();
+  await expect(results(page)).toBeVisible();
+  await expect(search.getByRole('tab', { name: /^在线音乐/ })).toHaveCount(0);
+});
+
+test('搜索下拉的在线音乐一区：艺人、专辑、曲目各一组，三类一起取；单击在线专辑进在线列表页', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openOnlineHarness(page, { view: 'flyout' });
+  await page.locator('[data-search-trigger]').click();
+  const flyout = page.locator('[data-search-flyout]');
+  await flyout.locator('[data-search-input="flyout"]').fill('Nujabes');
+  const group = (name: string) => flyout.getByRole('group', { name: `在线音乐 ${name}` });
+  await expect(group('艺人').getByRole('option').first()).toContainText('Nujabes');
+  await expect(group('专辑').getByRole('option').first()).toContainText('专辑 2000');
+  await expect(group('曲目').getByRole('option').first()).toContainText('Track 01');
+  const searched = (await onlineLog(page))
+    .filter((entry) => isKind(entry, 'search'))
+    .map((entry) => Reflect.get(entry, 'type'));
+  expect(searched).toEqual(['artist', 'album', 'track']);
+  await group('专辑').getByRole('option').first().click();
+  await expect(
+    page.locator('[data-page="onlineList"]').getByRole('heading', { name: '专辑 2000' }),
+  ).toBeVisible();
 });

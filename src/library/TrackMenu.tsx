@@ -73,6 +73,9 @@ export function TrackMenu({ at, onClose, isCurrent, group }: TrackMenuProps) {
         .filter(Boolean)
         .join(' · ');
   const batchName = batchNameOf(tracks, t);
+  const base = pathHandlers(trackActions, paths, batchName, LIBRARY_SOURCE);
+  // 单选且页面给了沿列表起播的做法：「播放」与双击一样，接着往下播
+  const handlers = single && menu.play && !group ? { ...base, play: menu.play } : base;
   const items: TrackMenuItem[] = group
     ? [
         { action: 'play', label: t('context.playGroup') },
@@ -147,7 +150,7 @@ export function TrackMenu({ at, onClose, isCurrent, group }: TrackMenuProps) {
       usable={paths.length > 0}
       multiple={tracks.length > 1}
       targets={menu.targets}
-      handlers={pathHandlers(trackActions, paths, batchName, LIBRARY_SOURCE)}
+      handlers={handlers}
       anchor={anchor}
 
       rating={rating}

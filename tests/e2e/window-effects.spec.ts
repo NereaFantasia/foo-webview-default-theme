@@ -22,7 +22,7 @@ for (const scheme of ['light', 'dark'] as const) {
           },
         });
       }, choice);
-      const settings = await openSettings(page);
+      const settings = await openSettings(page, {}, '外观');
       await expect(page.locator('[data-window-background="solid"]')).toBeVisible();
       await expect(settings.card('窗口背景')).toContainText('Windows 10 使用主题色背景');
       await expectBackground(page, '主题色背景');
@@ -61,7 +61,7 @@ test('检测失败与 Windows 10 分开提示，主窗口和托盘都使用纯�
     localStorage.setItem('default-theme.backdrop.v1', 'mica');
     Object.defineProperty(navigator, 'userAgentData', { configurable: true, value: undefined });
   });
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await expect(page.locator('[data-window-background="solid"]')).toBeVisible();
   await expect(settings.card('窗口背景')).toContainText('无法确认系统材质支持情况');
   await page.locator('[data-info-center-trigger]').click();
@@ -85,9 +85,13 @@ test('材质应用失败后使用纯色，成功事件恢复材质并撤去提�
       },
     });
   });
-  const settings = await openSettings(page, {
-    answers: { window: { setBackdropPolicy: hostFailure('OPERATION_FAILED') } },
-  });
+  const settings = await openSettings(
+    page,
+    {
+      answers: { window: { setBackdropPolicy: hostFailure('OPERATION_FAILED') } },
+    },
+    '外观',
+  );
   await expect(page.locator('[data-window-background="solid"]')).toBeVisible();
   await expect(settings.card('窗口背景')).toContainText('窗口材质未能应用');
   await page.locator('[data-info-center-trigger]').click();
@@ -125,7 +129,7 @@ for (const scheme of ['light', 'dark'] as const) {
           value: { platform: 'Windows', getHighEntropyValues: async () => ({ platformVersion }) },
         });
       }, version);
-      const settings = await openSettings(page);
+      const settings = await openSettings(page, {}, '外观');
       await expectBackground(page, '主题色背景');
       await expect(page.getByRole('combobox', { name: '背景取色', exact: true })).toHaveCount(0);
       const background = page.locator('[data-window-background="solid"]');
@@ -181,23 +185,27 @@ test('主题色背景和主视图复用强调色的封面取色开关', async ({
     context.fillRect(0, 0, 64, 64);
     return canvas.toDataURL();
   });
-  const settings = await openSettings(page, {
-    answers: {
-      playback: {
-        getState: { success: true, state: 'playing', canPause: true, canSeek: true },
-        getCurrentTrack: { success: true, found: true, track: makeTrack() },
-      },
-      artwork: {
-        getFb2kUrlByPath: (params) => ({
-          success: true,
-          available: true,
-          type: 'front',
-          path: String(params['path']),
-          dataUrl: redCover,
-        }),
+  const settings = await openSettings(
+    page,
+    {
+      answers: {
+        playback: {
+          getState: { success: true, state: 'playing', canPause: true, canSeek: true },
+          getCurrentTrack: { success: true, found: true, track: makeTrack() },
+        },
+        artwork: {
+          getFb2kUrlByPath: (params) => ({
+            success: true,
+            available: true,
+            type: 'front',
+            path: String(params['path']),
+            dataUrl: redCover,
+          }),
+        },
       },
     },
-  });
+    '外观',
+  );
   const background = page.locator('[data-window-background="solid"]');
   const pane = page.locator('main [data-reading-fill]').first();
   const backgroundColor = () =>

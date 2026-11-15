@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { BIOGRAPHY_PREFS_KEY } from '../../src/library/biography/biographyPrefs.ts';
 import { LASTFM_KEY_PREF } from '../../src/library/biography/lastfm-api/lastfmKey.ts';
+import { selectLastfmSource } from '../fixtures/biographySource.ts';
 import { openArtists } from '../fixtures/artistsPage.ts';
 import { apiReply, artistInfoSample } from '../fixtures/lastfmApiSamples.ts';
 import { artistSample, NUJABES } from '../fixtures/musicbrainzSamples.ts';
@@ -38,6 +39,7 @@ async function start(
       identities: [{ artist: 'Nujabes', sourceArtist: 'Nujabes', mbid: NUJABES }],
     });
     host.config.set(LASTFM_KEY_PREF.key, '0123456789abcdef0123456789abcdef');
+    selectLastfmSource(host);
     host.answer('http.get', (params) => {
       const url = new URL(String(params['url']));
       if (url.hostname === 'musicbrainz.org')
@@ -124,19 +126,7 @@ test('简介默认全文、资料字段块和末尾来源，没有折叠操作',
   await expect(article.locator('[data-folding]')).toHaveCount(0);
   const facts = about.getByRole('region', { name: '资料' }).locator('dl');
   await expect(facts.getByText('日本', { exact: true })).toBeVisible();
-  expect(
-    await facts.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length),
-  ).toBe(3);
-  const count = facts
-    .locator('div')
-    .filter({ has: page.locator('dt', { hasText: 'Last.fm 听众' }) });
-  expect(
-    await count.evaluate((node) => {
-      const label = node.querySelector('dt')?.getBoundingClientRect();
-      const value = node.querySelector('dd')?.getBoundingClientRect();
-      return !!label && !!value && value.top >= label.bottom && value.left === label.left;
-    }),
-  ).toBe(true);
+  await expect(facts.locator('dt', { hasText: 'Last.fm 听众' })).toBeVisible();
   expect(
     await about
       .locator('[data-biography-sources]')
@@ -168,26 +158,18 @@ test('正文超链接先确认，取消不打开，记住选择后直接经 SDK 
   expect(env.errors).toEqual([]);
 });
 
-test('常听与热门的本地条目使用曲目表选择、键盘和右键菜单', async ({ page }) => {
+test('常听与热门的本地条目右键出曲目菜单，外链条目经确认才打开', async ({ page }) => {
   const env = await start(page);
-  const highlights = env.view.getByRole('region', { name: '常听', exact: true });
-  const played = env.view.getByRole('treegrid', { name: '常听', exact: true });
+  const played = env.view.getByRole('list', { name: '常听', exact: true });
   await expect(played).toBeVisible();
-  await expect(highlights.getByRole('button', { name: '显示更多', exact: true })).toHaveCount(0);
-  const feather = played.getByRole('row').filter({ hasText: 'Feather' });
+  const feather = played.locator('[data-artist-top-track]').filter({ hasText: 'Feather' });
   await expect(feather).toBeVisible();
-  await feather.click();
-  await expect(feather).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('ArrowDown');
-  await expect(played.locator('[data-row-focus="true"]')).not.toContainText('Feather');
   await feather.click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: '播放', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await env.view.getByRole('tab', { name: '热门', exact: true }).click();
   await expect(
-    env.view
-      .getByRole('treegrid', { name: '热门', exact: true })
-      .getByText('Feather', { exact: true }),
+    env.view.getByRole('list', { name: '热门', exact: true }).getByText('Feather', { exact: true }),
   ).toBeVisible();
   await env.view.getByRole('button', { name: 'Outside' }).click();
   await expect(page.getByRole('dialog', { name: '访问外部链接？' })).toContainText('/Outside');
@@ -196,15 +178,43 @@ test('常听与热门的本地条目使用曲目表选择、键盘和右键菜�
     .getByRole('dialog', { name: '访问外部链接？' })
     .getByRole('button', { name: '取消', exact: true })
     .click();
-  await expect(highlights.locator('[data-artist-highlights-scroll]')).toHaveCSS(
-    'max-height',
-    '240px',
-  );
-  await expect(highlights.locator('[data-artist-highlights-scroll]')).toHaveCSS(
-    'overflow-y',
-    'auto',
-  );
-  await expect(env.view.getByRole('treegrid', { name: '热门', exact: true })).toBeVisible();
+  expect(env.errors).toEqual([]);
+});
+
+test('热门里外链条目与本地条目保持榜单次序，不把外链挪到本地条目后面', async ({ page }) => {
+  const env = await start(page, undefined, (host) => {
+    host.answer('http.get', (params) => {
+      const url = new URL(String(params['url']));
+      if (url.searchParams.get('method') === 'artist.getInfo')
+        return apiReply(artistInfoSample('Nujabes', '简介正文'));
+      if (url.searchParams.get('method') === 'artist.getTopTracks')
+        return apiReply({
+          toptracks: {
+            track: (
+              [
+                ['Outside', 800],
+                ['Feather', 1200],
+                ['Not In Library', 500],
+              ] as const
+            ).map(([name, playcount], at) => ({
+              name,
+              playcount: String(playcount),
+              listeners: '100',
+              '@attr': { rank: String(at + 1) },
+              url: `https://www.last.fm/music/Nujabes/_/${name.replace(/ /g, '+')}`,
+            })),
+          },
+        });
+      return apiReply({});
+    });
+  });
+  await env.view.getByRole('tab', { name: '热门', exact: true }).click();
+  const rows = env.view.getByRole('list', { name: '热门', exact: true }).getByRole('listitem');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('Outside');
+  await expect(rows.nth(1).locator('[data-artist-top-track]')).toContainText('Feather');
+  await expect(rows.nth(2)).toContainText('Not In Library');
+  await expect(rows.nth(2).locator('[data-artist-external-track]')).toHaveCount(1);
   expect(env.errors).toEqual([]);
 });
 
@@ -234,25 +244,30 @@ test('热门长标题省略但外链图标始终可见，播放次数不重叠',
   await expect(rows).toHaveCount(3);
   for (const width of [1280, 1008, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    expect(
-      await rows.evaluateAll((nodes) =>
-        nodes.every((node) => {
-          const link = node.querySelector('[title]')?.getBoundingClientRect();
-          const count = node.lastElementChild?.getBoundingClientRect();
-          const icon = node.querySelector('[title] svg')?.getBoundingClientRect();
-          return (
-            link &&
-            count &&
-            icon &&
-            icon.width >= 15 &&
-            icon.left >= link.left &&
-            icon.right <= link.right + 1 &&
-            link.right <= count.left &&
-            node.scrollWidth <= node.clientWidth
-          );
-        }),
-      ),
-    ).toBe(true);
+    // 缩窗后侧边栏与列表要重排一阵，几何按自动重试判，不取一次就下结论；行尾是播放次数加外链图标
+    await expect
+      .poll(
+        () =>
+          rows.evaluateAll((nodes) =>
+            nodes.every((node) => {
+              const row = node.getBoundingClientRect();
+              const title = node.querySelector('[title]')?.getBoundingClientRect();
+              const end = node.lastElementChild?.getBoundingClientRect();
+              const icon = node.lastElementChild?.querySelector('svg')?.getBoundingClientRect();
+              return (
+                title &&
+                end &&
+                icon &&
+                icon.width >= 15 &&
+                icon.right <= row.right + 1 &&
+                title.right <= end.left &&
+                node.scrollWidth <= node.clientWidth
+              );
+            }),
+          ),
+        { message: `${width} 宽` },
+      )
+      .toBe(true);
   }
   expect(env.errors).toEqual([]);
 });
@@ -326,7 +341,7 @@ for (const colorScheme of ['dark', 'light'] as const)
     const env = await start(page);
     const trigger = env.view.getByRole('button', { name: '打开艺人照片', exact: true });
     const foreground = trigger.locator('[data-artist-photo-foreground]');
-    await expect(trigger.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+    await expect(trigger).toHaveAttribute('data-artist-photo-state', 'ready');
     const before = await foreground.getAttribute('src');
     await trigger.click();
     const viewer = page.getByRole('dialog', { name: 'Nujabes', exact: true });
@@ -351,23 +366,26 @@ for (const colorScheme of ['dark', 'light'] as const)
     expect(env.errors).toEqual([]);
   });
 
-for (const [label, width, height] of [
-  ['竖幅', 128, 192],
-  ['方图', 192, 192],
-  ['大方图', 1024, 1024],
-  ['横幅', 320, 180],
-  ['极宽', 960, 120],
+for (const [label, width, height, shape] of [
+  ['竖幅', 128, 192, 'rect'],
+  ['方图', 192, 192, 'round'],
+  ['大方图', 1024, 1024, 'round'],
+  ['横幅', 320, 180, 'rect'],
+  ['极宽', 960, 120, 'rect'],
 ] as const) {
-  test(`${label}照片保持比例，详情宽度控制横幅高度和操作换行`, async ({ page }) => {
+  test(`${label}照片按宽高比选圆形头像或横幅，照片不裁切不拉伸，窄窗也不横向溢出`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme: label === '方图' ? 'light' : 'dark' });
     const env = await start(page, [
       [width, height],
       [128, 160],
     ]);
     const header = env.view.locator('[data-artist-header]');
-    const trigger = header.getByRole('button', { name: '打开艺人照片', exact: true });
-    const foreground = trigger.locator('[data-artist-photo-foreground]');
-    await expect(trigger.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+    const avatar = header.locator('[data-artist-photo-state]');
+    const foreground = header.locator('[data-artist-photo-foreground]');
+    await expect(avatar).toHaveAttribute('data-artist-photo-state', 'ready');
+    await expect(header).toHaveAttribute('data-shape', shape);
     await expect(foreground).toHaveAttribute('src', env.pictures[0]);
     expect(
       await foreground.evaluate(
@@ -379,31 +397,39 @@ for (const [label, width, height] of [
         { width, height },
       ),
     ).toBe(true);
-    for (const viewport of [1280, 1008, 390]) {
-      await page.setViewportSize({ width: viewport, height: 900 });
-      await expect(trigger).toHaveCSS('height', viewport === 1280 ? '306px' : '216px');
+    const media = header.locator('span[aria-hidden="true"]');
+    if (shape === 'round') {
+      await expect(avatar).toBeVisible();
+      await expect(media).toHaveCount(0);
+    } else {
+      // 横幅：头像淡出让位，原图按比例完整显示，空白处是同一张图放大后的模糊
+      await expect(avatar).toBeHidden();
       await expect(foreground).toHaveCSS('object-fit', 'contain');
-      const background = trigger.locator('img[aria-hidden="true"]');
+      const background = media.locator('img').first();
       await expect(background).toHaveAttribute('src', env.pictures[0]);
       expect(await background.evaluate((node) => getComputedStyle(node).filter)).toContain('blur');
-      const photoBox = await trigger.boundingBox();
-      const imageBox = await foreground.boundingBox();
-      expect(photoBox).not.toBeNull();
-      expect(imageBox).not.toBeNull();
-      if (photoBox && imageBox) {
-        expect(imageBox.x).toBeGreaterThanOrEqual(photoBox.x - 1);
-        expect(imageBox.y).toBeGreaterThanOrEqual(photoBox.y - 1);
-        expect(imageBox.x + imageBox.width).toBeLessThanOrEqual(photoBox.x + photoBox.width + 1);
-        expect(imageBox.y + imageBox.height).toBeLessThanOrEqual(photoBox.y + photoBox.height + 1);
-        const scale = Math.min(photoBox.width / width, photoBox.height / height);
-        expect(imageBox.width).toBeCloseTo(width * scale, 0);
-        expect(imageBox.height).toBeCloseTo(photoBox.height, 0);
-        expect(imageBox.x + imageBox.width / 2).toBeCloseTo(photoBox.x + photoBox.width / 2, 0);
+    }
+    for (const viewport of [1280, 1008, 390]) {
+      await page.setViewportSize({ width: viewport, height: 900 });
+      await expect(header.getByRole('heading', { name: 'Nujabes' })).toBeVisible();
+      await expect(header.getByRole('button', { name: '播放', exact: true })).toBeVisible();
+      if (shape === 'rect') {
+        // 照片框在头部之内、水平居中；缩窗后仍按自动重试判，不取一次就下结论
+        await expect
+          .poll(async () => {
+            const box = await header.boundingBox();
+            const image = await foreground.boundingBox();
+            if (!box || !image) return false;
+            return (
+              image.x >= box.x - 1 &&
+              image.x + image.width <= box.x + box.width + 1 &&
+              image.y >= box.y - 1 &&
+              image.y + image.height <= box.y + box.height + 1 &&
+              Math.abs(image.x + image.width / 2 - (box.x + box.width / 2)) <= 1
+            );
+          })
+          .toBe(true);
       }
-      const nameBox = await header.getByRole('heading', { name: 'Nujabes' }).boundingBox();
-      const playBox = await header.getByRole('button', { name: '播放', exact: true }).boundingBox();
-      expect(photoBox && nameBox && nameBox.y >= photoBox.y + photoBox.height).toBe(true);
-      expect(photoBox && playBox && playBox.y >= photoBox.y + photoBox.height).toBe(true);
       expect(await header.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
@@ -435,23 +461,23 @@ test('旧照片加载失败不能覆盖新头像，关闭查看器回到原入�
     }));
   });
   const trigger = env.view.getByRole('button', { name: '打开艺人照片', exact: true });
-  await expect(trigger.locator('[data-artist-photo-state="loading"]')).toBeVisible();
+  await expect(trigger).toHaveAttribute('data-artist-photo-state', 'loading');
   await trigger.click();
   const viewer = page.getByRole('dialog', { name: 'Nujabes', exact: true });
   await expect(viewer.getByRole('button', { name: '下一张照片' })).toBeEnabled();
   await page.keyboard.press('ArrowRight');
   await viewer.getByRole('button', { name: '设为头像', exact: true }).click();
-  await expect(trigger.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+  await expect(trigger).toHaveAttribute('data-artist-photo-state', 'ready');
   release();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
-  await expect(trigger.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+  await expect(trigger).toHaveAttribute('data-artist-photo-state', 'ready');
   expect(env.errors).toEqual([]);
 });
 
 test('390 胶囊下详情底部保留补偿，照片工具入口可用', async ({ page }) => {
   await page.addInitScript((key) => localStorage.setItem(key, 'capsule'), PLAYER_BAR_STORAGE_KEY);
-  // 宿主正放着一首：没有当前曲目时胶囊不出。
+  // 宿主正放着一首：没有当前曲目时胶囊不出
   const env = await start(page, undefined, (host) => {
     host.answer('playback.getState', {
       success: true,
@@ -463,20 +489,27 @@ test('390 胶囊下详情底部保留补偿，照片工具入口可用', async (
   });
   await page.setViewportSize({ width: 390, height: 800 });
   const header = env.view.locator('[data-artist-header]');
-  await expect(header.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+  await expect(header.locator('[data-artist-photo-state]')).toHaveAttribute(
+    'data-artist-photo-state',
+    'ready',
+  );
   const photos = header.getByRole('button', { name: '艺人照片', exact: true });
   await photos.click();
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-biography-viewer]')).toHaveCount(0);
   await expect(photos).toBeFocused();
-  const last = env.view.locator('[data-artist-albums] li').last();
-  await last.scrollIntoViewIfNeeded();
-  await header.evaluate((node) => {
-    if (node.parentElement) node.parentElement.scrollTop = node.parentElement.scrollHeight;
+  // 页面最下面是「关于」：滚到底后它的最后一块要整个落在胶囊之上
+  const last = env.view.locator('[data-artist-about] > :last-child');
+  await env.view.locator('[data-detail-scroller]').evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
   });
-  const rowBox = await last.boundingBox();
-  const capsuleBox = await page.locator('[data-player-capsule]').boundingBox();
-  expect(rowBox && capsuleBox && rowBox.y + rowBox.height <= capsuleBox.y).toBe(true);
+  await expect
+    .poll(async () => {
+      const rowBox = await last.boundingBox();
+      const capsuleBox = await page.locator('[data-player-capsule]').boundingBox();
+      return !!rowBox && !!capsuleBox && rowBox.y + rowBox.height <= capsuleBox.y;
+    })
+    .toBe(true);
   expect(env.errors).toEqual([]);
 });
 
@@ -498,18 +531,19 @@ test('坏图显示占位，选择正常照片后恢复；切人不保留旧照�
   });
   const header = env.view.locator('[data-artist-header]');
   const trigger = header.getByRole('button', { name: '打开艺人照片', exact: true });
-  await expect(header.locator('[data-artist-photo-state="failed"]')).toBeVisible();
+  // 头像照片加载不出来：不画坏图，画人像占位
+  await expect(trigger).toHaveAttribute('data-artist-photo-state', 'empty');
   await expect(trigger.locator('img')).toHaveCount(0);
-  await expect(trigger.getByRole('img', { name: '照片加载失败' })).toBeVisible();
   await trigger.click();
   const viewer = page.getByRole('dialog', { name: 'Nujabes', exact: true });
   await expect(viewer.getByRole('button', { name: '下一张照片' })).toBeEnabled();
   await page.keyboard.press('ArrowRight');
   await viewer.getByRole('button', { name: '设为头像', exact: true }).click();
-  await expect(header.locator('[data-artist-photo-state="ready"]')).toBeVisible();
+  await expect(trigger).toHaveAttribute('data-artist-photo-state', 'ready');
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
   const held = env.host.hold('artwork.getForTrack');
+  await page.keyboard.press('Alt+ArrowLeft');
   await env.artist('Shing02').click();
   await expect(header.getByRole('heading', { name: 'Shing02' })).toBeVisible();
   await expect(header.locator('[data-artist-photo-foreground]')).toHaveCount(0);

@@ -143,9 +143,7 @@ export function startArtistActions(
       });
     },
     queue(names: readonly string[], next: boolean) {
-      return withTracks(names, (paths) =>
-        paths.length <= 256 ? deps.actions.queuePaths(paths, next) : Promise.resolve(false),
-      );
+      return withTracks(names, (paths) => deps.actions.queuePaths(paths, next));
     },
     send(names: readonly string[], target?: SendTarget) {
       return withTracks(names, (paths) =>

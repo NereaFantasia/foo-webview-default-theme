@@ -8,6 +8,7 @@ import {
   albumGenreLink,
   musicArtistLinks,
   musicTrackLinks,
+  trackAlbumArtistLinks,
   trackLinks,
   type LinkableTrack,
 } from '../../../src/track/trackLinks.ts';
@@ -146,6 +147,32 @@ describe('albumArtistLink', () => {
   it('署名为空或全是空白时没有', () => {
     expect(albumArtistLink({ albumArtist: '', artist: '' })).toBeNull();
     expect(albumArtistLink({ albumArtist: ' ', artist: '' })).toBeNull();
+  });
+});
+
+describe('trackAlbumArtistLinks', () => {
+  it('按多值标签逐位给引用，署名原样作身份，去掉空名与重名', () => {
+    expect(
+      trackAlbumArtistLinks({ albumArtist: 'A, B', albumArtists: ['A', ' ', 'B', 'A'] }),
+    ).toEqual([
+      { text: 'A', ref: { kind: 'artist', name: 'A' } },
+      { text: 'B', ref: { kind: 'artist', name: 'B' } },
+    ]);
+  });
+
+  it('单个值里写了逗号时仍是一位艺人', () => {
+    expect(
+      trackAlbumArtistLinks({ albumArtist: 'Chorus: X, Y', albumArtists: ['Chorus: X, Y'] }),
+    ).toEqual([{ text: 'Chorus: X, Y', ref: { kind: 'artist', name: 'Chorus: X, Y' } }]);
+  });
+
+  it('没有多值标签时整串只显示，不当成一位艺人；署名为空时没有', () => {
+    expect(trackAlbumArtistLinks({ albumArtist: 'A, B', albumArtists: [] })).toEqual([
+      { text: 'A, B', ref: null },
+    ]);
+    expect(trackAlbumArtistLinks({ albumArtist: 'A, B' })).toEqual([{ text: 'A, B', ref: null }]);
+    expect(trackAlbumArtistLinks({ albumArtist: ' ', albumArtists: [' '] })).toEqual([]);
+    expect(trackAlbumArtistLinks({})).toEqual([]);
   });
 });
 

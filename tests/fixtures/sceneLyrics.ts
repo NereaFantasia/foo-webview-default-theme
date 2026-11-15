@@ -4,6 +4,7 @@ import { startLyricsIntegration } from '../../src/app/lyricsIntegration.ts';
 import { bindService } from '../../src/kit/serviceKey.ts';
 import { lyricsClockKey } from '../../src/lyrics/lyricsClock.ts';
 import { lyricsDisplayKey } from '../../src/lyrics/lyricsDisplay.ts';
+import { lyricsCacheKey } from '../../src/lyrics/lyricsCache.ts';
 import { lyricsMotionKey } from '../../src/lyrics/lyricsMotion.ts';
 import { lyricsPrefsKey } from '../../src/lyrics/lyricsPrefs.ts';
 import { lyricsKey } from '../../src/lyrics/lyricsService.ts';
@@ -18,7 +19,7 @@ import type { SceneEnv } from './sceneEnv.ts';
 export type SceneLyricsAnswer = { readonly text: string; readonly synced: boolean } | null;
 
 /**
- * 在场景夹具上起真的歌词装配，并停到沉浸视图这一页（取词需求随之为真），把歌词元素要的五项服务绑进去。
+ * 在场景夹具上起真的歌词装配，并停到沉浸视图这一页（取词需求随之为真），把歌词元素要的五项服务绑进去
  * 宿主的答案要在换曲之前定好，所以先调它再 `env.play`
  */
 export async function startSceneLyrics(env: SceneEnv, answer: SceneLyricsAnswer) {
@@ -59,6 +60,7 @@ export async function startSceneLyrics(env: SceneEnv, answer: SceneLyricsAnswer)
     bindService(lyricsKey, integration.service),
     bindService(lyricsMotionKey, integration.motion),
     bindService(lyricsPrefsKey, integration.prefs),
+    bindService(lyricsCacheKey, integration.cache),
     bindService(lyricsDisplayKey, integration.display),
     bindService(lyricsClockKey, { clock: integration.clock, seek: integration.seek }),
     bindService(lyricsSettingsKey, { open: () => undefined }),

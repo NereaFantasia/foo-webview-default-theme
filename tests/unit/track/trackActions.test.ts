@@ -92,6 +92,20 @@ describe('按一批路径执行', () => {
     expect(recorded).toEqual([BLUE]);
   });
 
+  it('入队不挡在专用列表的忙碌后面：起播在途时入队排在它之后照样做完，不挂忙碌提示', async () => {
+    const host = libraryHost();
+    const held = host.hold('playlist.playTrack');
+    const { actions, notice } = setup(host);
+    const playing = actions.playPaths(PATHS, 0, BLUE);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const queued = actions.queuePaths(PATHS, true);
+    held.release();
+    expect(await playing).toBe(true);
+    expect(await queued).toBe(true);
+    expect(notice()).toBeNull();
+    expect(host.callsTo('queue.insertNext')).toHaveLength(1);
+  });
+
   it('「更多命令」按生成那棵树时的目标执行', async () => {
     const host = libraryHost();
     const { actions } = setup(host);

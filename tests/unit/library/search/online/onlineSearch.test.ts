@@ -12,7 +12,7 @@ interface Call {
   readonly signal: AbortSignal | undefined;
   answer(data: unknown): void;
   fail(code: string): void;
-  /** 后端还没连上：请求当即被拒，不是后端答的失败。 */
+  /** 后端还没连上：请求当即被拒，不是后端答的失败 */
   unreachable(): void;
 }
 
@@ -86,6 +86,28 @@ describe('在线搜索', () => {
     });
     search.load(['track', 'album', 'artist']);
     expect(calls.map((call) => call.body['kind'])).toEqual(['track', 'album', 'artist']);
+  });
+
+  it('同一查询词的另一份接过已取到的类别，不再为它们发请求；查询词不同时不接', async () => {
+    const preview = setup();
+    preview.search.setText('Nujabes');
+    preview.search.load(['track', 'album']);
+    preview.calls[0]?.answer(page([musicTrack('1')], '20'));
+    await settle();
+    const results = setup();
+    results.search.setText('Nujabes');
+    results.search.adopt(preview.search.handover());
+    expect(results.store.get(results.search.kinds.track)).toMatchObject({
+      status: 'ready',
+      items: [{ ref: { id: '1' } }],
+      cursor: '20',
+    });
+    results.search.load(['track', 'album']);
+    expect(results.calls.map((call) => call.body['kind'])).toEqual(['album']);
+    const other = setup();
+    other.search.setText('Feather');
+    other.search.adopt(preview.search.handover());
+    expect(other.store.get(other.search.kinds.track).status).toBe('idle');
   });
 
   it('第一页失败记下原因，再要时重取', async () => {

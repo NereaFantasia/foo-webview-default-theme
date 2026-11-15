@@ -7,6 +7,7 @@ import { openPlaylist } from '../fixtures/playlistPage.ts';
 import { choosePlayerBar, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 import { openSongs } from '../fixtures/songsPage.ts';
 import { openHome } from '../fixtures/homePage.ts';
+import { wholeLibrary } from '../fixtures/wholeLibrary.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -33,11 +34,8 @@ test('首页聚焦胶囊遮挡区内的按钮时自动滚到可操作位置', as
   });
   const capsule = page.locator('[data-player-capsule]');
   await expect(capsule).toBeVisible();
-  const target = home.view
-    .locator('[data-home-section="explore"] [data-home-album]')
-    .nth(1)
-    .locator('button')
-    .first();
+  // 概览卡在页尾，一开始就在视口下面，能滚到胶囊后面
+  const target = home.view.locator('[data-home-section="overview"] [data-home-item]').nth(1);
   await target.evaluate((element) => {
     const scroll = element.closest<HTMLElement>('[data-page="home"]');
     if (!scroll) throw new Error('首页滚动容器不存在');
@@ -48,7 +46,8 @@ test('首页聚焦胶囊遮挡区内的按钮时自动滚到可操作位置', as
   expect((await box(target)).bottom).toBeGreaterThan(obstacle.y);
   await target.focus();
   await expect(target).toBeFocused();
-  await expect.poll(async () => (await box(target)).bottom).toBeLessThanOrEqual(obstacle.y);
+  // 滚动位置落在整像素上，上面几行的高度带小数，元素底边可能比胶囊顶边多出不到一像素
+  await expect.poll(async () => (await box(target)).bottom).toBeLessThan(obstacle.y + 1);
   expect(home.errors).toEqual([]);
 });
 
@@ -110,6 +109,10 @@ for (const scenario of [
     await page.locator('[data-album-menu] [data-action="open-detail"]').click();
     const view = page.locator('[data-page="album"]');
     await expect(view.getByRole('heading', { level: 1 })).toHaveText(album.name);
+    // 进场位移播完再量，免得先后两次取框正好跨过它的收尾
+    await view.evaluate((element) =>
+      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
     const scroller = view.locator('[data-detail-scroller]');
     const intro = view.locator('[data-detail-intro]');
     const glow = view.locator(':scope > [data-cover-glow]');
@@ -157,13 +160,7 @@ for (const width of [1280, 900]) {
     );
     const songs = await openSongs(page, {
       configure(host) {
-        host.answer('library.getAll', {
-          success: true,
-          tracks,
-          items: tracks,
-          total: tracks.length,
-          offset: 0,
-        });
+        host.answer('library.search', wholeLibrary(tracks));
         host.answer('library.query', {
           success: true,
           tracks: tracks.map(({ handle, index }) => ({ handle, index })),

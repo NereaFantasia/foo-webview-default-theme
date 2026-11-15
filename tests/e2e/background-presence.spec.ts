@@ -79,7 +79,7 @@ async function prepare(page: Page) {
   const track = makeTrack({ path: 'file://E:/Music/Flow/presence.flac', title: 'Presence' });
   player.state.track = track;
   await player.host.emit('playback:trackChanged', track);
-  await enterSettings(page);
+  await enterSettings(page, '外观');
   await expect(page.locator('[data-background-pending]')).toHaveCount(0);
   await expect(page.locator('[data-palette-field]')).toBeVisible();
   return player;

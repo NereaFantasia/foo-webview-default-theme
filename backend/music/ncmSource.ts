@@ -25,6 +25,7 @@ import {
 } from '../../src/server/musicObjects.ts';
 import { isRecord } from './lxSource.ts';
 import { MusicError } from './musicError.ts';
+import { startNcmDiscover } from './ncmDiscover.ts';
 import {
   NCM_PAGE_SIZE,
   NCM_SEARCH,
@@ -51,6 +52,11 @@ export interface NcmApi {
   readonly artists: (query: Record<string, unknown>) => Promise<unknown>;
   readonly artist_album: (query: Record<string, unknown>) => Promise<unknown>;
   readonly playlist_detail: (query: Record<string, unknown>) => Promise<unknown>;
+  readonly banner: (query: Record<string, unknown>) => Promise<unknown>;
+  readonly top_song: (query: Record<string, unknown>) => Promise<unknown>;
+  readonly personalized: (query: Record<string, unknown>) => Promise<unknown>;
+  readonly album_new: (query: Record<string, unknown>) => Promise<unknown>;
+  readonly toplist_detail: (query: Record<string, unknown>) => Promise<unknown>;
   readonly login_qr_key: (query: Record<string, unknown>) => Promise<unknown>;
   readonly login_qr_create: (query: Record<string, unknown>) => Promise<unknown>;
   readonly login_qr_check: (query: Record<string, unknown>) => Promise<unknown>;
@@ -110,6 +116,11 @@ export function ncmLoader(directory: string, temporary: string): NcmLoader {
         artists: method(module, 'artists'),
         artist_album: method(module, 'artist_album'),
         playlist_detail: method(module, 'playlist_detail'),
+        banner: method(module, 'banner'),
+        top_song: method(module, 'top_song'),
+        personalized: method(module, 'personalized'),
+        album_new: method(module, 'album_new'),
+        toplist_detail: method(module, 'toplist_detail'),
         login_qr_key: method(module, 'login_qr_key'),
         login_qr_create: method(module, 'login_qr_create'),
         login_qr_check: method(module, 'login_qr_check'),
@@ -138,6 +149,11 @@ const METADATA = new Set<keyof NcmApi>([
   'artists',
   'artist_album',
   'playlist_detail',
+  'banner',
+  'top_song',
+  'personalized',
+  'album_new',
+  'toplist_detail',
 ]);
 
 const LOGIN_STATES = new Map<unknown, MusicLoginState>([
@@ -205,6 +221,8 @@ export function startNcmSource(api: NcmApi, options: NcmSourceOptions = {}) {
   }
 
   return {
+    /** 平台的公共推荐，不带登录凭据：内容对所有访客相同 */
+    discover: startNcmDiscover(call).run,
     async search<K extends MusicSearchKind>(
       input: MusicSearchRequest & { readonly kind: K },
       signal: AbortSignal,

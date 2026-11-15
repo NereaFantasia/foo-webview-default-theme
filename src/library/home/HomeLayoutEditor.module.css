@@ -1,0 +1,117 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalM);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.hint {
+  flex: 1;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+}
+
+/* 占位符：虚线框，整行都能起拖 */
+.row {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-height: 56px;
+  border: var(--strokeWidthThin) dashed var(--line);
+  border-radius: var(--radius-card);
+  padding: 0 var(--spacingHorizontalS);
+  background-color: var(--bg-view-control);
+  cursor: grab;
+  user-select: none;
+}
+
+.row[data-dragging] {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase400);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 插入线画在行间的缝里：缝宽是行距，线压在缝的正中 */
+.row[data-drop='before']::before,
+.row[data-drop='after']::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: var(--strokeWidthThick);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorBrandStroke1);
+}
+
+.row[data-drop='before']::before {
+  top: calc(var(--spacingVerticalS) / -2);
+  transform: translateY(-50%);
+}
+
+.row[data-drop='after']::after {
+  bottom: calc(var(--spacingVerticalS) / -2);
+  transform: translateY(50%);
+}
+
+.add {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalS);
+  min-height: 56px;
+  border: var(--strokeWidthThin) dashed var(--line);
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.add:hover {
+  background: var(--state-hover);
+  color: var(--colorNeutralForeground1);
+}
+
+.add:active {
+  background: var(--state-pressed);
+}
+
+.add:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .row,
+  .add {
+    border-color: CanvasText;
+  }
+
+  .row[data-drop='before']::before,
+  .row[data-drop='after']::after {
+    background: Highlight;
+  }
+}

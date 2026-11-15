@@ -23,7 +23,17 @@ export type ColumnId =
   | 'art'
   | 'sampleRate'
   | 'channels'
-  | 'fileSize';
+  | 'fileSize'
+  | 'disc'
+  | 'fileName'
+  | 'folder'
+  | 'composer'
+  | 'performer'
+  | 'comment'
+  | 'bitDepth'
+  | 'tagType'
+  | 'lastModified'
+  | 'firstPlayed';
 
 export interface ColumnDef {
   readonly id: ColumnId;
@@ -55,6 +65,16 @@ export const EXTENDED_COLUMNS: readonly ColumnId[] = [
   'channels',
   'fileSize',
   'path',
+  'disc',
+  'fileName',
+  'folder',
+  'composer',
+  'performer',
+  'comment',
+  'bitDepth',
+  'tagType',
+  'lastModified',
+  'firstPlayed',
 ];
 /**
  * 原先只有基本列的表（播放列表、文件夹、流派）开放扩展字段时，存档的列宽项数还不到这么多；
@@ -78,7 +98,7 @@ function column(id: ColumnId, label: MessageKey, traits: Partial<ColumnDef> = {}
 
 /**
  * 列表，顺序就是存档里列宽的下标，显示换位不改这张表。下标与已有的存档对齐：前七列的下标与七项的旧存档
- * 一一对应，专辑列是 7，专辑艺术家到路径是 8 到 16，缩略图是 17；新列只能加在末尾，存档按项数认版本
+ * 一一对应，专辑列是 7，专辑艺人到路径是 8 到 16，缩略图是 17；新列只能加在末尾，存档按项数认版本
  * （`STORED_COUNTS`）
  */
 export const COLUMNS: readonly ColumnDef[] = [
@@ -107,13 +127,25 @@ export const COLUMNS: readonly ColumnDef[] = [
   column('sampleRate', 'table.sampleRate', { numeric: true }),
   column('channels', 'table.channels', { numeric: true }),
   column('fileSize', 'table.fileSize', { numeric: true }),
+  column('disc', 'table.disc', { numeric: true }),
+  column('fileName', 'table.fileName', { flexible: true }),
+  column('folder', 'table.folder', { flexible: true }),
+  // 后七列的值要按标签现算，只显示、不能排序：库页的排序走宿主一次排整库，筛选后的子集与目录页没有整份的值可排
+  column('composer', 'table.composer', { sortable: false }),
+  column('performer', 'table.performer', { sortable: false }),
+  column('comment', 'table.comment', { sortable: false, flexible: true }),
+  column('bitDepth', 'table.bitDepth', { numeric: true, sortable: false }),
+  column('tagType', 'table.tagType', { sortable: false }),
+  column('lastModified', 'table.lastModified', { numeric: true, sortable: false }),
+  column('firstPlayed', 'table.firstPlayed', { numeric: true, sortable: false }),
 ];
 
 /**
- * 各版存档的列数。七项的还没有专辑列，八项的还没有专辑艺术家以后的十列；读回时缺的列补上缺省宽、记成藏着，
+ * 各版存档的列数。七项的还没有专辑列，八项的还没有专辑艺人以后的十列，二十一项的还没有碟号以后的十列；
+ * 读回时缺的列补上缺省宽、记成藏着，
  * 存档时还没有这些列的表上不会突然多出列来
  */
-export const STORED_COUNTS: readonly number[] = [7, 8, 18, COLUMNS.length];
+export const STORED_COUNTS: readonly number[] = [7, 8, 18, 21, COLUMNS.length];
 
 export const COLUMN_IDS: readonly ColumnId[] = COLUMNS.map((column) => column.id);
 
@@ -135,7 +167,7 @@ export function isColumnId(value: unknown): value is ColumnId {
 }
 
 /**
- * 缺省的显示顺序：缩略图紧贴标题左边，专辑紧跟艺术家，后来加的几列排在专辑与等级之间，等级与时长留在最右
+ * 缺省的显示顺序：缩略图紧贴标题左边，专辑紧跟艺人，后来加的几列排在专辑与等级之间，等级与时长留在最右
  * 封面恒在最左，不参与换位
  */
 export const DEFAULT_ORDER: readonly ColumnId[] = [
@@ -158,6 +190,16 @@ export const DEFAULT_ORDER: readonly ColumnId[] = [
   'channels',
   'fileSize',
   'path',
+  'disc',
+  'fileName',
+  'folder',
+  'composer',
+  'performer',
+  'comment',
+  'bitDepth',
+  'tagType',
+  'lastModified',
+  'firstPlayed',
   'rating',
   'duration',
 ];
@@ -171,6 +213,8 @@ export type ColumnWidths = readonly number[];
 /** 独立像素列宽；窗口变宽时保留右侧空白，不拉伸用户的列 */
 export const DEFAULT_WIDTHS: ColumnWidths = [
   120, 24, 52, 280, 160, 88, 60, 180, 160, 52, 96, 96, 60, 96, 64, 72, 320, 48, 96, 56, 96,
+  // 碟号、文件名、文件夹、作曲、表演者、注释、位深、标签类型、最后修改、首次播放
+  52, 240, 160, 160, 160, 240, 64, 96, 96, 96,
 ];
 
 /** 按 `COLUMNS` 的顺序收成全部列的项数；多的丢掉，缺的补 0 */

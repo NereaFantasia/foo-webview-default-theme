@@ -303,6 +303,56 @@ describe('音乐客户端', () => {
     }
   });
 
+  it('公共推荐按类与地区请求；横幅与榜单的结构不对、条目重复或榜单超过三名都算答复无效', async () => {
+    const { request, client } = setup();
+    const chart = {
+      chart: {
+        ref: { platform: 'wy', id: '3778678' },
+        title: '热歌榜',
+        cover: null,
+        trackCount: 200,
+        kind: 'chart',
+        description: null,
+        playCount: 1,
+        updateNote: '刚刚更新',
+      },
+      region: null,
+      updatedAt: 5000,
+      entries: [{ track: TRACK, previous: 2, since: 1000 }],
+    };
+    const banner = {
+      label: '新歌首发',
+      image: 'https://p1.music.126.net/a.jpg',
+      target: { kind: 'track', track: TRACK },
+    };
+    request.mockResolvedValueOnce(reply([TRACK]));
+    expect(await client.discover({ kind: 'new-tracks', area: 'jp' })).toEqual([TRACK]);
+    request.mockResolvedValueOnce(reply([chart]));
+    expect(await client.discover({ kind: 'charts' })).toEqual([chart]);
+    request.mockResolvedValueOnce(reply([banner]));
+    expect(await client.discover({ kind: 'banners' })).toEqual([banner]);
+    expect(request.mock.calls.map(([path, body]) => [path, body])).toEqual([
+      ['/music/discover', { kind: 'new-tracks', area: 'jp' }],
+      ['/music/discover', { kind: 'charts' }],
+      ['/music/discover', { kind: 'banners' }],
+    ]);
+    const entry = chart.entries[0];
+    for (const [kind, data] of [
+      ['charts', [{ ...chart, entries: [entry, entry, entry, entry] }]],
+      ['charts', [{ ...chart, chart: { ...chart.chart, kind: 'playlist' } }]],
+      ['charts', [{ ...chart, region: 'cn' }]],
+      ['charts', [{ ...chart, entries: [{ ...entry, previous: 0 }] }]],
+      ['banners', [banner, banner]],
+      ['banners', [{ ...banner, target: { kind: 'playlist', track: TRACK } }]],
+      ['banners', [{ ...banner, image: 'javascript:alert(1)' }]],
+    ] as const) {
+      request.mockResolvedValueOnce(reply(data));
+      await expect(client.discover({ kind })).rejects.toMatchObject({
+        code: 'invalid-response',
+      });
+    }
+  });
+
   it('扫码登录、退出与解灰开关经同一连接，答复要与请求的结果一致', async () => {
     const { request, client } = setup();
     const code = { key: 'unikey', image: 'data:image/png;base64,iVBORw0KGgo=' };
@@ -413,5 +463,80 @@ describe('音乐客户端', () => {
       ['/music/failures', { after: 9 }],
       ['/music/failures', { after: 10 }],
     ]);
+  });
+
+  it('本地收藏：各走自己的路由；答复对不上请求（顺序、项数、取消数、类别）时当无效应答', async () => {
+    const { request, client } = setup();
+    const second: MusicTrack = { ...TRACK, ref: { platform: 'wy', id: '0013' } };
+    const keys = { track: [['wy', '0012', 5]], album: [], artist: [], playlist: [] };
+    request.mockResolvedValueOnce(reply(keys));
+    expect(await client.favoriteKeys()).toEqual(keys);
+
+    const stamps = [
+      { ref: TRACK.ref, addedAt: 5 },
+      { ref: second.ref, addedAt: 6 },
+    ];
+    request.mockResolvedValueOnce(reply(stamps));
+    expect(await client.addFavorites({ kind: 'track', items: [TRACK, second] })).toEqual(stamps);
+    request.mockResolvedValueOnce(reply([...stamps].reverse()));
+    await expect(
+      client.addFavorites({ kind: 'track', items: [TRACK, second] }),
+    ).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+    request.mockResolvedValueOnce(reply(stamps.slice(0, 1)));
+    await expect(
+      client.addFavorites({ kind: 'track', items: [TRACK, second] }),
+    ).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+
+    // 刷新只答库里有的，可以比请求少，但不能多出请求之外的
+    request.mockResolvedValueOnce(reply(stamps.slice(0, 1)));
+    expect(await client.refreshFavorites({ kind: 'track', items: [TRACK, second] })).toEqual(
+      stamps.slice(0, 1),
+    );
+    request.mockResolvedValueOnce(reply(stamps));
+    await expect(client.refreshFavorites({ kind: 'track', items: [TRACK] })).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+
+    request.mockResolvedValueOnce(reply({ removed: 1 }));
+    expect(await client.removeFavorites({ kind: 'track', refs: [TRACK.ref] })).toBe(1);
+    request.mockResolvedValueOnce(reply({ removed: 2 }));
+    await expect(
+      client.removeFavorites({ kind: 'track', refs: [TRACK.ref] }),
+    ).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+
+    // 一页里混进别的类别，整页不要
+    request.mockResolvedValueOnce(
+      reply({ items: [{ kind: 'album', item: TRACK, addedAt: 1 }], nextCursor: null, total: 1 }),
+    );
+    await expect(client.favoriteList({ kind: 'track', cursor: null })).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+    request.mockResolvedValueOnce(
+      reply({ items: [{ kind: 'track', item: TRACK, addedAt: 1 }], nextCursor: '1', total: 2 }),
+    );
+    expect(await client.favoriteList({ kind: 'track', cursor: null })).toEqual({
+      items: [{ kind: 'track', item: TRACK, addedAt: 1 }],
+      nextCursor: '1',
+      total: 2,
+    });
+    expect(request.mock.calls.map(([path]) => path)).toEqual([
+      '/music/favorites-keys',
+      '/music/favorites-add',
+      '/music/favorites-add',
+      '/music/favorites-add',
+      '/music/favorites-refresh',
+      '/music/favorites-refresh',
+      '/music/favorites-remove',
+      '/music/favorites-remove',
+      '/music/favorites-list',
+      '/music/favorites-list',
+    ]);
+    expect(request.mock.calls[8]?.[1]).toEqual({ kind: 'track', cursor: null });
   });
 });

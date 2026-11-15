@@ -3,7 +3,7 @@
 .row {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 56px 44px;
+  grid-template-columns: 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 56px 28px 44px;
   align-items: center;
   gap: var(--spacingHorizontalM);
   padding: 0 var(--spacingHorizontalM);
@@ -13,11 +13,43 @@
 .row[data-layout='list'] {
   grid-template-columns:
     28px 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr)
-    56px 44px 24px;
+    56px 28px 44px 24px;
 }
 .header[data-layout='album'],
 .row[data-layout='album'] {
-  grid-template-columns: 28px minmax(0, 5fr) minmax(0, 3fr) 56px 44px 24px;
+  grid-template-columns: 28px minmax(0, 5fr) minmax(0, 3fr) 56px 28px 44px 24px;
+}
+/* 收藏页：序号、封面、标题、艺人、专辑、收藏时间、音质、心形、时长、⋯ */
+.header[data-layout='favorites'],
+.row[data-layout='favorites'] {
+  grid-template-columns:
+    28px 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) minmax(96px, 1fr)
+    56px 28px 44px 24px;
+}
+.added {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 内容区放不下时先收收藏时间与音质，再收专辑；档位由页面根上的 data-tier 给 */
+[data-tier='medium'] .header[data-layout='favorites'],
+[data-tier='medium'] .row[data-layout='favorites'],
+[data-tier='narrow'] .header[data-layout='favorites'],
+[data-tier='narrow'] .row[data-layout='favorites'] {
+  grid-template-columns: 28px 32px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 28px 44px 24px;
+}
+[data-tier='narrow'] .header[data-layout='favorites'],
+[data-tier='narrow'] .row[data-layout='favorites'] {
+  grid-template-columns: 28px 32px minmax(0, 3fr) minmax(0, 2fr) 28px 44px 24px;
+}
+[data-tier='medium'] [data-layout='favorites'] .added,
+[data-tier='medium'] [data-layout='favorites'] .quality,
+[data-tier='narrow'] [data-layout='favorites'] .added,
+[data-tier='narrow'] [data-layout='favorites'] .quality,
+[data-tier='narrow'] [data-layout='favorites'] .album {
+  display: none;
 }
 .number {
   display: flex;
@@ -289,7 +321,6 @@ button.best:focus-visible {
   align-items: center;
   min-width: 0;
   overflow: hidden;
-  gap: var(--spacingHorizontalM);
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase200);
   line-height: var(--lineHeightBase200);

@@ -2,21 +2,22 @@ import { expect, test, type Page } from '@playwright/test';
 import type { AlbumInfo } from 'foo-webview-sdk';
 import {
   albumsAnswer,
+  albumsTracks,
   libraryAnswers,
   manyAlbums,
   SAMPLE_ALBUMS,
 } from '../fixtures/albumLibrary.ts';
 import { RESTORE_WINDOW_MS } from '../../src/kit/scrollRestore.ts';
-import type { ConfigValue } from '../fixtures/hostAnswers.ts';
+import { hostFailure, stringParam, type ConfigValue } from '../fixtures/hostAnswers.ts';
 import { albumTrackRow } from '../fixtures/libraryRows.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
-// 专辑页的状态：形态切走再切回来、离开再从历史回来、重新载入之后，各自该留下的都还在。
+// 专辑页的状态：形态切走再切回来、离开再从历史回来、重新载入之后，各自该留下的都还在
 
 const tiles = (page: Page) => page.locator('[data-album-tile]');
 const tile = (page: Page, name: string) => tiles(page).filter({ hasText: name });
 const grid = (page: Page) => page.locator('[data-album-wall]');
-const filter = (page: Page) => page.locator('input[data-album-filter]');
+const filter = (page: Page) => page.locator('input[data-query-input]');
 const scrollTop = (page: Page) => grid(page).evaluate((element) => element.scrollTop);
 const detailTitle = (page: Page) => page.locator('[data-page="album"] h1');
 const COLLAPSED = 'defaultTheme.browser.collapsed';
@@ -36,7 +37,7 @@ async function start(
   return host;
 }
 
-/** 等滚动停下（连着两次隔一帧读到同一个值），答停下的位置。 */
+/** 等滚动停下（连着两次隔一帧读到同一个值），答停下的位置 */
 async function settledScrollTop(page: Page): Promise<number> {
   await expect
     .poll(() =>
@@ -52,7 +53,7 @@ async function settledScrollTop(page: Page): Promise<number> {
   return scrollTop(page);
 }
 
-/** 滚到 `top`，等虚拟滚动把那一段的图块画出来。 */
+/** 滚到 `top`，等虚拟滚动把那一段的图块画出来 */
 async function scrollTo(page: Page, top: number): Promise<void> {
   await grid(page).evaluate((element, value) => element.scrollTo({ top: value }), top);
   await expect.poll(() => scrollTop(page)).toBe(top);
@@ -69,8 +70,8 @@ test('切到列表形态再切回来：滚动、焦点、筛选词都还在，�
   await scrollTo(page, 1200);
   const focused = tiles(page).nth(8);
   const name = (await focused.locator('span').first().textContent()) ?? '';
-  // 点中的那块若不在视口里，点击会先把它滚进来；单击还会展开它的下拉，放不下时视口跟着展开滚。
-  // 以滚完之后的位置为准。
+  // 点中的那块若不在视口里，点击会先把它滚进来；单击还会展开它的下拉，放不下时视口跟着展开滚
+  // 以滚完之后的位置为准
   await focused.click();
   const top = await settledScrollTop(page);
   expect(top).toBeGreaterThan(0);
@@ -94,7 +95,7 @@ test('切到列表形态再切回来：滚动、焦点、筛选词都还在，�
 
 /**
  * 在封面墙滚到最低处，切到列表形态，其间库里少了大半专辑，再切回来：记下的位置落不下了，
- * 交还后停在能滚到的最低处，挂着等条目流再变。答宿主替身与那时的最低处。
+ * 交还后停在能滚到的最低处，挂着等条目流再变。答宿主替身与那时的最低处
  */
 async function returnBeyondContent(page: Page): Promise<{ host: PageHost; bottom: number }> {
   const host = await start(page);
@@ -105,7 +106,7 @@ async function returnBeyondContent(page: Page): Promise<{ host: PageHost; bottom
   await page.getByRole('tab', { name: '列表', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-album-list]')).toBeVisible();
-  // 离开封面墙期间库里少了大半专辑，记下的位置落不下了。
+  // 离开封面墙期间库里少了大半专辑，记下的位置落不下了
   host.answer('library.getAlbums', albumsAnswer(manyAlbums(60)));
   await host.emit('library:itemsAdded', { count: 1, handles: [], truncated: false, timestamp: 1 });
   await expect(page.locator('[data-album-subtitle]')).toContainText('60 张');
@@ -118,7 +119,7 @@ async function returnBeyondContent(page: Page): Promise<{ host: PageHost; bottom
 }
 
 /**
- * 挂着的交还最迟在 RESTORE_WINDOW_MS 之后作罢：在这整段时间里逐帧看滚动位置，答见过的最高与最低。
+ * 挂着的交还最迟在 RESTORE_WINDOW_MS 之后作罢：在这整段时间里逐帧看滚动位置，答见过的最高与最低
  */
 function watchScroll(page: Page): Promise<{ readonly low: number; readonly high: number }> {
   return grid(page).evaluate(
@@ -143,7 +144,7 @@ test('切回来时记下的滚动位置已超出内容：停在最低处，之�
   await returnBeyondContent(page);
   await grid(page).evaluate((element) => element.scrollTo({ top: 0 }));
   await expect.poll(() => scrollTop(page)).toBe(0);
-  // 其间悬停换图块，让封面墙重渲染几次。
+  // 其间悬停换图块，让封面墙重渲染几次
   const watched = watchScroll(page);
   await tiles(page).first().hover();
   await tiles(page).nth(1).hover();
@@ -159,7 +160,7 @@ test('切回来时位置超出内容，不滚而是按 Shift + 滚轮放大封�
       .first()
       .evaluate((element) => element.getBoundingClientRect().width);
   const before = await width();
-  // 挂起只挂 RESTORE_WINDOW_MS：在页面里当场连转几格，赶在期限之内。
+  // 挂起只挂 RESTORE_WINDOW_MS：在页面里当场连转几格，赶在期限之内
   const watched = watchScroll(page);
   await grid(page).evaluate((element) => {
     for (let notch = 0; notch < 6; notch += 1) {
@@ -170,7 +171,7 @@ test('切回来时位置超出内容，不滚而是按 Shift + 滚轮放大封�
   });
   await expect.poll(width).toBeGreaterThan(before);
   // 放大后一行少几块、内容变高，记下的位置（大库的最低处）远在新的最低处之下：挂着的交还要是又设了一次，
-  // 视图就停在新的最低处。换列时视口锚在顶上那一行，停在新的最低处之上。
+  // 视图就停在新的最低处。换列时视口锚在顶上那一行，停在新的最低处之上
   const lowest = await grid(page).evaluate(
     (element) => element.scrollHeight - element.clientHeight,
   );
@@ -182,7 +183,7 @@ test('折叠一节写进 config，重新载入后还折着', async ({ page }) =>
   const host = await start(page, SAMPLE_ALBUMS, { 'defaultTheme.browser.dimension': 'genre' });
   const rock = page.locator('[data-section-head]').filter({ hasText: 'Rock' });
   await expect(rock).toHaveAttribute('aria-expanded', 'true');
-  // 网格的行里只放单元格：节头按钮包在一格里，这一格横跨整行（1280 宽时一行五块）。
+  // 网格的行里只放单元格：节头按钮包在一格里，这一格横跨整行（1280 宽时一行五块）
   const cell = rock.locator('xpath=..');
   await expect(cell).toHaveAttribute('role', 'gridcell');
   await expect(cell).toHaveAttribute('aria-colspan', '5');
@@ -218,6 +219,44 @@ test('离开专辑页再从历史回来：筛选词、滚动与焦点交还', as
   await expect(page.locator(`[id="${active}"]`)).toContainText(name);
 });
 
+test('高级查询：含命中曲目的整张专辑留下，认不出时留着上一份并出提示条，从历史回来模式与语句都在', async ({
+  page,
+}) => {
+  const host = await start(page, SAMPLE_ALBUMS);
+  // 宿主的查询语法不在这里实现：只认「album HAS 词」，别的一律当认不出
+  host.answer('library.query', (params) => {
+    const word = /^album HAS (.+)$/.exec(stringParam(params, 'query'))?.[1]?.toLowerCase();
+    if (word === undefined) return hostFailure('INVALID_PARAMS');
+    const tracks = albumsTracks(
+      SAMPLE_ALBUMS.filter((album) => album.name.toLowerCase().includes(word)),
+    );
+    return {
+      success: true,
+      tracks,
+      total: tracks.length,
+    };
+  });
+  const mode = page.locator('[data-query-scope]');
+  await mode.click();
+  await page.locator('[data-query-mode="advanced"]').click();
+  await filter(page).fill('album HAS blue');
+  await expect(tiles(page)).toHaveCount(2);
+  await filter(page).fill('oops');
+  await expect(page.locator('[data-query-invalid]')).toBeVisible();
+  await expect(tiles(page)).toHaveCount(2);
+  await filter(page).fill('album HAS moanin');
+  await expect(tiles(page)).toHaveCount(1);
+  await expect(page.locator('[data-query-invalid]')).toHaveCount(0);
+
+  await tile(page, 'Moanin').click({ button: 'right' });
+  await page.locator('[data-album-menu] [data-action="open-detail"]').click();
+  await expect(detailTitle(page)).toHaveText('Moanin');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(mode).toHaveAttribute('data-query-scope', 'advanced');
+  await expect(filter(page)).toHaveValue('album HAS moanin');
+  await expect(tiles(page)).toHaveCount(1);
+});
+
 test('离开时过滤无匹配，回来清掉过滤词：停在顶上，不跳回更早记下的位置', async ({ page }) => {
   await start(page);
   await scrollTo(page, 1200);
@@ -244,7 +283,7 @@ test('离开时过滤无匹配，回来清掉过滤词：停在顶上，不跳�
 
 test('回来时过滤词与眼下不同、曲目级命中晚到：等命中并上再交还滚动与焦点', async ({ page }) => {
   const host = await start(page);
-  // 过滤词按专辑字段只命中十张，曲目级命中再带出一百张：交还的位置只在并上之后的清单里够得着。
+  // 过滤词按专辑字段只命中十张，曲目级命中再带出一百张：交还的位置只在并上之后的清单里够得着
   const hits = manyAlbums(300)
     .slice(100, 200)
     .map((album) => albumTrackRow(album.name, album.albumArtist, 'Hit'));
@@ -267,7 +306,7 @@ test('回来时过滤词与眼下不同、曲目级命中晚到：等命中并�
   await page.locator('[data-album-menu] [data-action="open-detail"]').click();
   await expect(detailTitle(page)).toHaveText(name);
 
-  // 从侧边栏再进一次专辑页（历史里另一条），换一个过滤词，再退回最早那一条。
+  // 从侧边栏再进一次专辑页（历史里另一条），换一个过滤词，再退回最早那一条
   const nav = page.getByRole('navigation', { name: '侧边栏' });
   await nav.getByRole('button', { name: '专辑', exact: true }).click();
   await filter(page).fill('002');
@@ -279,7 +318,7 @@ test('回来时过滤词与眼下不同、曲目级命中晚到：等命中并�
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(filter(page)).toHaveValue('0000');
   await expect.poll(() => held.pending.length).toBe(1);
-  // 命中晚于交还的挂起期限才到（大库冷启动时常见）：先落在只筛专辑字段的清单上的话，这时已经作罢。
+  // 命中晚于交还的挂起期限才到（大库冷启动时常见）：先落在只筛专辑字段的清单上的话，这时已经作罢
   await page.waitForTimeout(RESTORE_WINDOW_MS + 200);
   held.release();
 
@@ -290,7 +329,7 @@ test('回来时过滤词与眼下不同、曲目级命中晚到：等命中并�
 
 test('Esc 在筛选框里清空筛选词；框是空的时不认领', async ({ page }) => {
   await start(page, SAMPLE_ALBUMS);
-  // 在命令登记处之后再挂一个监听：同一目标同一阶段按挂的先后调，这里看到的是登记处处理之后的结果。
+  // 在命令登记处之后再挂一个监听：同一目标同一阶段按挂的先后调，这里看到的是登记处处理之后的结果
   await page.evaluate(() => {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape')

@@ -5,6 +5,8 @@ export const updateZhCN = {
   'update.pluginStaged': '组件 {version} 已下载，可重启安装',
   'update.pluginRestarting': '正在退出 foobar2000 以安装组件…',
   'update.pluginFailed': '未能完成组件更新',
+  'update.pluginInstallFailed': '组件 {version} 未能安装',
+  'update.copyLog': '复制运行日志',
   'update.pluginNeedsBackend': '本地服务就绪后才能更新组件',
   'update.pluginNeedsTheme': '请先重启使已下载的主题生效，再更新组件',
   'update.pluginIncompatible': '现有组件新版不支持当前主题与组件组合',

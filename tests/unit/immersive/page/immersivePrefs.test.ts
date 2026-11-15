@@ -7,6 +7,7 @@ import {
   chooseImmersiveScene,
   chooseImmersiveTerrain,
   chooseImmersiveWash,
+  chooseOnlineAnalysis,
   chooseWaveformMode,
   DEFAULT_SCENE,
   FPS_CAPS,
@@ -16,11 +17,13 @@ import {
   immersiveTerrainAtom,
   immersiveWashAtom,
   loadImmersivePrefs,
+  onlineAnalysisAtom,
   readImmersiveFpsCap,
   readImmersiveHostFullscreen,
   readImmersiveScene,
   readImmersiveTerrain,
   readImmersiveWash,
+  readOnlineAnalysis,
   readWaveformMode,
   waveformModeAtom,
 } from '../../../../src/immersive/page/immersivePrefs.ts';
@@ -28,7 +31,7 @@ import { WAVEFORM_MODES } from '../../../../src/immersive/waveform/waveformModes
 import type { PrefStorage } from '../../../../src/kit/localPref.ts';
 import type { Store } from '../../../../src/kit/store.ts';
 
-/** 沉浸视图六项偏好的存档：缺省、读回、坏值、写入与存储被禁，以及帧率上限交给重画调度。 */
+/** 沉浸视图七项偏好的存档：缺省、读回、坏值、写入与存储被禁，以及帧率上限交给重画调度 */
 const KEYS = {
   terrain: 'default-theme.immersive.terrain.v1',
   wash: 'default-theme.immersive.wash.v1',
@@ -36,6 +39,7 @@ const KEYS = {
   fpsCap: 'default-theme.immersive.fpsCap.v1',
   waveformMode: 'default-theme.immersive.waveformMode.v1',
   scene: 'default-theme.immersive.scene.v1',
+  onlineAnalysis: 'default-theme.immersive.onlineAnalysis.v1',
 };
 
 const DEFAULTS = {
@@ -45,6 +49,7 @@ const DEFAULTS = {
   fpsCap: 0,
   waveformMode: 'rms',
   scene: 'paper',
+  onlineAnalysis: 'hold',
 };
 
 function fakeStorage(seed: Record<string, string> = {}) {
@@ -77,13 +82,14 @@ function prefsOf(store: Store) {
     fpsCap: store.get(immersiveFpsCapAtom),
     waveformMode: store.get(waveformModeAtom),
     scene: store.get(immersiveSceneAtom),
+    onlineAnalysis: store.get(onlineAnalysisAtom),
   };
 }
 
 afterEach(() => setPaintFpsCap(null));
 
 describe('loadImmersivePrefs', () => {
-  test('缺省：山脊图开、封面底色流动、进入不全屏、帧率不封顶、画法全频、场景图纸；读进来时按缺省设一次重画上限', () => {
+  test('缺省：山脊图开、封面底色流动、进入不全屏、帧率不封顶、画法全频、场景图纸、在线曲目整首预载；读进来时按缺省设一次重画上限', () => {
     const store = createStore();
     expect(prefsOf(store)).toStrictEqual(DEFAULTS);
     setPaintFpsCap(30);
@@ -113,12 +119,14 @@ describe('loadImmersivePrefs', () => {
     chooseImmersiveFpsCap(store, 0, storage);
     caps.push(paintFpsCap());
     chooseWaveformMode(store, 'lanes', storage);
+    chooseOnlineAnalysis(store, 'segments', storage);
     expect(Object.fromEntries(map)).toStrictEqual({
       [KEYS.terrain]: 'off',
       [KEYS.wash]: 'off',
       [KEYS.hostFullscreen]: 'on',
       [KEYS.fpsCap]: '0',
       [KEYS.waveformMode]: 'lanes',
+      [KEYS.onlineAnalysis]: 'segments',
     });
     expect(caps).toStrictEqual([null, 60, null]);
 
@@ -131,6 +139,7 @@ describe('loadImmersivePrefs', () => {
       fpsCap: 0,
       waveformMode: 'lanes',
       scene: 'paper',
+      onlineAnalysis: 'segments',
     });
   });
 
@@ -142,6 +151,7 @@ describe('loadImmersivePrefs', () => {
       [KEYS.fpsCap]: '45',
       [KEYS.waveformMode]: 'bars',
       [KEYS.scene]: 'nope',
+      [KEYS.onlineAnalysis]: 'cache',
     }).storage;
     const store = createStore();
     loadImmersivePrefs(store, bad);
@@ -150,6 +160,7 @@ describe('loadImmersivePrefs', () => {
     expect(readImmersiveWash(bad)).toBe('flow');
     expect(readImmersiveHostFullscreen(bad)).toBe(false);
     expect(readImmersiveFpsCap(bad)).toBe(0);
+    expect(readOnlineAnalysis(bad)).toBe('hold');
 
     const muted = createStore();
     loadImmersivePrefs(muted, broken);
@@ -159,6 +170,7 @@ describe('loadImmersivePrefs', () => {
     chooseImmersiveHostFullscreen(muted, true, broken);
     chooseImmersiveFpsCap(muted, 144, broken);
     chooseWaveformMode(muted, 'weighted', broken);
+    chooseOnlineAnalysis(muted, 'off', broken);
     expect(prefsOf(muted)).toStrictEqual({
       terrain: false,
       wash: 'static',
@@ -166,6 +178,7 @@ describe('loadImmersivePrefs', () => {
       fpsCap: 144,
       waveformMode: 'weighted',
       scene: 'paper',
+      onlineAnalysis: 'off',
     });
     expect(paintFpsCap()).toBe(144);
 
@@ -187,6 +200,7 @@ describe('loadImmersivePrefs', () => {
     chooseImmersiveFpsCap(store, 60, storage);
     chooseWaveformMode(store, 'rms', storage);
     chooseImmersiveScene(store, 'paper', storage);
+    chooseOnlineAnalysis(store, 'hold', storage);
     expect(writes()).toBe(0);
     chooseImmersiveWash(store, 'flow', storage);
     expect(writes()).toBe(1);
@@ -264,7 +278,7 @@ describe('场景存档', () => {
     chooseImmersiveScene(again, 'paper', saved.storage);
     expect(saved.writes()).toBe(0);
 
-    // 旧存档里可能还有已不再用的场景名 terrain：不在表里，回图纸而不是报错。
+    // 旧存档里可能还有已不再用的场景名 terrain：不在表里，回图纸而不是报错
     expect(readImmersiveScene(fakeStorage({ [KEYS.scene]: 'terrain' }).storage)).toBe(
       DEFAULT_SCENE,
     );

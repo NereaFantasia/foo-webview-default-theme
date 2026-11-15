@@ -1,29 +1,44 @@
 import type { ReactNode } from 'react';
+import { SettingsGroupContext } from './expanderMemory.ts';
 import styles from './SettingsGroup.module.css';
-import { GROUP_ATTR, groupAnchor } from './useSettingsNav.ts';
+
+/** 组的锚点 id，也是标题 id 的前缀。整个文档里要唯一，所以带前缀 */
+export function groupAnchor(group: string): string {
+  return `settings-${group}`;
+}
+
+/** 标题的 id：深链落地时把焦点放到它上 */
+export function groupTitleId(group: string): string {
+  return `${groupAnchor(group)}-title`;
+}
 
 export interface SettingsGroupProps {
-  /** 组名，目录里的那一项按它找到这一组；同一页里不重复 */
+  /** 组名，同一页里不重复 */
   readonly group: string;
   readonly title: string;
+  /** 标题已由别处写出（窄页里目录就是标题）：只留给读屏与程序焦点，不画出来 */
+  readonly titleHidden?: boolean;
   readonly children: ReactNode;
 }
 
-/** 一组设置：组标题加下面的几张卡。标题能接程序给的焦点，点目录跳过来时读屏从这里读起 */
-export function SettingsGroup({ group, title, children }: SettingsGroupProps) {
-  const anchor = groupAnchor(group);
-  const titleId = `${anchor}-title`;
+/** 一组设置：组标题加下面的几张卡。标题能接程序给的焦点，从别处跳来时读屏从这里读起 */
+export function SettingsGroup({ group, title, titleHidden = false, children }: SettingsGroupProps) {
+  const titleId = groupTitleId(group);
   return (
     <section
-      id={anchor}
+      id={groupAnchor(group)}
       className={styles.root}
       aria-labelledby={titleId}
-      {...{ [GROUP_ATTR]: group }}
+      data-settings-group={group}
     >
-      <h2 id={titleId} className={styles.title} tabIndex={-1}>
+      <h2
+        id={titleId}
+        className={titleHidden ? `${styles.title} ${styles.hidden}` : styles.title}
+        tabIndex={-1}
+      >
         {title}
       </h2>
-      {children}
+      <SettingsGroupContext value={group}>{children}</SettingsGroupContext>
     </section>
   );
 }

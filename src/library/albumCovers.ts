@@ -8,34 +8,40 @@ import { albumsAtom } from './albums.ts';
 import { albumKeyOf, type Album, type AlbumKey } from '../host/libraryContract.ts';
 import { coverAnalysis, type CoverAnalysis } from '../covers/coverAnalysis.ts';
 import { CoverGate, type CoverOutcome } from '../covers/coverGate.ts';
+import { watchFastScroll } from '../covers/fastScroll.ts';
 import { fetchCoverProbe, type CoverProbe } from '../covers/coverProbe.ts';
 
-/** 缓存条数上限。几千张的库滚一遍也不会把地址全留着。 */
+/** 封面地址缓存条目数量上限 */
 const MAX_CACHED = 2000;
-/** 同时在加载的 `<img>` 上限：低于宿主取图队列的深度 32，给别处取封面留一点。 */
+/** 预热同时在加载的张数；宿主按串行队列处理，前台来了请求最多多等这几张的时间 */
+const WARM_CONCURRENCY = 2;
+/** 一次预热最多取几张。宿主的缩放缓存只存 500 条，留出余量给前台正在看的 */
+const WARM_LIMIT = 400;
+/** 前台在加载或滚得快时，预热每隔多久看一次能不能继续，毫秒 */
+const WARM_POLL_MS = 200;
+/** 并发加载的 `<img>` 数量上限，低于宿主队列深度 32 以保留余量 */
 const LOADING_LIMIT = 24;
 /**
- * 加载失败后隔多久再放一次，毫秒；宿主队列满时答的 `Retry-After` 是 5 s。两次仍失败按缺图；其间问到
- * 宿主答 404 的当场判缺图。
+ * 图像加载失败后的重试退避间隔（毫秒）；连续两次失败判定为缺失封面，探测收到 404 时立即判定为缺失
  */
 const RETRY_DELAYS_MS: readonly number[] = [5000, 5000];
 
 export interface AlbumCover {
-  /** 喂给 `<img>` 的 `fb2k://` 地址；缺图时是空串。重试时带 `retry=n`，同一地址失败后浏览器不再发。 */
+  /** 提供给 `<img>` 的 `fb2k://` 协议地址；缺失封面时为空字符串，重试时附带 `retry=n` 查询参数以绕过浏览器失败缓存 */
   readonly url: string;
   readonly status: 'ready' | 'missing';
-  /** 取这张图时的请求尺寸，档位变大时靠它判断要不要升级。 */
+  /** 当前图块请求的像素尺寸，用于判定是否需要升档 */
   readonly size: number;
   /**
-   * 升档换上的新地址还没拿到名额时先画的旧地址。它加载过、在浏览器缓存里，画它不占名额；
-   * 新挂上的图块手上没有旧图，靠它不退成占位。
+   * 升档后新图像就绪前暂用的旧地址：
+   * 旧图像已在浏览器缓存中，渲染不占用并发加载名额，避免新图块回退为占位符
    */
   readonly previous?: string;
 }
 
 const versionAtom = atom(0);
 
-/** 封面有了变化（地址到了、换了一档、凉够了、判了缺图）就加一；读它的组件随之重新问 `coverOf`。 */
+/** 封面状态版本号：图像就绪、换档、重试冷却结束或判定缺图时递增，触发消费组件重新读取 */
 export const albumCoversVersionAtom: Atom<number> = atom((get) => get(versionAtom));
 
 export interface AlbumCoversFace extends Pick<HostReadyFace, 'isAvailable'> {
@@ -43,33 +49,66 @@ export interface AlbumCoversFace extends Pick<HostReadyFace, 'isAvailable'> {
 }
 
 export interface AlbumCoversOptions {
-  /** 设备像素比，缺省读 `window.devicePixelRatio`。 */
+  /** 设备像素比获取函数，缺省读取 `window.devicePixelRatio` */
   readonly pixelRatio?: () => number;
   readonly limit?: number;
   readonly retryDelays?: readonly number[];
-  /** 出错后问地址的状态，缺省用 fetch；null 不问，出错一律退避重试。 */
+  /** 加载失败时的状态探测器；为 null 时跳过探测，一律按退避策略重试 */
   readonly probe?: CoverProbe | null;
-  /** 清单整份换时丢掉按地址记的取色档案：地址不变，背后的封面可能已经换了。 */
+  /** 媒体库专辑列表全量更新时清理取色缓存，避免同名地址指向不同封面 */
   readonly analysis?: Pick<CoverAnalysis, 'forget'>;
+  /** 拉取的图像类型；默认为专辑封面 front，艺人墙可指定为 artist 图像 */
+  readonly type?: 'front' | 'artist';
+  /**
+   * 监视快速滚动：传入状态变化的回调，答停止监视的函数。快速滚动期间暂扣新封面的加载；缺省监视文档上的
+   * 滚动，没有文档或为 null 时不监视
+   */
+  readonly watchScroll?: ((onChange: (fast: boolean) => void) => () => void) | null;
+  /** 预热时把一个地址加载进浏览器缓存，答是否加载成功；缺省用 `Image` */
+  readonly preload?: (url: string) => Promise<boolean>;
 }
+
+function defaultWatchScroll(onChange: (fast: boolean) => void): () => void {
+  return watchFastScroll(document, onChange);
+}
+
+function preloadImage(url: string): Promise<boolean> {
+  if (typeof Image === 'undefined') return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(true);
+    image.onerror = () => resolve(false);
+    image.src = url;
+  });
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface AlbumCoversService {
   /**
-   * 这张专辑此刻该画什么；undefined 画占位。`displayWidth` 是图块的 CSS 像素边长。在渲染时调，只读缓存：
-   * 没问过的与该升档的排一次取地址，别的什么也不改。取地址只往缓存里填，渲染被丢弃也无妨。
+   * 获取专辑当前应展示的封面信息；返回 undefined 时展示占位符
+   *
+   * 仅在渲染阶段只读访问缓存；未查询或需要升档的专辑将安排异步地址解析并写入缓存，容忍渲染丢弃
+   * @param displayWidth 图块的 CSS 像素边长
    */
   coverOf(album: Album, displayWidth: number): AlbumCover | undefined;
   /**
-   * 图块要开始加载这张专辑的封面：拿到名额答 true，之后必须经 `settle` 报回结局；拿不到就 `wait`。
-   * 只在渲染之外调（布局阶段或事件里）：渲染可能被丢弃，占了的名额就没人还。
+   * 申请图块的并发加载名额：获取成功返回 true 且后续必须通过 `settle` 汇报加载结果，未获取到则通过 `wait` 排队
+   * 仅在渲染之外（如布局阶段或事件回调）调用，避免渲染丢弃导致名额泄漏
    */
   acquire(album: Album): boolean;
-  /** 图块报回 `<img>` 的结局；重试用完的判缺图。 */
+  /** 汇报 `<img>` 的加载结果；重试次数耗尽后判定为缺失封面 */
   settle(album: Album, outcome: CoverOutcome): void;
-  /** 这张的封面此前加载完过，图在浏览器缓存里；图块据此挂上时直接画出，不再淡入。 */
+  /** 封面此前是否已成功加载并存在于浏览器缓存中，用于新挂载图块直接显示而无需执行淡入动画 */
   shown(album: Album): boolean;
-  /** 排队等名额，见 `CoverGate.wait`；图块卸掉或不再要这个地址时撤出。 */
+  /** 注册名额排队回调；图块卸载或取消请求时调用返回的清理函数退出排队 */
   wait(retry: () => void): () => void;
+  /**
+   * 空闲时按次序把还没有记录的专辑封面提前取进浏览器缓存，翻到时图块直接有图。每次最多取前 `WARM_LIMIT`
+   * 张，同时只有 `WARM_CONCURRENCY` 张在途，前台图块在加载或页面在快速滚动时让路。`displayWidth` 与图块
+   * 向 `coverOf` 要的宽度一致，档位才对得上。答停止预热的函数；在途的几张不撤回，宿主照旧处理完
+   */
+  warm(albums: readonly Album[], displayWidth: number): () => void;
   dispose(): void;
 }
 
@@ -82,13 +121,12 @@ function browserPixelRatio(): number {
 }
 
 /**
- * 启动专辑封面的地址缓存：按专辑键缓存，只对画出来的图块取。`getFb2kUrlByPath` 只拼地址不开文件，
- * 真正的代价在 `<img>` 加载时，所以加载由闸门限流；「没有封面」要等 `<img>` 出错、再问到宿主答 404
- * 才知道（见 `fetchCoverProbe`）。
+ * 启动专辑封面地址缓存服务：按专辑键索引，仅对渲染视口内的图块发起解析
  *
- * 档位变大（换到像素比更高的屏幕、调大图块）就地升级：新地址一到就换上，图块拿到名额之前接着画旧图。
- * 新图加载出错就退回旧的那一档；取不到新地址也留着旧的。要的尺寸不比没升成的那一档大，就不再升。
- * 清单整份换了才清缓存：同一个专辑键背后的首曲可能已经换了。
+ * - `getFb2kUrlByPath` 仅拼接地址而不打开文件，由闸门限制 `<img>` 并发加载并发度
+ * - 缺失封面需经 `<img>` 加载失败后探测到 404 方可确认（参考 `fetchCoverProbe`）
+ * - 显示尺寸增大时原地平滑升档：新地址解析完成后切换，加载期间保留已缓存旧图作为垫底，加载失败时自动回退
+ * - 专辑列表全量变更时清空缓存，以应对同一专辑键背后首曲变更的场景
  */
 export function startAlbumCovers(
   store: Store,
@@ -98,11 +136,12 @@ export function startAlbumCovers(
   const pixelRatio = options.pixelRatio ?? browserPixelRatio;
   const probe = options.probe === undefined ? fetchCoverProbe() : options.probe;
   const analysis = options.analysis ?? coverAnalysis;
+  const type = options.type ?? 'front';
   const covers = new Map<AlbumKey, AlbumCover>();
   const pending = new Set<AlbumKey>();
-  /** 已换上更大一档、新图还没加载完时，加载过的旧那一档；新图出错就退回它。 */
+  /** 升档过程中新图未就绪时保留的旧档位封面，供新图加载出错时回退 */
   const fallbacks = new Map<AlbumKey, AlbumCover>();
-  /** 升级没成的那一档请求尺寸。要的尺寸不比它大就不再升，否则每次渲染都会重发一遍。 */
+  /** 升档失败记录的尺寸阈值；后续请求尺寸不大于该值时不再重复触发升档请求 */
   const declined = new Map<AlbumKey, number>();
   const bump = () => store.set(versionAtom, store.get(versionAtom) + 1);
   const gate = new CoverGate({
@@ -110,6 +149,14 @@ export function startAlbumCovers(
     retryDelays: options.retryDelays ?? RETRY_DELAYS_MS,
     onCooled: bump,
   });
+  const preload = options.preload ?? preloadImage;
+  const watch =
+    options.watchScroll === undefined
+      ? typeof document === 'undefined'
+        ? null
+        : defaultWatchScroll
+      : options.watchScroll;
+  const stopScroll = watch?.((fast) => gate.hold(fast));
   let generation = 0;
   let disposed = false;
   let list = store.get(albumsAtom).albums;
@@ -127,8 +174,11 @@ export function startAlbumCovers(
     }
   }
 
-  /** 超出上限从最早放进去的删起。读时不调次序：图块按滚动顺序取，放进去的先后基本就是用到的先后。 */
-  function remember(key: AlbumKey, cover: AlbumCover): void {
+  /**
+   * 缓存超出上限时按 FIFO 顺序淘汰最早记录；读取不调整顺序以契合滚动加载节奏。`quiet` 为真时不通知消费组件：
+   * 预热记下的专辑多半还没有图块，图块出现时渲染里直接读到
+   */
+  function remember(key: AlbumKey, cover: AlbumCover, quiet = false): void {
     covers.delete(key);
     covers.set(key, cover);
     for (const oldest of covers.keys()) {
@@ -137,24 +187,24 @@ export function startAlbumCovers(
       fallbacks.delete(oldest);
       declined.delete(oldest);
     }
-    bump();
+    if (!quiet) bump();
   }
 
   async function load(key: AlbumKey, path: string, size: number, mine: number): Promise<void> {
     const answer = path
-      ? await settle(() => host.artwork.getFb2kUrlByPath(path, 'front', { maxSize: size }))
+      ? await settle(() => host.artwork.getFb2kUrlByPath(path, type, { maxSize: size }))
       : null;
     if (disposed || mine !== generation) return;
     pending.delete(key);
     const url = answer && answer.success !== false && answer.available ? answer.dataUrl : '';
     const known = covers.get(key);
     if (known?.status === 'ready') {
-      // 升级那一发：没拿到就留着旧图、记下这一档；拿到了当场换上，旧的那一档留着给新图出错时退回。
+      // 升档请求：获取失败时记录拒绝尺寸并保留旧图；成功时立即替换并保留旧图作为出错回退兜底
       if (!url) {
         declined.set(key, size);
         return;
       }
-      // 只拿加载过的那一档垫着、留作退路：没加载过的画出来也要占名额，退回去也未必是好的。
+      // 仅保留已成功渲染的档位作为回退兜底，未加载成功的档位不作为回退目标
       const good = gate.isShown(key) ? known : fallbacks.get(key);
       if (good) fallbacks.set(key, good);
       gate.refresh(key);
@@ -165,8 +215,7 @@ export function startAlbumCovers(
   }
 
   /**
-   * 出错后问一次状态：宿主答 404 就当场判缺图，凉着等的那次重试也就不再放。问的途中缓存里这一条换过
-   * （换了地址、判了别的结局、清单整份换了），结论作废。
+   * 加载出错时探测状态：若宿主明确返回 404 则立即判定为缺失封面并取消后续退避重试；探测期间若缓存记录已变更则作废本次结论
    */
   function confirm(key: AlbumKey, known: AlbumCover, url: string): void {
     void probe?.(url).then((verdict) => {
@@ -181,6 +230,36 @@ export function startAlbumCovers(
     queueMicrotask(() => {
       if (!disposed && mine === generation) void load(key, path, size, mine);
     });
+  }
+
+  /**
+   * 预热一张：取地址、记下、加载进浏览器缓存。不占 `pending`，图块同时问到时各取各的，结果相同；没有封面的
+   * 不记，留给图块去问、判缺图
+   */
+  async function warmOne(album: Album, size: number, mine: number): Promise<void> {
+    const key = albumKeyOf(album);
+    if (covers.has(key)) return;
+    const answer = await settle(() =>
+      host.artwork.getFb2kUrlByPath(album.firstTrackPath, type, { maxSize: size }),
+    );
+    if (disposed || mine !== generation || covers.has(key)) return;
+    const url = answer && answer.success !== false && answer.available ? answer.dataUrl : '';
+    if (!url) return;
+    remember(key, { url, status: 'ready', size }, true);
+    if ((await preload(url)) && !disposed && mine === generation) gate.preloaded(key);
+  }
+
+  async function warmLoop(
+    todo: Album[],
+    size: number,
+    mine: number,
+    stopped: () => boolean,
+  ): Promise<void> {
+    for (let album = todo.shift(); album; album = todo.shift()) {
+      while (!stopped() && (gate.isHeld || gate.loading > 0)) await sleep(WARM_POLL_MS);
+      if (stopped()) return;
+      await warmOne(album, size, mine);
+    }
   }
 
   const offAlbums = store.sub(albumsAtom, () => {
@@ -215,8 +294,7 @@ export function startAlbumCovers(
       if (disposed) return;
       const fallback = fallbacks.get(key);
       if (fallback && outcome === 'error') {
-        // 新的那一档加载出错：退回旧的那一档。只还名额、不记失败次数，旧图本来是好的，不必凉着；
-        // 旧图在浏览器缓存里，名额占满时图块也照样拿得到。
+        // 新档位加载失败时回退至旧档位：释放并发名额且不记录失败次数，直接渲染浏览器缓存中的旧图像
         fallbacks.delete(key);
         declined.set(key, covers.get(key)?.size ?? fallback.size);
         gate.settle(key, 'abandon');
@@ -228,8 +306,7 @@ export function startAlbumCovers(
       const attempt = gate.attempt(key);
       const phase = gate.settle(key, outcome);
       const known = covers.get(key);
-      // 带着重试次数加载成功：记住这个地址。闸门随之清掉失败次数，不记住的话之后的渲染给回不带次数的
-      // 原地址，浏览器又取一遍；那一遍再出错时这张已算显示过，不再凉却重试，图块就一直停在占位。
+      // 附带重试参数加载成功后持久化更新地址，防止后续渲染给回原始地址导致浏览器重新拉取失败
       if (phase === 'shown' && attempt > 0 && known?.status === 'ready') {
         remember(key, { ...known, url: withRetry(known.url, attempt) });
       }
@@ -240,9 +317,24 @@ export function startAlbumCovers(
     },
     shown: (album) => !disposed && gate.isShown(albumKeyOf(album)),
     wait: (retry) => gate.wait(retry),
+    warm(albums, displayWidth) {
+      if (disposed || !host.isAvailable()) return () => {};
+      const size = artworkRequestSize(displayWidth, pixelRatio());
+      const mine = generation;
+      let cancelled = false;
+      const stopped = () => cancelled || disposed || mine !== generation;
+      const todo = albums
+        .filter((album) => album.firstTrackPath !== '' && !covers.has(albumKeyOf(album)))
+        .slice(0, WARM_LIMIT);
+      for (let at = 0; at < WARM_CONCURRENCY; at += 1) void warmLoop(todo, size, mine, stopped);
+      return () => {
+        cancelled = true;
+      };
+    },
     dispose() {
       disposed = true;
       generation += 1;
+      stopScroll?.();
       gate.reset();
       offAlbums();
     },

@@ -3,13 +3,12 @@ import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it } from 'vitest';
 import type { PlaybackState } from '../../../../src/playback/playbackContract.ts';
 import {
-  noteSkip,
   sameAlbum,
-  SKIP_INTENT_MS,
   startTrackSwap,
   swapOf,
   trackSwapAtom,
 } from '../../../../src/playback/now-playing/trackSwap.ts';
+import { noteSkip, SKIP_INTENT_MS } from '../../../../src/playback/skipIntent.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
 const first = makeTrack({ path: 'file://E:/Music/A/01.flac', title: 'One', duration: 200 });
@@ -24,6 +23,19 @@ const radio = makeTrack({ path: 'http://radio.example/live', title: 'Song A', du
 const quiet = { intent: null, now: 0, position: 10, duration: 200 };
 
 describe('swapOf', () => {
+  it('方向：新鲜的按键方向最优先；没有按键时按料到的下一首、上一首；再没有才看自然接下一首', () => {
+    const jump = { intent: null, now: 0, position: 10, duration: 200 };
+    expect(swapOf(first, second, { ...jump, neighbor: 'previous' })?.direction).toBe('previous');
+    expect(swapOf(first, second, { ...jump, neighbor: null })?.direction).toBe('none');
+    const pressed = { direction: 'next', at: 0, pending: 1 } as const;
+    expect(
+      swapOf(first, second, { ...jump, intent: pressed, neighbor: 'previous' })?.direction,
+    ).toBe('next');
+    expect(swapOf(first, second, { ...jump, position: 199, neighbor: null })?.direction).toBe(
+      'next',
+    );
+  });
+
   it('同一首的标签被编辑不算换曲；同一路流报了新曲名算电台换曲', () => {
     expect(swapOf(first, { ...first, title: 'Renamed' }, quiet)).toBeNull();
     expect(swapOf(null, null, quiet)).toBeNull();
@@ -47,7 +59,7 @@ describe('swapOf', () => {
     expect(swapOf(first, second, stale)?.direction).toBe('none');
     expect(swapOf(first, second, { ...quiet, position: 199 })?.direction).toBe('next');
     expect(swapOf(first, second, { ...quiet, position: 150 })?.direction).toBe('none');
-    // 没有时长（网络流）不按结尾算。
+    // 没有时长（网络流）不按结尾算
     expect(swapOf(radio, first, { ...quiet, position: 5, duration: 0 })?.direction).toBe('none');
   });
 });

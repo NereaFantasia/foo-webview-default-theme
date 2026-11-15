@@ -5,6 +5,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ServicesContext, serviceMap } from '../../../src/kit/useService.ts';
+import { lyricsCacheKey, type LyricsCacheService } from '../../../src/lyrics/lyricsCache.ts';
 import { lyricsKey, type LyricsService } from '../../../src/lyrics/lyricsService.ts';
 import {
   lyricsCandidateId,
@@ -30,7 +31,7 @@ const CANDIDATE: LyricsCandidate = {
 };
 
 /** 只含这个 hook 用到的几项的歌词服务；`choose` 的答案由测试给 */
-function mount(options: { enabled?: boolean; used?: boolean } = {}) {
+function mount(options: { enabled?: boolean; used?: boolean; remember?: boolean } = {}) {
   const search = vi.fn(() => Promise.resolve());
   const cancelSearch = vi.fn();
   const choose = vi.fn(() => Promise.resolve(options.used ?? true));
@@ -42,6 +43,9 @@ function mount(options: { enabled?: boolean; used?: boolean } = {}) {
       cancelSearch,
       choose,
     };
+  const cache: Pick<LyricsCacheService, 'pref'> = {
+    pref: atom({ remember: options.remember ?? true, enabled: true, limitMb: 50 }),
+  };
   const onUsed = vi.fn();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -62,7 +66,12 @@ function mount(options: { enabled?: boolean; used?: boolean } = {}) {
         { store: createStore() },
         createElement(
           ServicesContext,
-          { value: serviceMap([{ key: lyricsKey, value: service }]) },
+          {
+            value: serviceMap([
+              { key: lyricsKey, value: service },
+              { key: lyricsCacheKey, value: cache },
+            ]),
+          },
           createElement(Harness),
         ),
       ),
@@ -180,16 +189,23 @@ describe('歌词搜索的输入侧', () => {
     view.unmount();
   });
 
-  it('使用候选：先记着正在用哪一条，用上后清掉并通知', async () => {
+  it('使用候选：先记着正在用哪一条，用上后清掉并通知；是否设为默认跟设置里的开关', async () => {
     const view = mount();
     act(() => view.query().use(CANDIDATE));
     expect(view.query().using).toBe(lyricsCandidateId(CANDIDATE));
-    expect(view.choose).toHaveBeenCalledWith(CANDIDATE, false, 'subject');
+    expect(view.choose).toHaveBeenCalledWith(CANDIDATE, true, 'subject');
     await act(async () => {
       await Promise.resolve();
     });
     expect(view.query().using).toBe('');
     expect(view.onUsed).toHaveBeenCalledOnce();
+    view.unmount();
+  });
+
+  it('设置里关掉默认记住时，使用候选只用于当前', () => {
+    const view = mount({ remember: false });
+    act(() => view.query().use(CANDIDATE));
+    expect(view.choose).toHaveBeenCalledWith(CANDIDATE, false, 'subject');
     view.unmount();
   });
 

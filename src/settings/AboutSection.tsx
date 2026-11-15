@@ -1,7 +1,5 @@
 import { Button } from '@fluentui/react-components';
 import {
-  Alert20Regular,
-  ArrowCounterclockwise16Regular,
   Box20Regular,
   Checkmark16Regular,
   Copy16Regular,
@@ -14,16 +12,15 @@ import {
 import { useAtomValueRawSync } from 'jotai/react';
 import { useContext, useId } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
-import { diagnosticsAtom, dismissedCountAtom, infoCenterKey } from '../host/infoCenter.ts';
+import { diagnosticsAtom } from '../host/infoCenter.ts';
 import { LICENSE_URL, THEME_VERSION, versionReport } from './about.ts';
 import { CreditsCard } from './CreditsCard.tsx';
 import { MusicServiceCard } from './MusicServiceCard.tsx';
 import { openExternal } from './hostActions.ts';
+import { RuntimeLogCard } from './RuntimeLogCard.tsx';
 import { SettingsActionCard } from './SettingsActionCard.tsx';
 import { SettingsCard } from './SettingsCard.tsx';
 import { useHostAbsent } from './useHostAbsent.ts';
-import { useService } from '../kit/useService.ts';
-import { SettingsSaveNotice } from './SettingsSaveNotice.tsx';
 import { useCopyAction } from './useCopyAction.ts';
 import { UpdateSettingsContext } from './updateSettingsContext.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
@@ -89,59 +86,19 @@ function VersionCard() {
   );
 }
 
-/**
- * 点过「不再提示」的提醒：写出还记着几条，「恢复」把它们全忘掉，问题还在的随即重新提示。一条都没记时
- * 按钮禁用但仍能接焦点：刚按过「恢复」，条数归零、按钮随之禁用，焦点要留在它上面，不能掉到 body
- */
-function RemindersCard() {
-  const viewControls = useViewControlStyles();
-  const t = useAtomValueRawSync(translateAtom);
-  const count = useAtomValueRawSync(dismissedCountAtom);
-  const infoCenter = useService(infoCenterKey);
-  const saving = useAtomValueRawSync(infoCenter.persistence.state);
-  const buttonId = useId();
-  return (
-    <SettingsCard
-      icon={<Alert20Regular />}
-      title={t('settings.reminders')}
-      feedback={
-        <SettingsSaveNotice persistence={infoCenter.persistence} keys={[...saving.keys()]} />
-      }
-      description={
-        count > 0 ? t('settings.remindersCount', { count }) : t('settings.remindersNone')
-      }
-    >
-      {({ labelId, descriptionId }) => (
-        <Button
-          className={viewControls.field}
-          id={buttonId}
-          icon={<ArrowCounterclockwise16Regular />}
-          iconPosition="after"
-          disabledFocusable={count === 0}
-          aria-labelledby={`${buttonId} ${labelId}`}
-          aria-describedby={descriptionId}
-          onClick={() => infoCenter.restoreReminders()}
-        >
-          {t('settings.restore')}
-        </Button>
-      )}
-    </SettingsCard>
-  );
-}
-
 function UpdateSettings() {
   return useContext(UpdateSettingsContext);
 }
 
-/** 「关于」一组：版本、在线音乐服务的状态、主题更新、已关闭的提醒、开源许可与致谢 */
+/** 「关于」一组：版本、运行日志、在线音乐服务的状态、主题更新、开源许可与致谢 */
 export function AboutSection() {
   const t = useAtomValueRawSync(translateAtom);
   return (
     <>
       <VersionCard />
+      <RuntimeLogCard />
       <MusicServiceCard />
       <UpdateSettings />
-      <RemindersCard />
       <SettingsActionCard
         icon={<Scales20Regular />}
         title={t('settings.license')}

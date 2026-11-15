@@ -67,6 +67,41 @@ it('扩展字段按值比，同值按目录序；降序只反转所选列，统�
   ]);
 });
 
+const mine = (name: string, title: string, trackNumber: number) =>
+  trackRow('Mine', title, { path: `file://E:\\Mine\\${name}`, trackNumber });
+
+it('自己攒的歌单：曲号来自各自的专辑、凑不成一张专辑，缺省按文件名的自然序', () => {
+  const ten = mine('10 十年.mp3', '十年', 3);
+  const sunny = mine('02 晴天.mp3', '晴天', 7);
+  const stubborn = mine('1 倔强.mp3', '倔强', 12);
+  expect(foldersSort([ten, sunny, stubborn], null)).toEqual([stubborn, sunny, ten]);
+});
+
+it('曲号恰好是 1 到 n 的目录像一张专辑，缺省仍按曲号，不看文件名', () => {
+  const second = mine('x.flac', 'X', 2);
+  const first = mine('a.flac', 'A', 1);
+  const third = mine('m.flac', 'M', 3);
+  expect(foldersSort([third, second, first], null)).toEqual([first, second, third]);
+});
+
+it('每张碟各自从 1 数起，也算专辑', () => {
+  const at = (name: string, disc: number, trackNumber: number) =>
+    trackRow('Box', name, { path: `file://E:\\Box\\${name}.flac`, discNumber: disc, trackNumber });
+  const d1t2 = at('z', 1, 2);
+  const d1t1 = at('y', 1, 1);
+  const d2t1 = at('x', 2, 1);
+  expect(foldersSort([d2t1, d1t2, d1t1], null)).toEqual([d1t1, d1t2, d2t1]);
+});
+
+it('按其他列排序且值相同时，同样按目录里的文件名定次序', () => {
+  const first = mine('01 b.mp3', 'B', 9);
+  const second = mine('02 a.mp3', 'A', 4);
+  expect(foldersSort([second, first], { column: 'sampleRate', descending: true })).toEqual([
+    first,
+    second,
+  ]);
+});
+
 it('文件大小、声道与年份按数和原文比，不按字典序', () => {
   const small = trackRow('Album', 'Small', { fileSize: 9_000_000, channels: 2, date: '2001' });
   const big = trackRow('Album', 'Big', { fileSize: 10_000_000, channels: 6, date: '1999-05-01' });

@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openFolders } from '../fixtures/foldersPage.ts';
-import { openArtists } from '../fixtures/artistsPage.ts';
 import { openGenres } from '../fixtures/genresPage.ts';
 import { choosePlayerBar, PLAYING_TRACK } from '../fixtures/playerPage.ts';
 
@@ -12,13 +11,11 @@ async function finish(panel: Locator) {
 
 async function openArea(page: Page, area: string) {
   if (area === 'folders') return openFolders(page);
-  if (area === 'artists') return openArtists(page);
   return openGenres(page);
 }
 
 for (const [area, label] of [
   ['folders', '目录'],
-  ['artists', '艺人列表'],
   ['genres', '流派列表'],
 ] as const) {
   test(`${area} 窄屏抽屉与右侧共用布局和平移，保持选择与跨档行为`, async ({ page }) => {
@@ -138,9 +135,7 @@ for (const [area, label] of [
       await expect(drawer).toBeVisible();
       await drawer.getByRole('button', { name: '关闭目录导航', exact: true }).click();
     } else {
-      await drawer
-        .locator(area === 'artists' ? '[data-artist="Nujabes"]' : '[data-genre-name="Trip-Hop"]')
-        .click();
+      await drawer.locator('[data-genre-name="Trip-Hop"]').click();
     }
     await expect(drawer).toHaveCount(0);
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -148,25 +143,6 @@ for (const [area, label] of [
     expect(env.errors).toEqual([]);
   });
 }
-
-test('艺人抽屉打开的重命名对话框跨档后保留输入', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  const env = await openArtists(page);
-  await page.setViewportSize({ width: 900, height: 800 });
-  await env.view.getByRole('button', { name: '艺人列表', exact: true }).click();
-  const drawer = page.locator('[data-library-drawer]');
-  await drawer.locator('[data-artist="Nujabes"]').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '重命名', exact: true }).click();
-  const rename = page.getByRole('dialog', { name: '重命名艺人', exact: true });
-  const input = rename.getByRole('textbox');
-  await input.fill('Nujabes preview');
-  await expect(drawer).toHaveCount(1);
-  await page.setViewportSize({ width: 1600, height: 800 });
-  await expect(drawer).toHaveCount(0);
-  await expect(input).toHaveValue('Nujabes preview');
-  await rename.getByRole('button', { name: '取消', exact: true }).click();
-  expect(env.errors).toEqual([]);
-});
 
 test('文件夹抽屉避让正在播放的胶囊并随跨档退出', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -196,10 +172,7 @@ test('文件夹抽屉避让正在播放的胶囊并随跨档退出', async ({ pa
   expect(env.errors).toEqual([]);
 });
 
-for (const [area, label] of [
-  ['artists', '艺人列表'],
-  ['genres', '流派列表'],
-] as const) {
+for (const [area, label] of [['genres', '流派列表']] as const) {
   test(`${area} 筛选输入框未处理的 Esc 关闭抽屉并返回入口`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -239,10 +212,7 @@ test('文件夹查找框先处理 Esc，结束查找后才关闭抽屉', async (
   expect(env.errors).toEqual([]);
 });
 
-for (const [area, label] of [
-  ['folders', '目录'],
-  ['artists', '艺人列表'],
-] as const) {
+for (const [area, label] of [['folders', '目录']] as const) {
   test(`${area} 抽屉内右键菜单和子菜单不触发外部关闭`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -250,10 +220,7 @@ for (const [area, label] of [
     await page.setViewportSize({ width: 900, height: 800 });
     await env.view.getByRole('button', { name: label, exact: true }).click();
     const drawer = page.locator('[data-library-drawer]');
-    const row =
-      area === 'folders'
-        ? drawer.getByRole('treeitem').filter({ hasText: 'Alpha' })
-        : drawer.locator('[data-artist="Nujabes"]');
+    const row = drawer.getByRole('treeitem').filter({ hasText: 'Alpha' });
     await row.click({ button: 'right' });
     const submenu = page.getByRole('menuitem', { name: '发送到', exact: true });
     await expect(submenu).toBeEnabled();

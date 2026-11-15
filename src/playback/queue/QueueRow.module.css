@@ -1,7 +1,17 @@
 /* 一行高 `--queue-row-height`（缺省 48）：左槽的序号与手柄互斥、封面比行高小上下各 4（48 的行是 40，56 的行是 48）、标题两行、
-   右槽 36，槽与槽之间 8，左右各留 8 */
+   右槽 36，槽与槽之间 8，左右各留 8。
+
+   外框可以把行画成卡：`--queue-card-bg` 起各项底色，`--queue-row-gap` 是行与行的缝（占行距的一部分，行高相应减去），
+   `--queue-row-radius`、`--queue-row-pad`、`--queue-cover` 与 `--queue-cover-radius` 调形状。缝用下外边距：相邻的上下外边距会合并，
+   各留一半会让缝缩成一半。不给这些变量时与平铺的行一样，右侧卡就是这样。一组的首尾行（`data-edge-start`、`data-edge-end`）
+   用 `--queue-edge-radius` 收成大圆角 */
 .row {
-  --row-cover: calc(var(--queue-row-height, 48px) - 2 * var(--spacingVerticalXS));
+  --row-cover: var(
+    --queue-cover,
+    calc(var(--queue-row-height, 48px) - 2 * var(--spacingVerticalXS))
+  );
+  --row-radius: var(--queue-row-radius, var(--radius-control));
+  --edge-radius: var(--queue-edge-radius, var(--row-radius));
 
   position: relative;
   display: grid;
@@ -10,30 +20,59 @@
     var(--row-cover) minmax(0, 1fr) minmax(36px, max-content);
   align-items: center;
   gap: var(--spacingHorizontalS);
-  height: var(--queue-row-height, 48px);
-  padding: 0 var(--spacingHorizontalS);
-  border-radius: var(--radius-control);
+  height: calc(var(--queue-row-height, 48px) - var(--queue-row-gap, 0px));
+  margin-block-end: var(--queue-row-gap, 0px);
+  padding: 0 var(--queue-row-pad, var(--spacingHorizontalS));
+  border-radius: var(--row-radius);
+  background: var(--queue-card-bg, transparent);
   outline: none;
   cursor: default;
   user-select: none;
-  transition: background-color var(--motion-faster) var(--curveLinear);
+  transition:
+    background-color var(--motion-faster) var(--curveLinear),
+    border-radius var(--motion-fast) var(--motion-curve-point-to-point);
+}
+
+/* 组首末行的圆角随换人过渡：末行被移走、末尾入队时，大圆角不硬切。行第一次挂载没有「之前」，不过渡 */
+.row[data-edge-start] {
+  border-start-start-radius: var(--edge-radius);
+  border-start-end-radius: var(--edge-radius);
+}
+
+.row[data-edge-end] {
+  border-end-start-radius: var(--edge-radius);
+  border-end-end-radius: var(--edge-radius);
 }
 
 .row:hover {
-  background: var(--bg-hover);
+  background: var(--queue-card-hover, var(--bg-hover));
 }
 
 .row[data-selected] {
-  background: var(--bg-selected);
+  background: var(--queue-card-selected, var(--bg-selected));
+}
+
+.row[data-selected]:hover {
+  background: var(--queue-card-selected-hover, var(--queue-card-selected, var(--bg-selected)));
+}
+
+/* 拖动时跟着指针的副本：底由副本的外框画，行本身不再铺，也不带缝 */
+.row[data-preview] {
+  height: var(--queue-row-height, 48px);
+  margin-block-end: 0;
+  background: none;
 }
 
 .row:focus-visible {
   box-shadow: inset 0 0 0 var(--strokeWidthThick) var(--colorStrokeFocus2);
 }
 
-/* 拖着的那几行原位变淡，提起的副本跟着指针另画 */
+/* 拖着的那几行原位变淡，提起的副本跟着指针另画。变淡的程度写成变量：沉浸视图里行带着随滚动的渐隐动画，
+   动画占着 `opacity`，要把它读进关键帧才不被盖掉 */
 .row[data-lifted] {
-  opacity: 0.35;
+  --lifted-opacity: 0.35;
+
+  opacity: var(--lifted-opacity);
   cursor: grabbing;
 }
 
@@ -48,7 +87,7 @@
   grid-area: 1 / 1;
 }
 
-/* 悬停时换内容的几处（序号与手柄、时长与 ⋯、封面上的播放键）：自绘元素的指针反馈，83 ms 线性淡变。藏起来的一方
+/* 悬停时换内容或出现的几处（序号与手柄、右槽的 ⋯、封面上的播放键）：自绘元素的指针反馈，83 ms 线性淡变。藏起来的一方
    淡完才 `visibility: hidden`，不接指针也不进读屏；出现的一方立即可见、再淡入 */
 .number {
   color: var(--text-muted);
@@ -99,7 +138,7 @@
   width: var(--row-cover);
   height: var(--row-cover);
   overflow: hidden;
-  border-radius: var(--borderRadiusSmall);
+  border-radius: var(--queue-cover-radius, var(--borderRadiusSmall));
   background: var(--bg-surface);
   color: var(--text-muted);
   font-size: 18px;
@@ -188,22 +227,6 @@
   place-items: center;
 }
 
-.length {
-  white-space: nowrap;
-}
-
-.length,
-.more {
-  grid-area: 1 / 1;
-}
-
-.length {
-  color: var(--text-muted);
-  font-size: var(--fontSizeBase200);
-  font-variant-numeric: tabular-nums;
-  transition: opacity var(--motion-faster) var(--curveLinear);
-}
-
 .more {
   display: grid;
   place-items: center;
@@ -225,14 +248,6 @@
 
 .more:hover {
   background: var(--bg-hover);
-}
-
-.row:hover .length {
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--motion-faster) var(--curveLinear),
-    visibility 0s linear var(--motion-faster);
 }
 
 .row:hover .more {

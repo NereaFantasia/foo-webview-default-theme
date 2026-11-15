@@ -1,6 +1,14 @@
 import { Button, Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { MessageKey } from '../../../i18n/en.ts';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
 import { COMMAND_BAR_TIERS, type CommandBarTier } from '../../../kit/CommandBar.tsx';
@@ -24,13 +32,8 @@ import {
   OnlineUnavailable,
 } from './OnlineEmpty.tsx';
 import { blockedTrack, OnlineTrackHeader, OnlineTrackRow, useUnblock } from './OnlineItems.tsx';
-import {
-  OnlineAlbumTile,
-  OnlineArtistTile,
-  OnlinePlaylistTile,
-  ONLINE_ARTIST_SHAPE,
-  refKey,
-} from './OnlineTiles.tsx';
+import { OnlineAlbumTile, OnlineArtistTile, OnlinePlaylistTile, refKey } from './OnlineTiles.tsx';
+import { ARTIST_GRID_SHAPE } from '../../cover-tile/ObjectTile.tsx';
 import { CoverGrid, STANDARD_GRID_SHAPE } from '../../cover-tile/CoverGrid.tsx';
 import { ONLINE_CATEGORY_LABELS, ONLINE_KIND_LABELS, OnlineOverview } from './OnlineOverview.tsx';
 import { onlinePlayKey, onlineSearchSource } from './onlinePlay.ts';
@@ -82,18 +85,30 @@ export interface OnlineResume {
 export interface OnlineResultsProps {
   readonly text: string;
   readonly search: OnlineSearch;
-  readonly initial: OnlineCategory;
+  /** 分类由结果页持有：媒体库与在线音乐共用一行页签 */
+  readonly category: OnlineCategory;
+  onCategory(category: OnlineCategory): void;
+  /** 分类页签，`narrow` 时收成下拉 */
+  renderTabs(narrow: boolean): ReactNode;
   /** 进来时选中并滚到这首曲目（平台内的 ID） */
   readonly focus?: string;
-  /** 范围切换之间保留现场：卸载时写入，挂上时有同一查询词的现场就盖过 `initial` 与 `focus` */
+  /** 范围切换之间保留现场：卸载时写入，挂上时有同一查询词、同一分类的现场就盖过 `focus` */
   readonly resume: { current: OnlineResume | null };
 }
 
 /**
- * 搜索结果页的在线音乐范围：分类照本地结果页，再加歌单；分类行右端的来源下拉在可选来源多于网易云时出，
+ * 搜索结果页的在线音乐范围：分类行右端的来源下拉在可选来源多于网易云时出，
  * 换来源只换下面的结果，各来源已取到的结果留着，切回来不重搜
  */
-export function OnlineResults({ text, search, initial, focus, resume }: OnlineResultsProps) {
+export function OnlineResults({
+  text,
+  search,
+  category,
+  onCategory,
+  renderTabs,
+  focus,
+  resume,
+}: OnlineResultsProps) {
   const t = useAtomValueRawSync(translateAtom);
   const viewControls = useViewControlStyles();
   const { active: locale } = useAtomValueRawSync(localeAtom);
@@ -111,8 +126,11 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
     artist: useAtomValueRawSync(search.kinds.artist),
     playlist: useAtomValueRawSync(search.kinds.playlist),
   };
-  const [resumed] = useState(() => (resume.current?.text === text ? resume.current.view : null));
-  const [category, setCategory] = useState(resumed?.category ?? initial);
+  const [resumed] = useState(() =>
+    resume.current?.text === text && resume.current.view.category === category
+      ? resume.current.view
+      : null,
+  );
   const [active, setActive] = useState<string | null>(resumed ? resumed.active : (focus ?? null));
   const focusing = useRef(resumed ? undefined : focus);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -147,8 +165,8 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
   useEffect(() => reload(), [reload]);
   // 换到搜不了当前分类的平台时落到「曲目」；进来时带的分类（下拉里的「查看全部」）同理
   useEffect(() => {
-    if (!platformSearches(platform, category)) setCategory('tracks');
-  }, [platform, category]);
+    if (!platformSearches(platform, category)) onCategory('tracks');
+  }, [platform, category, onCategory]);
 
   const states: OnlineKindState<MusicSearchKind>[] = wanted.map((kind) => kinds[kind]);
   const failures = states.flatMap((state) => (state.status === 'failed' ? [state.failure] : []));
@@ -177,7 +195,8 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
       capture,
       restore: (snapshot) => {
         pending.current = snapshot;
-        setCategory(snapshot.category);
+        shownCategory.current = snapshot.category;
+        onCategory(snapshot.category);
         filtering.restore(snapshot.filtering);
         sources.choose(snapshot.platform);
       },
@@ -234,14 +253,17 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
     row.scrollIntoView({ block: 'center' });
   });
 
-  const choose = (next: OnlineCategory) => {
-    if (next === category) return;
+  // 分类由页面换过来时关菜单与筛选浮层、清选中、回到顶上；后退恢复现场时不清
+  const shownCategory = useRef(category);
+  const closeFilter = surface.setOpen;
+  useLayoutEffect(() => {
+    if (shownCategory.current === category) return;
+    shownCategory.current = category;
     setMenu(null);
-    surface.setOpen(false);
-    setCategory(next);
+    closeFilter(false);
     setActive(null);
     if (scroller) scroller.scrollTop = 0;
-  };
+  }, [category, scroller, closeFilter]);
   const chooseSource = (next: MusicPlatform) => {
     if (next === platform) return;
     setMenu(null);
@@ -320,7 +342,7 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
           albums={kinds.album.items}
           tracks={tracks}
           playlists={kinds.playlist.items}
-          onChoose={choose}
+          onChoose={onCategory}
           onPlay={activate}
           tileActions={tileActions}
           renderTracks={(items) => trackList(items, t('search.tracks'))}
@@ -335,7 +357,7 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
     if (category === 'artists')
       return (
         <CoverGrid
-          shape={ONLINE_ARTIST_SHAPE}
+          shape={ARTIST_GRID_SHAPE}
           keyOf={refKey}
           label={label}
           // 还有下一页时末行会随续页补满，等取完再居中，免得滚到底时末行跳位
@@ -368,23 +390,15 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
   return (
     <>
       <OnlineControls
-        category={category}
         platform={platform}
         options={sourceOptions}
-        totals={{
-          track: kinds.track.total,
-          album: kinds.album.total,
-          artist: kinds.artist.total,
-          playlist: kinds.playlist.total,
-        }}
         measure={measure}
-        tier={tier}
+        tabs={renderTabs(tier === 'narrow')}
         tools={
           category === 'tracks' && (
             <OnlineFilterTools filtering={filtering} surface={surface} labelled={tier === 'wide'} />
           )
         }
-        onCategory={choose}
         onSource={chooseSource}
       />
       {category === 'tracks' && (
@@ -393,7 +407,7 @@ export function OnlineResults({ text, search, initial, focus, resume }: OnlineRe
           <OnlineFilterConditions filtering={filtering} />
         </>
       )}
-      {/* 提示放在列表上方：放在列表末尾时，滚得较深就看不到。 */}
+      {/* 提示放在列表上方：放在列表末尾时，滚得较深就看不到 */}
       {((ready && failures.length > 0) || notice) && (
         <div className={styles.notices}>
           {ready && failures.length > 0 && (

@@ -31,6 +31,7 @@ import {
 } from '../detail/DetailHeader.tsx';
 import { ExpandableText } from '../detail/ExpandableText.tsx';
 import { ArtistRow, type ArtistEntry } from '../detail/ArtistRow.tsx';
+import { FavoriteAlbumKey, FavoritePlaylistKey, FollowKey } from '../detail/FavoriteObjectKeys.tsx';
 import { OnlineArtistAvatar } from './OnlineArtistAvatar.tsx';
 
 type Owner = MusicSearchItems[MusicListKind];
@@ -135,6 +136,22 @@ export function OnlineListHeader(props: OnlineListHeaderProps) {
                   list: { kind: 'artist', ref: artist.ref, title: artist.name },
                 }
               : null,
+            // 署名里只有名字与引用，头像、专辑数等收藏时没有，等刷新补
+            ...(artist.ref
+              ? {
+                  follow: (
+                    <FollowKey
+                      artist={{
+                        ref: artist.ref,
+                        name: artist.name,
+                        avatar: null,
+                        albumCount: null,
+                        trackCount: null,
+                      }}
+                    />
+                  ),
+                }
+              : {}),
           }))
         : [],
     [owner],
@@ -199,6 +216,17 @@ export function OnlineListHeader(props: OnlineListHeaderProps) {
       }
       more={
         <>
+          {'releaseDate' in owner ? (
+            <FavoriteAlbumKey
+              album={owner}
+              className={mergeClasses(classes.secondary, classes.icon)}
+            />
+          ) : 'cover' in owner ? (
+            <FavoritePlaylistKey
+              playlist={owner}
+              className={mergeClasses(classes.secondary, classes.icon)}
+            />
+          ) : null}
           <Tooltip content={t('album.enqueue')} relationship="label">
             <Button
               appearance="subtle"

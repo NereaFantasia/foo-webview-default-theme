@@ -1,20 +1,27 @@
 import { atom } from 'jotai/vanilla';
 import { fb } from 'foo-webview-sdk/bridge';
 import type { MessageKey } from '../i18n/en.ts';
-import { albumKeyOf, trackPathOf } from '../host/libraryContract.ts';
+import { albumKeyOf, trackAlbumArtistOf, trackPathOf } from '../host/libraryContract.ts';
 import { albumsAtom } from '../library/albums.ts';
+import { libraryTracksAtom } from '../library/libraryTracks.ts';
 import { playlistsAtom } from '../playback/playlists.ts';
 import { historyAtom } from '../nav/navHistory.ts';
-import { exclusive } from '../playback/libraryView.ts';
+import { exclusive, PLAY_LIMIT } from '../playback/libraryView.ts';
 import { createQueryAutoplaylist, playByQuery } from '../library/libraryQueryFill.ts';
 import { CHANNEL_PREVIEW_LIMIT, startChannelQuery } from '../library/home/channelQuery.ts';
 import { CHANNEL_SORT_PATTERNS, startHomeChannels } from '../library/home/homeChannels.ts';
 import { startHomeFeed } from '../library/home/homeFeed.ts';
+import { startHomeOnline, type HomeOnlineDeps } from '../library/home/homeOnline.ts';
+import { startHomeOverview } from '../library/home/homeOverview.ts';
 import { startHomeRecent } from '../library/home/homeRecent.ts';
 import { homePinKey, startHomePins, type HomePin } from '../library/home/homePins.ts';
+import { loadHomeSections } from '../library/home/homeSections.ts';
 import { homeGemQuery } from '../library/home/homeModel.ts';
 import type { HomeServices } from '../library/home/homeContext.ts';
 import type { AppServices } from './services.ts';
+
+/** 播放过的曲目 */
+const PLAYED_QUERY = '%play_count% GREATER 0';
 
 export function startHomeIntegration(
   services: Pick<
@@ -30,10 +37,15 @@ export function startHomeIntegration(
     | 'songs'
     | 'configWriter'
   >,
+  /** 在线音乐的请求入口与状态，首页的在线行用 */
+  music: Omit<HomeOnlineDeps, 'now'>,
 ): HomeServices {
   const { store, albums, trackActions, albumList, playbackSource, history, songs } = services;
+  loadHomeSections(store);
   const feed = startHomeFeed(store, albumList.tracks);
   const recent = startHomeRecent(store);
+  const overview = startHomeOverview(store);
+  const online = startHomeOnline(store, music);
   const pins = startHomePins(store);
   const channels = startHomeChannels(store, undefined, services.configWriter);
   const pinChoices = atom<readonly HomePin[]>((get) => {
@@ -89,10 +101,15 @@ export function startHomeIntegration(
   return {
     feed,
     recent,
+    overview,
+    online,
     pins,
     pinChoices,
     channels,
     notice,
+    notify: (message) => {
+      if (!disposed) store.set(notice, message);
+    },
     busy,
     createQuery: (preview = false) =>
       startChannelQuery(store, preview ? CHANNEL_PREVIEW_LIMIT : undefined),
@@ -105,6 +122,28 @@ export function startHomeIntegration(
           name: '',
         }),
       ),
+    playTop: (tracks, index) =>
+      run(() =>
+        trackActions.playPaths(tracks.map(trackPathOf), index, {
+          kind: 'songs',
+          subject: PLAYED_QUERY,
+          name: '',
+        }),
+      ),
+    playArtist: (name) =>
+      run(async () => {
+        const paths = [...store.get(libraryTracksAtom).byAlbum.values()].flatMap((tracks) =>
+          tracks.filter((track) => trackAlbumArtistOf(track).trim() === name).map(trackPathOf),
+        );
+        return (
+          paths.length > 0 &&
+          trackActions.playPaths(paths.slice(0, PLAY_LIMIT), 0, {
+            kind: 'artist',
+            subject: name,
+            name,
+          })
+        );
+      }),
     shuffle: () =>
       run(async (current) => {
         const ok = await exclusive(store, () =>
@@ -132,6 +171,14 @@ export function startHomeIntegration(
       songs.filter.setQuery({ mode: 'advanced', text: '', advancedText: homeGemQuery(mode) });
       songs.rows.flush();
     },
+    openArtists: () => history.navigate({ id: 'artists' }),
+    openMostPlayed() {
+      history.navigate({ id: 'songs' });
+      songs.filter.clear();
+      songs.filter.setQuery({ mode: 'advanced', text: '', advancedText: PLAYED_QUERY });
+      songs.prefs.setSort({ column: 'playCount', descending: true });
+      songs.rows.flush();
+    },
     openChannel: (channel) => history.navigate({ id: 'channel', subject: channel.id }),
     openPin(pin) {
       if (!store.get(pinChoices).some((item) => homePinKey(item) === homePinKey(pin))) return;
@@ -146,6 +193,8 @@ export function startHomeIntegration(
       disposed = true;
       feed.dispose();
       recent.dispose();
+      overview.dispose();
+      online.dispose();
       channels.dispose();
     },
   };

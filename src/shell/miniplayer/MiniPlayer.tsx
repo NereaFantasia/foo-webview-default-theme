@@ -104,7 +104,7 @@ export function MiniPlayer() {
   const url = track && cover.url !== failedCover ? cover.url : '';
   const live = track !== null && !(track.duration > 0);
   const subtitle = track
-    ? [track.artist, track.album].filter(Boolean).join(' · ') || (live ? t('mini.radio') : '')
+    ? [track.artist, track.album].filter(Boolean).join(' - ') || (live ? t('mini.radio') : '')
     : '';
   const closeMenu = () => {
     if (closing) return;
@@ -133,7 +133,7 @@ export function MiniPlayer() {
       .then(() => mini.setForm(form === 'compact' ? 'cover' : 'compact'))
       .then(() => {
         setSwitching(false);
-        // 换没换成都淡入：没换成时回到原来的样子
+        // 形态切换完成后统一执行淡入；若切换未成功则淡入恢复原状态
         fadeIn(viewOf(root.current), reduced);
       });
   };

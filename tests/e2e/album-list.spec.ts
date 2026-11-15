@@ -7,7 +7,7 @@ import { enterSettings } from '../fixtures/settingsPage.ts';
 import { DEFAULT_WIDTHS, DEFAULT_ORDER } from '../../src/table/columns/columns.ts';
 
 // 专辑页的列表形态：两层开合与落盘、批量入口（页头键、节头右键、修饰键、键盘）、排序切换、进详情页、
-// 单击分组头选中整张、三种右键菜单与起播。替身里每张专辑两首，流派分 Jazz 与 Rock 两节。
+// 单击分组头选中整张、三种右键菜单与起播。替身里每张专辑两首，流派分 Jazz 与 Rock 两节
 
 const COLLAPSED = 'defaultTheme.browser.collapsed';
 const LIST = { 'defaultTheme.browser.form': 'list', 'defaultTheme.browser.dimension': 'genre' };
@@ -35,7 +35,7 @@ async function start(page: Page, config: Record<string, ConfigValue> = {}): Prom
     answers: libraryAnswers(SAMPLE_ALBUMS),
     config: { ...LIST, ...config },
   });
-  // 列表是虚拟滚动，视口外的专辑不画。视口要放得下替身里全部专辑展开后的高度，用例按名字找行时才不必先滚过去。
+  // 列表是虚拟滚动，视口外的专辑不画。视口要放得下替身里全部专辑展开后的高度，用例按名字找行时才不必先滚过去
   await page.setViewportSize({ width: 1280, height: 2000 });
   await page.goto('/');
   await expect(track(page, 'Blue Train 1')).toBeVisible();
@@ -269,7 +269,7 @@ test('hook 刷新只重取变化曲目的统计，不整库重拉；非 hook 的
     count: 1,
     components: [{ name: 'Playback Statistics', filename: 'foo_playcount', version: '3.1.5' }],
   });
-  // 升序下 Blue Train 2(2) 排在 Blue Train 1(10) 前；hook 把 Blue Train 2 抬成 99 后次序翻过来。
+  // 升序下 Blue Train 2(2) 排在 Blue Train 1(10) 前；hook 把 Blue Train 2 抬成 99 后次序翻过来
   let boosted = false;
   host.answer('titleformat.evalBatch', (params) => {
     const paths: unknown = params['paths'];
@@ -307,7 +307,9 @@ test('hook 刷新只重取变化曲目的统计，不整库重拉；非 hook 的
       return one >= 0 && two >= 0 && two < one;
     })
     .toBe(true);
-  const beforeLibrary = host.callsTo('library.getAll').length;
+  const libraryReads = () =>
+    host.callsTo('library.search').filter((call) => call['query'] === 'ALL').length;
+  const beforeLibrary = libraryReads();
   const beforeEval = host.callsTo('titleformat.evalBatch').length;
   boosted = true;
   await host.emit('library:itemsModified', {
@@ -323,7 +325,7 @@ test('hook 刷新只重取变化曲目的统计，不整库重拉；非 hook 的
       return one < two;
     })
     .toBe(true);
-  expect(host.callsTo('library.getAll')).toHaveLength(beforeLibrary);
+  expect(libraryReads()).toBe(beforeLibrary);
   const evalCalls = host.callsTo('titleformat.evalBatch');
   expect(evalCalls).toHaveLength(beforeEval + 1);
   expect(evalCalls.at(-1)?.['paths']).toEqual(['E:\\Music\\Blue Train\\Blue Train 2.flac']);
@@ -334,7 +336,7 @@ test('hook 刷新只重取变化曲目的统计，不整库重拉；非 hook 的
     fromHook: false,
     timestamp: 2,
   });
-  await expect.poll(() => host.callsTo('library.getAll').length).toBe(beforeLibrary + 1);
+  await expect.poll(libraryReads).toBe(beforeLibrary + 1);
 });
 
 test('单击分组头空白选中整张；双击分组头从头播，双击曲目从那一首播；右键分三种菜单', async ({

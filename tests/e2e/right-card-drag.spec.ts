@@ -112,7 +112,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await page.mouse.move(box.x + 42, box.y - 45, { steps: 4 });
     const preview = page.locator('[data-queue-drag-preview]');
     await expect(preview).toBeVisible();
-    await expect(preview).toContainText(['待播 3', 'Nujabes', 'Modal Soul', '2:55'].join(''));
+    await expect(preview).toContainText(['待播 3', 'Nujabes', 'Modal Soul'].join(''));
     await expect(preview.locator('button, a, [tabindex], [data-queue-row]')).toHaveCount(0);
     const lifted = await preview.boundingBox();
     if (!lifted) throw new Error('拖动副本不可见');

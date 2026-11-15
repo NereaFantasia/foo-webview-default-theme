@@ -1,0 +1,73 @@
+/* 标题行在上：左边标题，右边集合操作；下面是页签与命令栏同一行。左右内边距与表格、网格对齐 */
+.root {
+  display: grid;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXXL) var(--spacingVerticalXS);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalL);
+  min-width: 0;
+}
+
+.titles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacingVerticalXXS) var(--spacingHorizontalMNudge);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+}
+
+/* 页签、一条竖线、命令栏同一行 */
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+}
+
+.rule {
+  flex: none;
+  width: var(--strokeWidthThin);
+  height: 20px;
+  background: var(--line);
+}
+
+.bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search {
+  width: 100%;
+  min-width: 0;
+}
+
+.selection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXS);
+}
+
+.selected {
+  padding: 0 var(--spacingHorizontalS);
+  color: var(--text-primary);
+  font-size: var(--fontSizeBase300);
+  white-space: nowrap;
+}

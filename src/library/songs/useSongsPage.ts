@@ -9,7 +9,7 @@ import { createRowSelection, type RowSelection } from '../../table/rowSelection.
 import type { TableRowItem, TableTrack } from '../../table/tableItems.ts';
 import type { TableSort } from '../../table/TrackTableHeader.tsx';
 import { albumsAtom } from '../albums.ts';
-import { albumKeyOf, trackAlbumKeyOf, type Album } from '../../host/libraryContract.ts';
+import type { Album } from '../../host/libraryContract.ts';
 import { libraryTracksAtom, type LibraryTracksState } from '../libraryTracks.ts';
 import { playStatsAtom } from '../playStats.ts';
 import type { SongsRun } from './songsActions.ts';
@@ -19,7 +19,7 @@ import { songsRowsAtom, type SongsRowsState } from './songsRows.ts';
 import { songsFillAtom, songsQueryAtom, songsKey } from './songsServices.ts';
 import { songsPrefsAtom, type SongsDensity } from './songsPrefs.ts';
 import { TRACK_SORT, TRACK_STATS_COLUMNS } from '../../track/trackSort.ts';
-import { buildSongsView, type SongsView } from './songsView.ts';
+import { albumLookupOf, buildSongsView, type SongsView } from './songsView.ts';
 import { useService } from '../../kit/useService.ts';
 import { useTrackStatsStatus, type TrackStatsStatus } from '../useTrackStats.ts';
 import { albumListKey } from '../album-list/albumList.ts';
@@ -143,15 +143,10 @@ export function useSongsPage(): SongsPageModel {
     selection.setTotal(rows.handles.length);
   }, [selection, rows.generation, rows.handles.length]);
 
-  // 表格交回的行只有 `TableTrack` 的字段，折专辑键要的多值艺术家按 handle 从整库曲目里取
-  const albumOf = useMemo(() => {
-    const index = new Map(albums.map((album) => [albumKeyOf(album), album]));
-    return (track: TableTrack): Album | undefined => {
-      const full = library.byHandle.get(track.handle);
-      const key = full ? trackAlbumKeyOf(full) : null;
-      return key ? index.get(key) : undefined;
-    };
-  }, [albums, library.byHandle]);
+  const albumOf = useMemo(
+    () => albumLookupOf(albums, library.byHandle),
+    [albums, library.byHandle],
+  );
 
   return {
     rows,

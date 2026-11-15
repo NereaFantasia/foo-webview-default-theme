@@ -4,12 +4,15 @@ import { genresEn } from './genresEn.ts';
 import { foldersEn } from './foldersEn.ts';
 import { playlistEn } from './playlistEn.ts';
 import { queryEn } from './queryEn.ts';
+import { autoplaylistEn } from './autoplaylistEn.ts';
+import { querySyntaxEn } from './querySyntaxEn.ts';
 import { settingsEn } from './settingsEn.ts';
 import { onboardingEn } from './onboardingEn.ts';
 import { songsEn } from './songsEn.ts';
 import { contextMenuEn } from './contextMenuEn.ts';
 import { queueEn } from './queueEn.ts';
 import { searchEn } from './searchEn.ts';
+import { favoritesEn } from './favoritesEn.ts';
 import { artistAlbumsEn } from './artistAlbumsEn.ts';
 import { detailEn } from './detailEn.ts';
 import { biographyEn } from './biographyEn.ts';
@@ -24,15 +27,17 @@ import { updateEn } from './updateEn.ts';
 import { miniPlayerEn } from './miniPlayerEn.ts';
 import { desktopLyricsEn } from './desktopLyricsEn.ts';
 import { lyricsEn } from './lyricsEn.ts';
+import { libraryMirrorEn } from './libraryMirrorEn.ts';
 
 /**
- * 主英文语言包，兼作语言键真值来源。`MessageKey` 与 `Messages` 基于此对象推导。
- * 键名扁平且按功能域加前缀，与 profile 外部语言包结构保持一致。
- * `{name}` 为插值占位符，运行时按参数替换。数字、时长与日期由 `Intl` 格式化，不进语言包
+ * 主英文语言包，兼作语言键真值来源，`MessageKey` 与 `Messages` 基于此对象推导
+ * 键名扁平且按功能域加前缀，与 profile 外部语言包结构保持一致
+ * `{name}` 为插值占位符，运行时按参数替换；数字、时长与日期由 `Intl` 格式化，不进语言包
  */
 export const en = {
   ...onlineEn,
   ...lyricsEn,
+  ...libraryMirrorEn,
   ...miniPlayerEn,
   ...desktopLyricsEn,
   ...updateEn,
@@ -45,6 +50,7 @@ export const en = {
   ...videoEn,
   ...biographyEn,
   ...searchEn,
+  ...favoritesEn,
   ...artistAlbumsEn,
   ...detailEn,
   ...contextMenuEn,
@@ -56,6 +62,8 @@ export const en = {
   ...playlistEn,
   ...songsEn,
   ...queryEn,
+  ...querySyntaxEn,
+  ...autoplaylistEn,
   ...queueEn,
   'host.unavailable': 'Not connected to foobar2000',
   'host.readFailed': 'Could not read the component version',
@@ -97,6 +105,7 @@ export const en = {
   'album.formWall': 'Cover wall',
   'album.formList': 'List',
   'album.filter': 'Search albums',
+  'album.queryInvalidDetail': 'Invalid query. Still showing the previous results.',
   'album.dimension': 'Group by',
   'album.dimAlbum': 'None',
   'album.dimAlbumArtist': 'Album artist',
@@ -177,6 +186,8 @@ export const en = {
   'nav.forwardTo': 'Forward to {name}',
   'nav.lyrics': 'Lyrics',
   'nav.queue': 'Play queue',
+  'nav.info': 'Track info',
+  'nav.bio': 'Artist bio',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
   'sidebar.hide': 'Hide sidebar',

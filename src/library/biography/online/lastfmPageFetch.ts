@@ -1,7 +1,12 @@
 import { fb } from 'foo-webview-sdk/bridge';
 import { settleDetailed, type HostCallFailure } from '../../../host/hostCall.ts';
-import { biographyHeader } from '../biographyCacheFormat.ts';
-import { lastfmArtistFromUrl } from '../biographyModel.ts';
+import { classifyHostHttpFailure } from '../../../host/hostHttpFailure.ts';
+import { biographyHeader, biographyRetryAt } from '../biographyCacheFormat.ts';
+import {
+  lastfmArtistFromUrl,
+  type BiographyFetchResult,
+  type BiographyProblem,
+} from '../biographyModel.ts';
 
 /**
  * Last.fm 会把别名写法的艺人名 301 到规范名（简体→繁体、全半角等），而 SDK 的
@@ -82,4 +87,48 @@ export async function requestLastfmPage(
     }
     currentUrl = next;
   }
+}
+
+export type LastfmPageFailure = Extract<BiographyFetchResult, { ok: false }>;
+
+/** 页面能用：状态是 200 或 404（404 是 Last.fm 没有这位艺人，由调用方按各自的形状处理） */
+export interface LastfmPageUsable {
+  readonly ok: true;
+  readonly answer: LastfmPageAnswer;
+  readonly finalArtist: string | null;
+  /** 正文读不出来时交回的失败，与上面的状态归类共用同一份响应头与时刻 */
+  readonly invalid: LastfmPageFailure;
+}
+
+/**
+ * 按响应判页面能不能用，不能用的归类并定下一次重试的时刻。取简介与取详情都经它：Last.fm 限流、封禁与
+ * 异常状态要退多久只在这里定，两处不会各退各的
+ */
+export function judgeLastfmPage(
+  page: LastfmPageResult,
+  now: number,
+): LastfmPageUsable | LastfmPageFailure {
+  const headers = (page.ok ? page.answer.headers : undefined) ?? {};
+  const failure = (
+    problem: BiographyProblem,
+    delay: number,
+    detail: string | null = null,
+  ): LastfmPageFailure => ({
+    ok: false,
+    problem,
+    retryAt: biographyRetryAt(headers, now, delay),
+    detail,
+  });
+  if (!page.ok)
+    return failure(classifyHostHttpFailure(page.failure) ?? 'network', 30_000, page.failure.text);
+  const { answer } = page;
+  if (answer.status === 429) return failure('rateLimited', 60_000);
+  if (answer.status === 403) return failure('blocked', 15 * 60_000);
+  if (answer.status !== 200 && answer.status !== 404) return failure('network', 30_000);
+  return {
+    ok: true,
+    answer,
+    finalArtist: page.finalArtist,
+    invalid: failure('invalid', 5 * 60_000),
+  };
 }

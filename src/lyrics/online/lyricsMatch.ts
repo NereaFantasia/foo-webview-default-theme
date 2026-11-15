@@ -3,9 +3,9 @@
 // 提交 53a2f81 的 Searchers/Helpers/CompareHelper.cs 及其 MatchHelpers/NameMatch.cs、ArtistMatch.cs、DurationMatch.cs
 // 改动：改写为 TypeScript；繁转简改用 OpenCC 的单字表（原版先过一遍 Microsoft 的繁简转换库）；
 // 两处原版永远不中的判断按本意改正：「群星、Various」那条改成与小写后的艺人名比较（原版拿 "Various" 比小写后的名字）；
-// 「曲名 - 注记」对「曲名 (注记)」只给改写了破折号的一边补右括号（原版两边都补，括号写法那边多出一个）
+// 匹配「曲名 - 注记」与「曲名 (注记)」时，破折号转括号仅在改写侧补齐闭合右括号以保持结构平衡
 import type { LyricsCandidate, LyricsQuery } from './lyricsSource.ts';
-import { TS_CHARACTER_PAIRS } from './tsCharacters.ts';
+import { simplifyChars } from './simplifiedChars.ts';
 
 /** 单项（曲名、艺人、时长）的档，分别记 7、6、5、4、2、0 分 */
 export type PartLevel = 'perfect' | 'veryHigh' | 'high' | 'medium' | 'low' | 'none';
@@ -52,20 +52,9 @@ export interface MatchResult {
   readonly points: number;
 }
 
-let simplifiedTable: Map<string, string> | null = null;
-
 /** 繁转简，只用来比较，不用来显示。原版在单字表之外还把这四个字换成常用写法 */
 function toSimplified(text: string): string {
-  if (!simplifiedTable) {
-    const chars = [...TS_CHARACTER_PAIRS];
-    simplifiedTable = new Map();
-    for (let index = 0; index + 1 < chars.length; index += 2) {
-      simplifiedTable.set(chars[index] ?? '', chars[index + 1] ?? '');
-    }
-  }
-  let result = '';
-  for (const char of text) result += simplifiedTable.get(char) ?? char;
-  return result
+  return simplifyChars(text)
     .replaceAll('藉', '借')
     .replaceAll('咀', '嘴')
     .replaceAll('昇', '升')

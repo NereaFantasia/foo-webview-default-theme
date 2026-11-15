@@ -4,7 +4,6 @@ import {
   Delete20Regular,
   Dismiss20Regular,
   Filter20Regular,
-  Play20Regular,
 } from '@fluentui/react-icons';
 import type { MenuCommand } from 'foo-webview-sdk';
 import { fb } from 'foo-webview-sdk/bridge';
@@ -21,7 +20,7 @@ import { divider, hostRatingEntry, type TrackMenuItem } from '../track/trackMenu
 import { useTrackMenuRating } from '../track/useTrackMenuRating.ts';
 import type { PlaylistMenuTracks } from './playlistMenuTracks.ts';
 import { usePlaylistMenuTracks } from './usePlaylistMenuTracks.ts';
-import { conditionChoices, type ConditionField } from './filter/playlistMatch.ts';
+import { conditionChoices, type RowConditionField } from './filter/rowConditions.ts';
 import { playlistsAtom } from '../playback/playlists.ts';
 import { SEND_TO_INLINE_LIMIT } from './playlistTrackActions.ts';
 import type { PlaylistView } from './playlistView.ts';
@@ -51,7 +50,7 @@ export interface PlaylistTrackMenuProps {
   readonly isCurrent?: () => boolean;
 }
 
-const FILTER_LABELS: Record<ConditionField, MessageKey> = {
+const FILTER_LABELS: Record<RowConditionField, MessageKey> = {
   artist: 'playlistPage.filterArtist',
   album: 'playlistPage.filterAlbum',
   genre: 'playlistPage.filterGenre',
@@ -144,16 +143,6 @@ export function PlaylistTrackMenu({
   };
   const items: TrackMenuItem[] = [
     inline ? 'play' : { action: 'play', disabled: true, reason: t('context.selectionLimited') },
-    {
-      kind: 'command',
-      id: 'play-from-here',
-      label: t('context.playFromHere'),
-      icon: <Play20Regular />,
-      disabled: !target,
-      onSelect: () => {
-        if (target) void playlistActions.play(guid, target.row);
-      },
-    },
     'play-next',
     'enqueue',
     divider('send-divider'),
@@ -183,15 +172,17 @@ export function PlaylistTrackMenu({
       icon: <Filter20Regular />,
       disabled: !anchor,
       detail: count > 1 ? t('trackMenu.clickedTrack') : undefined,
-      items: (anchor ? conditionChoices(anchor) : []).map(({ condition, usable }, index) => ({
-        kind: 'command',
-        id: `filter:${index}`,
-        data: { 'data-filter': condition.field },
-        label: t(FILTER_LABELS[condition.field]),
-        detail: condition.value,
-        disabled: !usable,
-        onSelect: () => page.filter.addCondition(guid, condition),
-      })),
+      items: (anchor ? conditionChoices(anchor) : []).map(
+        ({ field, condition, usable }, index) => ({
+          kind: 'command',
+          id: `filter:${index}`,
+          data: { 'data-filter': field },
+          label: t(FILTER_LABELS[field]),
+          detail: condition.value,
+          disabled: !usable,
+          onSelect: () => page.filter.addCondition(guid, condition),
+        }),
+      ),
     },
     {
       kind: 'command',
@@ -255,6 +246,13 @@ export function PlaylistTrackMenu({
           play: () => {
             const attempt = ++playAttempt.current;
             setPlayFailed(false);
+            // 单选：与双击同一条，沿这张列表从这一行往下播，来源记这张列表
+            if (count === 1 && target) {
+              void playlistActions.play(guid, target.row).then((ok) => {
+                if (attempt === playAttempt.current) setPlayFailed(!ok);
+              });
+              return;
+            }
             void playPlaylistSelection(fb, guid, ranges, valid, (paths) =>
               trackActions.playPaths(paths, 0, LIBRARY_SOURCE),
             ).then((ok) => {

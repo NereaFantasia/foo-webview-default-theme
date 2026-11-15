@@ -82,6 +82,32 @@ describe('本地后端', () => {
       ).status,
     ).toBe(413);
   });
+  it('媒体库镜像接口要过来源与令牌验证，镜像没建好时拒绝读取，请求体超过 8 MiB 拒收', async () => {
+    const env = await start();
+    expect((await fetch(env.url + '/library/status', { method: 'POST' })).status).toBe(403);
+    const status = await fetch(env.url + '/library/status', {
+      method: 'POST',
+      headers: env.headers,
+    });
+    expect(status.status).toBe(200);
+    expect(await status.json()).toMatchObject({ ready: false, count: 0 });
+    const page = await fetch(env.url + '/library/page', {
+      method: 'POST',
+      headers: env.headers,
+      body: JSON.stringify({ sort: 'title', descending: false, after: null, limit: 10 }),
+    });
+    expect(page.status).toBe(400);
+    expect(await page.json()).toEqual({ error: '镜像还没有建好' });
+    expect(
+      (
+        await fetch(env.url + '/library/apply', {
+          method: 'POST',
+          headers: env.headers,
+          body: 'x'.repeat(8 * 1024 * 1024 + 1),
+        })
+      ).status,
+    ).toBe(413);
+  });
   it('关闭请求完整送回应答后结束监听', async () => {
     const env = await start();
     const response = await fetch(env.url + '/shutdown', { method: 'POST', headers: env.headers });

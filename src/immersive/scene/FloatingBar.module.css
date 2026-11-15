@@ -1,0 +1,65 @@
+/* 悬浮在列底、水平居中的工具条：几块各有自己的毛玻璃底（着色 `--float-tint`、模糊 `--float-blur`，降级与减弱透明度时
+   换近实底 `--float-solid`），缝一条 `--spacingHorizontalXXS` 拼在一起。外侧的角是半圆（半个条高），相接的一侧用小圆角，与列表里「两头大、中段小」
+   是同一条规则。条本身不接指针：两块之外的行照常点得到 */
+.bar {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: var(--spacingVerticalL);
+  z-index: 1;
+  display: flex;
+  width: max-content;
+  margin-inline: auto;
+  gap: var(--spacingHorizontalXXS);
+  pointer-events: none;
+}
+
+.piece {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  height: var(--bar-height);
+  padding-inline: var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusXLarge);
+  background: var(--float-tint);
+  box-shadow: var(--column-shadow);
+  backdrop-filter: var(--float-blur);
+  pointer-events: auto;
+}
+
+/* 每块各画各的投影，`clip-path` 管它画到哪：只许往外侧和右边的缝里画，不许往左边的缝里画。后一块的投影压在前一块
+   上，相接处会发暗、像内阴影；只画整条的外轮廓，缝里又没有投影，比周围亮一截。缝里的投影只取左邻那一块的一层，
+   裁剪边落在块的边上、被邻块盖住；落在缝中线上的话，非整数缩放下两边的抗锯齿对不上，缝里会留一道细线。外侧放开
+   60，容得下 `0 8px 24px` 的投影 */
+.piece[data-pos='first'] {
+  border-start-start-radius: calc(var(--bar-height) / 2);
+  border-end-start-radius: calc(var(--bar-height) / 2);
+  clip-path: inset(-60px calc(var(--spacingHorizontalXXS) * -1) -60px -60px);
+}
+
+.piece[data-pos='middle'] {
+  clip-path: inset(-60px calc(var(--spacingHorizontalXXS) * -1) -60px 0);
+}
+
+.piece[data-pos='last'] {
+  border-start-end-radius: calc(var(--bar-height) / 2);
+  border-end-end-radius: calc(var(--bar-height) / 2);
+  clip-path: inset(-60px -60px -60px 0);
+}
+
+/* 单独一块：两头都是半圆，没有相接的缝，阴影四面都许画 */
+.piece[data-pos='only'] {
+  border-radius: calc(var(--bar-height) / 2);
+}
+
+[data-degraded] .piece {
+  background: var(--float-solid);
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .piece {
+    background: var(--float-solid);
+    backdrop-filter: none;
+  }
+}

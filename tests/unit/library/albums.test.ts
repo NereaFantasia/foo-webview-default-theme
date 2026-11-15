@@ -166,3 +166,43 @@ describe('库变更', () => {
     expect(host.listenerCount('library:itemsAdded')).toBe(0);
   });
 });
+
+describe('读镜像', () => {
+  function withMirror(albums: AlbumInfo[] | null) {
+    const host = installFakeHost();
+    host.answer('library.getAlbums', albumsAnswer([albumRow('宿主', 'X')]));
+    const store = createStore();
+    const mirror = { albums: vi.fn(() => Promise.resolve(albums)) };
+    const service = startAlbums(store, host.fb, mirror);
+    return { host, mirror, service, state: () => store.get(albumsAtom) };
+  }
+
+  it('镜像读得到就用镜像的清单，不向宿主要整份；库有没有开仍问宿主', async () => {
+    const { host, mirror, service, state } = withMirror([
+      albumRow('镜像', 'X'),
+      albumRow('B', 'Y'),
+    ]);
+    await service.ready;
+    expect(state()).toMatchObject({ status: 'ready', enabled: true, total: 2, truncated: false });
+    expect(state().albums.map((album) => album.name)).toEqual(['镜像', 'B']);
+    expect(mirror.albums).toHaveBeenCalledTimes(1);
+    expect(host.callsTo('library.isEnabled')).toHaveLength(1);
+    expect(host.callsTo('library.getAlbums')).toEqual([]);
+  });
+
+  it('镜像读不到（没建好、落后、后端没连）就退回宿主', async () => {
+    const { host, service, state } = withMirror(null);
+    await service.ready;
+    expect(state().albums.map((album) => album.name)).toEqual(['宿主']);
+    expect(host.callsTo('library.getAlbums')).toHaveLength(1);
+  });
+
+  it('库没开时不问镜像', async () => {
+    const host = installFakeHost();
+    host.answer('library.isEnabled', { success: true, enabled: false });
+    const mirror = { albums: vi.fn(() => Promise.resolve([albumRow('镜像', 'X')])) };
+    const service = startAlbums(createStore(), host.fb, mirror);
+    await service.ready;
+    expect(mirror.albums).not.toHaveBeenCalled();
+  });
+});

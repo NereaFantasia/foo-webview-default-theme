@@ -7,23 +7,27 @@ import {
   MenuItemRadio,
   MenuList,
   MenuTrigger,
+  ToggleButton,
   Tooltip,
   makeStyles,
   mergeClasses,
 } from '@fluentui/react-components';
-import { ArrowSortDownLines20Regular, Filter16Regular } from '@fluentui/react-icons';
+import {
+  ArrowSortDownLines20Regular,
+  Broom20Regular,
+  Filter16Regular,
+} from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../../i18n/locale.ts';
 import {
   ScrollMenu as Menu,
   ScrollMenuPopover as MenuPopover,
 } from '../../../kit/ScrollMenuPopover.tsx';
-import { SegmentedTabs } from '../../../kit/SegmentedTabs.tsx';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import { useArtists } from '../artistsContext.ts';
 import styles from './ArtistListTools.module.css';
 
-const useStyles = makeStyles({ input: { minWidth: 0, flex: 1 } });
+const useStyles = makeStyles({ input: { width: '240px', maxWidth: '100%' } });
 
 export interface ArtistListToolsProps {
   readonly text: string;
@@ -117,15 +121,17 @@ export function ArtistListTools({ text, tidy, onText, onTidy }: ArtistListToolsP
           </MenuPopover>
         </Menu>
       </div>
-      <SegmentedTabs
-        label={t('artists.title')}
-        value={tidy ? 'tidy' : 'all'}
-        options={[
-          { value: 'all', label: t('artists.all', { count: catalog.rows.length }) },
-          { value: 'tidy', label: t('artists.tidy', { count: catalog.issues.size }) },
-        ]}
-        onChange={(value) => onTidy(value === 'tidy')}
-      />
+      {(tidy || catalog.issues.size > 0) && (
+        <ToggleButton
+          className={mergeClasses(styles.end, controls.icon)}
+          appearance="subtle"
+          icon={<Broom20Regular />}
+          checked={tidy}
+          onClick={() => onTidy(!tidy)}
+        >
+          {t('artists.tidy', { count: catalog.issues.size })}
+        </ToggleButton>
+      )}
     </div>
   );
 }

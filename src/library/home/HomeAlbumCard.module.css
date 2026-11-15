@@ -1,4 +1,4 @@
-/* 方形图块卡片：边长与文字行高由封面网格通过 CSS 变量传入（内部样式见 cover-tile） */
+/* 方形图块卡片：边长与文字行高由封面网格通过 CSS 变量传入（封面块见 HomeAlbumTile，内部样式见 cover-tile） */
 .root {
   min-width: 0;
   display: flex;
@@ -6,34 +6,6 @@
   gap: var(--spacingVerticalXXS);
 }
 
-.cover {
-  position: relative;
-  width: var(--tile-size);
-}
-
-.open {
-  display: block;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  border-radius: var(--borderRadiusMedium);
-  cursor: pointer;
-  outline: none;
-}
-
-.open:focus-visible {
-  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
-  outline-offset: -2px;
-}
-
 .labels {
   cursor: pointer;
-}
-
-/* 无指针悬停支持的触控设备上常驻显示操作按钮 */
-@media (hover: none) {
-  .cover [data-home-keys][data-hidden] {
-    display: block;
-    opacity: 1;
-  }
 }

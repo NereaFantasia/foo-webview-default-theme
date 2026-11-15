@@ -6,8 +6,8 @@ import type { Translate } from '../../i18n/translate.ts';
 import type { TableGroupState } from '../../table/TrackTable.tsx';
 import type { TableGroupItem } from '../../table/tableItems.ts';
 import { trackAbilities } from '../../host/trackOrigin.ts';
-import { ObjectLink } from '../../nav/ObjectLink.tsx';
-import { TrackAlbum } from '../../track/TrackCredits.tsx';
+import { LinkedArtists, TrackAlbum } from '../../track/TrackCredits.tsx';
+import { trackAlbumArtistLinks } from '../../track/trackLinks.ts';
 import type { GroupCover, PlaylistCoversService } from './playlistCovers.ts';
 import styles from './PlaylistGroupHead.module.css';
 import type { PlaylistGroupHead as HeadData } from '../playlistView.ts';
@@ -77,10 +77,12 @@ export function PlaylistGroupHead(props: PlaylistGroupHeadProps) {
   if (data.pending) return <div className={styles.head} data-group-pending />;
   const album = props.albumMode && data.level === 1;
   const label = (album ? data.row?.album || data.key : data.key) || t('playlistPage.unknownGroup');
-  const artist = album ? (data.row?.albumArtist ?? '') : '';
   const year = album ? yearOf(data.row?.date) : '';
   // 在线曲目的专辑艺术家只是占位标签，媒体库里没有对应的艺人页
   const linkable = !!data.row && trackAbilities(data.row.path).libraryActions;
+  const artists = (album && data.row ? trackAlbumArtistLinks(data.row) : []).map((credit) =>
+    linkable ? credit : { ...credit, ref: null },
+  );
   const count = t(plural(data.count, 'album.menuTracksOne', 'album.menuTracks'), {
     count: data.count,
   });
@@ -108,12 +110,8 @@ export function PlaylistGroupHead(props: PlaylistGroupHeadProps) {
         <span className={styles.label}>
           {album && data.row?.album ? <TrackAlbum track={data.row} tabIndex={-1} /> : label}
         </span>
-        {artist && (
-          <span className={styles.artist}>
-            <ObjectLink to={linkable ? { kind: 'artist', name: artist } : null} tabIndex={-1}>
-              {artist}
-            </ObjectLink>
-          </span>
+        {artists.length > 0 && (
+          <LinkedArtists artists={artists} className={styles.artist} tabIndex={-1} />
         )}
         <span className={styles.rule} aria-hidden />
         <span className={styles.count}>{count}</span>

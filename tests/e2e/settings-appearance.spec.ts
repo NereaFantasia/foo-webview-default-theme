@@ -9,9 +9,9 @@ import {
 } from '../fixtures/settingsPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
-// 「外观」一组：深浅模式手选、强调色、窗口材质与播放栏位置。只断言状态与下发的参数，观感实机看。
+// 「外观」一组：深浅模式手选、强调色、窗口材质与播放栏位置。只断言状态与下发的参数，观感实机看
 
-/** 宿主正放着一首：没有当前曲目时底部通栏不出。 */
+/** 宿主正放着一首：没有当前曲目时底部通栏不出 */
 const PLAYING = {
   getState: { success: true, state: 'playing', canSeek: true, canPause: true },
   getCurrentTrack: { success: true, found: true, track: makeTrack() },
@@ -24,7 +24,7 @@ const stored = (page: Page, key: string) =>
 
 test('动效选择保存并跟随系统', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await expect(settings.card('动效')).toContainText('当前：完整动效');
   await settings.choose('动效', '减弱');
   await expect.poll(() => stored(page, 'default-theme.motion.v1')).toBe('reduce');
@@ -40,7 +40,7 @@ test('动效选择保存并跟随系统', async ({ page }) => {
 });
 
 test('界面缩放保存并跨页面重载恢复默认值，失败时显示实际档位', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await expect(settings.select('界面缩放')).toHaveText('跟随 foobar2000 首选项');
   await settings.choose('界面缩放', '150%');
   await expect.poll(() => stored(page, 'default-theme.zoom.v1')).toBe('150');
@@ -58,7 +58,7 @@ test('界面缩放保存并跨页面重载恢复默认值，失败时显示实�
   expect(settings.errors).toEqual([]);
 });
 
-/** 最近一次下发的材质与深浅；线上的参数把它们包在 `backdropPolicy` 里。 */
+/** 最近一次下发的材质与深浅；线上的参数把它们包在 `backdropPolicy` 里 */
 function lastPolicy(settings: SettingsPage): Readonly<Record<string, unknown>> {
   const policy = settings.host.callsTo('window.setBackdropPolicy').at(-1)?.['backdropPolicy'];
   return isRecord(policy) ? policy : {};
@@ -67,10 +67,10 @@ function lastPolicy(settings: SettingsPage): Readonly<Record<string, unknown>> {
 test.describe('系统是浅色', () => {
   test.use({ colorScheme: 'light' });
 
-  test('深浅模式：跟随系统时写出此刻是哪一档；手选后立即生效、下发给宿主，刷新后还在', async ({
+  test('深浅模式：跟随系统时写出此刻是哪一档；手选后立即生效、下发给宿主，刷新后还在 @smoke', async ({
     page,
   }) => {
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     await expect(
       settings.radios('颜色模式').getByRole('radio', { name: '跟随系统', exact: true }),
     ).toBeChecked();
@@ -83,7 +83,7 @@ test.describe('系统是浅色', () => {
     await expect.poll(() => lastPolicy(settings)['darkMode']).toBe(true);
 
     // 系统的深浅变了，手选的这一档不跟着变。matchMedia 的 change 在渲染更新那一步才派发：每换一次等两帧，
-    // 不然两次换在同一帧里互相抵掉、一个事件也没有，断言跟不跟都能过。
+    // 不然两次换在同一帧里互相抵掉、一个事件也没有，断言跟不跟都能过
     await page.emulateMedia({ colorScheme: 'dark' });
     await waitFrames(page);
     await page.emulateMedia({ colorScheme: 'light' });
@@ -107,7 +107,7 @@ test.describe('系统是浅色', () => {
 test('窗口材质：换档即下发；跟随首选项时写出宿主报的实际效果，报来的状态不触发下发', async ({
   page,
 }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await expectBackground(page, '跟随 foobar2000 首选项');
   await expect(settings.card('窗口背景')).not.toContainText('当前：');
 
@@ -138,7 +138,7 @@ test('播放栏位置：换到标题栏，底部通栏即时收掉并记住，�
   page,
 }) => {
   const key = 'default-theme.player-bar.v1';
-  const settings = await openSettings(page, { answers: { playback: PLAYING } });
+  const settings = await openSettings(page, { answers: { playback: PLAYING } }, '外观');
   const bar = page.locator('[data-player-bar]');
   await expect(
     settings.radios('播放栏位置').getByRole('radio', { name: '窗口底部', exact: true }),
@@ -166,7 +166,7 @@ test('强调色：进页面时收起，卡头写来源；Windows 强调色读不
   page,
 }) => {
   const failure = 'Windows 强调色读取失败，使用上次颜色或默认青绿';
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const accent = settings.expander('强调色');
   const head = accent.locator(':scope > :first-child');
   await expect(accent.locator('[data-settings-toggle]')).toHaveAttribute('aria-expanded', 'false');
@@ -182,5 +182,35 @@ test('强调色：进页面时收起，卡头写来源；Windows 强调色读不
   await accent.locator('[data-settings-toggle]').click();
   await expect(settings.row('基础强调色')).toHaveCount(0);
   await expect(head).toContainText(failure);
+  expect(settings.errors).toEqual([]);
+});
+
+test('窗口背景：来源选流动色场才有流动速度，拖动即存、刷新后还在，恢复当前模式默认值不动它', async ({
+  page,
+}) => {
+  const settings = await openSettings(page, {}, '外观');
+  await settings.expand('窗口背景');
+  const speed = page.getByRole('slider', { name: '流动速度', exact: true });
+  await expect(speed).toHaveCount(0);
+
+  await settings.choose('窗口背景', '流动色场');
+  await expect(speed).toHaveValue('100');
+  await speed.focus();
+  await speed.press('End');
+  await expect(speed).toHaveValue('200');
+  await expect.poll(() => stored(page, 'default-theme.background-flow.v1')).toBe('{"speed":200}');
+
+  await page.reload();
+  await enterSettings(page);
+  await settings.expand('窗口背景');
+  await expect(speed).toHaveValue('200');
+  await speed.focus();
+  await speed.press('Home');
+  await expect(speed).toHaveValue('25');
+  await page.getByRole('button', { name: '恢复当前模式默认值', exact: true }).click();
+  await expect(speed).toHaveValue('25');
+
+  await settings.choose('窗口背景', '正在播放的封面');
+  await expect(speed).toHaveCount(0);
   expect(settings.errors).toEqual([]);
 });

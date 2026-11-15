@@ -44,6 +44,20 @@ export interface JsonFileCache<T> {
   dispose(): void;
 }
 
+/** 两份缓存合成一份给界面看：条数、字节相加，都读完才算读完，任一份在清理或出错就算在清理或出错 */
+export function combineJsonFileCacheStates(
+  first: JsonFileCacheState,
+  second: JsonFileCacheState,
+): JsonFileCacheState {
+  return {
+    count: first.count + second.count,
+    bytes: first.bytes + second.bytes,
+    loaded: first.loaded && second.loaded,
+    clearing: first.clearing || second.clearing,
+    failed: first.failed || second.failed,
+  };
+}
+
 const EMPTY_TEXT = JSON.stringify({ version: 1, entries: [] });
 
 /**

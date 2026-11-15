@@ -1,7 +1,10 @@
+import { fb } from 'foo-webview-sdk/bridge';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { atom } from 'jotai/vanilla';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { immersiveCoverAtom, immersiveCoverKey } from '../../covers/immersiveCover.ts';
 import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
+import { playbackAtom } from '../../playback/playback.ts';
 import { useLease } from '../lease/useLease.ts';
 import styles from './Backdrop.module.css';
 import {
@@ -9,16 +12,22 @@ import {
   createBackdrop,
   type Backdrop as BackdropController,
 } from './backdropAdapter.ts';
+import { createLowFreqDrive } from './backdropAudio.ts';
 import { resolveBackdrop } from './backdropChoice.ts';
+import { resolveBackdropOptions } from './backdropOptions.ts';
+import { heldCover } from './coverHold.ts';
 import { BACKDROP_RENDERERS } from './backdropRegistry.ts';
 import {
   backdropChoiceAtom,
+  backdropOptionsAtom,
   backdropDegradedAtom,
   backdropUnavailableAtom,
   clearBackdropDegraded,
   markBackdropDegraded,
   markBackdropUnavailable,
 } from './backdropState.ts';
+
+const playingAtom = atom((get) => get(playbackAtom).state === 'playing');
 
 export interface BackdropProps {
   /** 完整窗口可见性状态（隐藏时释放渲染器与 canvas 资源） */
@@ -42,11 +51,21 @@ export function Backdrop({ visible, fpsCap, hasLyric }: BackdropProps) {
   const degraded = useAtomValueRawSync(backdropDegradedAtom);
   const reducedMotion = useAtomValueRawSync(reducedMotionAtom);
   useLease(immersiveCoverKey);
-  const cover = backdropCover(useAtomValueRawSync(immersiveCoverAtom));
+  const coverState = useAtomValueRawSync(immersiveCoverAtom);
+  // 换曲的空当（新地址还没到）里沿用上一张，不把背景先淡出到中性色再淡入
+  const lastCover = useRef<string | null>(null);
+  const cover = heldCover(coverState, lastCover.current, backdropCover(coverState));
+  useLayoutEffect(() => {
+    lastCover.current = cover;
+  }, [cover]);
   const renderer = resolveBackdrop(
     choice,
     (id) => BACKDROP_RENDERERS[id].supported() && !unavailable.has(id),
   );
+  const playing = useAtomValueRawSync(playingAtom);
+  const stored = useAtomValueRawSync(backdropOptionsAtom);
+  // 按实际在跑的渲染器取：因不支持而回退时，用户的选项照存，生效的是回退后那一个的项
+  const options = useMemo(() => resolveBackdropOptions(renderer, stored), [renderer, stored]);
   const host = useRef<HTMLDivElement>(null);
   const controller = useRef<BackdropController | null>(null);
 
@@ -58,6 +77,7 @@ export function Backdrop({ visible, fpsCap, hasLyric }: BackdropProps) {
       onUnavailable: (id) => markBackdropUnavailable(store, id),
       onDegrade: () => markBackdropDegraded(store),
       onRecover: () => clearBackdropDegraded(store),
+      openLowFreq: (lowFreq) => createLowFreqDrive({ host: fb.audio, ...lowFreq }),
     });
     controller.current = backdrop;
     return () => {
@@ -80,8 +100,10 @@ export function Backdrop({ visible, fpsCap, hasLyric }: BackdropProps) {
       degraded,
       visible,
       fpsCap,
+      options,
+      playing,
     });
-  }, [renderer, cover, hasLyric, reducedMotion, degraded, visible, fpsCap]);
+  }, [renderer, cover, hasLyric, reducedMotion, degraded, visible, fpsCap, options, playing]);
 
   return (
     <div ref={host} className={styles.backdrop} data-backdrop={renderer ?? 'off'} aria-hidden />

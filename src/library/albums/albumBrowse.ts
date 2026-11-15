@@ -31,6 +31,8 @@ import {
   type FacetSelection,
 } from './facets.ts';
 import { libraryRootsAtom, startLibraryRoots, type LibraryRootsFace } from './libraryRoots.ts';
+import { EMPTY_QUERY_INPUT, queryInputText, type QueryInput } from '../../track/queryInput.ts';
+import type { LibraryMirrorSource } from '../mirror/mirrorSource.ts';
 
 // 专辑页的浏览状态：清单 → 筛选 → 过滤 → 排序 → 分节。换分节、换排序都不打宿主；打宿主的是清单
 // 本身、过滤词的曲目级命中、库根、艺术家档的署名表与折叠状态，各归各的服务
@@ -44,7 +46,10 @@ import { libraryRootsAtom, startLibraryRoots, type LibraryRootsFace } from './li
 export type BrowsePhase = 'disabled' | 'loading' | 'empty' | 'noMatch' | 'ready';
 
 export interface AlbumBrowseState {
-  readonly term: string;
+  /** 搜索框的输入：模式与两份草稿；只有当前模式的那份参与过滤 */
+  readonly input: QueryInput;
+  /** 高级查询宿主认不出；过滤仍按上一份命中 */
+  readonly invalid: boolean;
   readonly facets: FacetSelection;
   /** 当前分节依据下折叠了的节，按节键；null 是「未知」节 */
   readonly collapsed: ReadonlySet<string | null>;
@@ -58,7 +63,7 @@ export interface AlbumBrowseState {
   readonly phase: BrowsePhase;
 }
 
-const termAtom = atom('');
+const inputAtom = atom<QueryInput>(EMPTY_QUERY_INPUT);
 const facetSelectionAtom = atom<FacetSelection>(EMPTY_FACET_SELECTION);
 
 export const facetOptionsAtom: Atom<FacetOptions> = atom((get) =>
@@ -68,7 +73,15 @@ export const facetOptionsAtom: Atom<FacetOptions> = atom((get) =>
 const filteredAtom = atom((get) => {
   const selection = get(facetSelectionAtom);
   const faceted = applyFacets(get(albumsAtom).albums, selection);
-  const filtered = filterAlbums(faceted, get(termAtom), get(albumSearchHitsAtom).hits);
+  const input = get(inputAtom);
+  const { hits } = get(albumSearchHitsAtom);
+  // 高级查询只看曲目命中：含命中曲目的整张专辑留下；还没有命中（词空、在路上头一份、失败）时不筛
+  const filtered =
+    input.mode === 'advanced'
+      ? hits === null || input.advancedText.trim() === ''
+        ? faceted
+        : faceted.filter((album) => hits.has(albumKeyOf(album)))
+      : filterAlbums(faceted, input.text, hits);
   const { sort, seed, custom } = get(wallSortAtom);
   if (!custom) return sortAlbums(filtered, get(browserPrefsAtom).sort);
   const { byAlbum } = get(libraryTracksAtom);
@@ -120,7 +133,8 @@ const phaseAtom = atom((get): BrowsePhase => {
   if (albums.status === 'loading' && count === 0) return 'loading';
   if (get(sectioningAtom) === 'waiting' && count > 0) return 'loading';
   if (albums.status === 'ready' && count === 0) return 'empty';
-  const filtering = get(termAtom).trim() !== '' || hasFacetSelection(get(facetSelectionAtom));
+  const filtering =
+    queryInputText(get(inputAtom)).trim() !== '' || hasFacetSelection(get(facetSelectionAtom));
   const pending = get(albumSearchHitsAtom).pending;
   if (count > 0 && get(filteredAtom).length === 0 && filtering && !pending) return 'noMatch';
   return 'ready';
@@ -129,7 +143,8 @@ const phaseAtom = atom((get): BrowsePhase => {
 export const albumBrowseAtom: Atom<AlbumBrowseState> = atom((get) => {
   const dimension = get(browserPrefsAtom).dimension;
   return {
-    term: get(termAtom),
+    input: get(inputAtom),
+    invalid: get(albumSearchHitsAtom).invalid,
     facets: get(facetSelectionAtom),
     collapsed: get(collapsedSectionsAtom),
     sections: get(sectionsAtom),
@@ -158,7 +173,8 @@ export interface AlbumBrowseService {
   readonly persistence: ConfigPersistence;
   /** 连上宿主、清单、库根与折叠状态的初读做完时兑现，不会拒绝 */
   readonly ready: Promise<void>;
-  setTerm(term: string): void;
+  /** 搜索框的输入变了：普通词按专辑字段加曲目命中过滤，高级查询交宿主求值、命中曲目的整张专辑留下 */
+  setInput(input: QueryInput): void;
   toggleFacet(field: FacetField, name: string): void;
   clearFacets(): void;
   /** 折叠或展开当前分节依据下的一节，并记进 config；平铺档没有节可折 */
@@ -178,10 +194,11 @@ export function startAlbumBrowse(
   store: Store,
   host: AlbumBrowseFace = fb,
   writer?: Pick<ConfigWriter, 'set'>,
+  mirror?: Pick<LibraryMirrorSource, 'albums'>,
 ): AlbumBrowseService {
-  store.set(termAtom, '');
+  store.set(inputAtom, EMPTY_QUERY_INPUT);
   store.set(facetSelectionAtom, EMPTY_FACET_SELECTION);
-  const albums = startAlbums(store, host);
+  const albums = startAlbums(store, host, mirror);
   const roots = startLibraryRoots(store, host);
   const credits = startArtistCredits(store, host);
   const hits = startAlbumSearchHits(store, host);
@@ -197,10 +214,18 @@ export function startAlbumBrowse(
   return {
     ready: Promise.all([albums.ready, roots.ready, collapsed.ready]).then(() => {}),
     persistence: collapsed.persistence,
-    setTerm(term) {
-      if (disposed || term === store.get(termAtom)) return;
-      store.set(termAtom, term);
-      hits.search(term);
+    setInput(input) {
+      const current = store.get(inputAtom);
+      if (
+        disposed ||
+        (input.mode === current.mode &&
+          input.text === current.text &&
+          input.advancedText === current.advancedText)
+      )
+        return;
+      store.set(inputAtom, input);
+      if (input.mode === 'advanced') hits.query(input.advancedText);
+      else hits.search(input.text);
     },
     toggleFacet(field, name) {
       if (disposed) return;

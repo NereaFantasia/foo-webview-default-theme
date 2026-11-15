@@ -1,4 +1,4 @@
-import { COLUMN_IDS, type ColumnId } from '../table/columns/columns.ts';
+import type { ColumnId } from '../table/columns/columns.ts';
 
 /**
  * 排序用的 Title Formatting 串，以及按什么分组
@@ -62,7 +62,7 @@ export interface SortChoice {
   readonly pattern: string;
 }
 
-/** 排序子菜单与列头共用同一份字段表达式 */
+/** 列头排序用的字段表达式 */
 export const SORT_CHOICES: readonly SortChoice[] = [
   { id: 'albumArtist', pattern: SORT_ALBUM_ARTIST },
   { id: 'artist', pattern: SORT_ARTIST },
@@ -106,11 +106,6 @@ export const COLUMN_SORT: Readonly<Partial<Record<ColumnId, string>>> = {
   added: SORT_CHOICES.find((choice) => choice.id === 'added')?.pattern ?? '',
   lastPlayed: SORT_CHOICES.find((choice) => choice.id === 'lastPlayed')?.pattern ?? '',
 };
-
-/** 反查排序串对应的列；排序子菜单里那些不对应任何一列的串给 null */
-export function columnOfSortKey(pattern: string): ColumnId | null {
-  return COLUMN_IDS.find((id) => COLUMN_SORT[id] === pattern) ?? null;
-}
 
 export type GroupModeId =
   'albumSimple' | 'albumArtistAlbumDisc' | 'albumArtist' | 'artist' | 'genre' | 'directory';

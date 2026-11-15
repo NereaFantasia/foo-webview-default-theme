@@ -34,8 +34,6 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
   const anchor = target.anchor ?? single;
   const ready = { nodes: target.nodes, tracks: menu.tracks ?? undefined };
   const node = target.nodes.length === 1 ? target.nodes[0] : undefined;
-  const queueLimited = (menu.tracks?.length ?? 0) > 256;
-  const limitedReason = t('context.selectionLimited');
   const items: TrackMenuItem[] = [
     // 只有右键单个视频文件时出；执行与「播放」同一条路，起播成功后才进视频页
     ...(single && isVideoPath(single.path)
@@ -51,8 +49,8 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
         ]
       : []),
     'play',
-    queueLimited ? { action: 'play-next', disabled: true, reason: limitedReason } : 'play-next',
-    queueLimited ? { action: 'enqueue', disabled: true, reason: limitedReason } : 'enqueue',
+    'play-next',
+    'enqueue',
     divider('send-divider'),
     'send-to',
     ...(target.trackMenu
@@ -166,7 +164,7 @@ export function FoldersMenu({ target, point, onClose, isCurrent }: FoldersMenuPr
         menu.loading
           ? t('folders.loading')
           : single
-            ? [single.artist, single.album].filter(Boolean).join(' · ')
+            ? [single.artist, single.album].filter(Boolean).join(' - ')
             : anchor
               ? t('context.clickedTitle', { title: trackDisplayTitle(anchor) })
               : undefined

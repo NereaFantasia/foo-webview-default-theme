@@ -18,13 +18,15 @@ export const PLACES = {
   /** 跟着正在播放的画面：侧边栏的「视频」项与播放栏的视频键进同一个地点，从播放栏进的调用方自己指明 `drill` */
   video: { level: 1, subject: false },
   home: { level: 1, subject: false },
+  /** 本地收藏的在线曲目、专辑、艺人与歌单；页签是页内状态，不进历史 */
+  favorites: { level: 1, subject: false },
   /** 在线专辑、歌单（含榜单）或艺人的热门曲目；主体见 `onlineListSubject` */
   onlineList: { level: 2, subject: true },
   /** 在线艺人专辑页签里的一节（专辑、合集、参与的专辑）铺成的一张墙；主体见 `onlineAlbumsSubject` */
   onlineAlbums: { level: 2, subject: true },
   channel: { level: 2, subject: true },
   recent: { level: 1, subject: false },
-  /** 列表与详情同页，主体是艺术家名；空串表示未填写 */
+  /** 没有主体是艺人封面墙，有主体是那位艺人的详情页；主体是艺术家名，空串表示未填写 */
   artists: { level: 1, subject: true },
   albums: { level: 1, subject: false },
   /** 主体是专辑键：专辑名 + `\0` + 专辑艺术家（缺则艺术家），与宿主折叠专辑的键同构 */
@@ -54,7 +56,7 @@ export interface Place {
   readonly subject?: string;
 }
 
-/** 中央区里每种页面拿到的参数：当前的地点 */
+/** 中央区里每种页面收到的参数：当前的地点 */
 export interface PageProps {
   readonly place: Place;
 }
@@ -63,6 +65,7 @@ export interface PageProps {
 export const PLACE_LABELS: Readonly<Record<PlaceId, MessageKey>> = {
   video: 'place.video',
   home: 'place.home',
+  favorites: 'place.favorites',
   onlineList: 'place.onlineList',
   onlineAlbums: 'place.onlineAlbums',
   channel: 'place.channel',
@@ -80,8 +83,10 @@ export const PLACE_LABELS: Readonly<Record<PlaceId, MessageKey>> = {
   nowPlaying: 'place.nowPlaying',
 };
 
-/** 打开窗口时落在专辑。历史不落盘，每次打开都从这里记起 */
-export const START_PLACE: Place = { id: 'albums' };
+/**
+ * 未设置「启动时打开」时，窗口启动落在此地点。没有可后退的记录时也回到此处。历史不落盘，每次打开窗口都从启动落点重新记录
+ */
+export const START_PLACE: Place = { id: 'home' };
 
 /**
  * 地点给人看的名字：后退、前进键的悬停提示与占位页用它。带主体的写主体（专辑写专辑名、列表写列表名、
@@ -156,12 +161,13 @@ export function readOnlineListSubject(subject: string): OnlineListSubject | null
   }
 }
 
-/** 艺人专辑墙能铺开的节，与专辑页签里的前三节一一对应 */
-export const ALBUM_WALL_SECTIONS = ['albums', 'compilations', 'featured'] as const;
+/** 艺人专辑墙能铺开的节：专辑、单曲与 EP、合集、参与的专辑，每节一个专用页 */
+export const ALBUM_WALL_SECTIONS = ['albums', 'singles', 'compilations', 'featured'] as const;
 export type AlbumWallSection = (typeof ALBUM_WALL_SECTIONS)[number];
 
 const WALL_SECTION_LABELS = {
   albums: 'artistAlbums.tab.albums',
+  singles: 'artistAlbums.tab.singles',
   compilations: 'artistAlbums.compilations',
   featured: 'artistAlbums.featured',
 } as const satisfies Record<AlbumWallSection, MessageKey>;

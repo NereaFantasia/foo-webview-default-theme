@@ -15,7 +15,7 @@ type Folders = Pick<FoldersServices, 'locateFile' | 'enter' | 'showInExplorer'>;
 /** 文件夹服务换成替身：目录怎么解析、资源管理器收不收由各用例给，进页记在历史里 */
 function setup(overrides: Partial<Folders> = {}) {
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const entered: string[] = [];
   const explored: string[] = [];
   const folders: Folders = {

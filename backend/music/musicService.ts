@@ -30,10 +30,15 @@ import {
   MAX_SCRIPT_BYTES,
   startLxSources,
 } from './lxSources.ts';
+import { startFavoritesStore } from './favoritesStore.ts';
 import { MusicError } from './musicError.ts';
 import {
   artistAlbumsRequest,
+  discoverRequest,
   empty,
+  favoriteListRequest,
+  favoriteRemoveRequest,
+  favoriteWriteRequest,
   listRequest,
   lxConfigRequest,
   lxSourceCheckRequest,
@@ -63,11 +68,14 @@ export interface MusicServiceOptions extends LxSourceOptions {
 }
 
 const MAX_BODY_BYTES = 16384;
+/** 加入与刷新收藏一次最多一百项，每项带一份展示快照 */
+const FAVORITES_BODY_BYTES = 512 * 1024;
 /** 失败应答的 HTTP 状态映射；未列出的错误统一映射为 503 */
 const HTTP_STATUS: Partial<Record<MusicFailureCode, number>> = {
   'invalid-request': 400,
   'not-found': 404,
   'rate-limited': 429,
+  'favorites-full': 409,
   unsupported: 501,
   timeout: 504,
 };
@@ -81,8 +89,14 @@ export const MUSIC_ACTIONS = [
   'tracks',
   'list',
   'artist-albums',
+  'discover',
   'resolve',
   'failures',
+  'favorites-keys',
+  'favorites-list',
+  'favorites-add',
+  'favorites-remove',
+  'favorites-refresh',
   'login-start',
   'login-check',
   'logout',
@@ -150,6 +164,7 @@ export async function startMusicService(directory: string, options: MusicService
     : null;
   let netease: Promise<ReturnType<typeof startNcmSource>> | null = null;
   const settings = await startNeteaseSettings(directory);
+  const favorites = await startFavoritesStore(directory);
   const status = (): MusicStatus => {
     const { cookie, nickname, unblock } = settings.get();
     return {
@@ -323,6 +338,29 @@ export async function startMusicService(directory: string, options: MusicService
         return list(listRequest(body), signal);
       case 'artist-albums':
         return artistAlbums(artistAlbumsRequest(body), signal);
+      case 'discover': {
+        const input = discoverRequest(body);
+        return (await neteaseSource()).discover(input, signal);
+      }
+      case 'favorites-keys':
+        empty(body);
+        return favorites.keys();
+      case 'favorites-list': {
+        const input = favoriteListRequest(body);
+        return favorites.list(input.kind, input.cursor);
+      }
+      case 'favorites-add': {
+        const input = favoriteWriteRequest(body);
+        return favorites.add(input.kind, input.items);
+      }
+      case 'favorites-refresh': {
+        const input = favoriteWriteRequest(body);
+        return favorites.refresh(input.kind, input.items);
+      }
+      case 'favorites-remove': {
+        const input = favoriteRemoveRequest(body);
+        return { removed: await favorites.remove(input.kind, input.refs) };
+      }
       case 'resolve': {
         const input = resolveRequest(body);
         return resolve(input.ref, input.quality, signal);
@@ -411,7 +449,11 @@ export async function startMusicService(directory: string, options: MusicService
         if (!action) throw new MusicError('invalid-request');
         // 导入音源时根据脚本体积上限动态放宽请求体大小限制
         const limit =
-          action === 'lx-source-add' ? 2 * MAX_SCRIPT_BYTES + MAX_BODY_BYTES : MAX_BODY_BYTES;
+          action === 'lx-source-add'
+            ? 2 * MAX_SCRIPT_BYTES + MAX_BODY_BYTES
+            : action === 'favorites-add' || action === 'favorites-refresh'
+              ? FAVORITES_BODY_BYTES
+              : MAX_BODY_BYTES;
         let size = 0;
         const chunks: Buffer[] = [];
         for await (const chunk of request) {

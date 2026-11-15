@@ -4,7 +4,8 @@ import {
   selectedGenreAtom,
   startGenresPlaces,
 } from '../../../../src/library/genres/genresPlaces.ts';
-import { genresLibrary, genreTracksAnswer, GENRE_TRACKS } from '../../../fixtures/genresLibrary.ts';
+import { genresLibrary, GENRE_TRACKS } from '../../../fixtures/genresLibrary.ts';
+import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
 
 async function setup() {
   const env = genresLibrary();
@@ -54,7 +55,7 @@ it('窄窗选择与变宽后的选择都沿用历史记录，后退离开页面'
 });
 it('宽窗当前流派移除后仍能另选；历史不锁在失效主体上', async () => {
   const env = await setup();
-  env.host.answer('library.getAll', genreTracksAnswer([GENRE_TRACKS[2]!]));
+  env.host.answer('library.search', wholeLibrary([GENRE_TRACKS[2]!]));
   await env.library.retry();
   env.places.select('Jazz');
   expect(env.nav().place).toEqual({ id: 'genres', subject: 'Jazz' });
@@ -65,7 +66,7 @@ it('宽窗当前流派移除后仍能另选；历史不锁在失效主体上', a
 
 it('首次加载未结束就离开，晚到目录不改离开时的主体，返回后再默认选择', async () => {
   const env = genresLibrary();
-  const held = env.host.hold('library.getAll');
+  const held = env.host.hold('library.search');
   const history = startNavHistory(env.store, { id: 'albums' });
   const places = startGenresPlaces(env.store, history);
   onTestFinished(() => places.dispose());

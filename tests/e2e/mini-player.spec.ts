@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { libraryAnswers } from '../fixtures/albumLibrary.ts';
+import { albumRow } from '../fixtures/libraryRows.ts';
 import { openPlayer, PLAYING_TRACK, type OpenPlayerOptions } from '../fixtures/playerPage.ts';
 
 test('完整窗口的播放栏底边不超出可见区域', async ({ page }) => {
@@ -132,7 +134,7 @@ test('同窗进入、常显评分，指针在播放器上才出窗口键，关�
   expect(x.errors).toEqual([]);
 });
 
-test('播放、音量、进度与评分继续使用已有宿主命令', async ({ page }) => {
+test('播放、音量、进度与评分继续使用已有宿主命令 @smoke', async ({ page }) => {
   const x = await openMini(page);
   await x.root.getByRole('button', { name: '暂停', exact: true }).click();
   await expect.poll(() => x.calls('playback.playOrPause').length).toBe(1);
@@ -158,7 +160,7 @@ test('播放、音量、进度与评分继续使用已有宿主命令', async ({
 test('封面展开与同窗菜单，关闭菜单恢复尺寸', async ({ page }) => {
   const x = await openMini(page);
   await x.root.getByRole('button', { name: '展开封面' }).click();
-  // 先淡出再改尺寸：点下去的当下窗口还是紧凑态的高度，内容正在淡出。
+  // 先淡出再改尺寸：点下去的当下窗口还是紧凑态的高度，内容正在淡出
   expect(x.bounds().height).toBe(133);
   expect(
     await x.root.locator('[data-mini-backdrop]').evaluate((node) => node.getAnimations().length),
@@ -308,5 +310,27 @@ test('按在封面或空白处拖动窗口，按在按键上不拖', async ({ pa
   await page.mouse.down();
   await page.mouse.up();
   await expect.poll(() => x.calls('window.startDrag').length).toBe(1);
+  expect(x.errors).toEqual([]);
+});
+
+test('菜单的「转到专辑」先退出迷你模式再进专辑页', async ({ page }) => {
+  const x = await openMini(page, {
+    answers: libraryAnswers([albumRow(PLAYING_TRACK.album, PLAYING_TRACK.albumArtist)]),
+  });
+  await x.root.getByRole('button', { name: '更多', exact: true }).click();
+  await x.root.getByRole('button', { name: '转到专辑', exact: true }).click();
+  await expect(x.root).toHaveCount(0);
+  await expect(
+    page
+      .locator('[data-player-bar]')
+      .getByRole('button', { name: PLAYING_TRACK.album, exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  expect(x.errors).toEqual([]);
+});
+
+test('库里没有这张专辑时，菜单的「转到专辑」置灰', async ({ page }) => {
+  const x = await openMini(page);
+  await x.root.getByRole('button', { name: '更多', exact: true }).click();
+  await expect(x.root.getByRole('button', { name: '转到专辑', exact: true })).toBeDisabled();
   expect(x.errors).toEqual([]);
 });

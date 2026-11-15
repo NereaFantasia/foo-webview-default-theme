@@ -3,8 +3,8 @@ import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { albumRow } from '../fixtures/libraryRows.ts';
 import { collectPageErrors, installPageHost, type PageHost } from '../fixtures/pageHost.ts';
 
-// 封面墙的指针与键盘：悬停键、两种作用对象的右键、双击与回车起播、打字即跳与全选。
-// 专辑按名字平铺（缺省的分节依据），1280 宽时一行五块。
+// 封面墙的指针与键盘：悬停键、两种作用对象的右键、双击与回车起播、打字即跳与全选
+// 专辑按名字平铺（缺省的分节依据），1280 宽时一行五块
 
 const tiles = (page: Page) => page.locator('[data-album-tile]');
 const tile = (page: Page, name: string) => tiles(page).filter({ hasText: name });
@@ -26,6 +26,23 @@ async function start(page: Page): Promise<PageHost> {
 
 test.afterEach(() => {
   expect(errors).toEqual([]);
+});
+
+test('右键菜单开着时，指针移到别的图块上不出悬停键；菜单关了再出', async ({ page }) => {
+  await start(page);
+  const keys = page.locator('[data-tile-keys]:not([data-hidden])');
+  await tile(page, 'Blue Train').click({ button: 'right' });
+  await expect(menu(page)).toBeVisible();
+  const box = await tile(page, 'Revolver').boundingBox();
+  if (!box) throw new Error('图块不可见');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await expect(keys).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(menu(page)).toBeHidden();
+  await page.mouse.move(x + 2, y + 2);
+  await expect(keys).toHaveCount(1);
 });
 
 test('悬停键跟着指针挪，可见的只有悬停那一块上的一对；播放键起播这一张，更多开专辑菜单', async ({
@@ -86,7 +103,7 @@ test('悬停键淡入淡出：离开后留在原处淡出，淡完不占位；�
 
 test('换块时新旧两对键交叉渐变：旧的留在原处淡出，新的在新一块上淡入', async ({ page }) => {
   await start(page);
-  // 把过渡拉长，才拿得到两对键都在半路上的那一刻。
+  // 把过渡拉长，才拿得到两对键都在半路上的那一刻
   await page.addStyleTag({ content: '[data-tile-keys] { transition-duration: 3s !important; }' });
   const keys = page.locator('[data-tile-keys]');
   const leaving = page.locator('[data-tile-keys][data-hidden]');
@@ -105,7 +122,7 @@ test('换块时新旧两对键交叉渐变：旧的留在原处淡出，新的�
   await expect.poll(opacity(leaving)).toBeLessThan(1);
   await expect.poll(opacity(entering)).toBeGreaterThan(0);
 
-  // 回到还在淡出的那一块：沿用原来那一对，不另起第三对。
+  // 回到还在淡出的那一块：沿用已有图块配对，不另起第三对
   await tile(page, 'Blue Train').hover();
   await expect(keys).toHaveCount(2);
   await expect.poll(async () => (await leaving.boundingBox())?.x).toBeCloseTo(second?.x ?? -1, 0);
@@ -119,7 +136,7 @@ test('右键落在选择里作用于整个选择；落在选择外改为只选�
 
   await tile(page, 'Blue Train').click({ button: 'right' });
   await expect(caption(page)).toContainText('2 张专辑');
-  await expect(caption(page)).toContainText('Abbey Road、Blue Train · 20 首');
+  await expect(caption(page)).toContainText('Abbey Road, Blue Train · 20 首');
   const enqueue = menu(page).locator('[data-action="enqueue"]');
   await expect(enqueue).not.toHaveAttribute('aria-disabled', 'true');
   await enqueue.click();
@@ -138,7 +155,9 @@ test('右键落在选择里作用于整个选择；落在选择外改为只选�
   await expect(menu(page)).toBeHidden();
 });
 
-test('双击与回车起播，页面不离开封面墙；方向键移焦点，打字即跳，Ctrl+A 全选', async ({ page }) => {
+test('双击与回车起播，页面不离开封面墙；方向键移焦点，打字即跳，Ctrl+A 全选 @smoke', async ({
+  page,
+}) => {
   const host = await start(page);
   await tile(page, 'Moanin').dblclick();
   await expect.poll(() => host.callsTo('playlist.playTrack').length).toBe(1);
@@ -163,7 +182,7 @@ test('双击与回车起播，页面不离开封面墙；方向键移焦点，�
   await page.keyboard.type('re');
   const revolver = await tile(page, 'Revolver').getAttribute('id');
   await expect(grid(page)).toHaveAttribute('aria-activedescendant', revolver ?? '');
-  // 打字即跳的提示在内容区里；标题栏另有一个宿主状态的提示区。
+  // 打字即跳的提示在内容区里；标题栏另有一个宿主状态的提示区
   await expect(page.getByRole('main').getByRole('status')).toHaveText('re');
 
   await page.keyboard.press('Control+a');
@@ -180,7 +199,7 @@ test('网格拿着焦点时 Alt+→ 照常前进：打开专辑详情、Alt+← 
   await expect(page.locator('[data-page="album"] h1')).toHaveText('The Wall');
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(tiles(page)).toHaveCount(SAMPLE_ALBUMS.length);
-  // 键要落在网格上才考得到「不被网格吃掉」：单击图块后焦点在网格元素自己身上。
+  // 键要落在网格上才考得到「不被网格吃掉」：单击图块后焦点在网格元素自己身上
   await tile(page, 'The Wall').click();
   await expect(grid(page)).toBeFocused();
   await page.keyboard.press('Alt+ArrowRight');
@@ -195,7 +214,7 @@ test('Shift+F10 在焦点图块的左下角开菜单', async ({ page }) => {
   await expect(caption(page)).toContainText('Kind of Blue');
   const box = await tile(page, 'Kind of Blue').boundingBox();
   const popover = await menu(page).boundingBox();
-  // 横向贴着图块左边；纵向在图块下沿，Fluent 摆弹出层时自己挪的几像素不算。
+  // 横向贴着图块左边；纵向在图块下沿，Fluent 摆弹出层时自己挪的几像素不算
   const bottom = box ? box.y + box.height : -1;
   expect(popover?.x).toBeCloseTo(box?.x ?? -1, 0);
   expect(Math.abs((popover?.y ?? 0) - bottom)).toBeLessThan(8);

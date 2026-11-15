@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
 import { useService } from '../../../kit/useService.ts';
 import { lyricsKey } from '../../../lyrics/lyricsService.ts';
+import { lyricsCacheKey } from '../../../lyrics/lyricsCache.ts';
 import { lyricsDisplayKey } from '../../../lyrics/lyricsDisplay.ts';
 import { lyricsMotionKey } from '../../../lyrics/lyricsMotion.ts';
 import { LyricsPlayer } from '../../../lyrics/LyricsPlayer.tsx';
@@ -42,7 +43,10 @@ export function LyricsDetailPage({
   const display = useAtomValueRawSync(displayService.display);
   const motionService = useService(lyricsMotionKey);
   const motion = useAtomValueRawSync(motionService.motion);
-  const [remember, setRemember] = useState(false);
+  const defaultRemember = useAtomValueRawSync(useService(lyricsCacheKey).pref).remember;
+  // 勾选框以设置里的默认记住为初值；用户在这一页改过就按改的
+  const [chosen, setRemember] = useState<boolean | null>(null);
+  const remember = chosen ?? defaultRemember;
   const [using, setUsing] = useState(false);
   const alive = useRef(true);
   useEffect(() => {

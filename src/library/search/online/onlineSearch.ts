@@ -48,6 +48,15 @@ const IDLE = {
 
 type KindAtoms = { readonly [K in MusicSearchKind]: PrimitiveAtom<OnlineKindState<K>> };
 
+/** 一个查询词下各平台已取到第一页的类别 */
+export interface OnlineHandover {
+  readonly text: string;
+  readonly states: ReadonlyMap<
+    MusicPlatform,
+    Partial<Record<MusicSearchKind, OnlineKindState<MusicSearchKind>>>
+  >;
+}
+
 const kindAtoms = (): KindAtoms => ({
   track: atom<OnlineKindState<'track'>>(IDLE),
   album: atom<OnlineKindState<'album'>>(IDLE),
@@ -61,12 +70,16 @@ export interface OnlineSearch {
   readonly platform: Atom<MusicPlatform>;
   /** 当前平台的各类结果；换平台时换成那个平台已取到的，不重取 */
   readonly kinds: { readonly [K in MusicSearchKind]: Atom<OnlineKindState<K>> };
-  /** 换查询词：各平台各类清空，不发请求。与当前相同时不动 */
+  /** 换查询词：各平台各类清空，不发请求。与当前查询相同时不做任何处理 */
   setText(text: string): void;
   /** 取当前平台这些类别的第一页：还没要过或第一页失败的才取，已取到或正在取的不重取；平台不搜的类别略过 */
   load(kinds: readonly MusicSearchKind[]): void;
   /** 接着取当前平台下一页；没有下一页、第一页还没取到或正在取时不动 */
   more(kind: MusicSearchKind): Promise<void>;
+  /** 交出当前查询词下各平台已取到的类别，给同一查询词的另一份搜索用 */
+  handover(): OnlineHandover;
+  /** 查询词相同时接过 `handover` 里自己还没要过的类别，之后不再为它们向平台要；查询词不同时不动 */
+  adopt(handover: OnlineHandover): void;
   dispose(): void;
 }
 
@@ -75,9 +88,10 @@ function failureOf(error: unknown): MusicClientFailureCode {
 }
 
 /**
- * 一个查询词的在线结果，按平台、按类别分开取、分开续页。换查询词或释放时取消在途请求，晚到的应答丢弃；
- * 换平台不取消别的平台在途的请求，应答写进它自己那个平台的状态；续页的结果按身份去重，平台翻页时偶尔会把上一页的条目再给一次
- * `port` 是本地后端连上的端口：当前平台因后端还没连上而没取到的类别，连上后自己重取；上游失败不自动重取
+ * 一个查询词的在线结果，按平台、按类别分开取、分开续页。换查询词或释放时取消在途请求，晚到的应答丢弃。
+ * 换平台不取消别的平台在途的请求，应答写进各自平台的状态。
+ * 续页的结果按身份去重，因为平台翻页时偶尔会把上一页的条目再给一次。
+ * `port` 是本地后端连上的端口：当前平台因后端尚未连上而没取到的类别，连上后自动重取，上游失败不自动重取。
  * `platform` 是当前要看的平台，缺省网易云
  */
 export function startOnlineSearch(
@@ -196,6 +210,28 @@ export function startOnlineSearch(
       } catch {
         patch(owner, kind, signal, (now) => ({ ...now, loadingMore: false, moreFailed: true }));
       }
+    },
+    handover() {
+      const ready = new Map<
+        MusicPlatform,
+        Partial<Record<MusicSearchKind, OnlineKindState<MusicSearchKind>>>
+      >();
+      for (const owner of MUSIC_PLATFORMS)
+        for (const kind of MUSIC_SEARCH_KINDS) {
+          const state = store.get(atomOf(owner, kind));
+          if (state.status === 'ready') ready.set(owner, { ...ready.get(owner), [kind]: state });
+        }
+      return { text: store.get(text), states: ready };
+    },
+    adopt(handover) {
+      if (disposed || handover.text !== store.get(text)) return;
+      for (const [owner, given] of handover.states)
+        for (const kind of MUSIC_SEARCH_KINDS) {
+          const state = given[kind];
+          const target = atomOf(owner, kind);
+          if (state && store.get(target).status === 'idle')
+            store.set(target, { ...state, loadingMore: false, moreFailed: false });
+        }
     },
     dispose() {
       disposed = true;

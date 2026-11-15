@@ -4,13 +4,22 @@ import { albumsAtom } from '../albums.ts';
 import { genreValuesAtom, type GenreValuesService } from '../genreValues.ts';
 import { libraryTracksAtom } from '../libraryTracks.ts';
 import { buildGenres, type GenreEntry } from './genresModel.ts';
+import { findGenreIssues, type GenreIssue } from './genresTidy.ts';
 
 export interface GenresCatalogState {
   readonly status: 'idle' | 'loading' | 'ready' | 'failed';
   readonly entries: readonly GenreEntry[];
+  /** 按流派名给出的整理提示；用户忽略过的不在里面 */
+  readonly issues: ReadonlyMap<string, readonly GenreIssue[]>;
   readonly generation: number;
 }
-const stateAtom = atom<GenresCatalogState>({ status: 'idle', entries: [], generation: 0 });
+const INITIAL: GenresCatalogState = {
+  status: 'idle',
+  entries: [],
+  issues: new Map(),
+  generation: 0,
+};
+const stateAtom = atom<GenresCatalogState>(INITIAL);
 export const genresCatalogAtom: Atom<GenresCatalogState> = atom((get) => get(stateAtom));
 
 export interface GenresCatalogService {
@@ -21,17 +30,24 @@ export interface GenresCatalogService {
 
 /**
  * 流派目录：整库曲目按流派标签值归类。标签值的读取归共用的流派值服务；读失败、整库重读与补读途中都保留
- * 旧目录，同一份标签值与专辑清单不重建
+ * 旧目录，同一份标签值与专辑清单不重建。整理提示只依赖流派名与曲目数：用户忽略了某个名字时
+ * 只重算提示，不重新归类整库曲目
  */
 export function startGenresCatalog(
   store: Store,
   values: Pick<GenreValuesService, 'want' | 'retry'>,
+  ignored: Atom<ReadonlySet<string>> = atom<ReadonlySet<string>>(new Set<string>()),
 ): GenresCatalogService {
-  store.set(stateAtom, { status: 'idle', entries: [], generation: 0 });
+  store.set(stateAtom, INITIAL);
   let wanted = false;
   let built: { readonly values: unknown; readonly albums: unknown } | null = null;
   const update = (change: Partial<GenresCatalogState>) =>
     store.set(stateAtom, { ...store.get(stateAtom), ...change });
+  const issuesOf = (entries: readonly GenreEntry[]) =>
+    findGenreIssues(
+      entries.map((entry) => ({ key: entry.key, trackCount: entry.tracks.length })),
+      store.get(ignored),
+    );
 
   const mark = (status: GenresCatalogState['status']) => {
     if (store.get(stateAtom).status !== status) update({ status });
@@ -52,9 +68,11 @@ export function startGenresCatalog(
       if (built?.values === read.values && built.albums === albums) mark('ready');
       else {
         built = { values: read.values, albums };
+        const entries = buildGenres([...library.byHandle.values()], read.values, albums);
         update({
           status: 'ready',
-          entries: buildGenres([...library.byHandle.values()], read.values, albums),
+          entries,
+          issues: issuesOf(entries),
           generation: read.generation,
         });
       }
@@ -66,6 +84,7 @@ export function startGenresCatalog(
     store.sub(libraryTracksAtom, sync),
     store.sub(genreValuesAtom, sync),
     store.sub(albumsAtom, sync),
+    store.sub(ignored, () => update({ issues: issuesOf(store.get(stateAtom).entries) })),
   ];
   return {
     want() {

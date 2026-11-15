@@ -3,7 +3,7 @@ import { collectPageErrors } from '../fixtures/pageHost.ts';
 import { onlineLog, openOnlineHarness } from '../fixtures/onlinePage.ts';
 
 // 设置里「在线音乐」一组在试验页里配音乐客户端替身跑：账号卡的扫码登录、退出与组件没下载时的引导，解灰卡的读取中与失败，
-// 其他平台卡的组件下载与音源管理。
+// 其他平台卡的组件下载与音源管理
 
 test.use({ screenshot: 'off' });
 
@@ -27,7 +27,7 @@ test('点「登录」才取二维码，收起后照样能登上；退出登录�
   const errors = collectPageErrors(page);
   await openOnlineHarness(page, { view: 'settings' });
   const card = account(page);
-  // 没登录时卡头只有「登录」键，不另写「未登录」。
+  // 没登录时卡头只有「登录」键，不另写「未登录」
   await expect(card.getByRole('button', { name: '登录', exact: true })).toBeVisible();
   await expect(card).not.toContainText('未登录');
   await expect(card.getByRole('img', { name: '登录二维码' })).toHaveCount(0);
@@ -62,7 +62,7 @@ test('组件没下载时不取二维码，就地下载，装好后能登录', as
   await expect(card).toContainText('下载即表示同意组件所含的许可：ISC, MIT');
   await expect(card.getByRole('button', { name: '登录', exact: true })).toHaveCount(0);
   expect(await kinds(page)).not.toContain('login-start');
-  // 后端没登记 lxserver 组件，其他平台卡不出。
+  // 后端没登记 lxserver 组件，其他平台卡不出
   await expect(platforms(page)).toHaveCount(0);
   await card.getByRole('button', { name: '下载', exact: true }).click();
   await expect(card.getByRole('button', { name: '登录', exact: true })).toBeVisible();
@@ -81,7 +81,7 @@ test('解灰：修改失败时风险说明与失败一起显示，开关照后�
   const toggle = unblock(page).getByRole('switch');
   await expect(toggle).not.toBeChecked();
   await toggle.click();
-  await expect(unblock(page)).toContainText('没能修改这项设置');
+  await expect(unblock(page)).toContainText('无法修改此设置');
   await expect(unblock(page)).toContainText('曲目 ID 会发送给第三方服务');
   await expect(toggle).not.toBeChecked();
 });
@@ -162,6 +162,32 @@ test('其他平台：从文件与网址导入；lxserver 不收时写原因，�
   await expect(source(page, 'net.js')).toBeVisible();
 });
 
+test('对话框里的输入框右键出编辑菜单，菜单在对话框上面，粘贴放进输入框而对话框还在', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const host = await openOnlineHarness(page, { view: 'settings', lx: 'hosted' });
+  host.answer('clipboard.read', {
+    success: true,
+    hasText: true,
+    hasImage: false,
+    hasFiles: false,
+    text: 'https://example.test/net.js',
+  });
+  await platforms(page).getByRole('button', { name: '导入脚本…' }).click();
+  await page.getByRole('menuitem', { name: '从网址…' }).click();
+  const dialog = page.getByRole('dialog', { name: '从网址导入音源脚本' });
+  const input = dialog.getByRole('textbox', { name: '脚本网址' });
+  await input.click({ button: 'right' });
+  const menu = page.locator('[data-edit-menu]');
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitem', { name: /粘贴/ }).click();
+  await expect(input).toHaveValue('https://example.test/net.js');
+  await expect(menu).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(input).toBeFocused();
+});
+
 const HOSTED = { view: 'settings', lx: 'hosted' } as const;
 const checkAll = (page: Page) =>
   platforms(page).getByRole('button', { name: /^(全部检测|检测中…)$/ });
@@ -190,7 +216,7 @@ test('其他平台：全部检测——结果写在各平台项上，悬停给�
   await expect(source(page, '星海音乐源')).toContainText('上次检测 刚刚');
   await expect(platformItem(page, '酷狗：地址打不开')).toBeVisible();
   await expect(platformItem(page, '咪咕：没有给出播放地址')).toBeVisible();
-  await expect(platformItem(page, 'QQ 音乐：没能检测')).toBeVisible();
+  await expect(platformItem(page, 'QQ 音乐：无法检测')).toBeVisible();
   await expect(checkAll(page)).toHaveText('全部检测');
   // 四个平台各检测一次；停用且载入失败的 old.js 不检测
   expect(await checks(page)).toHaveLength(4);
@@ -198,7 +224,7 @@ test('其他平台：全部检测——结果写在各平台项上，悬停给�
   await expectTip(page, '酷我：可用', '可用 · 215 毫秒 · 刚刚');
   await expectTip(page, '酷狗：地址打不开', '地址打不开 · HTTP 404 · 刚刚');
   await expectTip(page, '咪咕：没有给出播放地址', '没有给出播放地址 · 咪咕找不到 · 刚刚');
-  await expectTip(page, 'QQ 音乐：没能检测', '没有可检测的曲目');
+  await expectTip(page, 'QQ 音乐：无法检测', '没有可检测的曲目');
   expect(errors).toEqual([]);
 });
 

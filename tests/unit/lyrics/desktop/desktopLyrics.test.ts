@@ -1,6 +1,7 @@
 import type { LyricLine } from '@applemusic-like-lyrics/core';
 import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { entries, resetEventLog } from '../../../../src/diagnostics/eventLog.ts';
 import type { ConfigValue } from '../../../../src/host/configPref.ts';
 import { en } from '../../../../src/i18n/en.ts';
 import { createTranslate } from '../../../../src/i18n/translate.ts';
@@ -12,9 +13,12 @@ import {
   parseDesktopLyricsLines,
   parseDesktopLyricsView,
   type DesktopLyricsCommand,
+  type DesktopLyricsProcess,
 } from '../../../../src/lyrics/desktop/desktopLyricsLink.ts';
 import type { LyricsState } from '../../../../src/lyrics/lyricsService.ts';
 import { TRAY_IDS } from '../../../../src/playback/trayMenu.ts';
+import { DEFAULT_LYRICS_DISPLAY } from '../../../../src/lyrics/lyricsDisplay.ts';
+import type { FontChoice } from '../../../../src/theme/fontStack.ts';
 import { tealBrand } from '../../../../src/theme/brand.ts';
 import { createMemoryConfigWriter } from '../../../fixtures/dataWriter.ts';
 import { hostFailure } from '../../../fixtures/hostAnswers.ts';
@@ -52,6 +56,12 @@ function setup(config: Readonly<Record<string, ConfigValue>> = {}, existing?: Un
   const store = createStore();
   const lyricsState = atom<LyricsState>({ status: 'idle' });
   const offset = atom(0);
+  const process = atom<DesktopLyricsProcess>({
+    optimize: DEFAULT_LYRICS_DISPLAY.optimize,
+    maskMode: DEFAULT_LYRICS_DISPLAY.maskMode,
+    maskChar: DEFAULT_LYRICS_DISPLAY.maskChar,
+  });
+  const font = atom<FontChoice>({ latin: '', cjk: '' });
   const setOffset = vi.fn(async (seconds: number) => {
     store.set(offset, seconds);
     return true;
@@ -66,6 +76,8 @@ function setup(config: Readonly<Record<string, ConfigValue>> = {}, existing?: Un
       track: atom({ title: 'Quiet Light', artist: 'Sample Artist' }),
       ramp: atom(tealBrand),
       shown: atom(false),
+      font,
+      process,
       translate: atom(() => createTranslate(en, {})),
       writer: createMemoryConfigWriter(host.fb),
       page: 'desktop-lyrics.html',
@@ -79,7 +91,7 @@ function setup(config: Readonly<Record<string, ConfigValue>> = {}, existing?: Un
   };
   const fromPopup = (command: DesktopLyricsCommand, source = 'popup-1') =>
     host.emit('window:message', { sourceWindowId: source, message: desktopLyricsMessage(command) });
-  return { host, store, service, lyricsState, setOffset, seek, shared, fromPopup };
+  return { host, store, service, lyricsState, process, font, setOffset, seek, shared, fromPopup };
 }
 
 async function opened(config: Readonly<Record<string, ConfigValue>> = {}) {
@@ -92,6 +104,69 @@ async function opened(config: Readonly<Record<string, ConfigValue>> = {}) {
 }
 
 describe('startDesktopLyrics', () => {
+  it('字号与译文字号：视图带着实际的像素值，随正文缩放时译文取正文的 0.6 倍', async () => {
+    const { service, shared } = await opened();
+    const view = async () => parseDesktopLyricsView(await shared(DESKTOP_LYRICS_VIEW_KEY));
+    expect(await view()).toMatchObject({ fontSize: 34, translationFontSize: 20 });
+    service.update({ size: 'custom', customSize: 50 });
+    await settle();
+    expect(await view()).toMatchObject({ fontSize: 50, translationFontSize: 30 });
+    service.update({ translationSize: 22 });
+    await settle();
+    expect(await view()).toMatchObject({ fontSize: 50, translationFontSize: 22 });
+  });
+
+  it('自定义动效：没自定义过时视图带 AMLL 档的四项，存了就带存的', async () => {
+    const { service, shared } = await opened();
+    const view = async () => parseDesktopLyricsView(await shared(DESKTOP_LYRICS_VIEW_KEY));
+    expect((await view())?.motionCustom).toEqual({
+      blur: true,
+      scale: true,
+      hidePassedLines: false,
+      alignPosition: 0.5,
+    });
+    service.update({
+      motionPreset: 'custom',
+      motionCustom: { blur: false, scale: false, hidePassedLines: true, alignPosition: 0.3 },
+    });
+    await settle();
+    expect(await view()).toMatchObject({
+      motionPreset: 'custom',
+      motionCustom: { blur: false, scale: false, hidePassedLines: true, alignPosition: 0.3 },
+    });
+  });
+
+  it('桌面歌词自己的字体与字重，以及主窗口的界面字体，随视图推送；改了就重推', async () => {
+    const { store, service, font, shared } = await opened();
+    service.update({ fontFamily: 'Georgia', fontWeight: 450 });
+    store.set(font, { latin: 'Inter', cjk: 'DengXian' });
+    await settle();
+    expect(parseDesktopLyricsView(await shared(DESKTOP_LYRICS_VIEW_KEY))).toMatchObject({
+      font: 'Georgia',
+      fontWeight: 450,
+      uiFont: 'Inter',
+      cjkFont: 'DengXian',
+    });
+  });
+
+  it('主窗口歌词设置里的内容整理与屏蔽随视图推送，改了就重推', async () => {
+    const { store, process, shared } = await opened();
+    expect(parseDesktopLyricsView(await shared(DESKTOP_LYRICS_VIEW_KEY))?.process.maskMode).toBe(
+      '',
+    );
+    store.set(process, {
+      optimize: { ...DEFAULT_LYRICS_DISPLAY.optimize, tryAdvanceStartTime: false },
+      maskMode: 'full-mask',
+      maskChar: '#',
+    });
+    await settle();
+    expect(parseDesktopLyricsView(await shared(DESKTOP_LYRICS_VIEW_KEY))?.process).toEqual({
+      optimize: { ...DEFAULT_LYRICS_DISPLAY.optimize, tryAdvanceStartTime: false },
+      maskMode: 'full-mask',
+      maskChar: '#',
+    });
+  });
+
   it('桌面动效独立保存并推送，重开后沿用所选预设', async () => {
     const { host, store, service, shared } = await opened();
     service.update({ motionPreset: 'winui' });
@@ -246,6 +321,21 @@ describe('startDesktopLyrics', () => {
     expect(host.callsTo('window.createPopup')).toHaveLength(1);
     host.emit('tray:menuItemClicked', { id: TRAY_IDS.desktopLyricsLock });
     expect(store.get(service.pref).locked).toBe(true);
+  });
+
+  it('热键被宿主拒收时，日志里记下是哪一个，不记组合键', async () => {
+    resetEventLog();
+    const { host, service } = setup();
+    await service.ready;
+    host.answer('keyboard.registerHotkey', hostFailure('OPERATION_FAILED'));
+    expect(await service.setHotkey('lock', 'Ctrl+Alt+L')).toBe(false);
+    expect(entries()).toEqual([
+      expect.objectContaining({ tag: 'host', event: 'hotkey.failed', fields: { name: 'lock' } }),
+    ]);
+    resetEventLog();
+    host.answer('keyboard.registerHotkey', { success: true, id: 3 });
+    expect(await service.setHotkey('toggle', 'Ctrl+Alt+T')).toBe(true);
+    expect(entries()).toEqual([]);
   });
 
   it('热键被宿主拒收时标出来；换掉组合时先摘旧的', async () => {

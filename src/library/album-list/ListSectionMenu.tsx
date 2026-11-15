@@ -6,6 +6,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom } from '../../i18n/plural.ts';
 import { MenuCaption } from '../../kit/MenuCaption.tsx';
+import { useRetained } from '../../kit/useRetained.ts';
 import type { TablePoint } from '../../table/tableItems.ts';
 import type { ListSection } from './albumListModel.ts';
 import { useService } from '../../kit/useService.ts';
@@ -34,12 +35,14 @@ export function ListSectionMenu({ target, onClose }: ListSectionMenuProps) {
       returnTo.current = document.activeElement;
     }
   }, [open]);
-  const at = target?.at;
+  // 关闭时 `target` 先被清空：落点与这一节的内容都按关闭前的那一份画到退场结束，否则菜单会先跳到左上角再消失
+  const shown = useRetained(target);
+  const at = shown?.at;
   const anchor = useMemo(
     () => at && { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
     [at],
   );
-  const section = target?.section;
+  const section = shown?.section;
   const key = section?.key ?? null;
   const albums = section?.albums.length ?? 0;
   const tracks = section ? section.span.end - section.span.start : 0;

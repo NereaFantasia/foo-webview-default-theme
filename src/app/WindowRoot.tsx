@@ -1,10 +1,12 @@
 import { Activity, useEffect, useRef, type ReactNode } from 'react';
 import { Button, MessageBar, MessageBarActions, MessageBarBody } from '@fluentui/react-components';
 import { Dismiss20Regular } from '@fluentui/react-icons';
-import { useAtomValueRawSync } from 'jotai/react';
+import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { miniWindowAtom, miniWindowKey } from '../host/miniWindow.ts';
 import { translateAtom } from '../i18n/locale.ts';
 import { useService } from '../kit/useService.ts';
+import { commandsKey } from '../nav/commandRegistry.ts';
+import { startReservedKeys } from '../nav/reservedKeys.ts';
 import { useCommand } from '../nav/useCommand.ts';
 import { MiniPlayer } from '../shell/miniplayer/MiniPlayer.tsx';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
@@ -15,6 +17,10 @@ export function WindowRoot({ children }: { readonly children: ReactNode }) {
   const mini = useService(miniWindowKey);
   const t = useAtomValueRawSync(translateAtom);
   const viewControls = useViewControlStyles();
+  const store = useStore();
+  const commands = useService(commandsKey);
+  // 登记处里的按键告知宿主：页面有焦点时留给主题，不被 foobar2000 里绑定过同一个键的命令抢先
+  useEffect(() => startReservedKeys(store, commands), [store, commands]);
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasMini = useRef(state.active);
   useEffect(() => {

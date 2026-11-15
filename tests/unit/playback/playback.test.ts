@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { READY_TIMEOUT_MS } from '../../../src/host/waitForHost.ts';
 import { currentTrackAtom, playbackAtom, startPlayback } from '../../../src/playback/playback.ts';
 import { startOnlineTracks } from '../../../src/playback/onlineTracks.ts';
+import { skipIntentAtom } from '../../../src/playback/skipIntent.ts';
 import { HIGH_RES_SILENCE_MS } from '../../../src/playback/playbackEvents.ts';
 import { createVolumeSender } from '../../../src/playback/volume/volumeControl.ts';
 import { amplitudeOf } from '../../../src/playback/volumeScale.ts';
@@ -14,7 +15,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** 等替身在微任务里答完、服务把应答写进状态。 */
+/** 等替身在微任务里答完、服务把应答写进状态 */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const PLAYBACK_EVENTS = [
@@ -164,7 +165,7 @@ describe('startPlayback', () => {
     transport.release();
     await settle();
     expect(state().track?.title).toBe('Feather');
-    // 初读的 getState 答 playing，但它晚于暂停事件，丢掉。
+    // 初读的 getState 答 playing，但它晚于暂停事件，丢掉
     expect(state().state).toBe('paused');
   });
 
@@ -257,7 +258,7 @@ describe('startPlayback', () => {
       seen.push(store.get(currentTrackAtom)?.title ?? null);
     });
 
-    // 专辑起播：宿主对另一行 playTrack，先报用户停止，再报 starting 与还没打开的新曲目的状态。
+    // 专辑起播：宿主对另一行 playTrack，先报用户停止，再报 starting 与还没打开的新曲目的状态
     host.emit('playback:stopped', { reason: 'user' });
     host.emit('playback:stateChanged', {
       hostTime: Date.now(),
@@ -331,7 +332,7 @@ describe('startPlayback', () => {
     expect(state().track).toMatchObject({ title: 'Song A', artist: 'Band A', artists: ['Band A'] });
     host.emit('playback:dynamicInfoTrack', { title: 'Song B' });
     expect(state().track).toMatchObject({ title: 'Song B', artist: 'Radio', artists: ['Radio'] });
-    // 同一路流被编辑或回读时，报过的这一首照样盖着。
+    // 同一路流被编辑或回读时，报过的这一首照样盖着
     host.emit('playback:edited', { ...station, genre: 'Jazz' });
     expect(state().track).toMatchObject({ title: 'Song B', genre: 'Jazz' });
 
@@ -388,7 +389,7 @@ describe('startPlayback', () => {
     expect(state().canSeek).toBe(true);
     const reads = host.callsTo('playback.getState').length;
 
-    // 宿主换曲时先发 trackChanged，紧跟一条带新曲目 canSeek 的 stateChanged。
+    // 宿主换曲时先发 trackChanged，紧跟一条带新曲目 canSeek 的 stateChanged
     host.emit('playback:trackChanged', LUV);
     host.emit('playback:stateChanged', {
       hostTime: Date.now(),
@@ -413,7 +414,7 @@ describe('startPlayback', () => {
     const transport = host.hold('playback.getState');
     playback.retry();
     host.emit('playback:stopped', { reason: 'user' });
-    // 第二个在等的是核对停止的那次：它先答停着；停止前发出的那次后到，还答着在放。
+    // 第二个在等的是核对停止的那次：它先答停着；停止前发出的那次后到，还答着在放
     expect(transport.pending).toHaveLength(2);
     transport.respond(1, STOPPED);
     await settle();
@@ -483,6 +484,28 @@ describe('startPlayback', () => {
     host.answer('playback.next', hostFailure('NO_ACTIVE_ITEM'));
     await playback.next();
     expect(state().failure).toBe('command');
+  });
+
+  it('上一首、下一首由播放服务统一记按键方向：各界面的键调用它就够，没连上宿主时不记', async () => {
+    const host = installFakeHost();
+    const store = createStore();
+    const playback = startPlayback(store, host.fb);
+    await playback.ready;
+    await playback.next();
+    expect(store.get(skipIntentAtom)).toMatchObject({ direction: 'next', pending: 1 });
+    await playback.next();
+    expect(store.get(skipIntentAtom)).toMatchObject({ direction: 'next', pending: 2 });
+    await playback.previous();
+    expect(store.get(skipIntentAtom)).toMatchObject({ direction: 'previous', pending: 1 });
+    expect(host.callsTo('playback.next')).toHaveLength(2);
+    expect(host.callsTo('playback.previous')).toHaveLength(1);
+    playback.dispose();
+    const away = installFakeHost({ available: false });
+    const lone = createStore();
+    const unplugged = startPlayback(lone, away.fb);
+    await unplugged.next();
+    expect(lone.get(skipIntentAtom)).toBeNull();
+    unplugged.dispose();
   });
 
   it('音量服务只发在途值与最后待发值，松手后的回读只在写完后进行', async () => {

@@ -15,6 +15,7 @@ import {
   backgroundTransportAtom,
 } from '../../../../src/theme/background/windowBackground.ts';
 import { defer, installImageData } from '../../../fixtures/coverArt.ts';
+import { FLOW_SPEED_LIMITS, chooseFlowSpeed } from '../../../../src/theme/background/flowSpeed.ts';
 import { chooseColorMode } from '../../../../src/theme/colorScheme.ts';
 
 const settle = async () => {
@@ -209,4 +210,18 @@ test('深浅变化交给现有绘制实例，隐藏期间也传递主题以清�
   chooseColorMode(store, 'dark', null);
   expect(made[0].sleeping).toBe(true);
   expect(made[0].input?.scheme).toBe('dark');
+});
+
+test('流动速度偏好换算成倍率交给绘制实例，改了立即更新且不重建', async () => {
+  const { store, made } = setup();
+  chooseBackgroundSource(store, 'palette', null);
+  store.set(backgroundTransportAtom, 'playing');
+  store.set(backgroundCoverAtom, { url: 'cover', profile: null });
+  await settle();
+  expect(made[0].input?.rate).toBe(1);
+  chooseFlowSpeed(store, 150, null);
+  expect(made[0].input?.rate).toBe(1.5);
+  chooseFlowSpeed(store, FLOW_SPEED_LIMITS.min, null);
+  expect(made[0].input?.rate).toBe(0.25);
+  expect(made).toHaveLength(1);
 });

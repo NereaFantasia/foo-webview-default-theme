@@ -1,0 +1,90 @@
+.root {
+  min-width: 0;
+}
+
+/* 自画的外壳：版式与 Fluent 的描边输入框一致，用在对话框这类实色表面上；着色层铺满它，输入元素在它里面撑出高度 */
+.frame {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-bottom-color: var(--colorNeutralStrokeAccessible);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackground1);
+}
+.frame:hover {
+  border-color: var(--colorNeutralStroke1Hover);
+  border-bottom-color: var(--colorNeutralStrokeAccessibleHover);
+}
+.frame[data-invalid] {
+  border-color: var(--colorPaletteRedBorder2);
+}
+/* 焦点下划线：照 Fluent 输入框的做法，聚焦时从中间向两侧长出 */
+.frame::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  left: -1px;
+  box-sizing: border-box;
+  height: max(2px, var(--borderRadiusMedium));
+  border-bottom: 2px solid var(--colorCompoundBrandStroke);
+  border-bottom-right-radius: var(--borderRadiusMedium);
+  border-bottom-left-radius: var(--borderRadiusMedium);
+  clip-path: inset(calc(100% - 2px) 0 0 0);
+  transform: scaleX(0);
+  transition-property: transform;
+  transition-duration: var(--durationUltraFast);
+  transition-delay: var(--curveAccelerateMid);
+  pointer-events: none;
+}
+.frame:focus-within::after {
+  transform: scaleX(1);
+  transition-duration: var(--durationNormal);
+  transition-delay: var(--curveDecelerateMid);
+}
+.frame[data-invalid]::after {
+  border-bottom-color: var(--colorPaletteRedBorder2);
+}
+
+/* 输入元素：字是透明的，看到的是它后面着色的那一层；字体、字号、内边距与折行规则必须与着色层一致
+   高度随内容长，最少与最多的行数由调用方经两个自定义属性给，超出最多行数的内容在框里滚、不画滚动条 */
+.input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--spacingVerticalSNudge) var(--spacingHorizontalMNudge);
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  field-sizing: content;
+  min-height: calc(
+    var(--editor-min-rows) * var(--lineHeightBase300) + 2 * var(--spacingVerticalSNudge)
+  );
+  max-height: calc(
+    var(--editor-max-rows) * var(--lineHeightBase300) + 2 * var(--spacingVerticalSNudge)
+  );
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.input::selection {
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 24%, transparent);
+}
+.input::placeholder {
+  color: var(--colorNeutralForeground4);
+  opacity: 1;
+}
+@media (forced-colors: active) {
+  .input {
+    color: CanvasText;
+  }
+}

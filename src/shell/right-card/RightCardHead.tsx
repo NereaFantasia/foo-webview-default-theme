@@ -121,6 +121,7 @@ export function RightCardHead({ onMenu }: { onMenu(track: Track, at: RowPoint): 
   };
   const subtitle = track && (
     <TrackMetadata
+      share
       className={styles.subtitle}
       artist={track.artist}
       album={track.album}

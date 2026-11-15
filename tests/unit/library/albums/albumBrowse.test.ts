@@ -10,6 +10,7 @@ import {
 } from '../../../../src/library/albums/albumBrowse.ts';
 import { HIT_DEBOUNCE_MS, HIT_LIMIT } from '../../../../src/library/albums/albumSearchHits.ts';
 import { ALBUM_LIMIT } from '../../../../src/library/albums.ts';
+import { EMPTY_QUERY_INPUT } from '../../../../src/track/queryInput.ts';
 import { startBrowserPrefs } from '../../../../src/library/albums/browserPrefs.ts';
 import { hostFailure, type ConfigValue } from '../../../fixtures/hostAnswers.ts';
 import { albumRow } from '../../../fixtures/libraryRows.ts';
@@ -124,7 +125,7 @@ describe('过滤与筛选', () => {
       hasMore: false,
     });
     const { browse, state } = await setup(host);
-    browse.setTerm('blue');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: 'blue' });
     expect(state().shown).toBe(2);
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(state().shown).toBe(3);
@@ -134,12 +135,65 @@ describe('过滤与筛选', () => {
     vi.useFakeTimers();
     const host = hostWith(ALBUMS);
     const { browse, state } = await setup(host);
-    browse.setTerm('zzz');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: 'zzz' });
     expect(state()).toMatchObject({ shown: 0, phase: 'ready' });
     await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
     expect(state().phase).toBe('noMatch');
-    browse.setTerm('');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: '' });
     expect(state()).toMatchObject({ shown: 3, phase: 'ready' });
+  });
+
+  describe('高级查询', () => {
+    const advanced = (advancedText: string) => ({
+      ...EMPTY_QUERY_INPUT,
+      mode: 'advanced' as const,
+      advancedText,
+    });
+    const queryAnswer = (tracks: { album: string; albumArtist: string }[]) => ({
+      success: true as const,
+      tracks: tracks.map((track) => ({
+        album: track.album,
+        albumArtists: [track.albumArtist],
+        artists: [track.albumArtist],
+      })),
+      total: tracks.length,
+    });
+
+    it('只看曲目命中：含命中曲目的整张专辑留下，不比专辑名；命中没回来前整面墙不动', async () => {
+      vi.useFakeTimers();
+      const host = hostWith(ALBUMS);
+      host.answer(
+        'library.query',
+        queryAnswer([{ album: 'Abbey Road', albumArtist: 'The Beatles' }]),
+      );
+      const { browse, state, sectionNames } = await setup(host);
+      browse.setInput(advanced('%album% HAS blue'));
+      expect(state()).toMatchObject({ shown: 3, phase: 'ready' });
+      await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+      expect(sectionNames()).toEqual([[null, ['Abbey Road']]]);
+    });
+
+    it('零命中判 noMatch；宿主认不出时留着上一份并标出错，换回普通搜索后恢复', async () => {
+      vi.useFakeTimers();
+      const host = hostWith(ALBUMS);
+      host.answer(
+        'library.query',
+        queryAnswer([{ album: 'Abbey Road', albumArtist: 'The Beatles' }]),
+      );
+      const { browse, state } = await setup(host);
+      browse.setInput(advanced('ALL'));
+      await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+      host.answer('library.query', hostFailure('INVALID_PARAMS'));
+      browse.setInput(advanced('ALL AND ('));
+      await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+      expect(state()).toMatchObject({ shown: 1, invalid: true, phase: 'ready' });
+      browse.setInput({ ...EMPTY_QUERY_INPUT, advancedText: 'ALL AND (' });
+      expect(state()).toMatchObject({ shown: 3, invalid: false });
+      host.answer('library.query', queryAnswer([]));
+      browse.setInput(advanced('genre IS Opera'));
+      await vi.advanceTimersByTimeAsync(HIT_DEBOUNCE_MS);
+      expect(state()).toMatchObject({ shown: 0, phase: 'noMatch', invalid: false });
+    });
   });
 
   it('筛选的取值来自专辑清单，勾选跨列 AND；清掉恢复', async () => {

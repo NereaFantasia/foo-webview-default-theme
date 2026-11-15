@@ -1,0 +1,6 @@
+.feedback {
+  display: grid;
+  justify-items: start;
+  gap: var(--spacingVerticalXS);
+  margin-top: var(--spacingVerticalXS);
+}

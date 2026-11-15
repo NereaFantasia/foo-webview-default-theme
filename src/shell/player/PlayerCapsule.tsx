@@ -47,13 +47,16 @@ interface PlayerCapsuleProps {
 }
 
 /**
- * 浮在内容卡底部正中的胶囊：播放栏是胶囊形态时各档宽度都用它，放在标题栏时窄窗（< 1008）换成它；没有
- * 当前曲目时淡出，淡出前把焦点交给另一套播放控件或标题栏的 ⋯。盖住的那一截内容由页面按 `--player-inset` 让出来
- * 宽窗 680、641–1007 宽 600，卡片窄到放不下时撑满卡宽
- * 左端圆形封面（按下进沉浸视图），曲名（后面跟着星级，在线曲目是音质标记）与艺人、专辑（`TrackByline`）两行，右边是播放控制组与「音量、⋯」两组；贴底一条细的进度线，能点
- * 能拖，悬停它进悬停态（`ScrubSeek`），封面以外的东西模糊变淡。窗口 ≤ 640 时胶囊撑满卡宽、左右各留 16，
- * 去掉播放顺序键、音量键、星级与音质标记。过长的曲名截断、右缘渐隐、定时滚动一遍，悬停出全文；过长的署名艺人与专辑
- * 各自用省略号截断，名字始终可点；星不让位。换曲时两行字先退后进（`useTextSwap`，悬停态里直接换），圆形封面转入（`NowPlayingCover`）
+ * 浮于内容卡底部居中位置的胶囊。播放栏为胶囊形态时各档宽度都用它。播放栏放在标题栏时，窄窗（< 1008）改用它。
+ * 没有当前曲目时淡出，淡出前将焦点转移到另一套播放控件，或标题栏的 ⋯。被遮挡的内容由页面按 `--player-inset` 预留空间。
+ * 宽窗宽 680，641–1007 宽 600，卡片窄到放不下时撑满卡宽
+ *
+ * 左端是圆形封面（按下进入沉浸视图），中间是曲名与艺人、专辑（`TrackByline`）两行。
+ * 曲名后面跟着星级，在线曲目则显示音质标记。右边是播放控制组与「音量、⋯」两组。
+ * 贴底有一条细的进度线，可点击、可拖动，悬停时进入悬停态（`ScrubSeek`），封面以外的内容模糊变淡。
+ * 窗口 ≤ 640 时胶囊撑满卡宽、左右各留 16，去掉播放顺序键、音量键、星级与音质标记。
+ * 过长的曲名截断，右缘渐隐，定时滚动一遍，悬停显示全文。过长的署名艺人与专辑各自用省略号截断，名字始终可点，星级不让位。
+ * 换曲时两行字先退场后进场（`useTextSwap`，悬停态里直接换），圆形封面转入（`NowPlayingCover`）
  */
 export function PlayerCapsule({ visible }: PlayerCapsuleProps) {
   const viewControls = useViewControlStyles();
@@ -77,7 +80,7 @@ export function PlayerCapsule({ visible }: PlayerCapsuleProps) {
       node.removeAttribute('aria-hidden');
       return;
     }
-    // 禁用前记下焦点；同名控件的查找在微任务中进行，会跳过尚在淡出的胶囊
+    // 禁用前保存焦点。同名控件的查找在微任务中进行，会跳过仍在淡出的胶囊
     handOffPlayerFocus(node)?.();
     node.inert = true;
     node.setAttribute('aria-hidden', 'true');
@@ -131,14 +134,14 @@ export function PlayerCapsule({ visible }: PlayerCapsuleProps) {
           {!compact && <NowPlayingRating size="compact" track={track} />}
           {!compact && <QualityButton track={track} {...QUALITY_FOCUS} />}
         </div>
-        <TrackByline ellipsis className={styles.byline} track={track} />
+        <TrackByline pointerOnly className={styles.byline} track={track} />
       </div>
       <div className={`${styles.controls} ${styles.soft}`}>
-        <PlaybackControls compact={compact} />
+        <PlaybackControls compact={compact} favorite />
       </div>
       <div ref={handOffPlayerFocus} className={`${styles.tail} ${styles.soft}`}>
         {videoEntry}
-        {/* 窗口缩到 640 以下时音量键单独卸下，焦点也要跟走。 */}
+        {/* 窄窗（compact）时音量键被单独卸下，焦点须随之交接 */}
         {!compact && (
           <span ref={handOffPlayerFocus} className={styles.slot}>
             <CapsuleVolume />

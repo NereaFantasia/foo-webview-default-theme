@@ -8,7 +8,7 @@ import {
 
 type Listener = (event: KeyInput & ButtonInput) => void;
 
-/** 替身目标：按事件类型与阶段记下监听，`fire` 把一个事件交给它们。 */
+/** 替身目标：按事件类型与阶段记下监听，`fire` 把一个事件交给它们 */
 function fakeTarget() {
   const listeners = new Map<string, Set<Listener>>();
   const slot = (type: string, capture = false) => `${type}:${capture ? 'capture' : 'bubble'}`;
@@ -210,6 +210,30 @@ describe('startCommandRegistry', () => {
     expect(commands.dispatchKey(key('Enter'))).toBeNull();
   });
 
+  it('按键分派时 enabled 拿到这次按键，鼠标键分派时拿不到', () => {
+    const commands = startCommandRegistry(null);
+    const seen: (boolean | undefined)[] = [];
+    commands.register({
+      id: 'probe',
+      layer: 'global',
+      keys: [{ key: ' ' }],
+      buttons: [3],
+      enabled: (input) => {
+        seen.push(input?.repeat);
+        return true;
+      },
+      run() {},
+    });
+    commands.dispatchKey(key(' ', { repeat: true }));
+    commands.dispatchButton({
+      type: 'mouseup',
+      button: 3,
+      defaultPrevented: false,
+      preventDefault() {},
+    });
+    expect(seen).toEqual([true, undefined]);
+  });
+
   describe('挂在目标上', () => {
     it('键盘在冒泡阶段接手，接手了才拦缺省', () => {
       const { target, fire } = fakeTarget();
@@ -245,7 +269,7 @@ describe('startCommandRegistry', () => {
       enabled = false;
       expect(fire('mouseup', { button: 3 }, true).defaultPrevented).toBe(true);
       expect(run).toHaveBeenCalledTimes(1);
-      // 没人声明的键（右键）不碰。
+      // 没人声明的键（右键）不碰
       expect(fire('mouseup', { button: 2 }, true).defaultPrevented).toBe(false);
     });
 
@@ -301,6 +325,19 @@ describe('startCommandRegistry', () => {
           run: () => {},
         }),
       ).toThrow('early 只给拖动进行中的 gesture 层');
+    });
+
+    it('登记与注销之后各通知一次，取消订阅后不再通知', () => {
+      const commands = startCommandRegistry(null);
+      const changed = vi.fn();
+      const unsubscribe = commands.subscribe(changed);
+      const off = commands.register({ id: 'a', layer: 'global', run: () => {} });
+      expect(changed).toHaveBeenCalledTimes(1);
+      off();
+      expect(changed).toHaveBeenCalledTimes(2);
+      unsubscribe();
+      commands.register({ id: 'b', layer: 'global', run: () => {} });
+      expect(changed).toHaveBeenCalledTimes(2);
     });
 
     it('释放后摘掉全部监听', () => {

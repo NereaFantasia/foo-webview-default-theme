@@ -1,9 +1,12 @@
 /* 歌词栏顶部的工具条。位置与宽度跟歌词的文字区一致：左边距、右边距与行宽上限都读栏写进来的变量，
-   上沿距栏顶 `--lyrics-toolbar-top`（预设给，对齐封面上沿）。
+   上沿距栏顶 `--lyrics-toolbar-top`（预设给：分栏对齐封面上沿，满幅封面对齐队列页、历史页的列上沿）
 
-   外壳 `.bar` 管尺寸、圆角与 Acrylic 底（底在 `toolbarStyles.ts`），里面按状态叠几层，层都铺在外壳里、不撑它：
+   外壳 `.bar` 管尺寸、圆角与 Acrylic 底（底取 `scene/acrylic.ts` 的条表面），里面按状态叠几层，层都铺在外壳里、不撑它：
    一行或两格高的按键层、收起后的单个图标层、搜索的输入层。外壳的宽高随状态过渡，层之间交叉淡变，
-   层里的内容宽度固定为条宽（`--toolbar-width`），外壳收窄时只是被裁，不会跟着重排。 */
+   层里的内容宽度固定为条宽（`--toolbar-width`），外壳收窄时只是被裁，不会跟着重排
+
+   整个 `.toolbar` 占着文字区的全宽，自己不接指针，只有条与搜索结果接：收起后只剩一个图标时，
+   图标旁边那一截空着的宽度不挡下面的歌词，点上文的行照样能跳过去 */
 .toolbar {
   position: absolute;
   z-index: 1;
@@ -13,7 +16,13 @@
     calc(100% - var(--lyrics-edge-start) - var(--lyrics-edge-end)),
     var(--lyrics-max-width)
   );
+  pointer-events: none;
   transition: opacity var(--motion-faster) var(--curveLinear);
+}
+
+.bar,
+.results {
+  pointer-events: auto;
 }
 
 /* 还没量到条宽时不知道排哪一档，先藏起，免得第一帧排错再跳 */
@@ -21,12 +30,31 @@
   visibility: hidden;
 }
 
+/* 收起后只剩图标时，指针在歌词栏上才露出来，离开就藏起；键盘焦点在图标上时照常显示；
+   控制层静止时仍按下一条一起淡出：两条特指度相同，下一条写在后面，静止时它说了算 */
+.toolbar[data-collapsed]:not(:has(:focus-visible)) {
+  opacity: 0;
+}
+
+:global([data-scene-element='lyrics']:hover) .toolbar[data-collapsed] {
+  opacity: 1;
+}
+
 /* 随控制层静止一起淡出：根上的 data-idle 就是控制层的显隐，淡出慢、回来快。搜索展开、面板开着、键盘焦点在条内时不淡；
    鼠标点过的键留着焦点也照样淡，与控制层一样只认键盘焦点（`:focus-visible`） */
 :global([data-idle]) .toolbar:not(:has(:focus-visible)):not([data-open]) {
   opacity: 0;
-  pointer-events: none;
   transition-duration: var(--motion-normal);
+}
+
+/* 淡出后条也不接指针：`.toolbar` 上的 none 管不到自己写了 auto 的后代 */
+:global([data-idle]) .toolbar:not(:has(:focus-visible)):not([data-open]) .bar {
+  pointer-events: none;
+}
+
+/* 设置的编辑开着时整条让位，与控制层的键一样快淡出；条所在的模板此时是 inert，接不到指针与焦点 */
+:global([data-editing]) .toolbar {
+  opacity: 0;
 }
 
 /* 尺寸的过渡：已在场元素的点到点，250 ms。窗口缩放时条宽、两格高与一行之间换档也走它；
@@ -40,7 +68,10 @@
   border-radius: var(--borderRadius2XLarge);
   transition:
     width var(--motion-normal) var(--motion-curve-point-to-point),
-    height var(--motion-normal) var(--motion-curve-point-to-point);
+    height var(--motion-normal) var(--motion-curve-point-to-point),
+    background-color var(--motion-normal) var(--curveLinear),
+    box-shadow var(--motion-normal) var(--curveLinear),
+    backdrop-filter var(--motion-normal) var(--curveLinear);
 }
 
 /* 两格高：高度要与 `lyricsToolbar.ts` 的 `TOOLBAR_HEIGHT` 一致 */
@@ -48,8 +79,17 @@
   height: 72px;
 }
 
+/* 收起后只剩一个图标：外壳的 Acrylic 底、投影与颗粒都去掉（降级的近实底也去掉），悬停与按下时键自己出底；
+   展开时条照常带底：展开是要用它；缺省展开，也是让人先认得条的样子，收起后知道这个图标是什么 */
 .bar[data-state='collapsed'] {
   width: 40px;
+  background-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.bar[data-state='collapsed']::before {
+  opacity: 0;
 }
 
 /* 层：铺在外壳里，宽度固定为条宽。隐藏的层先淡出（83 ms），要出现的层等它淡完再淡入（167 ms），不同时露出 */
@@ -164,8 +204,8 @@
   }
 }
 
-/* 搜索结果面板：挂在条正下方，宽与条一致，高度不超过窗里剩下的地方（`--lyrics-toolbar-room`）。
-   进场从上面 6 px 处下落并淡入，等条的高度动起来之后；收起时只淡出。
+/* 搜索结果面板：挂在条正下方，宽与条一致，高度不超过窗里剩下的地方（`--lyrics-toolbar-room`）；
+   进场从上面 6 px 处下落并淡入，等条的高度动起来之后；收起时只淡出；
    候选卡原先带主窗的阅读面，这里换成面板里的半透明底 */
 .results {
   position: absolute;

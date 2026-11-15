@@ -3,7 +3,6 @@ import { formatTitle } from '../../fixtures/fakeTitleFormat.ts';
 import { describe, expect, it } from 'vitest';
 import {
   COLUMN_SORT,
-  columnOfSortKey,
   DEFAULT_GROUP_MODE,
   GROUP_MODES,
   SORT_ARTIST,
@@ -13,15 +12,14 @@ import {
 } from '../../../src/playlist/sortPatterns.ts';
 
 describe('sortPatterns', () => {
-  it('排序子菜单包含所有可排序列、id 不重复，列头能排的列反查得回来', () => {
+  it('排序表 id 不重复；列头能排的列用的串都出自排序表，同一个字段只有一个写法', () => {
     expect(SORT_CHOICES).toHaveLength(19);
     expect(new Set(SORT_CHOICES.map((choice) => choice.id)).size).toBe(19);
-    for (const [column, pattern] of Object.entries(COLUMN_SORT)) {
-      expect(columnOfSortKey(pattern)).toBe(column);
-    }
-    expect(columnOfSortKey(SORT_ARTIST)).toBe('artist');
-    expect(columnOfSortKey(SORT_DURATION)).toBe('duration');
-    expect(columnOfSortKey(SORT_PATH)).toBe('path');
+    const patterns = new Set(SORT_CHOICES.map((choice) => choice.pattern));
+    for (const pattern of Object.values(COLUMN_SORT)) expect(patterns.has(pattern)).toBe(true);
+    expect(COLUMN_SORT.artist).toBe(SORT_ARTIST);
+    expect(COLUMN_SORT.duration).toBe(SORT_DURATION);
+    expect(COLUMN_SORT.path).toBe(SORT_PATH);
   });
 
   it('缺省分组是「专辑 | 专辑艺术家」加碟号两级；每档都带切过去时的重排串', () => {

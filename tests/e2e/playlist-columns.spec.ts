@@ -40,7 +40,7 @@ test('播放列表列菜单提供元数据、音频属性和统计，选中后�
   expect(env.errors).toEqual([]);
 });
 
-test('列表排序可指定降序，标记跟随宿主成功结果且撤销可恢复', async ({ page }) => {
+test('列头排序键按两次改降序，标记跟随宿主成功结果且撤销可恢复', async ({ page }) => {
   const env = await openPlaylist(page, 'Mix', [
     makeRow('Mix', 0, { title: 'A', duration: 600 }),
     makeRow('Mix', 1, { title: 'B', duration: 120 }),
@@ -49,32 +49,38 @@ test('列表排序可指定降序，标记跟随宿主成功结果且撤销可�
   const order = () =>
     env.grid.locator('[role="gridcell"][data-column-id="title"]').allTextContents();
   await expect.poll(order).toEqual(['A', 'B', 'C']);
-  await env.view.locator('[data-playlist-more]').click();
-  await page.locator('[data-playlist-sort]').click();
-  await page.locator('[data-sort-choice="duration"]').click();
-  await page.getByRole('menuitem', { name: '降序', exact: true }).click();
-  await expect.poll(order).toEqual(['C', 'A', 'B']);
-  await expect(env.grid.getByRole('columnheader', { name: '时长', exact: true })).toHaveAttribute(
-    'aria-sort',
-    'descending',
-  );
-  await env.grid
-    .getByRole('columnheader', { name: '时长', exact: true })
-    .getByRole('button', { name: '时长', exact: true })
-    .press('Enter');
+  const duration = env.grid.getByRole('columnheader', { name: '时长', exact: true });
+  const sortButton = duration.getByRole('button', { name: '时长', exact: true });
+  await sortButton.press('Enter');
   await expect.poll(order).toEqual(['B', 'A', 'C']);
+  await expect(duration).toHaveAttribute('aria-sort', 'ascending');
+  await sortButton.press('Enter');
+  await expect.poll(order).toEqual(['C', 'A', 'B']);
+  await expect(duration).toHaveAttribute('aria-sort', 'descending');
   await env.row('B').click();
   await page.keyboard.press('Control+z');
-  await expect.poll(order).toEqual(['C', 'A', 'B']);
+  await expect.poll(order).toEqual(['B', 'A', 'C']);
   expect(env.errors).toEqual([]);
 });
 
-test('锁定播放列表的列表排序不允许重排', async ({ page }) => {
+test('自动播放列表不能重排：列头不可排序，⋯ 里只有编辑项', async ({ page }) => {
   const env = await openPlaylist(page, 'Smart');
-  await env.view.locator('[data-playlist-more]').click();
-  await page.locator('[data-playlist-sort]').click();
-  await expect(page.locator('[data-sort-choice="duration"]')).toBeDisabled();
-  await expect(page.getByRole('menuitem', { name: '反向', exact: true })).toBeDisabled();
+  const title = env.grid.getByRole('columnheader', { name: '标题', exact: true });
+  await title.click();
+  await expect(title).not.toHaveAttribute('aria-sort', /.+/);
   expect(env.host.callsTo('playlist.sort')).toHaveLength(0);
+  await env.view.locator('[data-playlist-more]').click();
+  await expect(page.locator('[data-action="edit-autoplaylist"]')).toBeVisible();
+  await expect(page.locator('[data-action="shuffle"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="reverse"]')).toHaveCount(0);
+  expect(env.errors).toEqual([]);
+});
+
+test('普通列表的 ⋯ 里随机与反向交给宿主，按字段排序只在列头', async ({ page }) => {
+  const env = await openPlaylist(page, 'Mix');
+  await env.view.locator('[data-playlist-more]').click();
+  await expect(page.locator('[data-playlist-sort]')).toHaveCount(0);
+  await page.locator('[data-action="reverse"]').click();
+  await expect.poll(() => env.host.callsTo('playlist.reverse').length).toBe(1);
   expect(env.errors).toEqual([]);
 });

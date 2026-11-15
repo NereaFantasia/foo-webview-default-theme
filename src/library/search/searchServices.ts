@@ -55,7 +55,7 @@ export interface SearchServices {
   readonly preview: SearchResultsService;
   /** 下拉里本地结果的右键菜单，与结果页同一套 */
   readonly previewMenu: SearchMenuService;
-  /** 下拉在线音乐范围的结果，只取曲目 */
+  /** 下拉里在线音乐一区的结果 */
   readonly onlinePreview: OnlineSearch;
   readonly notice: Atom<MessageKey | null>;
   /**
@@ -63,7 +63,9 @@ export interface SearchServices {
    */
   readonly request: PrimitiveAtom<(SearchTarget & { readonly text: string }) | null>;
   createResults(): SearchResultsService;
-  /** 一个查询词的在线结果。最近几个查询词的留在这里，结果页不释放 */
+  /**
+   * 一个查询词的在线结果。最近几个查询词的留在这里，结果页不释放；新建时接过下拉为同一个词已取到的类别
+   */
   online(text: string): OnlineSearch;
   play(hit: SearchHit): Promise<boolean>;
   dispose(): void;
@@ -99,6 +101,7 @@ export function startSearchServices(store: Store, deps: SearchDeps): SearchServi
       else {
         search = startOnlineSearch(store, deps.music, deps.port, deps.sources.selected);
         search.setText(text);
+        search.adopt(onlinePreview.handover());
       }
       kept.set(text, search);
       for (const [key, old] of kept) {

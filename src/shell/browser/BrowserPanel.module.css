@@ -1,0 +1,119 @@
+/* 居中的不透明面板：窗口放不下时上下各留 70（左上角的键离顶 20、高 44，不能被压住）、左右各留 64，
+   放得下时封顶 1400 × 900，用自动外边距居中。外框与内容卡取不透明的窗口底与阅读面（--bg-frame-solid、
+   --bg-card-solid），描边、半径与阴影同其他覆盖面板（见 SidePanel） */
+.panel {
+  position: fixed;
+  inset: 70px 64px;
+  box-sizing: border-box;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  max-width: 1400px;
+  max-height: 900px;
+  margin: auto;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAlpha);
+  border-radius: var(--radius-overlay);
+  background-color: var(--bg-frame-solid);
+  box-shadow: var(--shadow16);
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  outline: none;
+}
+
+/* 外框平时是不太透的亚克力；性能降级（data-solid）或系统要求减少透明度时回到实底。内容卡自己是实底，
+   透出的只有侧栏、导航行与卡四周的留白 */
+.panel:not([data-solid]) {
+  background-color: var(--bg-frame-acrylic);
+  backdrop-filter: var(--acrylic-filter);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .panel:not([data-solid]) {
+    background-color: var(--bg-frame-solid);
+    backdrop-filter: none;
+  }
+}
+
+/* 两列的宽度随侧边栏形态变，写在行内；内容区的位移由换形态的动画加在它身上 */
+.body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sidebar {
+  grid-column: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--spacingVerticalS);
+}
+
+.pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+.main {
+  position: relative;
+  grid-column: 2;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--spacingHorizontalS) var(--spacingVerticalS);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalXXS);
+  height: 48px;
+}
+
+.grow {
+  flex: 1;
+}
+
+/* 握柄的位置按主窗里的算（骑在主内容卡左缘、与卡等高），面板里卡的左缘与底都内缩得少，这里把它挪回卡的边上：
+   槽高 48 的导航行之下，左右、底部差值用 token 抵掉 */
+.splitterSlot {
+  position: absolute;
+  top: 48px;
+  bottom: calc(var(--spacingVerticalS) - var(--spacingVerticalL));
+  left: calc(var(--spacingHorizontalS) - var(--spacingHorizontalL));
+  width: 0;
+  pointer-events: none;
+}
+
+.splitterSlot > * {
+  pointer-events: auto;
+}
+
+/* 页面里的回退抽屉（页面窄了折成的）挂在这一层，按 --panel-* 定位：离卡片各边内缩 8，与主窗里同一关系 */
+.cardHost {
+  --panel-top: var(--spacingVerticalS);
+  --panel-bottom: var(--spacingVerticalS);
+  --panel-inset: var(--spacingHorizontalS);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 与主窗内容卡同一套：页面按这几个变量让出导航行与播放栏，面板里都没有，回到零 */
+.card {
+  --player-inset: 0px;
+  --nav-inset: 0px;
+  --layer-top-gap: var(--spacingVerticalXS);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAlpha);
+  border-radius: var(--radius-card);
+  background-color: var(--bg-card-solid);
+}

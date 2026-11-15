@@ -3,10 +3,6 @@
   padding: var(--spacingVerticalXXXL) 0;
 }
 
-.notice {
-  margin-bottom: var(--spacingVerticalM);
-}
-
 /* 查找没有匹配时接在列头下面 */
 .empty {
   margin: 0;

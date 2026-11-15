@@ -6,12 +6,15 @@ import { foldersZhCN } from './foldersZhCN.ts';
 import { immersiveZhCN } from './immersiveZhCN.ts';
 import { playlistZhCN } from './playlistZhCN.ts';
 import { queryZhCN } from './queryZhCN.ts';
+import { autoplaylistZhCN } from './autoplaylistZhCN.ts';
+import { querySyntaxZhCN } from './querySyntaxZhCN.ts';
 import { settingsZhCN } from './settingsZhCN.ts';
 import { onboardingZhCN } from './onboardingZhCN.ts';
 import { songsZhCN } from './songsZhCN.ts';
 import { contextMenuZhCN } from './contextMenuZhCN.ts';
 import { queueZhCN } from './queueZhCN.ts';
 import { searchZhCN } from './searchZhCN.ts';
+import { favoritesZhCN } from './favoritesZhCN.ts';
 import { artistAlbumsZhCN } from './artistAlbumsZhCN.ts';
 import { detailZhCN } from './detailZhCN.ts';
 import { biographyZhCN } from './biographyZhCN.ts';
@@ -25,11 +28,13 @@ import { updateZhCN } from './updateZhCN.ts';
 import { miniPlayerZhCN } from './miniPlayerZhCN.ts';
 import { desktopLyricsZhCN } from './desktopLyricsZhCN.ts';
 import { lyricsZhCN } from './lyricsZhCN.ts';
+import { libraryMirrorZhCN } from './libraryMirrorZhCN.ts';
 
 /** 简体中文语言包，遵循 `Messages` 契约补齐所有键 */
 export const zhCN: Messages = {
   ...onlineZhCN,
   ...lyricsZhCN,
+  ...libraryMirrorZhCN,
   ...miniPlayerZhCN,
   ...desktopLyricsZhCN,
   ...updateZhCN,
@@ -42,6 +47,7 @@ export const zhCN: Messages = {
   ...externalLinksZhCN,
   ...biographyZhCN,
   ...searchZhCN,
+  ...favoritesZhCN,
   ...artistAlbumsZhCN,
   ...detailZhCN,
   ...contextMenuZhCN,
@@ -53,6 +59,8 @@ export const zhCN: Messages = {
   ...playlistZhCN,
   ...songsZhCN,
   ...queryZhCN,
+  ...querySyntaxZhCN,
+  ...autoplaylistZhCN,
   ...queueZhCN,
   'host.unavailable': '未连接 foobar2000',
   'host.readFailed': '组件版本读取失败',
@@ -94,6 +102,7 @@ export const zhCN: Messages = {
   'album.formWall': '封面墙',
   'album.formList': '列表',
   'album.filter': '搜索专辑',
+  'album.queryInvalidDetail': '查询有误，仍显示上一次的结果',
   'album.dimension': '分节',
   'album.dimAlbum': '不分节',
   'album.dimAlbumArtist': '专辑艺人',
@@ -145,7 +154,7 @@ export const zhCN: Messages = {
   'album.menuAlbums': '{count} 张专辑',
   'album.menuTracksOne': '{count} 首',
   'album.menuTracks': '{count} 首',
-  'album.nameSeparator': '、',
+  'album.nameSeparator': ', ',
   'album.menuLimited': '超过 {albums} 张或 {tracks} 首，播放与发送不可用',
   'album.menuTracksFailed': '曲目读取失败',
   'album.openDetail': '打开专辑详情',
@@ -173,6 +182,8 @@ export const zhCN: Messages = {
   'nav.forwardTo': '前进到「{name}」',
   'nav.lyrics': '歌词',
   'nav.queue': '播放队列',
+  'nav.info': '曲目信息',
+  'nav.bio': '艺人简介',
   'sidebar.collapse': '收起侧边栏',
   'sidebar.expand': '展开侧边栏',
   'sidebar.hide': '隐藏侧边栏',

@@ -29,6 +29,11 @@ export interface TrackAbilities {
    * 网络流该项为 false，避免阻塞 fb2k 主线程长达 10 秒超时
    */
   readonly opensLocally: boolean;
+  /**
+   * 宿主能否整轨解码（`audio.decodePcm`、`audio.generateFullWaveform`）：解码在后台线程里跑，主线程只取一次文件状态
+   * 在线曲目的地址在本地后端上，后端不等上游就答 HEAD，那一步不会等网络；电台流没有整轨，不能
+   */
+  readonly decodesAudio: boolean;
   /** 是否支持交由宿主执行原生右键菜单上下文命令（属性编辑、格式转换、ReplayGain 扫描等） */
   readonly hostCommands: boolean;
   /** 是否支持媒体库操作联动（如添加至播放列表、跳转至媒体库同名专辑/艺人） */
@@ -41,6 +46,7 @@ export interface TrackAbilities {
 
 const LOCAL: TrackAbilities = {
   opensLocally: true,
+  decodesAudio: true,
   hostCommands: true,
   libraryActions: true,
   hostArtwork: true,
@@ -50,9 +56,10 @@ const LOCAL: TrackAbilities = {
 const ABILITIES: Readonly<Record<TrackOrigin, TrackAbilities>> = {
   file: LOCAL,
   container: LOCAL,
-  stream: { ...LOCAL, opensLocally: false },
+  stream: { ...LOCAL, opensLocally: false, decodesAudio: false },
   online: {
     opensLocally: false,
+    decodesAudio: true,
     hostCommands: false,
     libraryActions: false,
     hostArtwork: false,
@@ -70,6 +77,7 @@ export function batchAbilities(paths: readonly string[]): TrackAbilities {
   const all = (key: keyof TrackAbilities) => each.every((abilities) => abilities[key]);
   return {
     opensLocally: all('opensLocally'),
+    decodesAudio: all('decodesAudio'),
     hostCommands: all('hostCommands'),
     libraryActions: all('libraryActions'),
     hostArtwork: all('hostArtwork'),

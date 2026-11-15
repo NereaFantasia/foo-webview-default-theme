@@ -5,3 +5,39 @@
   gap: var(--spacingHorizontalXS);
   container: query-box / inline-size;
 }
+
+/* 高级查询的输入元素：字是透明的，看到的是它后面着色的那一层；字体、字号、内边距与着色层一致 */
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 var(--spacingHorizontalXXS);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+.input::selection {
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 24%, transparent);
+}
+.input::placeholder {
+  color: var(--colorNeutralForeground4);
+  opacity: 1;
+}
+.icon {
+  flex: none;
+  color: var(--colorNeutralForeground3);
+}
+.trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+@media (forced-colors: active) {
+  .input {
+    color: CanvasText;
+  }
+}

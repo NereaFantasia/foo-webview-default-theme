@@ -7,6 +7,12 @@ export interface QueueMotionItem {
   readonly rect: DOMRect;
 }
 
+/** 行用队列的行键，当前曲目的几块用部位名；节头卡（`data-queue-head`）加前缀，与行键分开 */
+function motionKey(node: HTMLElement): string {
+  if (node.dataset.queueHead) return `head:${node.dataset.queueHead}`;
+  return node.dataset.queueRow ?? node.dataset.currentPart ?? '';
+}
+
 /** 只量实际可见节点；虚拟列表的预渲染缓冲不生成退场副本 */
 export function queueMotionItems(
   root: HTMLElement,
@@ -26,7 +32,7 @@ export function queueMotionItems(
       }
     }
     if (rect.bottom <= top || rect.top >= bottom) continue;
-    const key = node.dataset.queueRow ?? node.dataset.currentPart ?? '';
+    const key = motionKey(node);
     const copy = node.cloneNode(true);
     if (!(copy instanceof HTMLElement)) continue;
     const identity = node.dataset.motionIdentity ?? key;
@@ -35,7 +41,10 @@ export function queueMotionItems(
   return items;
 }
 
-/** 副本只用于退场，去掉身份与可访问语义，不占焦点或响应命令 */
+/**
+ * 副本只用于退场，去掉身份与可访问语义，不占焦点或响应命令。组首末行的圆角标记（`data-edge-*`）不是身份，
+ * 留着：否则末行一开始退场，大圆角就掉回行的圆角
+ */
 export function queueMotionGhost(root: HTMLElement, item: QueueMotionItem): HTMLElement {
   const copy = item.copy;
   for (const element of [copy, ...copy.querySelectorAll('*')]) {
@@ -43,7 +52,7 @@ export function queueMotionGhost(root: HTMLElement, item: QueueMotionItem): HTML
       if (
         attr.name === 'id' ||
         attr.name === 'role' ||
-        attr.name.startsWith('data-') ||
+        (attr.name.startsWith('data-') && !attr.name.startsWith('data-edge-')) ||
         attr.name.startsWith('aria-')
       )
         element.removeAttribute(attr.name);

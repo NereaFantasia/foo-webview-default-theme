@@ -28,7 +28,13 @@ describe('resolveBackdrop', () => {
     expect(resolveBackdrop('titanium', only())).toBeNull();
   });
 
-  it('取值表里是三个渲染器加 off', () => {
-    expect([...BACKDROP_CHOICES]).toEqual(['titanium', 'mesh', 'isolation', 'off']);
+  it('取值表里是四个渲染器加 off', () => {
+    expect([...BACKDROP_CHOICES]).toEqual(['titanium', 'mesh', 'isolation', 'flow', 'off']);
+  });
+
+  it('流动色场排在最后：别的都用不了才轮到它，选了它用不了就退到前面的', () => {
+    expect(resolveBackdrop('mesh', only('flow'))).toBe('flow');
+    expect(resolveBackdrop('flow', only('mesh', 'titanium'))).toBe('titanium');
+    expect(resolveBackdrop('flow', all)).toBe('flow');
   });
 });

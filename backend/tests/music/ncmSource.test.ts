@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ncmLoader, startNcmSource, type NcmApi } from '../../music/ncmSource.ts';
 
-// 调用只看身份与权限怎么传，记录的转换见 ncmRecords 的用例。
+// 调用只看身份与权限怎么传，记录的转换见 ncmRecords 的用例
 const SONG = { id: 64317, name: '因为爱情', fee: 1, privilege: { id: 64317, st: 0 } };
 
 describe('NCM 适配的调用', () => {
@@ -23,7 +23,7 @@ describe('NCM 适配的调用', () => {
       ],
     },
   });
-  /** 歌单共 `total` 首，ID 为 1…total；详情带前 `included` 首。 */
+  /** 歌单共 `total` 首，ID 为 1…total；详情带前 `included` 首 */
   const PLAYLIST_BODY = (total: number, included: number) => {
     const ids = Array.from({ length: total }, (_, index) => index + 1);
     return {
@@ -88,6 +88,21 @@ describe('NCM 适配的调用', () => {
       ),
       playlist_detail: vi.fn<NcmApi['playlist_detail']>(
         overrides.playlist_detail ?? (async () => PLAYLIST_BODY(1, 1)),
+      ),
+      banner: vi.fn<NcmApi['banner']>(
+        overrides.banner ?? (async () => ({ body: { code: 200, banners: [] } })),
+      ),
+      top_song: vi.fn<NcmApi['top_song']>(
+        overrides.top_song ?? (async () => ({ body: { code: 200, data: [] } })),
+      ),
+      personalized: vi.fn<NcmApi['personalized']>(
+        overrides.personalized ?? (async () => ({ body: { code: 200, result: [] } })),
+      ),
+      album_new: vi.fn<NcmApi['album_new']>(
+        overrides.album_new ?? (async () => ({ body: { code: 200, albums: [] } })),
+      ),
+      toplist_detail: vi.fn<NcmApi['toplist_detail']>(
+        overrides.toplist_detail ?? (async () => ({ body: { code: 200, list: [] } })),
       ),
       login_qr_key: vi.fn<NcmApi['login_qr_key']>(
         overrides.login_qr_key ??
@@ -373,6 +388,27 @@ describe('NCM 适配的调用', () => {
     expect(api.cloudsearch).not.toHaveBeenCalled();
   });
 
+  it('公共推荐不带登录凭据；被限流后同样进入元数据冷却', async () => {
+    const { api, source } = fake(
+      { personalized: async () => Promise.reject({ status: 405, body: { code: 405 } }) },
+      { cookie: COOKIE, unblock: false },
+    );
+    await source.discover({ kind: 'new-albums', area: 'kr' }, signal());
+    expect(api.album_new.mock.calls[0]?.[0]).toEqual({
+      area: 'KR',
+      limit: 30,
+      offset: 0,
+      timeout: 1000,
+    });
+    await expect(source.discover({ kind: 'playlists' }, signal())).rejects.toMatchObject({
+      code: 'rate-limited',
+    });
+    await expect(
+      source.search({ platform: 'wy', kind: 'album', query: 'x', cursor: null }, signal()),
+    ).rejects.toMatchObject({ code: 'rate-limited' });
+    expect(api.cloudsearch).not.toHaveBeenCalled();
+  });
+
   it('歌单第一页用详情带的曲目，其余按 ID 续取、排回歌单顺序；下架的不算丢弃', async () => {
     const song_detail = vi.fn<NcmApi['song_detail']>(async () => ({
       body: {
@@ -455,6 +491,11 @@ describe('NCM 适配的调用', () => {
         artists: () => new Promise(() => {}),
         artist_album: () => new Promise(() => {}),
         playlist_detail: () => new Promise(() => {}),
+        banner: () => new Promise(() => {}),
+        top_song: () => new Promise(() => {}),
+        personalized: () => new Promise(() => {}),
+        album_new: () => new Promise(() => {}),
+        toplist_detail: () => new Promise(() => {}),
         login_qr_key: () => new Promise(() => {}),
         login_qr_create: () => new Promise(() => {}),
         login_qr_check: () => new Promise(() => {}),
@@ -474,7 +515,7 @@ describe('NCM 组件加载', () => {
     for (const root of ROOTS.splice(0)) await rm(root, { recursive: true, force: true });
   });
 
-  /** 仿造的组件：入口、请求模块与取密钥的步骤都在加载时记下当时的临时目录，并往那里写文件。 */
+  /** 仿造的组件：入口、请求模块与取密钥的步骤都在加载时记下当时的临时目录，并往那里写文件 */
   async function component(writesKey: boolean) {
     const root = await mkdtemp(join(tmpdir(), 'theme-ncm-'));
     ROOTS.push(root);
@@ -488,7 +529,7 @@ describe('NCM 组件加载', () => {
       join(ncm, 'main.js'),
       script(
         "fs.writeFileSync(at + '/anonymous_token', '');",
-        'module.exports = { cloudsearch: async () => ({ body: { at } }), song_url_v1: async () => ({}), song_detail: async () => ({}), album: async () => ({}), artists: async () => ({}), artist_album: async () => ({}), playlist_detail: async () => ({}), login_qr_key: async () => ({}), login_qr_create: async () => ({}), login_qr_check: async () => ({}), login_status: async () => ({}) };',
+        'module.exports = { cloudsearch: async () => ({ body: { at } }), song_url_v1: async () => ({}), song_detail: async () => ({}), album: async () => ({}), artists: async () => ({}), artist_album: async () => ({}), playlist_detail: async () => ({}), banner: async () => ({}), top_song: async () => ({}), personalized: async () => ({}), album_new: async () => ({}), toplist_detail: async () => ({}), login_qr_key: async () => ({}), login_qr_create: async () => ({}), login_qr_check: async () => ({}), login_status: async () => ({}) };',
       ),
     );
     await writeFile(

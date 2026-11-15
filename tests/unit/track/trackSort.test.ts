@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { nextTrackSort, sortFlatTracks, startsDescending } from '../../../src/track/trackSort.ts';
+import {
+  isTrackSortColumn,
+  nextTrackSort,
+  sortFlatTracks,
+  startsDescending,
+} from '../../../src/track/trackSort.ts';
 import { trackRow } from '../../fixtures/libraryRows.ts';
 
 const at = (title: string, sampleRate: number, trackNumber = 1) =>
@@ -56,5 +61,41 @@ describe('列的缺省方向', () => {
       descending: false,
     });
     expect(now).toEqual({ column: 'title', descending: false });
+  });
+});
+
+describe('碟号、文件名、文件夹三列', () => {
+  const file = (folder: string, name: string, discNumber = 0) =>
+    trackRow('Album', name, { path: `file://E:/Music/${folder}/${name}`, discNumber });
+
+  it('文件名按自然序：数字按大小，同名按路径', () => {
+    const [ten, two, other] = [
+      file('A', '10 b.flac'),
+      file('A', '2 a.flac'),
+      file('B', '2 a.flac'),
+    ];
+    expect(sortFlatTracks([ten, other, two], { column: 'fileName', descending: false })).toEqual([
+      other,
+      two,
+      ten,
+    ]);
+  });
+
+  it('文件夹按所在文件夹的名字排，降序反过来', () => {
+    const [b, a, c] = [file('B', 'x.flac'), file('A', 'x.flac'), file('C', 'x.flac')];
+    expect(sortFlatTracks([b, a, c], { column: 'folder', descending: false })).toEqual([a, b, c]);
+    expect(sortFlatTracks([b, a, c], { column: 'folder', descending: true })).toEqual([c, b, a]);
+  });
+
+  it('碟号按数排', () => {
+    const [d10, d2] = [file('A', 'a.flac', 10), file('A', 'b.flac', 2)];
+    expect(sortFlatTracks([d10, d2], { column: 'disc', descending: false })).toEqual([d2, d10]);
+  });
+
+  it('三列能交给宿主排；要按标签现算的列只显示，不进排序', () => {
+    for (const column of ['disc', 'fileName', 'folder'] as const)
+      expect(isTrackSortColumn(column)).toBe(true);
+    for (const column of ['composer', 'comment', 'lastModified', 'firstPlayed'] as const)
+      expect(isTrackSortColumn(column)).toBe(false);
   });
 });

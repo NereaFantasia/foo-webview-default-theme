@@ -1,8 +1,13 @@
 import { atom, createStore } from 'jotai/vanilla';
-import { describe, expect, it } from 'vitest';
-import type { QueueView } from '../../../../src/playback/queue/queueState.ts';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  queueViewAtom,
+  startQueueState,
+  type QueueView,
+} from '../../../../src/playback/queue/queueState.ts';
 import { startUpNext, upEarlierAtom, upNextAtom } from '../../../../src/playback/queue/upNext.ts';
 import type { HostParams } from '../../../fixtures/fakeHost.ts';
+import { installFakeQueue } from '../../../fixtures/fakeQueue.ts';
 import { numberParam } from '../../../fixtures/hostAnswers.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
@@ -171,7 +176,8 @@ describe('startUpNext', () => {
     const { host, store, service, titles } = setup({ at: 0, size: 5001 });
     await service.ready;
     expect(store.get(upNextAtom).total).toBe(5000);
-    expect(titles()).toHaveLength(600);
+    // 视口所在的那一页，加上往前预取的三页
+    expect(titles()).toHaveLength(800);
     const before = host.callsTo('playlist.getTracks').length;
     await service.readRange(4990, 4999);
     expect(titles().at(-1)).toBe('r5000');
@@ -247,13 +253,14 @@ describe('startUpNext', () => {
     service.dispose();
     held.release();
     await reading;
-    expect(titles()).toHaveLength(600);
+    // 视口所在的那一页，加上往前预取的三页
+    expect(titles()).toHaveLength(800);
     const before = host.callsTo('playlist.getTracks').length;
     await service.readRange(1500, 1501);
     expect(host.callsTo('playlist.getTracks')).toHaveLength(before);
   });
 
-  it('重复列表：到末尾就停，不绕回开头；最后一首在播时这一段是空的', async () => {
+  it('重复列表：到末尾就停，不绕回开头，最后一首在播放时这一段是空的', async () => {
     const { service, titles } = setup({ order: 'repeat-playlist', at: 3 });
     await service.ready;
     expect(titles()).toEqual(['r4']);
@@ -265,7 +272,7 @@ describe('startUpNext', () => {
     last.service.dispose();
   });
 
-  it('随机顺序、单曲循环、开了播放跟随光标、停止时都不出', async () => {
+  it('随机顺序、单曲循环、开了播放跟随光标、停止时都不出现', async () => {
     const random = setup({ order: 'shuffle-tracks' });
     await random.service.ready;
     expect(random.titles()).toEqual([]);
@@ -279,7 +286,7 @@ describe('startUpNext', () => {
     expect(stopped.titles()).toEqual([]);
   });
 
-  it('换成推得出的顺序时重新推', async () => {
+  it('换成推算得出的顺序时重新推算', async () => {
     const { store, order, service, titles } = setup({ order: 'random', at: 2 });
     await service.ready;
     expect(titles()).toEqual([]);
@@ -300,7 +307,7 @@ describe('startUpNext', () => {
     service.dispose();
   });
 
-  it('播列表外的曲目期间起点所在的列表被改：不再信记下的那一行', async () => {
+  it('播放列表外的曲目期间，起点所在的列表被改：不再信记下的那一行', async () => {
     const { host, service, titles } = setup({ at: 1 });
     await service.ready;
     host.answer('playback.getCurrentTrackIndex', {
@@ -340,6 +347,42 @@ describe('startUpNext', () => {
     });
     await settle();
     expect(titles()).toEqual(['r4']);
+  });
+
+  it('点选起播时目标先排进队首：「接下来」不提前重排，换曲之后一起换', async () => {
+    const { host, store, queue, service, titles } = setup({ at: 0 });
+    const fake = installFakeQueue(host);
+    const state = startQueueState(store, host.fb);
+    const off = store.sub(queueViewAtom, () => store.set(queue, store.get(queueViewAtom)));
+    await Promise.all([service.ready, state.ready]);
+    expect(titles()).toEqual(['r1', 'r2', 'r3', 'r4']);
+    // 点选第 3 行：宿主先把目标连同列表位置排进队首，再发 starting，音频还在打开
+    await host.fb.queue.insertNext([{ playlist: 0, item: 3 }], 0);
+    host.emit('playback:starting', { command: 'play', paused: false });
+    await settle();
+    await settle();
+    expect(fake.items).toHaveLength(1);
+    expect(titles()).toEqual(['r1', 'r2', 'r3', 'r4']);
+    host.answer('playback.getCurrentTrackIndex', {
+      playlistGuid: GUID,
+      success: true,
+      found: true,
+      playlist: 0,
+      index: 3,
+    });
+    const opened = fake.items[0]?.track;
+    if (!opened) throw new Error('队列里没有目标');
+    host.emit('playback:trackChanged', opened);
+    fake.set([]);
+    host.emit('playback:queueChanged', {
+      origin: 'playback_advance',
+      count: 0,
+      contentVersion: '9',
+    });
+    await vi.waitFor(() => expect(titles()).toEqual(['r4']));
+    off();
+    state.dispose();
+    service.dispose();
   });
 
   it('两次读起点的应答倒着回来：晚到的旧应答不盖掉新的起点', async () => {
@@ -430,7 +473,7 @@ describe('startUpNext', () => {
   });
 
   describe('前面那几行', () => {
-    it('播到第 N 行时是第 0 行到它前一行；界面要了才读，读到的是来源里的行号', async () => {
+    it('播到第 N 行时是第 0 行到它前一行，界面要了才读，读到的是来源里的行号', async () => {
       const { host, store, service } = setup({ at: 3, size: 10 });
       await service.ready;
       expect(store.get(upEarlierAtom)).toMatchObject({ total: 3, rows: [] });
@@ -469,7 +512,7 @@ describe('startUpNext', () => {
       service.dispose();
     });
 
-    it('播第 0 行、随机顺序、播列表外的曲目时都没有这一段', async () => {
+    it('播第 0 行、随机顺序、播放列表外的曲目时都没有这一段', async () => {
       const first = setup({ at: 0, size: 10 });
       await first.service.ready;
       expect(first.store.get(upEarlierAtom).total).toBe(0);

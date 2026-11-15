@@ -1,3 +1,4 @@
+import { albumFacetName } from './albumFacet.ts';
 import { conditionKey, conditionLabel } from './trackConditions.ts';
 import type { Translate } from '../i18n/translate.ts';
 import { PRESET_LABELS } from './queryLabels.ts';
@@ -27,7 +28,13 @@ export function decadeLabel(name: string, t: Translate): string {
     : t('songs.decade', { decade: name.slice(0, 4) });
 }
 
-/** 生效的条件：先预设，再按流派、年代、艺术家的分面。框里的字不算条件，条件行里不列 */
+/** 分面的一个取值写给人看的样子：年代写成「1990 年代」，专辑只写专辑名，其余原样 */
+export function facetValueLabel(facet: TrackFacet, name: string, t: Translate): string {
+  if (facet === 'decade') return decadeLabel(name, t);
+  return facet === 'album' ? albumFacetName(name) : name;
+}
+
+/** 生效的条件：先预设，再按流派、年代、艺人、专辑的分面。框里的字不算条件，条件行里不列 */
 export function filterConditions(filter: TrackFilter, t: Translate): FilterCondition[] {
   const presets = [...filter.presets].map((id): FilterCondition => ({
     key: `preset\n${id}`,
@@ -37,7 +44,7 @@ export function filterConditions(filter: TrackFilter, t: Translate): FilterCondi
   const facets = TRACK_FACETS.flatMap((facet) =>
     [...filter.facets[facet]].map((name): FilterCondition => ({
       key: `${facet}\n${name}`,
-      label: facet === 'decade' ? decadeLabel(name, t) : name,
+      label: facetValueLabel(facet, name, t),
       ref: { kind: 'facet', facet, name },
     })),
   );

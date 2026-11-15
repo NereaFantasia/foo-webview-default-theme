@@ -233,6 +233,19 @@ test('过期 ready 拒绝退出并发出取消请求', async ({ page }) => {
   });
   expect(requests).toContain('/plugin/cancel');
   expect(requests).not.toContain('/plugin/authorize');
+  // 复查后回到可更新，失败原因不再消失，并能复制运行日志
+  await expect(
+    page
+      .locator('[data-settings-row] [aria-hidden="true"]')
+      .filter({ hasText: '组件 2.1.0 未能安装' }),
+  ).toBeVisible({ timeout: 6000 });
+  await page.getByText('诊断详情').click();
+  await expect(page.getByText('执行器尚未确认本次安装')).toBeVisible();
+  await page.getByRole('button', { name: '复制运行日志' }).click();
+  await expect
+    .poll(() => String(env.host.callsTo('clipboard.write').at(-1)?.['text'] ?? ''))
+    .toContain('plugin.failed detail=执行器尚未确认本次安装');
+  await expect(page.getByRole('button', { name: /重启安装/ })).toBeVisible();
 });
 
 test('回滚结果显示恢复入口，只定位文件，不再推荐失败发行', async ({ page }) => {
@@ -246,8 +259,8 @@ test('回滚结果显示恢复入口，只定位文件，不再推荐失败发�
   await page.getByRole('button', { name: /打开恢复文件位置/ }).click();
   await expect.poll(() => env.host.callsTo('shell.showInExplorer').length).toBe(1);
   expect(env.host.callsTo('misc.exit')).toEqual([]);
-  expect(JSON.parse(env.disk.text('state/failed-plugin-releases.json') ?? '{}').releases).toEqual([
-    env.prepared.releaseSha256,
-  ]);
+  await expect
+    .poll(() => JSON.parse(env.disk.text('state/failed-plugin-releases.json') ?? '{}').releases)
+    .toEqual([env.prepared.releaseSha256]);
   await expect(page.getByRole('button', { name: /重启安装/ })).toHaveCount(0);
 });

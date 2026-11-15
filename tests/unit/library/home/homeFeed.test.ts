@@ -8,6 +8,7 @@ import { albumsAnswer } from '../../../fixtures/albumLibrary.ts';
 import { hostFailure, listParam } from '../../../fixtures/hostAnswers.ts';
 import { albumRow, albumTrackRow } from '../../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
+import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
 
 afterEach(() => vi.useRealTimers());
 afterEach(() => vi.restoreAllMocks());
@@ -18,13 +19,7 @@ function setup(available = true, count = 2) {
     albumTrackRow('A', 'Artist', String(index)),
   );
   host.answer('library.getAlbums', albumsAnswer([album]));
-  host.answer('library.getAll', {
-    success: true,
-    tracks: rows,
-    items: rows,
-    total: rows.length,
-    offset: 0,
-  });
+  host.answer('library.search', wholeLibrary(rows));
   host.answer('config.getComponents', {
     success: true,
     count: available ? 1 : 0,
@@ -75,7 +70,7 @@ describe('首页统计服务', () => {
     await vi.waitFor(() => expect(state().status).toBe('ready'));
     expect(state()).toMatchObject({
       unreadCount: 1,
-      statistics: { recent: [album], unplayed: [] },
+      statistics: { recent: [{ album }], unplayed: [] },
     });
   });
 
@@ -99,7 +94,7 @@ describe('首页统计服务', () => {
     });
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
-    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [{ album }] } });
   });
 
   it('后续批次超时保留已读数据，并记录异常与批次位置', async () => {
@@ -121,7 +116,7 @@ describe('首页统计服务', () => {
     });
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
-    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [{ album }] } });
     expect(warn).toHaveBeenCalledWith(
       '播放统计读取失败',
       expect.objectContaining({
@@ -158,7 +153,7 @@ describe('首页统计服务', () => {
     expect(state()).toMatchObject({
       status: 'ready',
       unreadCount: 0,
-      statistics: { recent: [album] },
+      statistics: { recent: [{ album }] },
     });
   });
 
@@ -179,7 +174,7 @@ describe('首页统计服务', () => {
     });
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
-    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [album] } });
+    expect(state()).toMatchObject({ unreadCount: 1, statistics: { recent: [{ album }] } });
   });
 
   it('组件清单失败记录实际错误，刷新恢复后清除失败阶段', async () => {
@@ -239,7 +234,7 @@ describe('首页统计服务', () => {
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
     expect(state().available).toBe(true);
-    expect(state().statistics.recent).toEqual([album]);
+    expect(state().statistics.recent.map((item) => item.album)).toEqual([album]);
   });
   it('缺少组件不请求统计也不伪装从未播放', async () => {
     const { host, service, state } = setup(false);
@@ -252,7 +247,7 @@ describe('首页统计服务', () => {
     const { host, service, state, album } = setup(true, HOME_STATS_BATCH + 1);
     service.activate();
     await vi.waitFor(() => expect(state().status).toBe('ready'));
-    expect(state().statistics.recent).toEqual([album]);
+    expect(state().statistics.recent.map((item) => item.album)).toEqual([album]);
     expect(state().statistics.added).toEqual([album]);
     expect(
       host.callsTo('playcount.getBatch').map((params) => listParam(params, 'paths').length),
@@ -293,7 +288,7 @@ describe('首页统计服务', () => {
     for (let pending = held.pending.length; pending > 0; pending -= 1) held.respond(0);
     await vi.advanceTimersByTimeAsync(0);
     expect(state()).toMatchObject({ status: 'ready', dirty: false });
-    expect(state().statistics.recent).toEqual([album]);
+    expect(state().statistics.recent.map((item) => item.album)).toEqual([album]);
   });
   it('就绪后变化不换序，刷新失败留旧数据', async () => {
     const { host, service, state, album } = setup();
@@ -306,7 +301,7 @@ describe('首页统计服务', () => {
     host.answer('playcount.getBatch', hostFailure('OPERATION_FAILED'));
     await service.refresh();
     await vi.waitFor(() => expect(state().status).toBe('failed'));
-    expect(state().statistics.recent).toEqual([album]);
+    expect(state().statistics.recent.map((item) => item.album)).toEqual([album]);
   });
   it('释放后不收应答、不留监听', async () => {
     const { host, service, state } = setup();

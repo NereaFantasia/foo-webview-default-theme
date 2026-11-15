@@ -1,7 +1,7 @@
 import { fb } from 'foo-webview-sdk/bridge';
 import { atom, type Atom } from 'jotai/vanilla';
 import { settle } from '../host/hostCall.ts';
-import { enqueuePaths, QUEUE_BATCH, type EnqueuePlace } from '../host/queueCommands.ts';
+import { enqueuePaths, type EnqueuePlace } from '../host/queueCommands.ts';
 import type { Store } from '../kit/store.ts';
 import { countRows, type SelectionRanges } from '../table/rangeSelection.ts';
 import { MAIN_COMMANDS } from './playlistActions.ts';
@@ -13,7 +13,6 @@ import { collectHandles, HANDLE_PAGE, type TrackRef } from './selectionHandles.t
  * 内联发送的行数上限。超过就改调宿主的「发送到播放列表…」对话框，由它在内部复制，不把几万条路径塞过桥
  */
 export const SEND_TO_INLINE_LIMIT = 2000;
-export const QUEUE_NEXT_BATCH = QUEUE_BATCH;
 /** 追加到末尾：宿主把超过当前行数的位置截到末尾，不必先读行数 */
 const APPEND = 0x7fffffff;
 

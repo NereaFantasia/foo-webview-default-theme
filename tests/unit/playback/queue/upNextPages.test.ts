@@ -119,14 +119,15 @@ describe('接下来按视口读取', () => {
     const held = host.hold('playlist.getTracks');
     const first = pages.readRange(0, 20);
     await settle();
-    expect(held.pending).toHaveLength(2);
+    // 三路并发：视口那一页与往前预取的两页同时在途，第四页还没发
+    expect(held.pending).toHaveLength(3);
     const last = pages.readRange(9000, 9020);
     const repeated = pages.readRange(9000, 9020);
     expect(repeated).toBe(last);
     held.respond(0);
     await settle();
     expect(held.pending.some((params) => params['start'] === 9000)).toBe(true);
-    expect(held.pending.some((params) => params['start'] === 400)).toBe(false);
+    expect(held.pending.some((params) => params['start'] === 600)).toBe(false);
     held.release();
     await Promise.all([first, last]);
     expect(view().rows.some((row) => row.offset === 9020)).toBe(true);

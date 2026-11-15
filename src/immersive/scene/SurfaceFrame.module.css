@@ -1,0 +1,14 @@
+/* 预设与舞台的外框给元素的一组表面变量，元素只用这一组画底与状态：文字取前景色的 100%、72%、48%，描边 32%，
+   悬停 10%、按下 6%，选中取封面强调色的 22%，表面（没有封面的占位底）8%。场景固定深色，前景色是白。
+   `--accent` 由沉浸主题层给 */
+.surface {
+  --text-primary: var(--colorNeutralForeground1);
+  --text-secondary: color-mix(in srgb, var(--colorNeutralForeground1) 72%, transparent);
+  --text-muted: color-mix(in srgb, var(--colorNeutralForeground1) 48%, transparent);
+  --line: color-mix(in srgb, var(--colorNeutralForeground1) 32%, transparent);
+  --state-hover: color-mix(in srgb, var(--colorNeutralForeground1) 10%, transparent);
+  --state-pressed: color-mix(in srgb, var(--colorNeutralForeground1) 6%, transparent);
+  --bg-hover: var(--state-hover);
+  --bg-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+  --bg-surface: color-mix(in srgb, var(--colorNeutralForeground1) 8%, transparent);
+}

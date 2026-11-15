@@ -1,182 +1,90 @@
-import { Button, Link, Tooltip } from '@fluentui/react-components';
-import {
-  ArrowShuffle20Regular,
-  MoreHorizontal20Regular,
-  ImageMultiple20Regular,
-  Play20Filled,
-  RecordRegular,
-  CalendarLtr16Regular,
-  Clock16Regular,
-  TextNumberListLtr16Regular,
-} from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useState } from 'react';
-import { localeAtom, translateAtom } from '../../../i18n/locale.ts';
-import { pluralAtom } from '../../../i18n/plural.ts';
-import { Metadata, MetadataItem } from '../../../kit/Metadata.tsx';
+import { useEffect, useState } from 'react';
+import { translateAtom } from '../../../i18n/locale.ts';
+import { appleLogoUrl } from '../../biography/apple/appleMedia.ts';
 import { BiographyPhotoViewer } from '../../biography/BiographyPhotoViewer.tsx';
-import { ArtistPhotoBanner } from '../photos/ArtistPhotoBanner.tsx';
-import { SongArt } from '../../SongArt.tsx';
+import { ArtistHero } from '../../detail/ArtistHero.tsx';
 import { useArtists } from '../artistsContext.ts';
-import { useViewControlStyles } from '../../../theme/controlStyles.ts';
-import styles from './ArtistHeader.module.css';
 import { ArtistPhotoTools } from '../photos/ArtistPhotoTools.tsx';
+import { useArtistPortrait } from './useArtistPortrait.ts';
 
-export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: number) => void }) {
+/**
+ * 头像等照片的最长时间，毫秒。照片还在找或在量宽高比时头像转圈，不先露占位再换成照片，更不先画成圆形再换成横幅；
+ * 超过这个时间还没有结果就不再转圈，露人像占位，照片晚到了再淡入
+ */
+const LOADING_MAX_MS = 10_000;
+
+/**
+ * 本地艺人页的头部：把这位艺人的照片、可播放与否与回调喂给 `ArtistHero`。照片取「设为头像」的那张，没设取第一张；
+ * 合辑不用照片。点头像或「照片」键打开 `BiographyPhotoViewer`
+ */
+export function ArtistHeader({
+  narrow,
+  onMenu,
+}: {
+  readonly narrow: boolean;
+  readonly onMenu: (x: number, y: number) => void;
+}) {
   const services = useArtists();
-  const viewControls = useViewControlStyles();
   const name = useAtomValueRawSync(services.places.selected);
   const state = useAtomValueRawSync(services.detail.state);
   const compilation = useAtomValueRawSync(services.compilation);
-  const photos = useAtomValueRawSync(services.biography.photos.state);
-  const prefs = useAtomValueRawSync(services.prefs.state);
+  const logo = useAtomValueRawSync(services.biography.logo);
   const viewerTop = useAtomValueRawSync(services.biography.viewerTop);
   const t = useAtomValueRawSync(translateAtom);
-  const plural = useAtomValueRawSync(pluralAtom);
-  const locale = useAtomValueRawSync(localeAtom).active;
+  const {
+    pictures,
+    portrait,
+    chosen: preferred,
+    shown,
+    wide,
+    searching,
+    measuring,
+  } = useArtistPortrait();
   const [viewing, setViewing] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
-  const pictures = photos.artist === name ? photos.photos : [];
+  const [grace, setGrace] = useState(true);
+  // 换一位艺人重新计时：头部留在页面上时，第二位也要有加载态
+  useEffect(() => {
+    setGrace(true);
+    const timer = setTimeout(() => setGrace(false), LOADING_MAX_MS);
+    return () => clearTimeout(timer);
+  }, [name]);
   const index = Math.max(
     0,
-    pictures.findIndex((photo) => photo.key === (chosen ?? prefs.portraits[name ?? ''])),
+    pictures.findIndex((photo) => photo.key === (chosen ?? preferred)),
   );
   const photo = pictures[index];
-  const portrait = pictures.find((item) => item.key === prefs.portraits[name ?? '']) ?? pictures[0];
-  const loading = photos.artist === name && (photos.loading || !!photos.onlineLoading);
   const openPhotos = () => {
     setChosen(portrait?.key ?? null);
     setViewing(true);
   };
   const detail = state.subject === name ? state.detail : null;
-  const count = new Intl.NumberFormat(locale);
   const playable =
-    detail &&
+    !!detail &&
     detail.summary.tracks > 0 &&
     !state.partial &&
     !state.refreshFailed &&
     !state.guestPending;
   return (
-    <header className={styles.root} data-artist-header data-compact={compilation || undefined}>
-      {compilation ? (
-        <div className={styles.collage}>
-          {Array.from({ length: 4 }, (_, at) => (
-            <SongArt key={at} album={detail?.own[at]?.album} size={66} />
-          ))}
-        </div>
-      ) : (
-        <button
-          className={styles.portrait}
-          type="button"
-          disabled={!photo}
-          aria-label={t('biography.openPhotos')}
-          onClick={openPhotos}
-        >
-          <ArtistPhotoBanner
-            key={portrait?.url ?? ''}
-            url={portrait?.url}
-            label={name ?? ''}
-            loading={loading}
-            loadingLabel={t('artists.photoLoading')}
-            missing={photos.failed ? t('biography.photoFailed') : t('artists.noPhoto')}
-            failed={t('biography.photoFailed')}
-          />
-          {pictures.length > 1 && <span className={styles.badge}>{pictures.length}</span>}
-        </button>
-      )}
-      <div className={styles.identity}>
-        <div className={styles.info}>
-          {compilation && <span className={styles.kind}>{t('artists.compilation')}</span>}
-          <h2 title={name || t('artists.unknown')}>{name || t('artists.unknown')}</h2>
-          {detail && (
-            <p>
-              <Metadata>
-                <MetadataItem icon={<RecordRegular />} label={t('trackInfo.album')}>
-                  {t(plural(detail.summary.ownAlbums, 'album.countOne', 'album.count'), {
-                    count: count.format(detail.summary.ownAlbums),
-                  })}
-                </MetadataItem>
-                <MetadataItem icon={<RecordRegular />}>
-                  {t(
-                    plural(
-                      detail.summary.guestAlbums,
-                      'artists.guestCountOne',
-                      'artists.guestCount',
-                    ),
-                    { count: count.format(detail.summary.guestAlbums) },
-                  )}
-                </MetadataItem>
-                <MetadataItem icon={<TextNumberListLtr16Regular />}>
-                  {t(plural(detail.summary.tracks, 'album.menuTracksOne', 'album.menuTracks'), {
-                    count: count.format(detail.summary.tracks),
-                  })}
-                </MetadataItem>
-                <MetadataItem icon={<Clock16Regular />} label={t('table.duration')}>
-                  {new Intl.NumberFormat(locale, {
-                    style: 'unit',
-                    unit: 'hour',
-                    maximumFractionDigits: 1,
-                  }).format(detail.summary.duration / 3600)}
-                </MetadataItem>
-                {detail.summary.firstYear && (
-                  <MetadataItem icon={<CalendarLtr16Regular />} label={t('table.year')}>
-                    {detail.summary.firstYear}
-                    {detail.summary.lastYear !== detail.summary.firstYear
-                      ? `–${detail.summary.lastYear}`
-                      : ''}
-                  </MetadataItem>
-                )}
-              </Metadata>
-            </p>
-          )}
-          {!compilation && !!detail?.collaborators.length && (
-            <p className={styles.collaborators}>
-              {t('artists.collaborators')}{' '}
-              {detail.collaborators.slice(0, 5).map((artist, at) => (
-                <span key={artist.name}>
-                  {at > 0 && ' · '}
-                  <Link onClick={() => services.places.open(artist.name)}>{artist.name}</Link>
-                </span>
-              ))}
-            </p>
-          )}
-        </div>
-        <div className={styles.actions}>
-          <Button
-            appearance="primary"
-            icon={<Play20Filled />}
-            disabled={!playable}
-            onClick={() => void services.play()}
-          >
-            {t('artists.play')}
-          </Button>
-          <Button
-            className={viewControls.field}
-            icon={<ArrowShuffle20Regular />}
-            disabled={!playable}
-            onClick={() => void services.play(0, true)}
-          >
-            {t('artists.shuffle')}
-          </Button>
-          {!compilation && (
-            <Tooltip content={t('biography.photos')} relationship="label">
-              <Button
-                className={viewControls.field}
-                icon={<ImageMultiple20Regular />}
-                disabled={!photo}
-                onClick={openPhotos}
-              />
-            </Tooltip>
-          )}
-          <Button
-            className={viewControls.field}
-            icon={<MoreHorizontal20Regular />}
-            aria-label={t('artists.more')}
-            onClick={(event) => onMenu(event.clientX, event.clientY)}
-          />
-        </div>
-      </div>
-      {!compilation && photo && (
+    <ArtistHero
+      name={name || t('artists.unknown')}
+      {...(logo
+        ? { logo: { src: appleLogoUrl(logo), width: logo.width, height: logo.height } }
+        : {})}
+      narrow={narrow}
+      {...(shown ? { shown: { url: shown.photo.url, shape: shown.shape } } : {})}
+      wide={wide}
+      loading={grace && (searching || measuring)}
+      canOpenPhotos={!!photo}
+      photosLoading={grace && searching}
+      {...(compilation ? {} : { onOpenPhotos: openPhotos })}
+      playable={playable}
+      onPlay={() => void services.play()}
+      onShuffle={() => void services.play(0, true)}
+      onMenu={onMenu}
+    >
+      {photo && (
         <BiographyPhotoViewer
           open={viewing}
           artist={name ?? ''}
@@ -190,6 +98,6 @@ export function ArtistHeader({ onMenu }: { readonly onMenu: (x: number, y: numbe
           onClose={() => setViewing(false)}
         />
       )}
-    </header>
+    </ArtistHero>
   );
 }

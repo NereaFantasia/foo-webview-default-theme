@@ -19,9 +19,13 @@ export interface SearchQuery {
   readonly sort: string;
 }
 
+// 艺人与专辑艺术家是多值字段，`$meta(x)` 只取第一个值，署名排在后面的艺人会被排到末档：改用 `$meta_sep`
+// 把全部值连起来；没有这个字段时无值可连，先用 `$meta_num` 判断，与流派补读的写法一致
+const allValues = (field: string) =>
+  `$if($meta_num(${field}),$lower($meta_sep(${field},$char(31))),)`;
 const TITLE = '$lower($meta(title))';
-const ARTIST = '$lower($meta(artist))';
-const ALBUM_ARTIST = '$lower($meta(album artist))';
+const ARTIST = allValues('artist');
+const ALBUM_ARTIST = allValues('album artist');
 const ALBUM = '$lower($meta(album))';
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 

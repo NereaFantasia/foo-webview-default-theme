@@ -2,7 +2,9 @@ import { Link, MenuItem, MenuList, mergeClasses } from '@fluentui/react-componen
 import { useAtomValueRawSync } from 'jotai/react';
 import { Fragment, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
+import { useMetadataValue } from '../kit/Metadata.tsx';
 import { ScrollMenu, ScrollMenuPopover } from '../kit/ScrollMenuPopover.tsx';
+import { useContentFit } from '../kit/useContentFit.ts';
 import {
   isPlainClick,
   ObjectLink,
@@ -55,7 +57,10 @@ export function LinkedAlbum({
   );
 }
 
-/** 艺人署名：不超过 `MAX_INLINE_ARTISTS` 位时每个名字各自可点，再多整串点了弹菜单选人 */
+/**
+ * 艺人署名：不超过 `MAX_INLINE_ARTISTS` 位时每个名字各自可点，再多整串点了弹菜单选人。放在 `MetadataItem`
+ * 里时，几位名字铺不开（被截断）也收成整串一个点击目标：被截掉的名字指针够不着，只能进菜单选
+ */
 export function LinkedArtists({
   artists,
   ...style
@@ -63,7 +68,12 @@ export function LinkedArtists({
   const t = useAtomValueRawSync(translateAtom);
   const separator = t('album.nameSeparator');
   const title = artists.map((artist) => artist.text).join(separator);
-  if (artists.length > MAX_INLINE_ARTISTS) {
+  const fits = useContentFit(
+    useMetadataValue(),
+    artists.length > 1 && artists.length <= MAX_INLINE_ARTISTS,
+    title,
+  );
+  if (artists.length > MAX_INLINE_ARTISTS || !fits) {
     return <ArtistsMenu {...style} artists={artists} separator={separator} title={title} />;
   }
   return (

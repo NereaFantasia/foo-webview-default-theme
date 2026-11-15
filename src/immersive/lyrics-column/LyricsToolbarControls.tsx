@@ -29,7 +29,7 @@ import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './LyricsToolbar.module.css';
 import { FONT_SIZE_STEP, formatOffset, stepFontSize, stepOffset } from './lyricsToolbar.ts';
 import { RomanizationIcon } from './RomanizationIcon.tsx';
-import { useToolbarStyles } from './toolbarStyles.ts';
+import { useToolsStyles } from './toolsStyles.ts';
 
 /** 控件排布模式：tile 适用于宽档磁贴布局，panel 适用于下拉面板竖向布局 */
 export type ControlLayout = 'tile' | 'panel';
@@ -51,7 +51,7 @@ export function FontSizeControl({
   readonly available: boolean;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
   const { fontSize } = useAtomValueRawSync(service.display);
@@ -137,7 +137,7 @@ export function TimingControl({
   readonly available: boolean;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsKey);
   const offset = useAtomValueRawSync(service.offset);
@@ -224,7 +224,7 @@ export function DisplayToggle({
   readonly available: boolean;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
   const checked = useAtomValueRawSync(service.display)[field];
@@ -282,7 +282,7 @@ export function AlignControl({
   readonly available: boolean;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const classes = useToolbarStyles();
+  const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
   const { align } = useAtomValueRawSync(service.display);

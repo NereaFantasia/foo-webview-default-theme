@@ -1,5 +1,6 @@
-import { Button, Spinner } from '@fluentui/react-components';
+import { Button, Link, Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
+import { Fragment } from 'react';
 import type { BiographyTranslate } from '../BiographyPanel.tsx';
 import type { BiographyLibraryService } from './biographyLibrary.ts';
 import styles from './BiographyLibraryInfo.module.css';
@@ -9,11 +10,14 @@ export function BiographyLibraryInfo({
   locale,
   t,
   collaborators = false,
+  onOpenArtist,
 }: {
   readonly service: BiographyLibraryService;
   readonly locale: string;
   readonly t: BiographyTranslate;
   readonly collaborators?: boolean;
+  /** 给了就把常合作艺人的名字做成可点的链接，点开该艺人 */
+  onOpenArtist?(name: string): void;
 }) {
   const state = useAtomValueRawSync(service.state);
   if (!state.artist) return null;
@@ -21,7 +25,13 @@ export function BiographyLibraryInfo({
   if (collaborators)
     return summary?.collaborators.length ? (
       <div className={styles.collaborators} data-biography-collaborators>
-        <span>{t('biography.collaborators')}</span> {summary.collaborators.join(' · ')}
+        <span>{t('biography.collaborators')}</span>{' '}
+        {summary.collaborators.map((name, at) => (
+          <Fragment key={name}>
+            {at > 0 && ' · '}
+            {onOpenArtist ? <Link onClick={() => onOpenArtist(name)}>{name}</Link> : name}
+          </Fragment>
+        ))}
       </div>
     ) : null;
   if (!summary?.tracks && !state.loading && !state.failed) return null;

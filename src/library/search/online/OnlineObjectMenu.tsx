@@ -1,4 +1,11 @@
-import { BookOpen20Regular, Copy20Regular } from '@fluentui/react-icons';
+import {
+  BookOpen20Regular,
+  Copy20Regular,
+  Heart20Regular,
+  HeartBroken20Regular,
+  PersonAdd20Regular,
+  PersonSubtract20Regular,
+} from '@fluentui/react-icons';
 import { fb } from 'foo-webview-sdk/bridge';
 import { useAtomValueRawSync } from 'jotai/react';
 import { settle } from '../../../host/hostCall.ts';
@@ -6,6 +13,9 @@ import type { MessageKey } from '../../../i18n/en.ts';
 import { translateAtom } from '../../../i18n/locale.ts';
 import { ContextMenu } from '../../../kit/context-menu/ContextMenu.tsx';
 import { useService } from '../../../kit/useService.ts';
+import { platformName } from '../../../playback/musicPlatforms.ts';
+import { onlineFavoritesKey } from '../../../playback/onlineFavorites.ts';
+import { canFavorite } from '../../../server/musicFavorites.ts';
 import { MENU_SURFACE_MOTION } from '../../../motion/MenuMotion.tsx';
 import { objectOpenerKey } from '../../../nav/objectOpener.ts';
 import { onlineListSubject, type OnlineListSubject } from '../../../nav/places.ts';
@@ -18,6 +28,12 @@ import type {
 import type { TablePoint } from '../../../table/tableItems.ts';
 import { divider, trackMenuEntries } from '../../../track/trackMenuEntries.ts';
 import { artistNames } from './OnlineItems.tsx';
+import {
+  favoriteLabelKey,
+  isFavoriteObject,
+  isFollowable,
+  toggleFavoriteObject,
+} from './objectFavorite.ts';
 import { useOnlineObjectActions } from './useOnlineObjectActions.ts';
 
 /** 菜单头第二行的种类名 */
@@ -29,6 +45,8 @@ export const ONLINE_LIST_KIND_LABELS = {
 
 export interface OnlineObjectTarget {
   readonly list: OnlineListSubject;
+  /** 收藏时存的快照；没有时菜单不出收藏项 */
+  readonly item?: MusicAlbum | MusicArtist | MusicPlaylist;
   /** 菜单头第二行种类之后的字，如专辑的艺人 */
   readonly detail?: string;
   /** 已取到的曲目；不给时播放、入队前从在线列表的数据里取第一页 */
@@ -38,9 +56,14 @@ export interface OnlineObjectTarget {
 /** 搜索结果里的一张专辑、一位艺人或一张歌单作为菜单的作用对象 */
 export function objectTargetOf(item: MusicAlbum | MusicArtist | MusicPlaylist): OnlineObjectTarget {
   if ('releaseDate' in item)
-    return { list: { kind: 'album', ref: item.ref, title: item.title }, detail: artistNames(item) };
-  if ('cover' in item) return { list: { kind: 'playlist', ref: item.ref, title: item.title } };
-  return { list: { kind: 'artist', ref: item.ref, title: item.name } };
+    return {
+      list: { kind: 'album', ref: item.ref, title: item.title },
+      detail: artistNames(item),
+      item,
+    };
+  if ('cover' in item)
+    return { list: { kind: 'playlist', ref: item.ref, title: item.title }, item };
+  return { list: { kind: 'artist', ref: item.ref, title: item.name }, item };
 }
 
 export interface OnlineObjectMenuProps {
@@ -61,8 +84,11 @@ export function OnlineObjectMenu({ menu, here = false, onClose, onFailed }: Onli
   const t = useAtomValueRawSync(translateAtom);
   const actions = useOnlineObjectActions(onFailed);
   const objects = useService(objectOpenerKey);
+  const favorites = useService(onlineFavoritesKey);
   const target = menu?.target;
   const list = target?.list;
+  const item = target?.item;
+  const on = item ? isFavoriteObject(favorites, item) : false;
   const noop = () => {};
   const run = (queue: boolean | null) => async () => {
     if (target) await actions.run(target, queue);
@@ -86,6 +112,31 @@ export function OnlineObjectMenu({ menu, here = false, onClose, onFailed }: Onli
       'play',
       'play-next',
       'enqueue',
+      ...(item && favorites.isReady()
+        ? [
+            {
+              kind: 'command' as const,
+              id: 'favorite',
+              disabled: !canFavorite(item.ref),
+              reason: canFavorite(item.ref)
+                ? undefined
+                : t('favorite.unsupported', { platform: platformName(t, item.ref.platform) }),
+              label: t(favoriteLabelKey(item, on)),
+              icon: isFollowable(item) ? (
+                on ? (
+                  <PersonSubtract20Regular />
+                ) : (
+                  <PersonAdd20Regular />
+                )
+              ) : on ? (
+                <HeartBroken20Regular />
+              ) : (
+                <Heart20Regular />
+              ),
+              onSelect: () => void toggleFavoriteObject(favorites, item),
+            },
+          ]
+        : []),
       divider('copy-divider'),
       {
         kind: 'command',

@@ -129,7 +129,6 @@ export function FoldersHeader(props: FoldersHeaderProps) {
     <SelectionBar
       count={selected}
       labelled={tier === 'wide'}
-      queueLimited={selected > 256}
       handlers={{
         play: () => void folders.actions.run(picked(), 'play'),
         next: () => void folders.actions.run(picked(), 'next'),
@@ -265,6 +264,7 @@ export function FoldersHeader(props: FoldersHeaderProps) {
               onMenuOpenChange={setQueryOpen}
               label={t('folders.resultFilter')}
               placeholder={t('folders.resultFilterShort')}
+              playcountMissing={available === false}
               onChange={folders.results.setQuery}
               onEnter={folders.results.flush}
               onScope={(scope) => folders.prefs.change({ scope })}

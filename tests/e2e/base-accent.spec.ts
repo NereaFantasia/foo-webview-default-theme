@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { enterSettings, openSettings } from '../fixtures/settingsPage.ts';
 
 test('基础色：自定义取色即时生效并恢复，Windows 通过 SDK 更新', async ({ page }) => {
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   const color = () =>
     page
       .locator('#root > .fui-FluentProvider')
@@ -41,7 +41,7 @@ test('基础色：自定义取色即时生效并恢复，Windows 通过 SDK 更�
 for (const scheme of ['light', 'dark'] as const) {
   test(`390 宽自定义取色浮层不越界，非法输入不覆盖颜色：${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     await settings.expand('强调色');
     await settings.choose('基础强调色', '自定义颜色');
     await page.setViewportSize({ width: 390, height: 800 });

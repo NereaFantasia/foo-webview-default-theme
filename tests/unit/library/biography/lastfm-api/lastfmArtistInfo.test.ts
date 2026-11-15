@@ -7,11 +7,18 @@ describe('Last.fm artist.getInfo 转换', () => {
   it('正文去掉来源尾句，保留安全链接位置，换行分段并记录许可', () => {
     const info = readLastfmArtistInfo(artistInfoSample(), 'Nujabes', 'zh');
     expect(info?.document).toEqual({
+      source: 'lastfm',
+      sourceId: 'Nujabes',
       artist: 'Nujabes',
       language: 'zh',
       paragraphs: ['瀬葉淳是日本的唱片制作人。', '他创办了 Hydeout Productions。'],
       links: [{ paragraph: 1, start: 5, end: 24, url: 'https://www.last.fm/label/Hydeout' }],
       url: 'https://www.last.fm/zh/music/Nujabes/+wiki',
+      attribution: {
+        name: 'Last.fm',
+        url: 'https://www.last.fm/zh/music/Nujabes/+wiki',
+        license: { name: 'CC BY-SA 3.0', url: 'https://creativecommons.org/licenses/by-sa/3.0/' },
+      },
       licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',
       license: 'CC BY-SA 3.0',
     });

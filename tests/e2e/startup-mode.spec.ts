@@ -34,7 +34,7 @@ for (const scheme of ['light', 'dark'] as const) {
   }
 }
 
-test('模式应答前不启动业务，确认独立窗口后加载正常界面', async ({ page }) => {
+test('模式应答前不启动业务，确认独立窗口后加载正常界面 @smoke', async ({ page }) => {
   const host = await installPageHost(page);
   const held = host.hold('window.getMode');
   await page.goto('/');
@@ -79,6 +79,22 @@ test('模式读取失败保留重试入口，不把失败当成独立窗口', as
   await expect(page.getByRole('heading', { name: '专辑', level: 1 })).toBeVisible();
 });
 
+test('主题启动失败时记下异常，复制排在重新加载前面，文本里有异常的名称与消息', async ({ page }) => {
+  const host = await installPageHost(page);
+  host.answer('clipboard.write', { success: true });
+  await page.route(/\/src\/app\/appServices\.ts/, (route) => route.abort());
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '主题启动失败' })).toBeVisible();
+  const buttons = page.locator('[data-startup-state="startFailed"] button');
+  await expect(buttons).toHaveText(['复制运行日志', '重新加载']);
+  await buttons.first().click();
+  await expect(buttons.first()).toHaveText('已复制');
+  const text = String(host.callsTo('clipboard.write').at(-1)?.['text']);
+  expect(text).toMatch(/^foo-webview-default-theme \d+\.\d+\.\d+\nuser agent: /);
+  expect(text).toContain('start name=TypeError');
+  expect(text).toContain('Failed to fetch dynamically imported module');
+});
+
 test('超时的旧应答不会启动业务，用户重试后以新模式为准', async ({ page }) => {
   const host = await installPageHost(page);
   const held = host.hold('window.getMode');
@@ -101,7 +117,8 @@ test('超时的旧应答不会启动业务，用户重试后以新模式为准',
 
 test('没有宿主的开发服务器仍可预览主题', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '专辑', level: 1 })).toBeVisible({
+  // 没有宿主替身预存的启动落点，停在缺省的首页
+  await expect(page.getByRole('heading', { name: '首页', level: 1 })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.locator('[data-startup-state]')).toHaveCount(0);

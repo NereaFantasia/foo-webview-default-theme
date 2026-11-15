@@ -1,0 +1,10 @@
+/* 本地曲目时留一个同宽的空位，播放键不随换曲位移 */
+.empty {
+  display: inline-block;
+  flex: none;
+  visibility: hidden;
+}
+
+.on {
+  color: var(--colorPaletteRedForeground1);
+}

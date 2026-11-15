@@ -15,11 +15,6 @@
   flex: none;
   padding: var(--spacingVerticalS) var(--spacingHorizontalS);
 }
-/* 顶部的「媒体库｜在线音乐」，两段平分整宽 */
-.scope {
-  flex: none;
-  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
-}
 .scroller {
   margin: 0 calc(-1 * var(--spacingHorizontalXS)) calc(-1 * var(--spacingVerticalXS));
   padding: 0 var(--spacingHorizontalXS) var(--spacingVerticalXS);
@@ -37,6 +32,22 @@
   font-size: var(--fontSizeBase200);
   font-weight: var(--fontWeightSemibold);
   color: var(--colorNeutralForeground3);
+}
+/* 媒体库、在线音乐两区的区标题，比组头高一级；第二区上方一条分隔线。高度改了要同步 searchSuggestions.ts 的 sectionHead */
+.section {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground1);
+}
+.section[data-second] {
+  margin-top: var(--spacingVerticalS);
+  border-top: var(--strokeWidthThin) solid var(--line);
 }
 .history {
   display: flex;

@@ -5,6 +5,7 @@ import { colorSchemeAtom } from '../colorScheme.ts';
 import type { CoverProfile } from '../coverPalette.ts';
 import type { ColorScheme } from '../themes.ts';
 import { loadBackgroundAppearance, resetBackgroundAppearance } from './backgroundAppearance.ts';
+import { loadFlowSpeed } from './flowSpeed.ts';
 import { loadThemeBackground } from './themeBackground.ts';
 
 export const WINDOW_BACKGROUND_KEY = 'default-theme.window-background.v1';
@@ -87,6 +88,7 @@ export function loadWindowBackground(store: Store, storage?: PrefStorage | null)
   backgroundPref.load(store, storage);
   loadBackgroundAppearance(store, storage);
   loadThemeBackground(store, storage);
+  loadFlowSpeed(store, storage);
 }
 
 export function resetBackgroundParameters(

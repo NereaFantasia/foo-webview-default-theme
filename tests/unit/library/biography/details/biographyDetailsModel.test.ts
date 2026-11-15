@@ -9,6 +9,7 @@ import { biographyDocument } from '../../../../fixtures/biographySamples.ts';
 
 const NOW = 1_800_000_000_000;
 const DETAILS = {
+  source: 'lastfm',
   artist: 'Queen',
   language: 'zh',
   url: lastfmArtistUrl('Queen', 'zh'),
@@ -32,6 +33,8 @@ describe('简介附加资料缓存', () => {
     ])
       expect(readBiographyDetails(bad, 'Queen', 'zh', NOW)).toBeUndefined();
     const entry = {
+      source: 'lastfm',
+      sourceId: 'Queen',
       artist: 'Queen',
       language: 'zh',
       fetchedAt: NOW - 100,

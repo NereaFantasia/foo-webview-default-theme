@@ -4,6 +4,7 @@ import { createStore } from 'jotai/vanilla';
 import { describe, expect, it, vi } from 'vitest';
 import { startAlbumBrowse } from '../../../../src/library/albums/albumBrowse.ts';
 import { ALBUM_LIMIT } from '../../../../src/library/albums.ts';
+import { EMPTY_QUERY_INPUT } from '../../../../src/track/queryInput.ts';
 import {
   albumSelectionAtom,
   startAlbumSelection,
@@ -72,7 +73,7 @@ describe('菜单作用对象', () => {
     const { browse, selection, names } = await setup();
     selection.activate(a!, PLAIN);
     selection.activate(b!, CTRL);
-    browse.setTerm('a');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: 'a' });
     expect(names()).toEqual(['A']);
     expect(selection.menuTargets(c!).map((album) => album.name)).toEqual(['C']);
   });
@@ -108,7 +109,7 @@ describe('选择随看得见的专辑变', () => {
   it('过滤掉的去掉，换排序保留', async () => {
     const { store, browse, selection } = await setup();
     selection.selectAll();
-    browse.setTerm('b');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: 'b' });
     expect([...store.get(albumSelectionAtom)]).toEqual([albumKeyOf(b!)]);
   });
 
@@ -116,7 +117,7 @@ describe('选择随看得见的专辑变', () => {
     const { store, browse, selection } = await setup();
     selection.selectAll();
     selection.dispose();
-    browse.setTerm('b');
+    browse.setInput({ ...EMPTY_QUERY_INPUT, text: 'b' });
     expect(store.get(albumSelectionAtom).size).toBe(4);
   });
 });

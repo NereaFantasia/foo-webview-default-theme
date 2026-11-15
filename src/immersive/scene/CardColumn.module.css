@@ -1,0 +1,164 @@
+/* 侧栏里的一列：上沿与高度由预设写进来的变量给（对齐封面列整组）；左缘、右边距与宽度上限同歌词栏的文字区与歌词工具条
+   （`--column-start`、`--column-end`、`--column-max`，数值在 `sideBox.ts`）：靠左，宽度取栏宽扣两边边距与上限里小的，
+   超宽屏多出的空白留在右边。没有面板：不画底与投影，行与节头各自成卡；上下两端的卡逐张淡出、变糊。
+   用相对定位下移而不用上外边距：外边距会穿过没有边框的父元素。工具条悬浮在列底，不占滚动区的高度 */
+.frame {
+  position: relative;
+  inset-block-start: var(--column-top);
+  box-sizing: border-box;
+  width: min(calc(100% - var(--column-start) - var(--column-end)), var(--column-max));
+  height: var(--column-height);
+  min-width: 0;
+  margin-inline-start: var(--column-start);
+}
+
+/* 滚动容器比列宽出一截：行卡的阴影投向右边，容器自己 `overflow` 不是 visible，会把盒子之外的阴影裁掉
+   用负外边距把盒子向左右撑开，再用同样大小的内边距把内容缩回原位，行卡的位置与宽度不变，只是阴影有地方画。
+   右边撑得多（阴影主要往那边投），左边只留软边；撑出的一截落在列外的空地上，滚轮在那里也照常滚列表。
+   上下也各多伸出一条渐隐带 `--queue-fade`：卡在带里淡完，整组范围内的卡是不透明的，所以可见的队列与左边的封面列整组齐高；
+   不伸出的话，带占进整组里，队列看起来比封面列短一截。带落在整组之外的空地上（上面是控制层让出的 `COLUMN_EDGE`），
+   工具条锚在 `.frame` 的底，不随容器伸出。上移用相对定位，不用负的上外边距：外边距会穿过没有边框的 `.frame`，
+   把整列连同工具条一起顶上去。
+   `will-change: scroll-position` 让容器走合成线程滚动：下面卡的渐隐动画要和滚动一起在合成线程上算，容器自己得是合成滚动；
+   透明底的容器浏览器不会自动合成，不写的话渐隐落在主线程，主线程忙时赶不上滚动，离开端的卡会在裁切线上露出来 */
+.scroller {
+  position: relative;
+  will-change: scroll-position;
+  inset-block-start: calc(var(--queue-fade) * -1);
+  box-sizing: border-box;
+  height: calc(100% + 2 * var(--queue-fade));
+  margin-inline: calc(var(--spacingHorizontalS) * -1) calc(var(--spacingHorizontalXXL) * -1);
+  padding-inline: var(--spacingHorizontalS) var(--spacingHorizontalXXL);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+/* 队列根的留白（上下各一条渐隐带，下面再加工具条的让位）算在最小高度里：列表比列短时，下面没有可滚的空白，
+   能滚的量只剩前面那一段已播曲目的高度。右侧卡的留白小、前面那一段的高度估得略紧，仍按原样算 */
+.scroller [data-queue-cards] {
+  box-sizing: border-box;
+}
+
+/* 上下两端渐隐变糊：每张卡按其进出滚动区边缘的进度（CSS view() 滚动时间线）淡出并变糊
+   时间线上下各向内缩一个渐隐带高 `--queue-fade`（一行高）：卡在碰到滚动容器的硬裁切线之前就淡完，裁切线上切到的只是
+   已经看不见的卡；不内缩的话，露出七成的卡还有七成不透明，上沿被切平。
+   `--queue-fade` 同时是列表上内边距与「前面的曲目」下内边距（`scene/cardVariables.ts`）：静止时第一张卡落在带的边缘，不在渐隐里。
+   滚动容器上下各多伸出这一条带（见 `.scroller`），时间线内缩的这一条正好落在伸出的部分里。
+   一条对称的时间线，关键帧里用具名范围（`entry` 管下沿进入，`exit` 管上沿离开），`fill both` 让范围外的卡停在端点。
+   `opacity` 与 `filter` 各写一个动画，且每个属性只能有一个动画管：`filter: blur` 上不了合成线程，和 `opacity` 写在同一个动画里
+   会把 `opacity` 一起拖到主线程；进入、离开分成两个动画也不行，同一元素上两个动画都改 `opacity`，浏览器判成不兼容，同样回到主线程。
+   主线程落后于合成线程的滚动，滚得越快、主线程越忙，离开端的卡到硬裁切线时越没淡完。分开后 `opacity` 在合成线程，与滚动
+   逐帧同步；`blur` 在主线程，最多落后一两帧，只是糊得多一点或少一点，不会露出没淡完的卡。
+   `blur` 的中段写 `none`：写 `blur(0)` 会让每张卡常驻一个滤镜。`opacity` 的动画整个存续期都占着这个属性，行自己的
+   `opacity`（拖动提起的行）经 `--lifted-opacity` 带进关键帧。
+   不在滚动容器上加蒙版：祖先带蒙版时里面所有行卡的 `backdrop-filter` 读不到背后的内容、模糊就没了；卡自己带 `opacity` 与
+   `filter` 不影响它自己的 `backdrop-filter`。时间线按布局位置算行的进出，不认 `transform`，所以画成卡的行用 `top` 定位
+   （`playback/queue/rowOffset.ts`）。选择器认卡的属性，不引用队列目录的类名 */
+.scroller [data-queue-cards] :is([data-kind], [data-queue-head], [aria-disabled='true']) {
+  animation:
+    edge-opacity linear both,
+    edge-blur linear both;
+  animation-timeline: view(block var(--queue-fade) var(--queue-fade));
+}
+
+@keyframes edge-opacity {
+  entry 0% {
+    opacity: 0;
+  }
+
+  entry 100% {
+    opacity: var(--lifted-opacity, 1);
+  }
+
+  exit 0% {
+    opacity: var(--lifted-opacity, 1);
+  }
+
+  exit 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes edge-blur {
+  entry 0% {
+    filter: blur(var(--spacingHorizontalM));
+  }
+
+  entry 100% {
+    filter: none;
+  }
+
+  exit 0% {
+    filter: none;
+  }
+
+  exit 100% {
+    filter: blur(var(--spacingHorizontalM));
+  }
+}
+
+/* 卡的皮肤：队列的样式只读变量（`scene/cardVariables.ts`），队列样式不管的几样在这里补。选择器只认卡的属性，不引用队列目录的类名；
+   都落在 `[data-queue-cards]` 里，右侧卡不画。
+   磨砂是背后的模糊、外阴影，再加一层压在底色上、内容下面的噪点。噪点是普通混合的纹理，不读背后的内容，成本只是多一块平铺图，
+   不像混合模式那样每帧重算；占位行转眼就换成真行，只铺噪点，不模糊、不投影。模糊只在卡后面，缝里没有。
+   `:where()` 把前缀的权重清零，磨砂规则的权重只剩属性本身，比行自己的焦点环（`:focus-visible` 的内阴影）低，焦点环照常盖过外阴影 */
+:where(.scroller [data-queue-cards]) :is([data-kind], [data-queue-head], [aria-disabled='true']) {
+  position: relative;
+  isolation: isolate;
+}
+
+:where(.scroller [data-queue-cards]) :is([data-kind], [data-queue-head]) {
+  backdrop-filter: var(--queue-card-blur, none);
+  box-shadow: var(--queue-card-shadow, none);
+}
+
+:where(.scroller [data-queue-cards])
+  :is([data-kind], [data-queue-head], [aria-disabled='true'])::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url('/cover-grain.png');
+  opacity: var(--queue-card-grain, 0);
+  content: '';
+  pointer-events: none;
+}
+
+/* 已播的行（队列页「前面的曲目」）：底换成压暗的一档（`--queue-played-bg`），内容降一档并略去色，看起来暗淡。降档落在行的
+   子元素上、不落在行本身：行自己的 `opacity` 要给渐隐用，并且会让它拿不到背后的内容，没有模糊。悬停、选中、焦点在行里时
+   内容回到原样，底沿用行卡的悬停与选中。这几条要压过行自己的状态底，所以带着完整的前缀权重 */
+.scroller [data-queue-cards] [data-kind='earlier'] {
+  background: var(--queue-played-bg, var(--queue-card-bg, transparent));
+}
+
+.scroller [data-queue-cards] [data-kind='earlier']:hover {
+  background: var(--queue-card-hover, var(--bg-hover));
+}
+
+.scroller [data-queue-cards] [data-kind='earlier'][data-selected] {
+  background: var(--queue-card-selected, var(--bg-selected));
+}
+
+.scroller [data-queue-cards] [data-kind='earlier'][data-selected]:hover {
+  background: var(--queue-card-selected-hover, var(--queue-card-selected, var(--bg-selected)));
+}
+
+.scroller [data-queue-cards] [data-kind='earlier'] > * {
+  opacity: var(--queue-played-content, 1);
+  filter: grayscale(var(--queue-played-gray, 0));
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    filter var(--motion-faster) var(--curveLinear);
+}
+
+.scroller [data-queue-cards] [data-kind='earlier']:is(:hover, :focus-within, [data-selected]) > * {
+  opacity: 1;
+  filter: grayscale(0);
+}
+
+/* 画成卡时虚拟行用 `top` 定位（`playback/queue/rowOffset.ts`），上面的滚动时间线按布局位置算进出，不认 `transform` */
+.scroller [data-queue-cards] :is([data-queue-slot], [data-queue-earlier-index]) {
+  top: var(--row-y, 0px);
+  transform: none;
+}

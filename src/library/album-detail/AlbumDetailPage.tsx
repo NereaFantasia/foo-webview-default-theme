@@ -153,6 +153,7 @@ export function AlbumDetailPage({ place }: PageProps) {
       chosen,
       item?.kind === 'row' ? rows.tracks[item.order] : undefined,
       stamp,
+      item?.kind === 'row' ? () => play(target.index) : undefined,
     );
     setTrackMenuAt(point);
   };

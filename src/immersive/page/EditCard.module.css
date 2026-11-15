@@ -1,0 +1,105 @@
+/* 设置编辑的卡片：停右时离右缘 32、停左时离左缘 32，离顶 88，宽 360，最低到离窗底 24，内容超出时卡片内滚动。
+   底板是单独的一层（材质类在组件里），按住滑块或拖拖柄时只让底板与内容让位，卡片本身不动。
+   进退场的淡入淡出分别挂在底板与内容上，不挂在卡片上：祖先上的 opacity 动画会让卡片成为 backdrop-filter 的背景根，
+   底板就取不到后面的画面，Acrylic 只剩着色。动画只在开始前填充（`backwards`），播完不留效果 */
+.card {
+  position: absolute;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 360px;
+  max-height: calc(100% - 112px);
+  isolation: isolate;
+  color: var(--text-primary);
+}
+
+.card[data-dock='end'] {
+  right: 32px;
+  --card-from: 10px;
+}
+
+.card[data-dock='start'] {
+  left: 32px;
+  --card-from: -10px;
+}
+
+.plate,
+.body {
+  animation: card-in var(--motion-normal) var(--curveDecelerateMid) backwards;
+}
+
+.card[data-leaving] .plate,
+.card[data-leaving] .body {
+  animation: card-out var(--motion-faster) var(--curveLinear) forwards;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    translate: var(--card-from, 0) 0;
+  }
+}
+
+@keyframes card-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 窄窗与竖版：停在底部，左右各留 24，最高为窗高的 40% */
+@media (max-width: 959px), (orientation: portrait) {
+  .card[data-dock] {
+    top: auto;
+    right: 24px;
+    bottom: 24px;
+    left: 24px;
+    width: auto;
+    max-height: 40%;
+    --card-from: 0;
+  }
+}
+
+.plate,
+.rowPlate {
+  position: absolute;
+  z-index: -1;
+  border-radius: var(--borderRadius2XLarge);
+  background-color: var(--bg-panel-overlay);
+  box-shadow: var(--shadow16);
+  outline: 1px solid var(--colorNeutralStrokeAlpha);
+  outline-offset: -1px;
+}
+
+.plate {
+  inset: 0;
+  transition: opacity var(--motion-fast) var(--curveLinear);
+}
+
+/* 只留下的那一行的底板：左右比行多出 16，与卡片内边距对齐 */
+.rowPlate {
+  right: 4px;
+  left: 4px;
+}
+
+.card[data-holding] .plate,
+.card[data-yielded] .plate {
+  opacity: 0;
+  transition-duration: var(--motion-faster);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--spacingVerticalL) var(--spacingHorizontalXL);
+  overflow-y: auto;
+}
+
+.card[data-holding] .body,
+.card[data-yielded] .body {
+  visibility: hidden;
+}
+
+.card[data-holding] [data-held] {
+  visibility: visible;
+}

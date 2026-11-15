@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { editOpenAtom, enterEdit } from '../../../../src/immersive/page/editSession.ts';
 import {
   registerImmersiveCommands,
   SEEK_STEP_SECONDS,
@@ -10,12 +11,13 @@ import {
   type FakeElement,
   type PressOptions,
 } from '../../../fixtures/fakeFocusDom.ts';
+import { stubBrowserPanel } from '../../../fixtures/browserPanelStub.ts';
 import { flush, startPlayingTrack } from '../../../fixtures/playingTrack.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
 /**
  * 正在播放全屏页的按键：经真的命令登记处分派，焦点与按键在一棵假的元素树上走捕获与冒泡，
- * 播放状态来自接在宿主替身上的真播放服务。断言的是结果：发了哪条播放命令、跳到几秒、离没离开。
+ * 播放状态来自接在宿主替身上的真播放服务。断言的是结果：发了哪条播放命令、跳到几秒、离没离开
  */
 const TRACK = makeTrack({ duration: 200 });
 
@@ -56,11 +58,13 @@ async function setup(options: { position?: number; canSeek?: boolean } = {}) {
       actions.push(up ? 'volume up' : 'volume down');
     },
   };
+  const browser = stubBrowserPanel();
   const unregister = registerImmersiveCommands(commands, {
     playback,
     store: player.store,
     shell,
     togglePerfOverlay: () => actions.push('perf'),
+    browser: browser.service,
   });
   const detach = attachImmersiveRoot(root);
   const press = (key: string, options?: PressOptions) => doc.press(key, options).defaultPrevented;
@@ -72,6 +76,7 @@ async function setup(options: { position?: number; canSeek?: boolean } = {}) {
     commands,
     actions,
     shell,
+    browser,
     press,
     unregister,
     detach,
@@ -187,7 +192,7 @@ describe('焦点', () => {
     expect(view.press('ArrowUp')).toBe(true);
     view.doc.click(button);
     expect(view.press(' ')).toBe(true);
-    // 点过之后再用 Tab 聚焦到别的键，又是键盘聚焦。
+    // 点过之后再用 Tab 聚焦到别的键，又是键盘聚焦
     const other = view.root.append('button');
     other.focus();
     expect(view.press(' ')).toBe(false);
@@ -321,5 +326,49 @@ describe('跳转', () => {
     expect(view.press('ArrowRight')).toBe(false);
     expect(view.press('ArrowUp')).toBe(true);
     expect(view.actions).toStrictEqual(['volume up']);
+  });
+});
+
+describe('设置的编辑', () => {
+  test('编辑开着时 Esc 先结束编辑、不离开视图，再按一次才离开', async () => {
+    const view = await setup();
+    enterEdit(view.player.store);
+    expect(view.press('Escape')).toBe(true);
+    expect(view.player.store.get(editOpenAtom)).toBe(false);
+    expect(view.actions).toStrictEqual([]);
+    expect(view.press('Escape')).toBe(true);
+    expect(view.actions).toStrictEqual(['leave']);
+  });
+});
+
+describe('浏览面板', () => {
+  test('Ctrl+B 开关面板；不带 Ctrl 的 B 不认领', async () => {
+    const view = await setup();
+    expect(view.press('b', { ctrl: true })).toBe(true);
+    expect(view.browser.toggle).toHaveBeenCalledTimes(1);
+    expect(view.press('b')).toBe(false);
+    expect(view.browser.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  test('面板用不了（窗口太窄、迷你窗口）或设置的编辑开着时，Ctrl+B 不认领', async () => {
+    const view = await setup();
+    view.player.store.set(view.browser.available, false);
+    expect(view.press('b', { ctrl: true })).toBe(false);
+
+    view.player.store.set(view.browser.available, true);
+    enterEdit(view.player.store);
+    expect(view.press('b', { ctrl: true })).toBe(false);
+    expect(view.browser.toggle).not.toHaveBeenCalled();
+  });
+
+  test('面板开着时 Esc 不离开视图：收面板归面板那一层，这里不认领', async () => {
+    const view = await setup();
+    view.player.store.set(view.browser.open, true);
+    expect(view.press('Escape')).toBe(false);
+    expect(view.actions).toStrictEqual([]);
+
+    view.player.store.set(view.browser.open, false);
+    expect(view.press('Escape')).toBe(true);
+    expect(view.actions).toStrictEqual(['leave']);
   });
 });

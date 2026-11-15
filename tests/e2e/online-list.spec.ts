@@ -3,7 +3,7 @@ import { onlineLog, openOnlineHarness } from '../fixtures/onlinePage.ts';
 import { collectPageErrors } from '../fixtures/pageHost.ts';
 
 // 在线列表页（专辑、歌单、艺人热门共用）在在线结果试验页里跑：音乐客户端是页面里的替身，
-// 单击结果里的图块或用 `list=<种类>:<ID>` 直接进来。
+// 单击结果里的图块或用 `list=<种类>:<ID>` 直接进来
 
 test.use({ screenshot: 'off' });
 
@@ -56,18 +56,20 @@ test('歌单滚到底接着取，查找只筛已取到的曲目，筛不到时�
   const scroller = listPage(page).locator('[data-detail-scroller]');
   const cursors = async () =>
     (await entries(page, 'list')).map((entry) => Reflect.get(entry, 'cursor'));
-  for (let round = 0; round < 8 && (await cursors()).length < 3; round += 1) {
-    await scroller.evaluate((element) => element.scrollTo(0, element.scrollHeight));
-    await page.waitForTimeout(150);
-  }
-  await expect.poll(cursors).toEqual([null, '20', '40']);
+  await expect
+    .poll(async () => {
+      const seen = await cursors();
+      if (seen.length < 3) await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      return seen;
+    })
+    .toEqual([null, '20', '40']);
   await expect(page.locator('[data-online-more]')).toHaveCount(0);
 
   await scroller.evaluate((element) => element.scrollTo(0, 0));
   await listPage(page).locator('[data-detail-find-toggle]').click();
   const find = listPage(page).locator('[data-detail-find]');
   await find.fill('playlist 4');
-  // 按空白拆词、每个词都要出现：标题含「4」的是 04、14、24、34 与 40–45。
+  // 按空白拆词、每个词都要出现：标题含「4」的是 04、14、24、34 与 40–45
   await expect(rows(page)).toHaveCount(10);
   await find.fill('不存在');
   await expect(listPage(page).locator('[data-online-list-no-matches]')).toHaveText(
@@ -76,17 +78,18 @@ test('歌单滚到底接着取，查找只筛已取到的曲目，筛不到时�
   expect(await cursors()).toEqual([null, '20', '40']);
 });
 
-test('艺人热门：工具行左边是页签；页头的 ⋯ 出在线对象菜单，没有「打开」，加入队列带上全部曲目', async ({
+test('艺人页：页头的 ⋯ 出在线对象菜单，没有「打开」，加入队列带上全部热门歌曲；没有页签', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { list: 'artist:3000' });
   await expect(listPage(page).getByRole('heading', { name: 'Nujabes' })).toBeVisible();
-  const tabs = listPage(page).locator('[data-detail-tools]').getByRole('tab');
-  await expect(tabs).toHaveText([/^热门歌曲/, /^专辑/, /^单曲与 EP/]);
-  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(listPage(page).getByRole('tab')).toHaveCount(0);
 
-  await listPage(page).locator('[data-detail-more]').click();
+  await listPage(page)
+    .locator('[data-artist-header]')
+    .getByRole('button', { name: '更多' })
+    .click();
   await expect(page.locator('[data-online-object-menu]')).toBeVisible();
   for (const name of ['播放', '下一首播放', '加入队列', '复制名称'])
     await expect(page.getByRole('menuitem', { name, exact: true })).toBeVisible();
@@ -98,10 +101,58 @@ test('艺人热门：工具行左边是页签；页头的 ⋯ 出在线对象菜
   expect(Reflect.get((await entries(page, 'queue')).at(-1) ?? {}, 'ids')).toHaveLength(12);
 });
 
+test('艺人页的热门歌曲：双击一行从这一行起播，队列是全部热门歌曲；无版权的行变淡、双击不起播', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openOnlineHarness(page, { list: 'artist:3000' });
+  const songs = listPage(page).locator('[data-online-artist-songs]');
+  await expect(songs).toBeVisible();
+  // 不超过 12 首：没有「显示全部」
+  await expect(songs.getByRole('button', { name: /^显示全部/ })).toHaveCount(0);
+  // 第 6 首无版权：变淡，双击不起播
+  const blocked = songs.locator('[data-online-top-track="300006"]');
+  await expect(blocked).toHaveAttribute('data-dimmed', 'true');
+  await blocked.dblclick();
+  await songs.locator('[data-online-top-track="300003"]').dblclick();
+  await expect.poll(async () => (await entries(page, 'play')).length).toBe(1);
+  const play = (await entries(page, 'play')).at(-1) ?? {};
+  expect(Reflect.get(play, 'index')).toBe(2);
+  expect(Reflect.get(play, 'ids')).toHaveLength(12);
+  expect(Reflect.get(play, 'query')).toBe('Nujabes');
+});
+
+test('艺人页的热门歌曲：专辑名是链接，单击打开这张专辑，不当成行的操作起播', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openOnlineHarness(page, { list: 'artist:3000' });
+  const row = listPage(page).locator('[data-online-artist-songs] [data-online-top-track="300003"]');
+  await row.getByText('Modal Soul', { exact: true }).click();
+  await expect(listPage(page).getByRole('heading', { name: 'Modal Soul' })).toBeVisible();
+  expect(
+    (await entries(page, 'list')).some((entry) => Reflect.get(entry, 'key') === 'album:b300003'),
+  ).toBe(true);
+  expect(await entries(page, 'play')).toEqual([]);
+});
+
+test('艺人页的热门歌曲超过 12 首：标题行右端出「显示全部」，点后原地展开到全部，再点收起', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openOnlineHarness(page, { list: 'artist:3000', tops: 'many' });
+  const songs = listPage(page).locator('[data-online-artist-songs]');
+  const rowsShown = songs.locator('[data-online-top-track]:visible');
+  await expect(songs.getByRole('button', { name: '显示全部 50' })).toBeVisible();
+  expect(await rowsShown.count()).toBeLessThan(50);
+  await songs.getByRole('button', { name: '显示全部 50' }).click();
+  await expect(rowsShown).toHaveCount(50);
+  await songs.getByRole('button', { name: '收起' }).click();
+  await expect.poll(() => rowsShown.count()).toBeLessThan(50);
+});
+
 test('读取失败写明原因，重试再取', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { list: 'album:5000', lists: 'fail' });
-  await expect(listPage(page).getByText('没能读取这张专辑')).toBeVisible();
+  await expect(listPage(page).getByText('无法读取专辑')).toBeVisible();
   await expect(listPage(page).getByText('网易云提示请求过于频繁')).toBeVisible();
   await listPage(page).getByRole('button', { name: '重试' }).click();
   await expect(listPage(page).getByRole('heading', { name: 'Modal Soul' })).toBeVisible();
@@ -126,7 +177,7 @@ test('后退回列表页时第一帧就在离开时的滚动位置，不先露�
     return element.scrollTop;
   });
   expect(left).toBeGreaterThan(200);
-  // 离开这一页：直接改地点，试验页随即显示结果页。
+  // 离开这一页：直接改地点，试验页随即显示结果页
   await page.evaluate(() => {
     const go: unknown = Reflect.get(window, '__onlineGo');
     if (typeof go === 'function') go();
@@ -216,6 +267,7 @@ test('歌单没有介绍时头部不出介绍这一行', async ({ page }) => {
 test('曲目行的艺人名与专辑名可点：进在线的艺人页与专辑页；Ctrl 单击交给行选择，不跳转', async ({
   page,
 }) => {
+  const errors = collectPageErrors(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { list: 'playlist:6000' });
   const row = rows(page).first();
@@ -225,7 +277,7 @@ test('曲目行的艺人名与专辑名可点：进在线的艺人页与专辑�
 
   await row.getByRole('button', { name: 'Nujabes', exact: true }).click();
   await expect(listPage(page).getByRole('heading', { name: 'Nujabes' })).toBeVisible();
-  await expect(listPage(page).locator('[data-detail-facts]')).toContainText('艺人');
+  await expect(listPage(page).locator('[data-artist-header]')).toBeVisible();
   await page.evaluate(() => {
     const back: unknown = Reflect.get(window, '__onlineBack');
     if (typeof back === 'function') back();
@@ -233,11 +285,13 @@ test('曲目行的艺人名与专辑名可点：进在线的艺人页与专辑�
   await expect(listPage(page).getByRole('heading', { name: '深夜 Jazzy Hip Hop' })).toBeVisible();
   await rows(page).first().getByRole('button', { name: 'Modal Soul', exact: true }).click();
   await expect(listPage(page).getByRole('heading', { name: 'Modal Soul' })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test('曲目右键菜单出「转到专辑」「转到艺人」，去在线的专辑页与艺人页；多选时不出', async ({
   page,
 }) => {
+  const errors = collectPageErrors(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openOnlineHarness(page, { list: 'playlist:6000' });
   const menu = page.locator('[data-online-menu]');
@@ -267,4 +321,30 @@ test('曲目右键菜单出「转到专辑」「转到艺人」，去在线的�
   await expect(menu.getByRole('menuitem', { name: '复制标题' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: '转到艺人' })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: '转到专辑' })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test.describe('125% 缩放', () => {
+  test.use({ deviceScaleFactor: 1.25 });
+
+  // 几何本身就是被测行为：行带停在半个设备像素上时，行里的文字跟着发虚
+  test('行带吸住视口后，各行顶边落在整数设备像素上', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openOnlineHarness(page, { list: 'playlist:6000' });
+    await expect(rows(page).first()).toBeVisible();
+    const scroller = listPage(page).locator('[data-detail-scroller]');
+    const misalignment = () =>
+      page.evaluate(() => {
+        const tops = [...document.querySelectorAll('[data-online-track]')].map(
+          (row) => row.getBoundingClientRect().top * devicePixelRatio,
+        );
+        return tops.length === 0
+          ? 1
+          : Math.max(...tops.map((top) => Math.abs(top - Math.round(top))));
+      });
+    for (const top of [520, 563, 607]) {
+      await scroller.evaluate((element, y) => element.scrollTo(0, y), top);
+      await expect.poll(misalignment).toBeLessThan(0.02);
+    }
+  });
 });

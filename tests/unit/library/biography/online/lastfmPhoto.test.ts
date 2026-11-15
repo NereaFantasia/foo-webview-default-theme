@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   lastfmPhotoId,
+  lastfmPhotoOf,
   readLastfmPhotoValue,
 } from '../../../../../src/library/biography/online/lastfmPhoto.ts';
 import { readBiographyCacheEntry } from '../../../../../src/library/biography/biographyCacheFormat.ts';
@@ -48,8 +49,22 @@ describe('Last.fm 图片身份', () => {
       expect(readLastfmPhotoValue(photo, 'Taishi', 'zh')).toBeNull();
   });
 
+  it('只有 Last.fm 的照片交给 Last.fm 的取图管线，Apple 的和没有的都不交', () => {
+    const apple = {
+      source: 'apple',
+      url: 'https://is1-ssl.mzstatic.com/image/thumb/a/b.png',
+      pageUrl: 'https://music.apple.com/cn/artist/q/1',
+    } as const;
+    expect(lastfmPhotoOf(TAISHI_PHOTO)).toBe(TAISHI_PHOTO);
+    expect(lastfmPhotoOf(apple)).toBeNull();
+    expect(lastfmPhotoOf(null)).toBeNull();
+    expect(lastfmPhotoOf(undefined)).toBeNull();
+  });
+
   it('缓存读回保留合法主图，丢弃伪造地址而不丢正文，兼容没有图片字段的旧缓存', () => {
     const entry = {
+      source: 'lastfm',
+      sourceId: 'Taishi',
       artist: 'Taishi',
       language: 'zh',
       fetchedAt: 100,

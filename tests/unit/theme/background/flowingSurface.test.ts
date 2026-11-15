@@ -22,6 +22,7 @@ const INPUT: FlowInput = {
   reduced: false,
   focused: true,
   scheme: 'dark',
+  rate: 1,
 };
 const settle = async () => {
   for (let i = 0; i < 20; i++) await Promise.resolve();
@@ -417,4 +418,24 @@ test('在隐藏期间停止播放，恢复时不重绘旧封面或等待再次�
   draw();
   expect(canvases.at(-1)?.style.opacity).toBe('0');
   expect(renders.at(-1)?.draws).toBe(0);
+});
+
+test('绘制循环按输入里的速度倍率推进色场运动，换倍率不重置进度', async () => {
+  const { surface, memory, draw } = setup();
+  await settle();
+  draw();
+  draw();
+  const run = (frames: number) => {
+    const from = memory.motion.time;
+    for (let i = 0; i < frames; i++) draw();
+    return memory.motion.time - from;
+  };
+  const normal = run(60);
+  surface.update({ ...INPUT, rate: 2 });
+  const fast = run(60);
+  surface.update({ ...INPUT, rate: 0.5 });
+  const slow = run(60);
+  expect(normal).toBeGreaterThan(0.5);
+  expect(fast / normal).toBeCloseTo(2, 1);
+  expect(slow / normal).toBeCloseTo(0.5, 1);
 });

@@ -1,0 +1,27 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  margin-top: var(--spacingVerticalS);
+}
+
+.form {
+  display: flex;
+  gap: var(--spacingHorizontalS);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+}
+
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingHorizontalS);
+  margin: 0;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground2);
+}

@@ -14,6 +14,8 @@ export interface FlowInput {
   readonly reduced: boolean;
   readonly focused: boolean;
   readonly scheme: ColorScheme;
+  /** 用户设的流动速度倍率，1 是原速 */
+  readonly rate: number;
 }
 export interface FlowSurface {
   update(input: FlowInput): void;
@@ -217,7 +219,7 @@ export function createFlowingSurface(
     const elapsed = last ? Math.min(100, now - last) : 0;
     last = now;
     const moving = input.running && !input.reduced && imageReady;
-    if (moving) advanceFlowMotion(memory.motion, elapsed);
+    if (moving) advanceFlowMotion(memory.motion, elapsed, input.rate);
     fade = input.reduced ? 1 : Math.min(1, fade + elapsed / duration);
     try {
       if (imageReady) renderer.draw(memory.motion, progress(), input.scheme);

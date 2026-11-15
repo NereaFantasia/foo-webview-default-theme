@@ -8,6 +8,7 @@ import {
   parseDesktopLyricsView,
   type DesktopLyricsView,
 } from '../../../../src/lyrics/desktop/desktopLyricsLink.ts';
+import { DEFAULT_LYRICS_DISPLAY } from '../../../../src/lyrics/lyricsDisplay.ts';
 
 const wire = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
@@ -22,6 +23,12 @@ const VIEW: DesktopLyricsView = {
   mode: 'multi',
   multilineSize: null,
   fontSize: 34,
+  translationFontSize: 18,
+  motionCustom: { blur: false, scale: true, hidePassedLines: true, alignPosition: 0.35 },
+  font: 'Georgia',
+  fontWeight: 450,
+  uiFont: 'Inter',
+  cjkFont: 'DengXian',
   sung: '#78d7ce',
   unsung: null,
   tint: null,
@@ -34,6 +41,11 @@ const VIEW: DesktopLyricsView = {
   title: 'Quiet Light',
   artist: 'Sample Artist',
   hidden: false,
+  process: {
+    optimize: { ...DEFAULT_LYRICS_DISPLAY.optimize, normalizeSpaces: false },
+    maskMode: 'partial-mask',
+    maskChar: '#',
+  },
 };
 
 const LINE = {
@@ -49,6 +61,63 @@ const LINE = {
 describe('parseDesktopLyricsView', () => {
   it('经 JSON 往返后原样读回', () => {
     expect(parseDesktopLyricsView(wire(desktopLyricsViewJson(VIEW)))).toEqual(VIEW);
+  });
+
+  it('译文字号与自定义动效往返；旧版主窗口没有这两项时取正文的 0.6 倍与 AMLL 档的四项', () => {
+    const json = desktopLyricsViewJson(VIEW);
+    expect(parseDesktopLyricsView(wire(json))).toMatchObject({
+      translationFontSize: 18,
+      motionCustom: { blur: false, scale: true, hidePassedLines: true, alignPosition: 0.35 },
+    });
+    expect(
+      parseDesktopLyricsView({ ...json, translationFontSize: undefined, motionCustom: undefined }),
+    ).toMatchObject({
+      translationFontSize: 20,
+      motionCustom: { blur: true, scale: true, hidePassedLines: false, alignPosition: 0.5 },
+    });
+    expect(
+      parseDesktopLyricsView({
+        ...json,
+        translationFontSize: 5,
+        motionCustom: { alignPosition: 9 },
+      }),
+    ).toMatchObject({
+      translationFontSize: 10,
+      motionCustom: { blur: true, scale: true, hidePassedLines: false, alignPosition: 1 },
+    });
+  });
+
+  it('字体与字重往返；旧版主窗口没有这几项、或取值不合法时回到缺省，不影响其余显示', () => {
+    const json = desktopLyricsViewJson(VIEW);
+    const plain = { ...VIEW, font: '', fontWeight: null, uiFont: '', cjkFont: '' };
+    expect(
+      parseDesktopLyricsView({
+        ...json,
+        font: undefined,
+        fontWeight: undefined,
+        uiFont: undefined,
+        cjkFont: undefined,
+      }),
+    ).toEqual(plain);
+    expect(
+      parseDesktopLyricsView({ ...json, font: 'bad\nname', fontWeight: 5000, uiFont: 7 }),
+    ).toEqual({ ...plain, cjkFont: 'DengXian' });
+  });
+
+  it('内容整理与屏蔽缺项或不合法时回到缺省，不影响其余显示', () => {
+    const json = desktopLyricsViewJson(VIEW);
+    const defaults = {
+      optimize: DEFAULT_LYRICS_DISPLAY.optimize,
+      maskMode: DEFAULT_LYRICS_DISPLAY.maskMode,
+      maskChar: DEFAULT_LYRICS_DISPLAY.maskChar,
+    };
+    expect(parseDesktopLyricsView({ ...json, process: undefined })).toEqual({
+      ...VIEW,
+      process: defaults,
+    });
+    expect(
+      parseDesktopLyricsView({ ...json, process: { maskMode: 'bad', maskChar: 'ab' } })?.process,
+    ).toEqual(defaults);
   });
 
   it('缺文案、对齐不认识或开关不是布尔时整份不收', () => {

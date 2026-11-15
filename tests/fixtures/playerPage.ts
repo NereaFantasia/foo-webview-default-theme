@@ -1,11 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import type { Track } from 'foo-webview-sdk';
 import { PLAYER_BAR_STORAGE_KEY, type PlayerBarStyle } from '../../src/theme/playerBarStyle.ts';
+import type { AnswerTable } from './fakeHost.ts';
+import type { ConfigValue } from './hostAnswers.ts';
 import { collectPageErrors, installPageHost, type PageHost } from './pageHost.ts';
 import { makeTrack } from './tracks.ts';
 
 // 播放栏的 e2e 共用：装一台正在放歌的宿主替身再打开页面。宿主那边的状态放在一个可改的对象里，
-// 各读取按它此刻的值作答，用例改了它再推事件，回读就与事件对得上。
+// 各读取按它此刻的值作答，用例改了它再推事件，回读就与事件对得上
 
 export const PLAYING_TRACK: Track = makeTrack({
   title: 'Luv (sic) Part 3',
@@ -20,9 +22,9 @@ export interface PlayerHostState {
   position: number;
   volumeDb: number;
   muted: boolean;
-  /** 宿主的顺序编号 0–6，与 `ORDER_IDS` 同序。 */
+  /** 宿主的顺序编号 0–6，与 `ORDER_IDS` 同序 */
   order: number;
-  /** `%__encoding%|%__bitspersample%` 的求值结果。 */
+  /** `%__encoding%|%__bitspersample%` 的求值结果 */
   format: string;
 }
 
@@ -30,15 +32,21 @@ export interface PlayerPage {
   readonly host: PageHost;
   readonly errors: string[];
   readonly state: PlayerHostState;
-  /** 宿主调用的参数，按先后。 */
+  /** 宿主调用的参数，按先后 */
   calls(method: Parameters<PageHost['callsTo']>[0]): ReturnType<PageHost['callsTo']>;
 }
 
 export interface OpenPlayerOptions {
   readonly width?: number;
   readonly state?: Partial<PlayerHostState>;
-  /** 换成 `appHarnessEntry.ts` 这个入口，运行中能用 `switchPreference` 改偏好。 */
+  /** 换成 `appHarnessEntry.ts` 这个入口，运行中能用 `switchPreference` 改偏好 */
   readonly harness?: boolean;
+  /** 开页前就装上的宿主应答，比如媒体库里有哪些专辑 */
+  readonly answers?: AnswerTable;
+  /** 开页前就写进宿主 config 的值，比如简介来源 */
+  readonly config?: Readonly<Record<string, ConfigValue>>;
+  /** 开页前对宿主替身再装一些应答，比如带记账的播放列表 */
+  readonly configure?: (host: PageHost) => void;
 }
 
 const HARNESS_ENTRY = `import '/tests/fixtures/appHarnessEntry.ts';
@@ -55,6 +63,17 @@ const ORDER_NAMES = [
   'shuffle-folders',
 ] as const;
 
+/**
+ * 把页面入口换成试验入口，在 `page.goto` 之前调：页面仍由开发服务器给，只把 src/main.tsx 换成一句导入，
+ * 整个主窗照常挂上，另在 window 上挂 `__harness`，运行中能用 `switchPreference` 改偏好。各页面的打开函数
+ * 都是 `page.goto('/')`，先调它再用它们，就能在那一页上换播放栏形态
+ */
+export async function routeHarness(page: Page): Promise<void> {
+  await page.route('**/src/main.tsx', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/javascript', body: HARNESS_ENTRY }),
+  );
+}
+
 export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): Promise<PlayerPage> {
   await page.setViewportSize({ width: options.width ?? 1280, height: 800 });
   const errors = collectPageErrors(page);
@@ -69,9 +88,12 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
     format: 'lossless|16',
     ...options.state,
   };
-  const host = await installPageHost(page);
+  const host = await installPageHost(page, {
+    answers: options.answers,
+    ...(options.config ? { config: options.config } : {}),
+  });
   // 应答与事件的 hostTime 取页内的时刻：冻结时钟的用例里页内与 Node 的 Date 不同步，
-  // 取 Node 的时刻会把 SDK 进度时钟的新到界线推到未来，之后的合法事件都被丢掉。
+  // 取 Node 的时刻会把 SDK 进度时钟的新到界线推到未来，之后的合法事件都被丢掉
   const pageNow = () => page.evaluate(() => Date.now());
   host.answer('playback.getState', () => ({
     success: true,
@@ -97,7 +119,7 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
     const requested = Number(params['position'] ?? 0);
     const oldPosition = state.position;
     state.position = Math.min(duration, Math.max(0, requested));
-    // 真宿主应用跳转后随即发 seeked；进度时钟靠这条事件重新对准。
+    // 真宿主应用跳转后随即发 seeked；进度时钟靠这条事件重新对准
     void pageNow().then((hostTime) =>
       host.emit('playback:seeked', { hostTime, position: state.position }),
     );
@@ -130,18 +152,14 @@ export async function openPlayer(page: Page, options: OpenPlayerOptions = {}): P
     result: state.format,
     infoAvailable: true,
   }));
-  // 入口照表格试验页的做法换：页面仍由开发服务器给，只把 src/main.tsx 换成一句导入。
-  if (options.harness) {
-    await page.route('**/src/main.tsx', (route) =>
-      route.fulfill({ status: 200, contentType: 'text/javascript', body: HARNESS_ENTRY }),
-    );
-  }
+  options.configure?.(host);
+  if (options.harness) await routeHarness(page);
   await page.goto('/');
   if (state.track) await expect(page.getByText(state.track.title).first()).toBeVisible();
   return { host, errors, state, calls: (method) => host.callsTo(method) };
 }
 
-/** 元素的边框盒，取整到像素。 */
+/** 元素的边框盒，取整到像素 */
 export function boxOf(page: Page, selector: string) {
   return page
     .locator(selector)
@@ -159,7 +177,7 @@ export function boxOf(page: Page, selector: string) {
 
 /**
  * 页面打开之前定下播放栏的形态（写 localStorage）；在 `openPlayer`、`page.goto` 之前调。缺省的形态是
- * 底部通栏，标题栏播放与胶囊的用例要调这个换成 `titlebar`。
+ * 底部通栏，标题栏播放与胶囊的用例要调这个换成 `titlebar`
  */
 export async function choosePlayerBar(page: Page, style: PlayerBarStyle): Promise<void> {
   await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
@@ -170,7 +188,7 @@ export async function choosePlayerBar(page: Page, style: PlayerBarStyle): Promis
 
 /**
  * 运行中改一项偏好，照设置页那样调写入口；页面要用 `harness: true` 打开。调的是 `appHarnessEntry.ts` 挂在
- * window 上的 `__harness.set`：先等它挂上（开发服务器可能在这时整页重载），它没认这个值就直接报错。
+ * window 上的 `__harness.set`：先等它挂上（开发服务器可能在这时整页重载），它没认这个值就直接报错
  */
 export async function switchPreference(
   page: Page,

@@ -34,7 +34,7 @@ export async function openArtists(page: Page, width = 1280, configure?: (host: P
     host,
     errors,
     view,
-    list: view.getByRole('grid', { name: '艺人' }),
+    wall: view.getByRole('list', { name: '艺人' }),
     artist: (name: string) => view.locator(`[data-artist="${name}"]`),
   };
 }

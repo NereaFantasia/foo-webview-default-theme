@@ -20,6 +20,7 @@ import type { StoredOptions } from './presetOptions.ts';
 export const SCENE_PREF_KEYS = {
   startPage: 'default-theme.immersive.startPage.v1',
   presetOptions: 'default-theme.immersive.presetOptions.v1',
+  collapseWithoutLyrics: 'default-theme.immersive.collapseWithoutLyrics.v1',
   toolbarCollapsed: 'default-theme.immersive.lyricsToolbarCollapsed.v1',
 } as const;
 
@@ -28,6 +29,16 @@ export const startPagePref: LocalPref<SidebarPage> = defineLocalPref({
   key: SCENE_PREF_KEYS.startPage,
   fallback: 'lyrics',
   ...choiceCodec(SIDEBAR_PAGES),
+});
+
+/**
+ * 没有歌词时侧栏要不要自动收起、封面列居中：缺省关，右栏照常留着（空着），要居中就从更多菜单收起侧栏。
+ * 所有预设共用；开了就是没有歌词时自动居中
+ */
+export const collapseWithoutLyricsPref: LocalPref<boolean> = defineLocalPref({
+  key: SCENE_PREF_KEYS.collapseWithoutLyrics,
+  fallback: false,
+  ...ON_OFF,
 });
 
 /** 歌词工具条收成单个图标；存 `on`，缺省展开 */
@@ -63,9 +74,10 @@ export const presetOptionsPref: LocalPref<PresetOptionStore> = defineLocalPref<P
   format: (value) => JSON.stringify(value),
 });
 
-/** 把起始页签、各预设的可调项与工具条的收起状态读进 `store`；与 `loadImmersivePrefs` 一样，只在首帧之前或头一次进视图之前调一次 */
+/** 把起始页签、各预设的可调项、无歌词收起与工具条的收起状态读进 `store`；与 `loadImmersivePrefs` 一样，只在首帧之前或头一次进视图之前调一次 */
 export function loadScenePrefs(store: Store, storage?: PrefStorage | null): void {
   startPagePref.load(store, storage);
   presetOptionsPref.load(store, storage);
+  collapseWithoutLyricsPref.load(store, storage);
   toolbarCollapsedPref.load(store, storage);
 }

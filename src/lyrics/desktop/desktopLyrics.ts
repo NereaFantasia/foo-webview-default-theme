@@ -7,6 +7,7 @@ import {
   type ConfigPersistence,
   type ConfigPrefFace,
 } from '../../host/configPref.ts';
+import { log } from '../../diagnostics/eventLog.ts';
 import type { ConfigWriter } from '../../host/configWrite.ts';
 import { hostCommand, settle } from '../../host/hostCall.ts';
 import { readScreen } from '../../host/miniPlacement.ts';
@@ -14,20 +15,22 @@ import type { Translate } from '../../i18n/translate.ts';
 import { serviceKey } from '../../kit/serviceKey.ts';
 import type { Store } from '../../kit/store.ts';
 import { TRAY_IDS } from '../../playback/trayMenu.ts';
+import type { FontChoice } from '../../theme/fontStack.ts';
 import { lyricsVersion } from '../lyricsArchive.ts';
 import type { LyricsService } from '../lyricsService.ts';
 import {
   DESKTOP_LYRICS_LINES_KEY,
   DESKTOP_LYRICS_VIEW_KEY,
+  desktopLyricsLinesJson,
   desktopLyricsMessage,
   desktopLyricsViewJson,
   parseDesktopLyricsMessage,
   type DesktopLyricsCommand,
+  type DesktopLyricsProcess,
   type DesktopLyricsView,
 } from './desktopLyricsLink.ts';
 import {
   DESKTOP_LYRICS_ALIGNS,
-  DESKTOP_LYRICS_FONT_SIZES,
   DESKTOP_LYRICS_HOTKEYS,
   DESKTOP_LYRICS_PREF,
   desktopLyricsConfig,
@@ -38,6 +41,7 @@ import {
   type DesktopLyricsHotkey,
   type DesktopLyricsPref,
 } from './desktopLyricsPrefs.ts';
+import { desktopLyricsViewOf } from './desktopLyricsView.ts';
 
 export interface DesktopLyricsFace extends ConfigPrefFace {
   on: typeof fb.on;
@@ -55,6 +59,10 @@ export interface DesktopLyricsDeps {
   readonly ramp: Atom<BrandVariants>;
   /** 主窗口在前台，且右侧卡或沉浸视图正显示歌词 */
   readonly shown: Atom<boolean>;
+  /** 主窗口歌词设置里的内容整理与屏蔽，桌面上同样生效 */
+  readonly process: Atom<DesktopLyricsProcess>;
+  /** 界面字体，弹窗的字体栈要用 */
+  readonly font: Atom<FontChoice>;
   readonly translate: Atom<Translate>;
   readonly writer: Pick<ConfigWriter, 'set'>;
   /** 弹窗页相对站点根的路径；缺省按当前页面的地址算，与主窗口同一个版本目录 */
@@ -97,9 +105,7 @@ export const desktopLyricsKey = serviceKey<DesktopLyricsService>('desktopLyrics'
 const DEFAULT_SIZE = { width: 640, height: 472 };
 /** 窗口底边与工作区底部的边距（CSS 像素） */
 const BOTTOM_GAP = 48;
-/** 已播放歌词高亮色取色阶 step 120，染色底板取色阶 step 30（设置页缺省值对齐该基准） */
-export const DESKTOP_LYRICS_SUNG_STEP = 120;
-export const DESKTOP_LYRICS_TINT_STEP = 30;
+export { DESKTOP_LYRICS_SUNG_STEP, DESKTOP_LYRICS_TINT_STEP } from './desktopLyricsView.ts';
 const HOTKEY_ACTIONS: Readonly<Record<DesktopLyricsHotkey, string>> = {
   toggle: 'defaultTheme.desktopLyrics.toggle',
   lock: 'defaultTheme.desktopLyrics.lock',
@@ -132,34 +138,6 @@ function shortHash(text: string): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16);
-}
-
-/** 将播放器歌词行对象转换为纯 JSON 结构（共享状态仅接收标准 JSON） */
-function linesJson(lines: readonly LyricLine[]) {
-  return lines.map((line) => ({
-    startTime: line.startTime,
-    endTime: line.endTime,
-    translatedLyric: line.translatedLyric,
-    romanLyric: line.romanLyric,
-    isBG: line.isBG,
-    isDuet: line.isDuet,
-    words: line.words.map((word) => ({
-      word: word.word,
-      startTime: word.startTime,
-      endTime: word.endTime,
-      romanWord: word.romanWord ?? '',
-      obscene: word.obscene ?? false,
-      ...(word.ruby
-        ? {
-            ruby: word.ruby.map(({ word: text, startTime, endTime }) => ({
-              word: text,
-              startTime,
-              endTime,
-            })),
-          }
-        : {}),
-    })),
-  }));
 }
 
 /**
@@ -214,47 +192,17 @@ export function startDesktopLyrics(
       : 'none';
   }
 
-  function view(): DesktopLyricsView {
-    const p = pref();
-    const ramp = store.get(deps.ramp);
-    const t = store.get(deps.translate);
-    const track = store.get(deps.track);
-    const accent = ramp[DESKTOP_LYRICS_SUNG_STEP];
-    return {
-      labels: {
-        previous: t('player.previous'),
-        play: t('player.play'),
-        pause: t('player.pause'),
-        next: t('player.next'),
-        earlier: t('desktopLyrics.earlier'),
-        later: t('desktopLyrics.later'),
-        align: t('desktopLyrics.alignCycle'),
-        mode: t(p.mode === 'multi' ? 'desktopLyrics.toSingle' : 'desktopLyrics.toMulti'),
-        lock: t('desktopLyrics.lock'),
-        unlock: t('desktopLyrics.unlock'),
-        settings: t('desktopLyrics.settings'),
-        close: t('desktopLyrics.close'),
-      },
-      locked: p.locked,
-      align: p.align,
-      motionPreset: p.motionPreset,
-      mode: p.mode,
-      multilineSize: p.multilineSize,
-      fontSize: DESKTOP_LYRICS_FONT_SIZES[p.size],
-      sung: p.palette === 'white' ? null : p.palette === 'custom' ? p.sungColor || accent : accent,
-      unsung: p.palette === 'custom' ? p.unsungColor || null : null,
-      tint: p.plateTint ? ramp[DESKTOP_LYRICS_TINT_STEP] : null,
-      plate: p.background === 'plate',
-      plateOpacity: p.plateOpacity,
-      glow: p.glowColor || null,
-      showTranslation: p.showTranslation,
-      showRomanization: p.showRomanization,
+  const view = (): DesktopLyricsView =>
+    desktopLyricsViewOf({
+      pref: pref(),
+      ramp: store.get(deps.ramp),
+      translate: store.get(deps.translate),
       offset: store.get(deps.lyrics.offset),
-      title: track?.title ?? '',
-      artist: track?.artist ?? '',
-      hidden: p.autoHide && store.get(deps.shown),
-    };
-  }
+      track: store.get(deps.track),
+      shown: store.get(deps.shown),
+      process: store.get(deps.process),
+      font: store.get(deps.font),
+    });
 
   /** 合并同一事件循环内的多处变更，内容无变动时跳过更新 */
   function push(): void {
@@ -271,7 +219,10 @@ export function startDesktopLyrics(
       sentLines = lines;
       const id = lines ? linesId() : 'none';
       void settle(() =>
-        host.sharedState.set(DESKTOP_LYRICS_LINES_KEY, { id, lines: lines && linesJson(lines) }),
+        host.sharedState.set(DESKTOP_LYRICS_LINES_KEY, {
+          id,
+          lines: lines && desktopLyricsLinesJson(lines),
+        }),
       );
     }
   }
@@ -403,6 +354,8 @@ export function startDesktopLyrics(
       await settle(() => host.keyboard.unregisterHotkey({ key: chord }));
       ok = await hostCommand(() => host.keyboard.registerHotkey(chord, HOTKEY_ACTIONS[name]));
       if (ok) registered[name] = chord;
+      // 宿主调用的失败已按方法名与错误码记下；两个热键的失败折成一条就分不出是哪个
+      else log.warn('host', 'hotkey.failed', { name });
     }
     patchState({ hotkeyTaken: { ...store.get(state).hotkeyTaken, [name]: !ok } });
     return ok;
@@ -518,6 +471,8 @@ export function startDesktopLyrics(
       deps.track,
       deps.ramp,
       deps.shown,
+      deps.process,
+      deps.font,
       deps.translate,
     ].map((input) => store.sub(input, schedulePush)),
   );

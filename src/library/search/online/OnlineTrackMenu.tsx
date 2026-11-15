@@ -1,4 +1,4 @@
-import { Copy20Regular } from '@fluentui/react-icons';
+import { Copy20Regular, Heart20Regular, HeartBroken20Regular } from '@fluentui/react-icons';
 import { fb } from 'foo-webview-sdk/bridge';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useMemo } from 'react';
@@ -6,8 +6,12 @@ import { settle } from '../../../host/hostCall.ts';
 import { translateAtom } from '../../../i18n/locale.ts';
 import { pluralAtom } from '../../../i18n/plural.ts';
 import { ContextMenu } from '../../../kit/context-menu/ContextMenu.tsx';
+import type { ContextMenuEntry } from '../../../kit/context-menu/contextMenuItems.ts';
 import { useService } from '../../../kit/useService.ts';
+import { onlineFavoritesKey } from '../../../playback/onlineFavorites.ts';
 import { MENU_SURFACE_MOTION } from '../../../motion/MenuMotion.tsx';
+import { platformName } from '../../../playback/musicPlatforms.ts';
+import { canFavorite } from '../../../server/musicFavorites.ts';
 import type { MusicTrack } from '../../../server/musicObjects.ts';
 import type { TablePoint } from '../../../table/tableItems.ts';
 import { musicTrackLinks } from '../../../track/trackLinks.ts';
@@ -33,6 +37,7 @@ export function OnlineTrackMenu({ menu, onClose, onPlay, onQueued }: OnlineTrack
   const t = useAtomValueRawSync(translateAtom);
   const plural = useAtomValueRawSync(pluralAtom);
   const player = useService(onlinePlayKey);
+  const favorites = useService(onlineFavoritesKey);
   const picked = menu?.tracks ?? [];
   const single = picked.length === 1 ? picked[0] : undefined;
   // 多首时不出「转到」：菜单不知道点的是哪一首
@@ -42,11 +47,47 @@ export function OnlineTrackMenu({ menu, onClose, onPlay, onQueued }: OnlineTrack
     'trackMenu.noAlbumPage',
   );
   const noop = () => {};
+  // 所选的都已收藏时写「取消收藏」，否则写「收藏」，只收还没收的；多选时点明是所选
+  const everyOn =
+    picked.length > 0 && picked.every((track) => favorites.isFavorite('track', track.ref));
+  const many = picked.length > 1;
+  const unsupported = picked.find((track) => !canFavorite(track.ref));
+  const favoriteEntries: ContextMenuEntry[] =
+    favorites.isReady() && picked.length > 0
+      ? [
+          {
+            kind: 'command',
+            id: 'favorite',
+            disabled: unsupported !== undefined,
+            reason: unsupported
+              ? t('favorite.unsupported', { platform: platformName(t, unsupported.ref.platform) })
+              : undefined,
+            label: t(
+              everyOn
+                ? many
+                  ? 'favorite.removeSelected'
+                  : 'favorite.remove'
+                : many
+                  ? 'favorite.addSelected'
+                  : 'favorite.add',
+            ),
+            icon: everyOn ? <HeartBroken20Regular /> : <Heart20Regular />,
+            onSelect: () =>
+              void (everyOn
+                ? favorites.remove(
+                    'track',
+                    picked.map((track) => track.ref),
+                  )
+                : favorites.add('track', picked)),
+          },
+        ]
+      : [];
   const items = trackMenuEntries(
     [
       'play',
       'play-next',
       'enqueue',
+      ...favoriteEntries,
       divider('go-to-divider'),
       'go-to-album',
       'go-to-artist',

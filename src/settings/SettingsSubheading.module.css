@@ -1,0 +1,13 @@
+/* 小节名：与上一张卡隔开一些，紧跟着它管的那一组卡 */
+.subheading {
+  margin: var(--spacingVerticalM) 0 var(--spacingVerticalXXS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
+}
+
+/* 紧挨着分区大标题的第一个小节名不再额外隔开 */
+h2 + .subheading {
+  margin-top: 0;
+}

@@ -34,6 +34,8 @@ export function createUpNextPages(
   let wanted: number[] = [];
   let firstWanted = 0;
   let lastWanted = 0;
+  /** 上一次视口所在的起始页，用来判断往哪个方向滚 */
+  let lastStartPage = 0;
   const cache = new Map<number, readonly UpNextRow[]>();
   const failed = new Set<number>();
   const asking = new Set<number>();
@@ -107,8 +109,14 @@ export function createUpNextPages(
       { length: Math.min(UP_NEXT_CACHED_PAGES, end - start + 1) },
       (_, i) => start + i,
     );
-    // 先读视口，再预取两侧各两页；普通连续滚动越过页边时已有元数据
-    for (const page of [end + 1, start - 1, end + 2, start - 2]) {
+    // 先读视口，再按滚动方向预取：前进的一侧三页，回头的一侧一页。往前拖得快时，只取两侧各两页的话回头那两页是白读，
+    // 前进一侧又来不及在到达之前读完（宿主一页的往返要几百毫秒），拖到的位置只有占位行
+    const forward = start >= lastStartPage;
+    lastStartPage = start;
+    const prefetch = forward
+      ? [end + 1, end + 2, end + 3, start - 1]
+      : [start - 1, start - 2, start - 3, end + 1];
+    for (const page of prefetch) {
       if (page >= 0 && page <= endPage && wanted.length < UP_NEXT_CACHED_PAGES) wanted.push(page);
     }
     for (const page of failed) if (!wanted.includes(page)) failed.delete(page);
@@ -124,7 +132,7 @@ export function createUpNextPages(
     const mine = generation;
     // 先装上在途标记，宿主的同步失败或空范围也不能留下已结束的 Promise
     running = Promise.resolve()
-      .then(() => Promise.all([pump(mine), pump(mine)]))
+      .then(() => Promise.all([pump(mine), pump(mine), pump(mine)]))
       .then(() => {})
       .finally(() => {
         if (mine === generation) {

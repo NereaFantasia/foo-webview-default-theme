@@ -1,9 +1,11 @@
 import type { MessageKey } from '../i18n/en.ts';
+import { BROWSER_KEYS } from '../nav/browserPanel.ts';
 import type { KeyChord } from '../nav/commandRegistry.ts';
 import { FULLSCREEN_KEYS } from '../nav/fullscreenCommand.ts';
 import { BACK_KEYS, FORWARD_KEYS } from '../nav/navCommands.ts';
 import { QUEUE_KEYS } from '../nav/queueKeys.ts';
 import { CLEAR_SELECTION_KEYS } from '../nav/selectionKeys.ts';
+import { PLAY_PAUSE_KEYS } from '../playback/playPauseCommand.ts';
 
 /** 一种按法：键盘上的一个组合，或鼠标的一个键（`mouse` 是这个键的名字的文案键） */
 export type ShortcutInput = { readonly chord: KeyChord } | { readonly mouse: MessageKey };
@@ -27,7 +29,7 @@ const chords = (keys: readonly KeyChord[]): ShortcutInput[] => keys.map((chord) 
  * 快捷键一览的内容，按起作用的地方分小节
  *
  * 这是一张静态清单：命令要等所在的页面或部件挂上才登记，设置页里问不到别处的命令。后退、前进与全屏取登记
- * 它们的模块给的按键，队列按键取共享声明；其余几条照实写在这里，改了那边的按键要跟着改这里
+ * 它们的模块给的按键，队列与浏览面板的按键取共享声明；其余几条照实写在这里，改了那边的按键要跟着改这里
  */
 export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
   {
@@ -42,7 +44,12 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
         inputs: [...chords(FORWARD_KEYS), { mouse: 'settings.mouseForward' }],
       },
       { label: 'settings.shortcutFullscreen', inputs: chords(FULLSCREEN_KEYS) },
+      { label: 'tray.playPause', inputs: chords(PLAY_PAUSE_KEYS) },
     ],
+  },
+  {
+    title: 'settings.shortcutsImmersive',
+    entries: [{ label: 'immersive.browse', inputs: chords(BROWSER_KEYS.toggle) }],
   },
   {
     title: 'settings.shortcutsPlaylists',

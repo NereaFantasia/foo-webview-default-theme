@@ -20,22 +20,26 @@ test('音量刻度：换到按分贝，音量条即时按新刻度重算并记�
   page,
 }) => {
   expect(positionText('db')).not.toBe(positionText('perceptual'));
-  const settings = await openSettings(page, {
-    answers: {
-      playback: {
-        // 宿主正放着一首：没有当前曲目时底部通栏不出，音量条也就不在。
-        getState: { success: true, state: 'playing', canSeek: true, canPause: true },
-        getCurrentTrack: { success: true, found: true, track: makeTrack() },
-        getVolume: {
-          success: true,
-          volume: Math.round(100 * 10 ** (VOLUME_DB / 20)),
-          volumeDb: VOLUME_DB,
-          muted: false,
-          isMuted: false,
+  const settings = await openSettings(
+    page,
+    {
+      answers: {
+        playback: {
+          // 宿主正放着一首：没有当前曲目时底部通栏不出，音量条也就不在
+          getState: { success: true, state: 'playing', canSeek: true, canPause: true },
+          getCurrentTrack: { success: true, found: true, track: makeTrack() },
+          getVolume: {
+            success: true,
+            volume: Math.round(100 * 10 ** (VOLUME_DB / 20)),
+            volumeDb: VOLUME_DB,
+            muted: false,
+            isMuted: false,
+          },
         },
       },
     },
-  });
+    '播放',
+  );
   const volume = page.locator('[data-player-bar]').getByRole('slider', { name: '音量' });
   await expect(settings.select('音量刻度')).toHaveText('按听感');
   await expect(volume).toHaveAttribute('aria-valuenow', positionText('perceptual'));

@@ -1,4 +1,3 @@
-import { BackgroundRender, TitaniumRenderer } from '@applemusic-like-lyrics/core';
 import type { BackdropRenderer } from './backdropRegistry.ts';
 
 /** 钛金属背景的构图：颗粒位置、主题色落到四个角的顺序、锋线姿态 */
@@ -61,7 +60,7 @@ export interface TitaniumHost extends BackdropRenderer {
  * 封面切换后交由底层渲染器重新随机生成姿态
  */
 export function createTitaniumBackdrop(
-  make: () => TitaniumHost = () => BackgroundRender.new(TitaniumRenderer),
+  make: () => TitaniumHost,
   memory: LookMemory = sessionMemory,
 ): BackdropRenderer {
   const host = make();
@@ -112,6 +111,8 @@ export function createTitaniumBackdrop(
     setRenderScale: (scale) => host.setRenderScale(scale),
     setLowFreqVolume: (volume) => host.setLowFreqVolume(volume),
     setFPS: (fps) => host.setFPS(fps),
+    setFlowSpeed: (speed) => host.setFlowSpeed(speed),
+    setOptions: (patch) => host.setOptions(patch),
     setStaticMode: (enable) => host.setStaticMode(enable),
     setHasLyric: (has) => host.setHasLyric(has),
     dispose() {

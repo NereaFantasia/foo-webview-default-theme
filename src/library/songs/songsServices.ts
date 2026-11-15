@@ -64,7 +64,7 @@ export interface SongsDeps extends SongsActionsDeps {
 export function startSongs(store: Store, deps: SongsDeps, host: SongsFace = fb): SongsServices {
   const prefs = startSongsPrefs(store);
   const filter = startSongsFilter(store);
-  const rows = startSongsRows(store, host);
+  const rows = startSongsRows(store, host, undefined, deps.mirror);
   const actions = startSongsActions(store, deps, host);
   let disposed = false;
   let previous = store.get(songsFilterAtom);

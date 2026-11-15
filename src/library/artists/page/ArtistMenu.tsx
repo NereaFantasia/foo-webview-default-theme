@@ -62,7 +62,6 @@ export function ArtistMenu(props: ArtistMenuProps) {
   const first = props.names[0] ?? '';
   const name = props.names.map((name) => name || t('artists.unknown')).join(', ');
   const available = !!tracks?.length && !busy;
-  const queueDisabled = !available || (tracks?.length ?? 0) > 256;
   const command = (
     id: string,
     label: string,
@@ -99,21 +98,19 @@ export function ArtistMenu(props: ArtistMenuProps) {
     ),
     command(
       'next',
-      t('artists.next'),
+      t('album.playNext'),
       () => {
         void services.actions.queue(props.names, true);
       },
-      queueDisabled,
-      queueDisabled ? t('artists.queueLimit') : undefined,
+      !available,
     ),
     command(
       'queue',
-      t('artists.queue'),
+      t('album.enqueue'),
       () => {
         void services.actions.queue(props.names, false);
       },
-      queueDisabled,
-      queueDisabled ? t('artists.queueLimit') : undefined,
+      !available,
     ),
     {
       kind: 'submenu',

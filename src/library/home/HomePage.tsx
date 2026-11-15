@@ -1,60 +1,66 @@
-import {
-  Button,
-  Option,
-  Spinner,
-  Tab,
-  TabList,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-} from '@fluentui/react-components';
-import { ScrollDropdown } from '../../kit/ScrollDropdown.tsx';
-import { ArrowClockwise20Regular, ArrowShuffle20Regular } from '@fluentui/react-icons';
+import { Button, Spinner } from '@fluentui/react-components';
+import { ArrowClockwise20Regular, Checkmark20Regular, Edit20Regular } from '@fluentui/react-icons';
+import type { LibraryTrack } from 'foo-webview-sdk';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Fragment,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
+import { flushSync } from 'react-dom';
+import type { Album } from '../../host/libraryContract.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { focusLost } from '../../kit/focusLost.ts';
+import { useService } from '../../kit/useService.ts';
 import { createSnapshotSlot } from '../../nav/navHistory.ts';
+import { useCommand } from '../../nav/useCommand.ts';
 import { usePageSnapshot } from '../../nav/usePageSnapshot.ts';
-import { PrimaryPlayButton } from '../../theme/PrimaryPlayButton.tsx';
 import type { TablePoint } from '../../table/tableItems.ts';
+import { useViewControlStyles } from '../../theme/controlStyles.ts';
+import { AddFoldersAction } from '../AddFoldersAction.tsx';
+import { albumListKey } from '../album-list/albumList.ts';
 import { AlbumMenu } from '../AlbumMenu.tsx';
 import { albumsAtom } from '../albums.ts';
-import { albumKeyOf, type Album } from '../../host/libraryContract.ts';
+import { albumsKey } from '../albumServices.ts';
 import { libraryTracksAtom } from '../libraryTracks.ts';
 import { TrackMenu } from '../TrackMenu.tsx';
-import { CoverGrid, STANDARD_GRID_SHAPE } from '../cover-tile/CoverGrid.tsx';
-import { HomeAlbumCard } from './HomeAlbumCard.tsx';
-import { HomeCandidateCard } from './HomeCandidateCard.tsx';
+import { HomeAdded } from './HomeAdded.tsx';
+import { HomeBanners } from './HomeBanners.tsx';
+import { HomeCharts } from './HomeCharts.tsx';
 import { HomeChannels } from './HomeChannels.tsx';
-import { HomePins } from './HomePins.tsx';
-import { HOME_RECENT_LIMIT } from './homeRecent.ts';
 import { HomeContext, useHomeServices } from './homeContext.ts';
+import { HomeGems } from './HomeGems.tsx';
+import { HomeLayoutEditor } from './HomeLayoutEditor.tsx';
+import { HOME_TRACK_COUNT } from './homeModel.ts';
+import { HomeMostPlayed } from './HomeMostPlayed.tsx';
+import { HomeNcmSetup } from './HomeNcmSetup.tsx';
+import { HomeNewTracks } from './HomeNewTracks.tsx';
+import { HomePlaylists, HomeReleases } from './HomeOnlineTiles.tsx';
+import { HomeOverview } from './HomeOverview.tsx';
+import { HomeQuick } from './HomeQuick.tsx';
+import { railIndex, scrollRailTo } from './HomeRail.tsx';
 import {
-  HOME_TRACK_COUNT,
-  sampleHomeAlbums,
-  type HomeDuration,
-  type HomeGemMode,
-  type HomeMode,
-} from './homeModel.ts';
-import { HomeTrackRow } from './HomeTrackRow.tsx';
+  anyHomeSectionShown,
+  HOME_ONLINE_SECTIONS,
+  HOME_STATISTICS_SECTIONS,
+  homeHiddenSectionsAtom,
+  homeLayoutAtom,
+  type HomeSection,
+} from './homeSections.ts';
+import { useHomeOnlineRows } from './useHomeOnlineRows.ts';
 import styles from './HomePage.module.css';
-import { useService } from '../../kit/useService.ts';
-import { albumsKey } from '../albumServices.ts';
-import { albumListKey } from '../album-list/albumList.ts';
-import { AddFoldersAction } from '../AddFoldersAction.tsx';
-import { useViewControlStyles } from '../../theme/controlStyles.ts';
 
-interface HomeView {
-  readonly mode: HomeMode;
-  readonly gem: HomeGemMode;
-  readonly duration: HomeDuration;
-  readonly albums: readonly Album[];
-  readonly offset: number;
-}
 interface HomeSnapshot {
-  readonly view: HomeView;
+  /** 重听遗珠换到了第几首起的一批 */
+  readonly offset: number;
   readonly scroll: number;
+  /** 各横排行翻到了第几张，按行的名字记 */
+  readonly rails: Readonly<Record<string, number>>;
   readonly focus: {
     readonly section: string;
     readonly item?: string;
@@ -62,16 +68,42 @@ interface HomeSnapshot {
   } | null;
 }
 const HOME_SLOT = createSnapshotSlot<HomeSnapshot>();
-const useStyles = makeStyles({ dropdown: { minWidth: 0 } });
+
+const controlsIn = (element: HTMLElement | null | undefined) => [
+  ...(element?.querySelectorAll<HTMLElement>('button, select') ?? []),
+];
+const railsIn = (element: HTMLElement | null) => [
+  ...(element?.querySelectorAll<HTMLElement>('[data-home-rail]') ?? []),
+];
 
 export function HomePage() {
   const home = useContext(HomeContext);
   return home ? <HomeContent /> : null;
 }
 
+/**
+ * 各行同宽，量一次页头的宽度交给各行算版式。挂载时先同步读一次：回到这一页时滚动位置要落在排好的版式上，
+ * 不能等观察器的第一次回调
+ */
+function useRowWidth(target: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = target.current;
+    if (!element) return;
+    setWidth(element.getBoundingClientRect().width);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      // 观察器在排版后、绘制前回调；走常规调度会晚一帧，拖动窗口时各行落后于窗口
+      if (entry) flushSync(() => setWidth(entry.contentRect.width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [target]);
+  return width;
+}
+
 function HomeContent() {
   const viewControls = useViewControlStyles();
-  const classes = useStyles();
   const home = useHomeServices();
   const t = useAtomValueRawSync(translateAtom);
   const albums = useService(albumsKey);
@@ -80,33 +112,37 @@ function HomeContent() {
   const catalog = useAtomValueRawSync(albumsAtom);
   const feed = useAtomValueRawSync(home.feed.state);
   const recent = useAtomValueRawSync(home.recent.state);
-  const added = useAtomValueRawSync(home.recent.albums);
-  const busy = useAtomValueRawSync(home.busy);
+  const overview = useAtomValueRawSync(home.overview.state);
   const notice = useAtomValueRawSync(home.notice);
   const root = useRef<HTMLElement>(null);
+  const head = useRef<HTMLElement>(null);
   const waiting = useRef<HomeSnapshot | null>(null);
-  const initialized = useRef(catalog.status === 'ready');
-  const [view, setView] = useState<HomeView>(() => ({
-    mode: 'albums',
-    gem: 'forgotten',
-    duration: 0,
-    albums: sampleHomeAlbums(catalog.albums, 0),
-    offset: 0,
-  }));
+  const rowWidth = useRowWidth(head);
+  const online = useHomeOnlineRows();
+  const hidden = useAtomValueRawSync(homeHiddenSectionsAtom);
+  const layout = useAtomValueRawSync(homeLayoutAtom);
+  const statistics = anyHomeSectionShown(hidden, HOME_STATISTICS_SECTIONS);
+  const added = !hidden.includes('added');
+  const overviewShown = !hidden.includes('overview');
+  const [editing, setEditing] = useState(false);
+  useCommand({
+    id: 'home.edit.done',
+    layer: 'overlay',
+    keys: [{ key: 'Escape' }],
+    enabled: () => editing,
+    run: () => setEditing(false),
+  });
+  const [now] = useState(() => Date.now());
+  const [view, setView] = useState({ offset: 0 });
   const [albumMenu, setAlbumMenu] = useState<{ at: TablePoint; owner: string } | null>(null);
   const [trackMenu, setTrackMenu] = useState<TablePoint | null>(null);
+  // 在设置里关掉的行不读它的数据
   useEffect(() => {
-    home.feed.activate();
-    home.recent.activate();
-  }, [home]);
-  useLayoutEffect(() => {
-    if (catalog.status !== 'ready' || initialized.current) return;
-    initialized.current = true;
-    setView((old) => ({ ...old, albums: sampleHomeAlbums(catalog.albums, old.duration) }));
-  }, [catalog]);
-  const controls = (element: HTMLElement | null | undefined) => [
-    ...(element?.querySelectorAll<HTMLElement>('button, select') ?? []),
-  ];
+    if (statistics) home.feed.activate();
+    if (added) home.recent.activate();
+    if (overviewShown) home.overview.activate();
+    home.online.activate();
+  }, [home, statistics, added, overviewShown]);
   const captureFocus = (): HomeSnapshot['focus'] => {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !root.current?.contains(active)) return null;
@@ -115,7 +151,7 @@ function HomeContent() {
     return {
       section: section.dataset.homeSection ?? '',
       item: item?.dataset.homeItem,
-      index: controls(item ?? section).indexOf(active),
+      index: controlsIn(item ?? section).indexOf(active),
     };
   };
   usePageSnapshot(
@@ -123,23 +159,26 @@ function HomeContent() {
     {
       capture: () =>
         waiting.current ?? {
-          view,
+          offset: view.offset,
           scroll: root.current?.scrollTop ?? 0,
+          rails: Object.fromEntries(
+            railsIn(root.current).map((rail) => [rail.dataset.homeRail ?? '', railIndex(rail)]),
+          ),
           focus: captureFocus(),
         },
       restore(snapshot) {
-        initialized.current = true;
-        const restored = { ...snapshot.view };
-        waiting.current = { ...snapshot, view: restored };
-        setView(restored);
+        waiting.current = snapshot;
+        setView({ offset: snapshot.offset });
       },
     },
     catalog.status === 'ready',
   );
   useLayoutEffect(() => {
     const saved = waiting.current;
-    if (!saved || saved.view !== view || !root.current) return;
+    if (!saved || saved.offset !== view.offset || !root.current || rowWidth <= 0) return;
     waiting.current = null;
+    for (const rail of railsIn(root.current))
+      scrollRailTo(rail, saved.rails[rail.dataset.homeRail ?? ''] ?? 0);
     root.current.scrollTop = saved.scroll;
     if (focusLost() && saved.focus) {
       const { section, item, index } = saved.focus;
@@ -153,55 +192,72 @@ function HomeContent() {
             (node) => node.dataset.homeItem === item,
           )
         : group;
-      controls(container)[index]?.focus({ preventScroll: true });
+      controlsIn(container)[index]?.focus({ preventScroll: true });
     }
-  }, [view]);
+  }, [view, rowWidth]);
 
-  const menu = (album: Album, at: TablePoint, owner: string) => {
+  const forgotten = feed.statistics.forgotten;
+  useLayoutEffect(() => {
+    if (feed.status === 'ready' && view.offset > 0 && view.offset >= forgotten.length)
+      setView({ offset: 0 });
+  }, [feed.status, forgotten.length, view.offset]);
+  const openAlbumMenu = (album: Album, at: TablePoint, owner: string) => {
     setTrackMenu(null);
     void albums.menu.prepare([album]);
     setAlbumMenu({ at, owner });
   };
-  const albumCard = (album: Album) => (
-    <HomeAlbumCard
-      key={albumKeyOf(album)}
-      album={album}
-      onMenu={menu}
-      menuOwner={albumMenu?.owner}
-    />
-  );
-  // 方形图块照封面墙排；横排的候选卡带着曲数与时长，自己一列列排
-  const albumGrid = (items: readonly Album[]) => (
-    <CoverGrid
-      shape={STANDARD_GRID_SHAPE}
-      items={items}
-      keyOf={albumKeyOf}
-      render={(album) => albumCard(album)}
-    />
-  );
-  const candidateGrid = (items: readonly Album[]) => (
-    <div className={styles.candidates}>
-      {items.map((album) => (
-        <HomeCandidateCard
-          key={albumKeyOf(album)}
-          album={album}
-          onMenu={menu}
-          menuOwner={albumMenu?.owner}
-        />
-      ))}
-    </div>
-  );
-  const candidates =
-    view.gem === 'forgotten' ? feed.statistics.forgotten : feed.statistics.unplayed;
-  useLayoutEffect(() => {
-    if (feed.status === 'ready' && view.offset > 0 && view.offset >= candidates.length)
-      setView((old) => ({ ...old, offset: 0 }));
-  }, [feed.status, candidates.length, view.offset]);
-  const gems = candidates.slice(view.offset, view.offset + HOME_TRACK_COUNT);
+  const openTrackMenu = (track: LibraryTrack, at: TablePoint) => {
+    setAlbumMenu(null);
+    void albumList.menu.prepare([track], track, store.get(libraryTracksAtom).stamp);
+    setTrackMenu(at);
+  };
   const refresh = () => {
     void albums.browse.retry();
-    void home.feed.refresh();
-    void home.recent.refresh();
+    if (statistics) void home.feed.refresh();
+    if (added) void home.recent.refresh();
+    if (overviewShown) void home.overview.refresh();
+  };
+  const retry = (
+    <Button className={viewControls.field} onClick={refresh}>
+      {t('album.retry')}
+    </Button>
+  );
+  const statsFailed = feed.status === 'failed' || feed.status === 'unavailable';
+  // 各行的元素先备好，按设置里的次序放；元素不渲染就不取数，关掉的行只是不放
+  const rows: Record<HomeSection, ReactNode> = {
+    quick: <HomeQuick rowWidth={rowWidth} now={now} onMenu={openAlbumMenu} />,
+    banners: <HomeBanners rowWidth={rowWidth} />,
+    added: <HomeAdded rowWidth={rowWidth} onMenu={openAlbumMenu} menuOwner={albumMenu?.owner} />,
+    'new-tracks': (
+      <HomeNewTracks
+        rowWidth={rowWidth}
+        tracks={online.newTracks}
+        loading={online.newTracksLoading}
+      />
+    ),
+    charts: (
+      <HomeCharts rowWidth={rowWidth} charts={online.charts} loading={online.chartsLoading} />
+    ),
+    playlists: <HomePlaylists rowWidth={rowWidth} />,
+    gems: (
+      <HomeGems
+        rowWidth={rowWidth}
+        now={now}
+        offset={view.offset}
+        onNext={() =>
+          setView(({ offset }) => {
+            const next = offset + HOME_TRACK_COUNT;
+            return { offset: next < forgotten.length ? next : 0 };
+          })
+        }
+        onMenu={(item, at) => openTrackMenu(item.track, at)}
+      />
+    ),
+    releases: <HomeReleases rowWidth={rowWidth} />,
+    'most-played': (
+      <HomeMostPlayed rowWidth={rowWidth} onAlbumMenu={openAlbumMenu} onTrackMenu={openTrackMenu} />
+    ),
+    overview: <HomeOverview rowWidth={rowWidth} />,
   };
   return (
     <section
@@ -211,23 +267,30 @@ function HomeContent() {
       aria-label={t('place.home')}
       data-page-scrolls-header
     >
-      <header className={styles.header}>
+      <header ref={head} className={styles.header}>
         <h1>{t('place.home')}</h1>
-        <PrimaryPlayButton
-          icon={<ArrowShuffle20Regular />}
-          disabled={busy || !catalog.enabled}
-          onClick={() => void home.shuffle()}
-        >
-          {t('home.shuffle')}
-        </PrimaryPlayButton>
+        {editing ? (
+          <Button
+            appearance="primary"
+            icon={<Checkmark20Regular />}
+            onClick={() => setEditing(false)}
+          >
+            {t('home.done')}
+          </Button>
+        ) : (
+          <Button
+            className={viewControls.field}
+            icon={<Edit20Regular />}
+            onClick={() => setEditing(true)}
+          >
+            {t('home.edit')}
+          </Button>
+        )}
       </header>
       {notice && <p role="alert">{t(notice)}</p>}
       {catalog.status === 'failed' && (
         <p role="alert">
-          {t('album.readFailed')}{' '}
-          <Button className={viewControls.field} onClick={refresh}>
-            {t('album.retry')}
-          </Button>
+          {t('album.readFailed')} {retry}
         </p>
       )}
       {catalog.status === 'ready' && !catalog.enabled && <p>{t('album.disabledTitle')}</p>}
@@ -237,9 +300,8 @@ function HomeContent() {
       <AddFoldersAction />
       {catalog.truncated && <p>{t('album.truncated', { count: catalog.albums.length })}</p>}
       {catalog.status === 'loading' && <Spinner size="tiny" label={t('album.loading')} />}
-      <HomePins />
-      {(feed.dirty || recent.dirty) && (
-        <div className={styles.header}>
+      {(feed.dirty || recent.dirty || overview.dirty) && (
+        <div className={styles.changed}>
           <span role="status">{t('home.changed')}</span>
           <Button
             className={viewControls.field}
@@ -250,198 +312,35 @@ function HomeContent() {
           </Button>
         </div>
       )}
-      {feed.available !== false &&
-        (feed.status !== 'ready' || feed.unreadCount > 0 || feed.statistics.recent.length > 0) && (
-          <section aria-label={t('home.recent')} data-home-section="recent">
-            <h2>{t('home.recent')}</h2>
-            {albumGrid(feed.statistics.recent)}
-            {(feed.status === 'idle' || feed.status === 'loading') && (
-              <Spinner size="tiny" label={t('home.statsLoading')} />
-            )}
-            {(feed.status === 'failed' || feed.status === 'unavailable') && (
-              <p role="alert">
-                {t(
-                  feed.failure === 'components'
-                    ? 'home.statsProbeFailed'
-                    : feed.failure === 'library'
-                      ? 'home.statsLibraryFailed'
-                      : feed.failure === 'albums'
-                        ? 'album.readFailed'
-                        : 'home.statsFailed',
-                )}{' '}
-                <Button className={viewControls.field} onClick={refresh}>
-                  {t('album.retry')}
-                </Button>
-              </p>
-            )}
-            {feed.status === 'ready' && feed.unreadCount > 0 && (
-              <p role="status">
-                {t('home.statsPartial', { count: feed.unreadCount })}{' '}
-                <Button className={viewControls.field} onClick={refresh}>
-                  {t('album.retry')}
-                </Button>
-              </p>
-            )}
-          </section>
-        )}
-      {feed.available === false && <p role="status">{t('home.statsMissing')}</p>}
-      <section aria-label={t('home.added')} data-home-section="added">
-        <header className={styles.header}>
-          <h2>{t('home.added')}</h2>
-          <Tooltip content={t('home.refreshAdded')} relationship="label">
-            <Button
-              appearance="subtle"
-              className={viewControls.icon}
-              icon={<ArrowClockwise20Regular />}
-              aria-label={t('home.refreshAdded')}
-              onClick={() => {
-                void home.recent.refresh();
-                void albums.browse.retry();
-              }}
-            />
-          </Tooltip>
-        </header>
-        {albumGrid(added)}
-        {(recent.status === 'idle' || recent.status === 'loading') && (
-          <Spinner size="tiny" label={t('home.addedLoading')} />
-        )}
-        {(recent.status === 'failed' || recent.status === 'unavailable') && (
-          <p role="alert">
-            {t('home.addedFailed')}{' '}
-            <Button className={viewControls.field} onClick={() => void home.recent.refresh()}>
-              {t('album.retry')}
-            </Button>
-          </p>
-        )}
-        {recent.status === 'disabled' && <p>{t('album.disabledTitle')}</p>}
-        {(recent.status === 'missing' ||
-          (recent.status === 'ready' && catalog.status === 'ready' && !added.length)) && (
-          <p>{t('home.noAdded')}</p>
-        )}
-        {recent.status === 'ready' && recent.limited && added.length < 6 && (
-          <p>{t('home.addedLimit', { count: HOME_RECENT_LIMIT })}</p>
-        )}
-      </section>
-      <section aria-label={t('home.explore')} data-home-section="explore">
-        <header className={styles.header}>
-          <h2>{t('home.explore')}</h2>
-          <Tooltip content={t('home.nextBatch')} relationship="label">
-            <Button
-              appearance="subtle"
-              className={viewControls.icon}
-              icon={<ArrowClockwise20Regular />}
-              aria-label={t('home.nextBatch')}
-              disabled={view.mode === 'albums' ? !catalog.albums.length : !candidates.length}
-              onClick={() =>
-                setView((old) =>
-                  old.mode === 'albums'
-                    ? { ...old, albums: sampleHomeAlbums(catalog.albums, old.duration) }
-                    : {
-                        ...old,
-                        offset:
-                          old.offset + HOME_TRACK_COUNT < candidates.length
-                            ? old.offset + HOME_TRACK_COUNT
-                            : 0,
-                      },
-                )
-              }
-            />
-          </Tooltip>
-        </header>
-        <div className={styles.filters}>
-          <TabList
-            selectedValue={view.mode}
-            onTabSelect={(_, data) =>
-              setView((old) => ({ ...old, mode: data.value === 'gems' ? 'gems' : 'albums' }))
-            }
-          >
-            <Tab value="albums">{t('home.albums')}</Tab>
-            <Tab value="gems" disabled={feed.available !== true}>
-              {t('home.gems')}
-            </Tab>
-          </TabList>
-          {view.mode === 'albums' ? (
-            <ScrollDropdown
-              className={mergeClasses(viewControls.field, classes.dropdown)}
-              aria-label={t('home.duration')}
-              value={
-                view.duration ? t('home.minutes', { count: view.duration }) : t('home.anyDuration')
-              }
-              selectedOptions={[String(view.duration)]}
-              onOptionSelect={(_, data) => {
-                if (!data.optionValue) return;
-                const duration: HomeDuration =
-                  data.optionValue === '30' ? 30 : data.optionValue === '60' ? 60 : 0;
-                setView((old) => ({
-                  ...old,
-                  duration,
-                  albums: sampleHomeAlbums(catalog.albums, duration),
-                }));
-              }}
-            >
-              <Option value="0">{t('home.anyDuration')}</Option>
-              <Option value="30">{t('home.minutes', { count: 30 })}</Option>
-              <Option value="60">{t('home.minutes', { count: 60 })}</Option>
-            </ScrollDropdown>
-          ) : (
-            <ScrollDropdown
-              className={mergeClasses(viewControls.field, classes.dropdown)}
-              aria-label={t('home.gemCondition')}
-              value={t(view.gem === 'unplayed' ? 'home.unplayed' : 'home.forgotten')}
-              selectedOptions={[view.gem]}
-              onOptionSelect={(_, data) => {
-                if (!data.optionValue) return;
-                setView((old) => ({
-                  ...old,
-                  gem: data.optionValue === 'unplayed' ? 'unplayed' : 'forgotten',
-                  offset: 0,
-                }));
-              }}
-            >
-              <Option value="forgotten">{t('home.forgotten')}</Option>
-              <Option value="unplayed">{t('home.unplayed')}</Option>
-            </ScrollDropdown>
+      {editing ? (
+        <HomeLayoutEditor scroller={root} />
+      ) : (
+        <>
+          {anyHomeSectionShown(hidden, HOME_ONLINE_SECTIONS) && <HomeNcmSetup />}
+          {rowWidth > 0 && (
+            <>
+              {statistics && feed.available !== false && (statsFailed || feed.unreadCount > 0) && (
+                <p role={statsFailed ? 'alert' : 'status'} data-home-section="statistics">
+                  {statsFailed
+                    ? t(
+                        feed.failure === 'components'
+                          ? 'home.statsProbeFailed'
+                          : feed.failure === 'library'
+                            ? 'home.statsLibraryFailed'
+                            : feed.failure === 'albums'
+                              ? 'album.readFailed'
+                              : 'home.statsFailed',
+                      )
+                    : t('home.statsPartial', { count: feed.unreadCount })}{' '}
+                  {retry}
+                </p>
+              )}
+              {layout.map(({ id, shown }) => shown && <Fragment key={id}>{rows[id]}</Fragment>)}
+            </>
           )}
-        </div>
-        {view.mode === 'albums' ? (
-          <>
-            {candidateGrid(view.albums)}
-            {catalog.status === 'ready' && !view.albums.length && <p>{t('home.noAlbums')}</p>}
-          </>
-        ) : (
-          <>
-            {gems.map((item) => (
-              <HomeTrackRow
-                key={item.track.handle}
-                item={item}
-                mode={view.gem}
-                onMenu={(target, at) => {
-                  setAlbumMenu(null);
-                  void albumList.menu.prepare(
-                    [target.track],
-                    target.track,
-                    store.get(libraryTracksAtom).stamp,
-                  );
-                  setTrackMenu(at);
-                }}
-              />
-            ))}
-            {!gems.length && feed.status === 'ready' && feed.unreadCount === 0 && (
-              <p>{t('home.noGems')}</p>
-            )}
-            {!!candidates.length && (
-              <Button
-                className={viewControls.icon}
-                appearance="subtle"
-                onClick={() => home.openGems(view.gem)}
-              >
-                {t('home.viewAll')}
-              </Button>
-            )}
-          </>
-        )}
-      </section>
-      <HomeChannels />
+          <HomeChannels />
+        </>
+      )}
       <AlbumMenu at={albumMenu?.at ?? null} onClose={() => setAlbumMenu(null)} />
       <TrackMenu at={trackMenu} onClose={() => setTrackMenu(null)} />
     </section>

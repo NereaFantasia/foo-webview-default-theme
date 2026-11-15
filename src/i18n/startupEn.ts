@@ -18,4 +18,7 @@ export const startupEn = {
     'If reloading does not resolve the problem, reinstall the complete theme package.',
   'startup.retry': 'Check again',
   'startup.reload': 'Reload',
+  'startup.copy': 'Copy runtime log',
+  'startup.copied': 'Copied',
+  'startup.copyFailed': 'Could not copy',
 } as const;

@@ -1,76 +1,71 @@
-/**
- * 设置页目录里亮哪一组
- *
- * 平时亮的是按页面顺序最靠上、正在看的那一组；滚到底时亮最后一组，不然最后一组很矮时永远轮不到它
- * 点了目录里的一项：滚过去的途中会依次经过中间各组，这段时间钉在点的那一组上，不一路跳过去；滚动停下
- * 之后仍亮着它，直到用户自己滚动。点的那组靠近页尾时滚不到顶，停下时它不在上部、页面又已到底，按「正在
- * 看」或「到底取最后一组」算都会把刚点的那项换掉
- * 一组都不在看（判定区带边距时会出现）时保持上一次的结果
- */
-export interface SettingsNav {
-  current(): string;
-  /** 某一组进出「正在看」的区域，由调用方的 IntersectionObserver 报 */
-  setVisible(group: string, visible: boolean): void;
-  /** 滚动区是不是已经到底 */
-  setAtBottom(atBottom: boolean): void;
-  /** 用户在目录里点了一组 */
-  select(group: string): void;
-  /** 点选引起的滚动停下了 */
-  release(): void;
-  /** 用户自己滚动了：点选的滚动途中是滚轮、拖滚动条与按键，停下之后是任何一次滚动 */
-  userScroll(): void;
+import { atom, type Atom } from 'jotai/vanilla';
+import { choiceCodec, defineLocalPref, type PrefStorage } from '../kit/localPref.ts';
+import { serviceKey } from '../kit/serviceKey.ts';
+import type { Store } from '../kit/store.ts';
+import type { NavHistoryService } from '../nav/navHistory.ts';
+
+/** 设置页的分区，也是目录里的先后 */
+export const SETTINGS_SECTIONS = [
+  'general',
+  'appearance',
+  'playback',
+  'immersive',
+  'lyrics',
+  'music',
+  'online',
+  'shortcuts',
+  'about',
+] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+
+export const SETTINGS_SECTION_STORAGE_KEY = 'default-theme.settings-section.v1';
+
+// 记住本机上次所在的分区；存档里无法识别的分区按缺省处理
+const pref = defineLocalPref<SettingsSection>({
+  key: SETTINGS_SECTION_STORAGE_KEY,
+  fallback: 'general',
+  ...choiceCodec(SETTINGS_SECTIONS),
+});
+
+export interface SettingsNavService {
+  /** 设置页此刻显示的分区 */
+  readonly section: Atom<SettingsSection>;
+  /** 外面要求落到某个分区，设置页还没把焦点放到分区标题上 */
+  readonly landing: Atom<boolean>;
+  /** 页内换分区：分区是页内状态，不进历史 */
+  select(section: SettingsSection): void;
+  /** 从别处进设置页并落到某个分区；已经在设置页时只换分区 */
+  open(section: SettingsSection): void;
+  /** 设置页已把焦点放到分区标题上 */
+  landed(): void;
 }
 
-/** `order` 是各组在页面上的先后，至少一组；亮的那一组变了就调 `onChange` */
-export function createSettingsNav(
-  order: readonly string[],
-  onChange: (current: string) => void,
-): SettingsNav {
-  const first = order[0];
-  if (first === undefined) throw new Error('设置页至少要有一组');
-  const visible = new Set<string>();
-  let atBottom = false;
-  // 滚动途中钉住的那一组
-  let pinned: string | null = null;
-  // 用户点过、还没被自己的滚动顶掉的那一组
-  let chosen: string | null = null;
-  let current = first;
+export interface SettingsNavDeps {
+  readonly history: Pick<NavHistoryService, 'navigate'>;
+  /** 缺省用页面的偏好存储；给 null 只在内存里记 */
+  readonly storage?: PrefStorage | null;
+}
 
-  function update(): void {
-    const last = order[order.length - 1] ?? first;
-    const watched = order.find((group) => visible.has(group));
-    const next = pinned ?? chosen ?? (atBottom ? last : (watched ?? current));
-    if (next === current) return;
-    current = next;
-    onChange(current);
-  }
-
+/** 设置页的分区状态与深链入口。启动时读一次存档，之后换分区即时生效并写回 */
+export function startSettingsNav(store: Store, deps: SettingsNavDeps): SettingsNavService {
+  const { history, storage } = deps;
+  pref.load(store, storage);
+  const landing = atom(false);
   return {
-    current: () => current,
-    setVisible(group, isVisible) {
-      if (isVisible) visible.add(group);
-      else visible.delete(group);
-      update();
+    section: pref.atom,
+    landing,
+    select(section) {
+      pref.set(store, section, storage);
     },
-    setAtBottom(next) {
-      atBottom = next;
-      update();
+    open(section) {
+      pref.set(store, section, storage);
+      store.set(landing, true);
+      history.navigate({ id: 'settings' });
     },
-    select(group) {
-      if (!order.includes(group)) return;
-      pinned = group;
-      chosen = group;
-      update();
-    },
-    release() {
-      pinned = null;
-      update();
-    },
-    userScroll() {
-      if (chosen === null) return;
-      chosen = null;
-      pinned = null;
-      update();
+    landed() {
+      store.set(landing, false);
     },
   };
 }
+
+export const settingsNavKey = serviceKey<SettingsNavService>('settingsNav');

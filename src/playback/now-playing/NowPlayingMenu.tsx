@@ -1,4 +1,9 @@
-import { ArrowCounterclockwise20Regular, Stop20Regular } from '@fluentui/react-icons';
+import {
+  ArrowCounterclockwise20Regular,
+  Heart20Regular,
+  HeartBroken20Regular,
+  Stop20Regular,
+} from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -13,6 +18,10 @@ import { playbackCanSeekAtom, playbackConnectedAtom } from '../playerAtoms.ts';
 import { nowPlayingMenuAtom, nowPlayingMenuKey } from './nowPlayingMenu.ts';
 import { useService } from '../../kit/useService.ts';
 import { trackActionsKey } from '../../track/trackActions.ts';
+import { canFavorite } from '../../server/musicFavorites.ts';
+import { platformName } from '../musicPlatforms.ts';
+import { onlineFavoritesKey } from '../onlineFavorites.ts';
+import { onlineInfoOf, onlineRefOf, onlineTracksAtom } from '../onlineTracks.ts';
 
 export interface NowPlayingMenuProps {
   readonly at: ContextMenuPoint | null;
@@ -38,13 +47,40 @@ export function NowPlayingMenu({
   const playback = useService(playbackKey);
   const ratings = useService(ratingsKey);
   const trackActions = useService(trackActionsKey);
+  const favorites = useService(onlineFavoritesKey);
+  const onlineInfos = useAtomValueRawSync(onlineTracksAtom);
   const { track, stamp, tree, path, targets, stopAfter } = state;
   const quality = useQualityMenu(track);
   useEffect(() => (track ? ratings.watch([track], stamp) : undefined), [track, stamp, ratings]);
   if (!track) return null;
   const report = (action: Promise<boolean>) => void menu.report(action);
+  // 在线曲目：已收藏的随时能取消，没收藏的要有展示信息才能收
+  const ref = onlineRefOf(track.path);
+  const info = onlineInfoOf(track.path, onlineInfos);
+  const favorited = ref ? favorites.isFavorite('track', ref) : false;
+  const favoriteItems: TrackMenuItem[] =
+    ref && favorites.isReady() && (favorited || info)
+      ? [
+          {
+            kind: 'command',
+            id: 'favorite',
+            disabled: !canFavorite(ref),
+            reason: canFavorite(ref)
+              ? undefined
+              : t('favorite.unsupported', { platform: platformName(t, ref.platform) }),
+            label: t(favorited ? 'favorite.remove' : 'favorite.add'),
+            icon: favorited ? <HeartBroken20Regular /> : <Heart20Regular />,
+            onSelect: () =>
+              void (favorited
+                ? favorites.remove('track', [ref])
+                : info && favorites.add('track', [info])),
+          },
+          divider('favorite-divider'),
+        ]
+      : [];
   const items: TrackMenuItem[] = [
     ...extraItems,
+    ...favoriteItems,
     'rating',
     {
       kind: 'command',

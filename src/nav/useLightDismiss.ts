@@ -1,6 +1,14 @@
 import { useContext, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { CommandsContext, useCommand } from './useCommand.ts';
 
+/**
+ * 右键菜单层不算「外面」。文本框的编辑菜单挂在 App 层，在浮层的组件树之外，按它的菜单项不会沿树冒到浮层根上；
+ * 但它只会在浮层开着时从浮层里或放行区域里右键出现，按它不该把浮层收掉
+ */
+function inMenuLayer(target: Element): boolean {
+  return target.closest('[data-context-menu-owner]') !== null;
+}
+
 export interface LightDismissOptions {
   /** Esc 命令的 id，各浮层各用各的 */
   readonly id: string;
@@ -44,7 +52,8 @@ export function useLightDismiss(options: LightDismissOptions): () => void {
       inside.current = false;
       if (pressedInside) return;
       const { exempt, held, onDismiss } = latest.current;
-      if (event.target instanceof Element && exempt?.(event.target)) return;
+      if (event.target instanceof Element && (inMenuLayer(event.target) || exempt?.(event.target)))
+        return;
       if (held?.()) return;
       onDismiss(false);
     };

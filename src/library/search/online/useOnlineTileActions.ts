@@ -5,7 +5,7 @@ import { objectOpenerKey } from '../../../nav/objectOpener.ts';
 import type { MusicAlbum, MusicArtist, MusicPlaylist } from '../../../server/musicObjects.ts';
 import type { TablePoint } from '../../../table/tableItems.ts';
 import { objectTargetOf, type OnlineObjectTarget } from './OnlineObjectMenu.tsx';
-import type { OnlineTileActions } from './OnlineTiles.tsx';
+import type { ObjectTileActions } from '../../cover-tile/ObjectTile.tsx';
 import { useOnlineObjectActions } from './useOnlineObjectActions.ts';
 
 export interface OnlineTileMenu {
@@ -22,7 +22,7 @@ export function useOnlineTileActions(setNotice: (notice: MessageKey | null) => v
   const objectActions = useOnlineObjectActions(setNotice);
   const [menu, setMenu] = useState<OnlineTileMenu | null>(null);
   const tileActions = useCallback(
-    (item: MusicAlbum | MusicArtist | MusicPlaylist): OnlineTileActions => {
+    (item: MusicAlbum | MusicArtist | MusicPlaylist): ObjectTileActions => {
       const target = objectTargetOf(item);
       return {
         onOpen: () => void objects.open({ kind: 'onlineList', list: target.list }),

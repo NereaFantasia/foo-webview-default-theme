@@ -2,11 +2,15 @@ import type { contextMenuEn } from './contextMenuEn.ts';
 
 export const contextMenuZhCN: Record<keyof typeof contextMenuEn, string> = {
   'context.back': '返回',
+  'context.editMenu': '编辑',
+  'context.cut': '剪切',
+  'context.copy': '复制',
+  'context.paste': '粘贴',
+  'context.selectAll': '全选',
   'context.stop': '停止',
   'context.stopAfter': '当前曲目播放结束后停止',
   'context.restart': '从头播放',
   'context.playSelected': '播放所选',
-  'context.playFromHere': '从此处播放',
   'context.loading': '正在读取扩展命令…',
   'context.failed': '扩展命令读取失败',
   'context.limited': '所选数量超出扩展命令的限制',

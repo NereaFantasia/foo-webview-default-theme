@@ -48,7 +48,7 @@ describe('loadHostInfo', () => {
 });
 
 describe('diagnosticText', () => {
-  it('两行：fb2k 的版本与构建，组件的版本与要求的下限；不带 profile 路径', async () => {
+  it('两行：fb2k 的版本与构建，组件的版本；组件低于下限时带上要求；不带 profile 路径', async () => {
     const host = installFakeHost();
     host.answer('config.getVersionInfo', {
       success: true,
@@ -70,6 +70,22 @@ describe('diagnosticText', () => {
       ].join('\n'),
     );
     expect(text).not.toContain('AppData');
+  });
+
+  it('组件版本刚好达标或更高时不写下限', () => {
+    const base = {
+      foobar2000: 'foobar2000 v2.25',
+      is64bit: true,
+      isPortable: false,
+      pluginName: 'foo_ui_webview2',
+    };
+    for (const pluginVersion of [REQUIRED_HOST_VERSION, '99.0.0'])
+      expect(diagnosticText({ ...base, pluginVersion }).split('\n')[1]).toBe(
+        `foo_ui_webview2 ${pluginVersion}`,
+      );
+    expect(diagnosticText({ ...base, pluginVersion: 'dev' }).split('\n')[1]).toBe(
+      `foo_ui_webview2 dev (requires ${REQUIRED_HOST_VERSION} or later)`,
+    );
   });
 });
 

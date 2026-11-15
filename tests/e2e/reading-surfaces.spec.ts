@@ -1,9 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openPlayer } from '../fixtures/playerPage.ts';
 import { enterSettings, backgroundCard } from '../fixtures/settingsPage.ts';
-import { openArtists } from '../fixtures/artistsPage.ts';
 import { openGenres } from '../fixtures/genresPage.ts';
 import { openFolders } from '../fixtures/foldersPage.ts';
+import { openSongs } from '../fixtures/songsPage.ts';
+import { openRightCardPage } from '../fixtures/rightCardPage.ts';
 
 test.use({ screenshot: 'off' });
 
@@ -75,7 +76,7 @@ for (const scheme of ['light', 'dark'] as const) {
         }),
       ).toBe('none');
     }
-    await enterSettings(page);
+    await enterSettings(page, '外观');
     const toggle = backgroundCard(page).locator('[data-settings-toggle]');
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
     const opacity = page.getByRole('slider', { name: '内容区域不透明度', exact: true });
@@ -92,8 +93,12 @@ for (const scheme of ['light', 'dark'] as const) {
     const player = await openPlayer(page);
     for (const width of [900, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
-      const queueKey = page.locator('[data-right-card-key="queue"]');
-      await queueKey.click();
+      // 360 以下队列键收进菜单键：经菜单打开队列，Esc 收起后焦点回到打开它的键
+      const opener = page
+        .locator('[data-right-card-key="queue"]')
+        .or(page.locator('[data-right-card-key="pages"]'))
+        .first();
+      await openRightCardPage(page, 'queue');
       const right = page.locator('[data-form="overlay"]');
       await expectOpaque(right, scheme);
       const rightBox = await right.boundingBox();
@@ -105,10 +110,10 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(rightBox && rightBox.x >= 0 && rightBox.x + rightBox.width <= width).toBe(true);
       await page.mouse.click(2, 160);
       await expect(right).toHaveCount(0);
-      await queueKey.click();
+      await openRightCardPage(page, 'queue');
       await page.keyboard.press('Escape');
       await expect(right).toHaveCount(0);
-      await expect(queueKey).toBeFocused();
+      await expect(opener).toBeFocused();
 
       const sidebarKey = page.locator('[data-sidebar-key]');
       await sidebarKey.click();
@@ -130,18 +135,13 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(player.errors).toEqual([]);
   });
 
-  for (const area of ['artists', 'genres', 'folders'] as const) {
+  for (const area of ['genres', 'folders'] as const) {
     test(`${scheme} ${area} 的窄窗抽屉保留外部点击区，关闭后恢复焦点`, async ({ page }) => {
       await prepare(page, scheme, 0);
       await page.setViewportSize({ width: 1280, height: 800 });
-      const env =
-        area === 'artists'
-          ? await openArtists(page)
-          : area === 'genres'
-            ? await openGenres(page)
-            : await openFolders(page);
+      const env = area === 'genres' ? await openGenres(page) : await openFolders(page);
       await page.setViewportSize({ width: 320, height: 800 });
-      const label = area === 'artists' ? '艺人列表' : area === 'genres' ? '流派列表' : '目录';
+      const label = area === 'genres' ? '流派列表' : '目录';
       const trigger = env.view.getByRole('button', { name: label, exact: true });
       await trigger.click();
       const drawer = page.getByRole('dialog', { name: label, exact: true });
@@ -165,4 +165,12 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(env.errors).toEqual([]);
     });
   }
+
+  test(`${scheme} 筛选浮层保持实色，阅读面浓度调到 0 也不透出表格`, async ({ page }) => {
+    await prepare(page, scheme, 0);
+    const songs = await openSongs(page);
+    await songs.view.locator('[data-filter-toggle]').click();
+    await expectOpaque(page.locator('[data-filter-surface]'), scheme);
+    expect(songs.errors).toEqual([]);
+  });
 }

@@ -3,7 +3,7 @@ import { useAtomValueRawSync } from 'jotai/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useService } from '../kit/useService.ts';
 import { lyricsKey } from './lyricsService.ts';
-import { lyricsDisplayKey, lyricsFontFamily } from './lyricsDisplay.ts';
+import { lyricsDisplayKey, lyricsFontStyle } from './lyricsDisplay.ts';
 import { createLyricsTimeline, type LyricsCue } from './lyricsTimeline.ts';
 import { playbackAtom } from '../playback/playback.ts';
 import { trackKeyOf } from '../playback/playbackContract.ts';
@@ -59,7 +59,7 @@ function useLyricsPreview(target: SeekPreview | null) {
     visible,
     synced: timeline !== null,
     hasSub: timeline?.hasSub ?? false,
-    fontFamily: lyricsFontFamily(display.fontFamily),
+    font: lyricsFontStyle(display.fontFamily, display.fontWeight),
   };
 }
 
@@ -176,12 +176,7 @@ function PreviewText({ content }: { readonly content: PreviewContent }) {
     </>
   );
   return (
-    <div
-      className={styles.lines}
-      style={{ fontFamily: content.fontFamily }}
-      aria-hidden
-      data-seek-lyrics
-    >
+    <div className={styles.lines} style={content.font} aria-hidden data-seek-lyrics>
       <div ref={incoming} className={styles.row}>
         {row(frame.cue)}
       </div>

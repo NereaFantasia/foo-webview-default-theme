@@ -1,32 +1,31 @@
-import { Button, Spinner, useRestoreFocusTarget } from '@fluentui/react-components';
-import { PanelLeft20Regular } from '@fluentui/react-icons';
+import { Button, Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
-import { createSnapshotSlot, historyAtom } from '../../../nav/navHistory.ts';
-import { PageEntryContext, usePageSnapshot } from '../../../nav/usePageSnapshot.ts';
-import { emptySelection } from '../../../kit/keyedSelection.ts';
-import { useLibrarySplit } from '../../split-view/useLibrarySplit.ts';
-import { LibrarySplitHandle } from '../../split-view/LibrarySplitHandle.tsx';
-import { LibraryDrawer } from '../../split-view/LibraryDrawer.tsx';
+import { createSnapshotSlot } from '../../../nav/navHistory.ts';
+import { usePageSnapshot } from '../../../nav/usePageSnapshot.ts';
+import type { PageProps } from '../../../nav/places.ts';
 import { ArtistsContext, useArtists } from '../artistsContext.ts';
-import { ArtistsList } from './ArtistsList.tsx';
+import { ArtistWall } from './ArtistWall.tsx';
 import { ArtistHeader } from './ArtistHeader.tsx';
 import { ArtistAbout } from './ArtistAbout.tsx';
 import { ArtistHighlights } from './ArtistHighlights.tsx';
-import { ArtistAlbums } from './ArtistAlbums.tsx';
+import { ArtistAlbums, ArtistAlbumsStatus } from './ArtistAlbums.tsx';
 import { ArtistMenu } from './ArtistMenu.tsx';
 import { ArtistRenameDialog } from './ArtistRenameDialog.tsx';
 import { useViewControlStyles } from '../../../theme/controlStyles.ts';
 import styles from './ArtistsPage.module.css';
 import { AddFoldersAction } from '../../AddFoldersAction.tsx';
+import { ArtistColorTheme } from './ArtistColorTheme.tsx';
+import { ArtistHeroImage } from './ArtistHeroImage.tsx';
+import { DetailFrame } from '../../detail/DetailFrame.tsx';
+import { newestFirst } from '../albumOrder.ts';
 
+/** 墙与详情各是一条历史记录，各记各的：墙记筛选与滚动，详情只记滚动 */
 interface ArtistsSnapshot {
   readonly text: string;
   readonly tidy: boolean;
-  readonly focus: string | null;
-  readonly listTop: number;
-  readonly detailTop: number;
+  readonly top: number;
 }
 const SLOT = createSnapshotSlot<ArtistsSnapshot>();
 
@@ -34,140 +33,71 @@ interface ArtistMenuState {
   readonly names: readonly string[];
   readonly x: number;
   readonly y: number;
-  readonly inDrawer: boolean;
 }
 
 interface ArtistRenameState {
   readonly names: readonly string[];
   readonly target: string;
-  readonly inDrawer: boolean;
 }
 
-function ArtistsContent() {
+/**
+ * 艺人地点：没有主体时是封面墙，有主体时是这位艺人的整页详情。墙还是详情按这一层自己的记录定，不读全局的
+ * 当前艺人：过渡时新旧两层同时在画，读全局的话离场那层会跟着变成另一边
+ */
+function ArtistsContent({ place }: PageProps) {
   const services = useArtists();
   const viewControls = useViewControlStyles();
   const t = useAtomValueRawSync(translateAtom);
   const catalog = useAtomValueRawSync(services.catalog.state);
   const all = useAtomValueRawSync(services.catalog.all);
-  const subject = useAtomValueRawSync(services.places.selected);
+  const subject = place.subject ?? null;
   const temporary = useAtomValueRawSync(services.places.temporary);
   const detail = useAtomValueRawSync(services.detail.state);
   const failed = useAtomValueRawSync(services.actions.failed);
-  const split = useLibrarySplit('artists');
-  const drawerTrigger = useRestoreFocusTarget();
-  const entry = useContext(PageEntryContext);
-  const history = useAtomValueRawSync(historyAtom);
-  const active = entry === null || entry === history.entry;
-  const [directoryOpen, setDirectoryOpen] = useState(false);
   const [text, setText] = useState('');
   const [tidy, setTidy] = useState(false);
-  const [focus, setFocus] = useState<string | null>(subject);
   const [menu, setMenu] = useState<ArtistMenuState | null>(null);
   const [rename, setRename] = useState<ArtistRenameState | null>(null);
-  const list = useRef<HTMLDivElement>(null);
-  const listTop = useRef(0);
-  const listSelection = useRef(emptySelection<string>());
-  const scroll = useRef<HTMLDivElement>(null);
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  const [liveVideo, setLiveVideo] = useState<HTMLVideoElement | null>(null);
   const restoring = useRef<ArtistsSnapshot | null>(null);
-  const previous = useRef(subject);
-  useEffect(() => {
-    if (!split.compact || !active) setDirectoryOpen(false);
-  }, [split.compact, active]);
-  useEffect(() => {
-    if (!directoryOpen || !split.compact || !active) {
-      setMenu((current) => (current?.inDrawer ? null : current));
-    }
-  }, [directoryOpen, split.compact, active]);
-  useEffect(() => {
-    if (subject === previous.current) return;
-    previous.current = subject;
-    if (!restoring.current) {
-      if (scroll.current) scroll.current.scrollTop = 0;
-    }
-  }, [subject]);
   usePageSnapshot(
     SLOT,
     {
-      capture: () =>
-        restoring.current ?? {
-          text,
-          tidy,
-          focus,
-          listTop: listTop.current,
-          detailTop: scroll.current?.scrollTop ?? 0,
-        },
+      capture: () => restoring.current ?? { text, tidy, top: scroller?.scrollTop ?? 0 },
       restore: (saved) => {
         restoring.current = saved;
         setText(saved.text);
         setTidy(saved.tidy);
-        setFocus(saved.focus);
-        listTop.current = saved.listTop;
       },
     },
     true,
   );
   useLayoutEffect(() => {
     const saved = restoring.current;
-    if (!saved || !catalog.loaded || text !== saved.text || tidy !== saved.tidy) return;
-    if (list.current) list.current.scrollTop = saved.listTop;
+    if (!saved || !scroller || !catalog.loaded || text !== saved.text || tidy !== saved.tidy)
+      return;
     if (subject !== null && (detail.subject !== subject || detail.status !== 'ready')) return;
-    if (scroll.current) scroll.current.scrollTop = saved.detailTop;
+    scroller.scrollTop = saved.top;
     restoring.current = null;
-  }, [catalog.loaded, detail, subject, text, tidy]);
+  }, [catalog.loaded, detail, scroller, subject, text, tidy]);
   const selected = all.find((row) => row.name === subject);
-  const openMenu = (names: readonly string[], x: number, y: number, inDrawer = false) => {
-    setMenu({ names, x, y, inDrawer });
-  };
   const contextMenu = menu && (
     <ArtistMenu
       names={menu.names}
       at={menu}
       onClose={() => setMenu(null)}
       onAbout={() => {
-        scroll.current?.querySelector('[data-artist-about]')?.scrollIntoView({ block: 'start' });
+        const name = menu.names[0];
+        if (subject === null && name !== undefined) services.places.open(name);
+        else scroller?.querySelector('[data-artist-about]')?.scrollIntoView({ block: 'start' });
       }}
-      onRename={(names, target) => setRename({ names, target, inDrawer: menu.inDrawer })}
+      onRename={(names, target) => setRename({ names, target })}
     />
   );
-  const renameDialog = rename && <ArtistRenameDialog {...rename} onClose={() => setRename(null)} />;
-  const navigator = (
-    <ArtistsList
-      text={text}
-      tidy={tidy}
-      focus={focus}
-      compact={split.compact}
-      scroll={list}
-      scrollTop={listTop}
-      selection={listSelection}
-      commands={services.commands}
-      onText={setText}
-      onTidy={setTidy}
-      onFocus={setFocus}
-      onMenu={(names, x, y) => openMenu(names, x, y, split.compact)}
-      onSelect={() => setDirectoryOpen(false)}
-    />
-  );
-  return (
-    <section
-      ref={split.measure}
-      className={styles.root}
-      data-page="artists"
-      aria-label={t('artists.title')}
-    >
-      {split.compact && (
-        <header className={styles.toolbar}>
-          <Button
-            {...drawerTrigger}
-            className={viewControls.icon}
-            appearance="subtle"
-            icon={<PanelLeft20Regular />}
-            aria-expanded={directoryOpen}
-            onClick={() => setDirectoryOpen(true)}
-          >
-            {t('artists.directory')}
-          </Button>
-        </header>
-      )}
+  const notices = (
+    <>
       {(catalog.status === 'failed' || catalog.truncated || failed) && (
         <div className={styles.notice} role="alert">
           {t(
@@ -194,6 +124,55 @@ function ArtistsContent() {
           </Button>
         </div>
       )}
+    </>
+  );
+  const overlay = (
+    <>
+      {contextMenu}
+      {rename && <ArtistRenameDialog {...rename} onClose={() => setRename(null)} />}
+    </>
+  );
+  if (subject !== null && catalog.loaded && selected) {
+    const own = detail.subject === subject ? (detail.detail?.own ?? []) : [];
+    const theme = newestFirst(own, (group) => group.album)[0]?.album ?? null;
+    return (
+      <ArtistColorTheme album={theme} live={liveVideo}>
+        {(glow, hero) => (
+          <DetailFrame
+            label={subject || t('artists.unknown')}
+            page="artists"
+            glow={glow}
+            backdrop={hero ? <ArtistHeroImage {...hero} onVideo={setLiveVideo} /> : undefined}
+            heroReady={!!hero?.url}
+            intro={
+              <>
+                <ArtistHeader
+                  key={`header:${subject}`}
+                  narrow={narrow}
+                  onMenu={(x, y) => setMenu({ names: [subject], x, y })}
+                />
+                {notices}
+              </>
+            }
+            overlay={overlay}
+            onScroller={setScroller}
+            onNarrow={setNarrow}
+          >
+            <div className={styles.sections}>
+              <ArtistAlbumsStatus />
+              <ArtistAlbums key={`own:${subject}`} section="own" />
+              <ArtistHighlights key={`highlights:${subject}`} />
+              <ArtistAlbums key={`guest:${subject}`} section="guest" />
+              <ArtistAbout />
+            </div>
+          </DetailFrame>
+        )}
+      </ArtistColorTheme>
+    );
+  }
+  return (
+    <section className={styles.root} data-page="artists" aria-label={t('artists.title')}>
+      {notices}
       {!catalog.loaded && catalog.status !== 'failed' ? (
         <Spinner aria-label={t('artists.loading')} />
       ) : catalog.loaded && !all.length ? (
@@ -201,57 +180,28 @@ function ArtistsContent() {
           {t('artists.empty')}
           <AddFoldersAction />
         </div>
-      ) : (
-        <div className={styles.body}>
-          {!split.compact && (
-            <>
-              <div className={styles.browser} style={{ width: split.size }}>
-                {navigator}
-              </div>
-              <LibrarySplitHandle split={split} label={t('artists.split')} />
-            </>
-          )}
-          {selected ? (
-            <div className={styles.detail} ref={scroll}>
-              <ArtistHeader
-                key={`header:${subject}`}
-                onMenu={(x, y) => {
-                  if (subject !== null) openMenu([subject], x, y);
-                }}
-              />
-              <ArtistAbout />
-              <ArtistHighlights key={`highlights:${subject}`} />
-              <ArtistAlbums />
-            </div>
-          ) : (
-            <div className={styles.empty}>
-              {t(subject === null ? 'artists.pick' : 'artists.gone')}
-            </div>
-          )}
+      ) : subject === null ? (
+        <div className={styles.wall} ref={setScroller}>
+          <ArtistWall
+            text={text}
+            tidy={tidy}
+            scroller={scroller}
+            onText={setText}
+            onTidy={setTidy}
+            onMenu={(name, x, y) => setMenu({ names: [name], x, y })}
+          />
         </div>
+      ) : (
+        <div className={styles.empty}>{t('artists.gone')}</div>
       )}
-      {split.compact && (
-        <LibraryDrawer
-          open={directoryOpen && active}
-          title={t('artists.directory')}
-          closeLabel={t('artists.closeDirectory')}
-          onOpenChange={(open) => {
-            if (open || !rename?.inDrawer) setDirectoryOpen(open);
-          }}
-        >
-          {navigator}
-          {menu?.inDrawer && contextMenu}
-        </LibraryDrawer>
-      )}
-      {!menu?.inDrawer && contextMenu}
-      {renameDialog}
+      {overlay}
     </section>
   );
 }
 
-export function ArtistsPage() {
+export function ArtistsPage({ place }: PageProps) {
   const services = useContext(ArtistsContext);
-  return services ? <ArtistsContent /> : <Spinner />;
+  return services ? <ArtistsContent place={place} /> : <Spinner />;
 }
 
 export const ARTISTS_PAGES = { artists: ArtistsPage };

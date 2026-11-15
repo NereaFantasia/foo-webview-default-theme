@@ -1,0 +1,142 @@
+/* 设置编辑时盖在预设画面上的一层：铺满场景，接管指针；描框、能拖的线与读数都画在这一层里，伸出窗外的部分裁掉。
+   出现时 167 ms 淡入，退出编辑时 83 ms 淡出且不接指针
+
+   层级从显眼到淡：正在拖或悬停的线（强调色 2 像素实线）、当前分类能拖的线（1 像素虚线）、
+   当前分类的元素（强调色细框，能调的边已由线画出来时只写名字）、指针指到的别的元素（淡框）。
+   线与框底下都垫一圈半透明的深色，名字签与读数是同一种浮签，亮封面、暗背景上都看得清 */
+.layer {
+  --edit-halo: color-mix(in srgb, var(--colorNeutralBackground1) 45%, transparent);
+  --edit-line: color-mix(in srgb, var(--colorNeutralForeground1) 80%, transparent);
+  --edit-accent: var(--colorBrandStroke1);
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  animation: layer-in var(--motion-fast) var(--curveLinear) backwards;
+}
+
+.layer[data-leaving] {
+  pointer-events: none;
+  animation: layer-out var(--motion-faster) var(--curveLinear) forwards;
+}
+
+/* 指针在取景手势的目标（满幅封面）上：按住拖是取景 */
+.layer[data-pan] {
+  cursor: move;
+}
+
+@keyframes layer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes layer-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 描框：线在元素里面那一侧，里外各垫 1 像素的深色。指到的别的元素是淡的前景色，当前分类的元素是强调色 */
+.outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--colorNeutralForeground1) 40%, transparent);
+  box-shadow:
+    0 0 0 1px var(--edit-halo),
+    inset 0 0 0 1px var(--edit-halo);
+  pointer-events: none;
+  animation: layer-in var(--motion-faster) var(--curveLinear) backwards;
+}
+
+.outline[data-tone='current'] {
+  border-color: color-mix(in srgb, var(--edit-accent) 80%, transparent);
+}
+
+/* 名字签：与读数同一种浮签，中性底加投影，不与编辑条上的「完成」抢眼；指到的别的元素名字淡一档 */
+.name {
+  position: absolute;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorNeutralBackground1);
+  color: var(--colorNeutralForeground1);
+  box-shadow: var(--shadow4);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: layer-in var(--motion-faster) var(--curveLinear) backwards;
+}
+
+.name[data-tone='hover'] {
+  color: var(--colorNeutralForeground2);
+  font-weight: var(--fontWeightRegular);
+}
+
+/* 能拖的线：一张 SVG 里每条线三层，深色垫底、看得见的线、两侧各 6 像素的命中带。命中带自己接指针，光标按方向换 */
+.guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.halo,
+.stroke,
+.hit {
+  fill: none;
+}
+
+.halo {
+  stroke: var(--edit-halo);
+  stroke-width: 3;
+  transition: stroke-width var(--motion-faster) var(--curveLinear);
+}
+
+.stroke {
+  stroke: var(--edit-line);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+  transition:
+    stroke var(--motion-faster) var(--curveLinear),
+    stroke-width var(--motion-faster) var(--curveLinear);
+}
+
+.hit {
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: ew-resize;
+}
+
+[data-axis='y'] > g > .hit {
+  cursor: ns-resize;
+}
+
+/* 悬停或正在拖：强调色 2 像素实线，垫底跟着加宽 */
+[data-active] .stroke {
+  stroke: var(--edit-accent);
+  stroke-dasharray: none;
+  stroke-width: 2;
+}
+
+[data-active] .halo {
+  stroke-width: 4;
+}
+
+/* 拖动时指针旁的读数：项名加值与单位，与卡片里同一项一致 */
+.readout {
+  position: absolute;
+  translate: 12px -36px;
+  padding: var(--spacingVerticalXXS) var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorNeutralBackground1);
+  color: var(--colorNeutralForeground1);
+  box-shadow: var(--shadow8);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  white-space: nowrap;
+  pointer-events: none;
+}

@@ -1,87 +1,63 @@
-import { describe, expect, it } from 'vitest';
-import { createSettingsNav } from '../../../src/settings/settingsNav.ts';
+import { createStore } from 'jotai/vanilla';
+import { describe, expect, it, vi } from 'vitest';
+import type { PrefStorage } from '../../../src/kit/localPref.ts';
+import {
+  SETTINGS_SECTION_STORAGE_KEY,
+  startSettingsNav,
+} from '../../../src/settings/settingsNav.ts';
 
-const ORDER = ['general', 'appearance', 'playback', 'about'];
-
-function start() {
-  const seen: string[] = [];
-  const nav = createSettingsNav(ORDER, (current) => seen.push(current));
-  return { nav, seen };
+function memoryStorage(initial: Record<string, string> = {}) {
+  const items = new Map(Object.entries(initial));
+  const storage: PrefStorage = {
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => void items.set(key, value),
+  };
+  return { storage, items };
 }
 
-describe('createSettingsNav', () => {
-  it('起步亮第一组；一组都没有时不给建', () => {
-    expect(start().nav.current()).toBe('general');
-    expect(() => createSettingsNav([], () => {})).toThrow();
+function start(initial?: Record<string, string>) {
+  const store = createStore();
+  const { storage, items } = memoryStorage(initial);
+  const navigate = vi.fn();
+  const nav = startSettingsNav(store, { history: { navigate }, storage });
+  return { store, nav, items, navigate };
+}
+
+describe('设置页的分区状态', () => {
+  it('没有存档或存档无法识别时停在「常规」', () => {
+    const fresh = start();
+    expect(fresh.store.get(fresh.nav.section)).toBe('general');
+    const stale = start({ [SETTINGS_SECTION_STORAGE_KEY]: 'removed-section' });
+    expect(stale.store.get(stale.nav.section)).toBe('general');
   });
 
-  it('亮的是按页面顺序最靠上、正在看的那一组', () => {
-    const { nav, seen } = start();
-    nav.setVisible('playback', true);
-    nav.setVisible('appearance', true);
-    expect(nav.current()).toBe('appearance');
-
-    nav.setVisible('appearance', false);
-    expect(nav.current()).toBe('playback');
-    expect(seen).toEqual(['playback', 'appearance', 'playback']);
+  it('启动时读取上次所在的分区', () => {
+    const { store, nav } = start({ [SETTINGS_SECTION_STORAGE_KEY]: 'lyrics' });
+    expect(store.get(nav.section)).toBe('lyrics');
   });
 
-  it('一组都不在看时保持上一次的结果，同一组不重复通知', () => {
-    const { nav, seen } = start();
-    nav.setVisible('appearance', true);
-    nav.setVisible('appearance', false);
-    expect(nav.current()).toBe('appearance');
-    nav.setVisible('appearance', true);
-    expect(seen).toEqual(['appearance']);
+  it('页内切换分区即时生效并写入存档，不跳转到设置地点，也不要求页面落焦点', () => {
+    const { store, nav, items, navigate } = start();
+    nav.select('appearance');
+    expect(store.get(nav.section)).toBe('appearance');
+    expect(items.get(SETTINGS_SECTION_STORAGE_KEY)).toBe('appearance');
+    expect(store.get(nav.landing)).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('滚到底时亮最后一组，离开底部后回到正在看的那一组', () => {
-    const { nav } = start();
-    nav.setVisible('playback', true);
-    nav.setAtBottom(true);
-    expect(nav.current()).toBe('about');
-    nav.setAtBottom(false);
-    expect(nav.current()).toBe('playback');
+  it('从别处进入设置并指定分区：切换分区、跳转到设置地点、等待页面把焦点落到标题', () => {
+    const { store, nav, navigate } = start();
+    nav.open('online');
+    expect(store.get(nav.section)).toBe('online');
+    expect(navigate).toHaveBeenCalledWith({ id: 'settings' });
+    expect(store.get(nav.landing)).toBe(true);
+    nav.landed();
+    expect(store.get(nav.landing)).toBe(false);
   });
 
-  it('点选后钉在那一组上，途中经过别的组不跟着换', () => {
-    const { nav, seen } = start();
-    nav.setVisible('general', true);
-    nav.select('about');
-    nav.setVisible('appearance', true);
-    nav.setVisible('general', false);
-    nav.setVisible('playback', true);
-    expect(nav.current()).toBe('about');
-    expect(seen).toEqual(['about']);
-  });
-
-  it('滚动停下后仍亮着点的那一组，用户自己滚了才交回去', () => {
-    const { nav } = start();
-    nav.setVisible('playback', true);
-    nav.select('about');
-    nav.setAtBottom(true);
-    nav.release();
-    expect(nav.current()).toBe('about');
-
-    nav.setAtBottom(false);
-    expect(nav.current()).toBe('about');
-    nav.userScroll();
-    expect(nav.current()).toBe('playback');
-  });
-
-  it('滚动途中用户自己滚了，立刻交回去', () => {
-    const { nav } = start();
-    nav.setVisible('appearance', true);
-    nav.select('about');
-    nav.userScroll();
-    expect(nav.current()).toBe('appearance');
-  });
-
-  it('没点选过时用户滚动不改结果，不认识的组不钉', () => {
-    const { nav, seen } = start();
-    nav.userScroll();
-    nav.select('nowhere');
-    expect(nav.current()).toBe('general');
-    expect(seen).toEqual([]);
+  it('已在该分区时再次进入该分区，仍要求页面落一次焦点', () => {
+    const { store, nav } = start({ [SETTINGS_SECTION_STORAGE_KEY]: 'lyrics' });
+    nav.open('lyrics');
+    expect(store.get(nav.landing)).toBe(true);
   });
 });

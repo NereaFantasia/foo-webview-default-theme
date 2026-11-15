@@ -13,10 +13,10 @@ import { installFakeHost, type UnitHost } from '../../../fixtures/unitHost.ts';
 
 const MAIN = guidOf(0);
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
-/** 等过行服务与分组两道合并窗口，外加应答。 */
+/** 等过行服务与分组两道合并窗口，外加应答 */
 const coalesced = () => wait(350);
 
-/** 专辑 A 两碟三首、专辑 B 一碟两首。 */
+/** 专辑 A 两碟三首、专辑 B 一碟两首 */
 function albumRows(): PlaylistTrack[] {
   const spec: [string, number][] = [
     ['A', 1],
@@ -104,7 +104,7 @@ describe('startPlaylistGroups', () => {
     pages.release();
     await coalesced();
     expect(keys(store.get(groups.stateOf(MAIN)).runs)).toStrictEqual(['A | Artist', 'B | Artist']);
-    // 行的第一页到了不算内容变化，不再重取。
+    // 行的第一页到了不算内容变化，不再重取
     expect(runCalls(host)).toHaveLength(1);
   });
 
@@ -180,7 +180,7 @@ describe('startPlaylistGroups', () => {
     expect(state().collapsed.size).toBe(0);
     groups.collapseAll(MAIN);
     expect([...state().collapsed]).toStrictEqual(['A | Artist', 'B | Artist']);
-    // 删掉 B 的两首：B 的键不在了，A 的折叠留着。
+    // 删掉 B 的两首：B 的键不在了，A 的折叠留着
     await host.fb.playlist.removeTracks(MAIN, [3, 4]);
     await coalesced();
     expect(lists.items[0]?.trackCount).toBe(3);
@@ -250,6 +250,24 @@ describe('startPlaylistGroups', () => {
     await groups.setMode(MAIN, artist);
     await coalesced();
     expect(runCalls(host).at(-1)).toMatchObject({ patterns: ['%artist%'] });
+  });
+
+  it('选中当前这一档也重排：别的列表或新加的曲目让顺序对不上它时，再选一次能排回来', async () => {
+    const host = installFakeHost();
+    setup(host);
+    const storage = memoryStorage();
+    const { groups } = await start(host, storage);
+    const sorts = host.callsTo('playlist.sort').length;
+    const runsBefore = runCalls(host).length;
+    await groups.setMode(MAIN, DEFAULT_GROUP_MODE);
+    await coalesced();
+    expect(host.callsTo('playlist.sort')).toHaveLength(sorts + 1);
+    expect(host.callsTo('playlist.sort').at(-1)).toMatchObject({
+      playlistGuid: MAIN,
+      pattern: GROUP_MODES[DEFAULT_GROUP_MODE]?.sort,
+    });
+    expect(runCalls(host).length).toBeGreaterThan(runsBefore);
+    expect(readGroupsPrefs(storage).mode).toBe(DEFAULT_GROUP_MODE);
   });
 
   it('切档或内容变了：在途的旧游程晚到不覆盖新的', async () => {

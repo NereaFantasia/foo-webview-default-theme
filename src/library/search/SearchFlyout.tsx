@@ -10,7 +10,7 @@ import {
 } from '@fluentui/react-components';
 import { ArrowRight16Regular, Delete16Regular, Dismiss16Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom } from '../../i18n/plural.ts';
 import { objectOpenerKey } from '../../nav/objectOpener.ts';
@@ -21,25 +21,41 @@ import { SEARCH_TAB_KEYS, useSearchSession } from './searchContext.ts';
 import { SearchFeedback } from './SearchFeedback.tsx';
 import { SearchInput } from './SearchInput.tsx';
 import { SearchResultRow } from './SearchResultRow.tsx';
-import { searchOptionId } from './searchSuggestions.ts';
+import {
+  searchOptionId,
+  type SearchSuggestion,
+  type SuggestionGroup,
+} from './searchSuggestions.ts';
 import { useSearchFlyoutMotion } from './useSearchFlyoutMotion.ts';
 import styles from './SearchFlyout.module.css';
 import { useService } from '../../kit/useService.ts';
-import { searchKey } from './searchServices.ts';
-import { SegmentedTabs } from '../../kit/SegmentedTabs.tsx';
+import { searchKey, type SearchTarget } from './searchServices.ts';
 import { OnlineSuggestionRow } from './online/OnlineItems.tsx';
+import { OnlineObjectMenu, objectTargetOf } from './online/OnlineObjectMenu.tsx';
 import { OnlineTrackMenu } from './online/OnlineTrackMenu.tsx';
+import type { OnlineTileMenu } from './online/useOnlineTileActions.ts';
 import { SearchResultMenu } from './menus/SearchResultMenu.tsx';
 import { platformName } from '../../playback/musicPlatforms.ts';
-import { musicStatusKey } from '../../playback/musicStatus.ts';
 import type { MessageKey } from '../../i18n/en.ts';
-import type { MusicTrack } from '../../server/musicObjects.ts';
+import type { MusicAlbum, MusicArtist, MusicTrack } from '../../server/musicObjects.ts';
 import type { TablePoint } from '../../table/tableItems.ts';
 import type { SearchHit } from './searchQuery.ts';
 
 const MAX_WIDTH = 420;
 // 节头是小号加粗的灰字，链接只取字号、不取字重
 const useStyles = makeStyles({ more: { fontWeight: tokens.fontWeightRegular } });
+
+const LIBRARY_GROUPS = ['recent', 'best', 'albums', 'tracks'] as const;
+const ONLINE_GROUPS = ['onlineArtists', 'onlineAlbums', 'onlineTracks'] as const;
+const GROUP_LABELS = {
+  recent: 'search.recent',
+  best: 'search.best',
+  albums: 'search.albums',
+  tracks: 'search.tracks',
+  onlineArtists: 'search.artists',
+  onlineAlbums: 'search.albums',
+  onlineTracks: 'search.tracks',
+} as const satisfies Record<SuggestionGroup, MessageKey>;
 
 export function SearchFlyout() {
   const session = useSearchSession();
@@ -52,36 +68,46 @@ export function SearchFlyout() {
   const albums = useAtomValueRawSync(search.preview.albums);
   const notice = useAtomValueRawSync(useService(objectOpenerKey).notice);
   const playNotice = useAtomValueRawSync(search.notice);
-  const musicStatus = useService(musicStatusKey);
-  const online = useAtomValueRawSync(search.onlinePreview.kinds.track);
   const onlinePlatform = platformName(t, useAtomValueRawSync(search.onlinePreview.platform));
+  const totals = {
+    onlineArtists: useAtomValueRawSync(search.onlinePreview.kinds.artist).total,
+    onlineAlbums: useAtomValueRawSync(search.onlinePreview.kinds.album).total,
+    onlineTracks: useAtomValueRawSync(search.onlinePreview.kinds.track).total,
+  };
   const menuFailed = useAtomValueRawSync(search.previewMenu.notice);
-  // 本地行与在线行的右键菜单各一份，同一时刻只开一个；菜单在浮层的组件树里，点它不算点在外面
+  // 媒体库行、在线曲目与在线艺人专辑的右键菜单各一份，同一时刻只开一个；菜单在浮层的组件树里，点它不算点在外面
   const [menuAt, setMenuAt] = useState<TablePoint | null>(null);
   const [onlineMenu, setOnlineMenu] = useState<{
     readonly at: TablePoint;
     readonly tracks: readonly MusicTrack[];
   } | null>(null);
+  const [objectMenu, setObjectMenu] = useState<OnlineTileMenu | null>(null);
   const [queueNotice, setQueueNotice] = useState<MessageKey | null>(null);
-  const openMenu = (hit: SearchHit, at: TablePoint) => {
+  const closeMenus = () => {
+    search.previewMenu.close();
+    setMenuAt(null);
     setOnlineMenu(null);
+    setObjectMenu(null);
+  };
+  const openMenu = (hit: SearchHit, at: TablePoint) => {
+    closeMenus();
     void search.previewMenu.open(hit);
     setMenuAt(at);
   };
-  const openOnlineMenu = (track: MusicTrack, at: TablePoint) => {
-    search.previewMenu.close();
-    setMenuAt(null);
-    setOnlineMenu({ at, tracks: [track] });
-  };
-  const onlineScope = session.scope === 'online';
   const draft = session.draft.trim();
+  const online = session.online;
+  // 有搜索词且在线一区在时分两区，各带区标题；否则与只搜媒体库时一样
+  const sections = !!draft && online.phase !== 'off';
   const { panel, present } = useSearchFlyoutMotion(session.open);
+  const scroller = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ left: 8, top: 40, width: MAX_WIDTH, maxHeight: 500 });
   const markInside = useLightDismiss({
     id: 'search.dismiss',
     open: session.open,
     panel,
-    exempt: (target) => !!target.closest('[data-search-input], [data-search-trigger]'),
+    // 搜索框整个（含图标、清除键）都不算在外面
+    exempt: (target) =>
+      !!target.closest('[data-search-input], [data-search-box], [data-search-trigger]'),
     onDismiss: (escape) => session.close(escape),
   });
   useCommand({
@@ -122,11 +148,179 @@ export function SearchFlyout() {
       window.removeEventListener('resize', measure);
     };
   }, [session.open, session.anchor, session.mode]);
+  // 列表能占的高度是最大高度减去输入框、节头与底栏这些不随条数变的部分，各组条数按它收
+  useLayoutEffect(() => {
+    const root = panel.current;
+    const list = scroller.current;
+    if (!session.open || !root || !list) return;
+    const style = getComputedStyle(list);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    session.fit(Math.max(0, box.maxHeight - (root.offsetHeight - list.clientHeight) - padding));
+  });
   useLayoutEffect(() => {
     if (session.active)
       document.getElementById(searchOptionId(session.active))?.scrollIntoView({ block: 'nearest' });
   }, [session.active]);
   if (!present) return null;
+
+  const link = (group: SuggestionGroup): { text: string; target: SearchTarget } | null => {
+    const view = (count: number | null, one: MessageKey, many: MessageKey) =>
+      count === null ? '' : t(plural(count, one, many), { count });
+    switch (group) {
+      case 'albums':
+        return {
+          text: view(albums.length, 'search.viewAlbumsOne', 'search.viewAlbums'),
+          target: { scope: 'library', category: 'albums' },
+        };
+      case 'tracks':
+        return {
+          text: view(preview.total, 'search.viewTracksOne', 'search.viewTracks'),
+          target: { scope: 'library', category: 'tracks' },
+        };
+      case 'onlineArtists':
+        return {
+          text: view(totals[group], 'search.viewArtistsOne', 'search.viewArtists'),
+          target: { scope: 'online', category: 'artists' },
+        };
+      case 'onlineAlbums':
+        return {
+          text: view(totals[group], 'search.viewAlbumsOne', 'search.viewAlbums'),
+          target: { scope: 'online', category: 'albums' },
+        };
+      case 'onlineTracks':
+        return {
+          text: view(totals[group], 'search.viewTracksOne', 'search.viewTracks'),
+          target: { scope: 'online', category: 'tracks' },
+        };
+      default:
+        return null;
+    }
+  };
+  const openObject = (key: string, item: MusicArtist | MusicAlbum) => ({
+    onOpen: () => {
+      session.select(key);
+      session.openOnline(item);
+    },
+    onMenu: (at: TablePoint) => {
+      session.select(key);
+      closeMenus();
+      setObjectMenu({ at, target: objectTargetOf(item) });
+    },
+  });
+  const row = (item: SearchSuggestion) => {
+    const id = searchOptionId(item.key);
+    const selected = session.active === item.key;
+    switch (item.group) {
+      case 'recent':
+        return (
+          <div key={item.key} className={styles.history}>
+            <div
+              role="option"
+              id={id}
+              aria-selected={selected}
+              className={styles.word}
+              data-selected={selected || undefined}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => session.accept(item)}
+            >
+              {item.text}
+            </div>
+            <Tooltip content={t('search.removeHistory', { text: item.text })} relationship="label">
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<Dismiss16Regular />}
+                aria-label={t('search.removeHistory', { text: item.text })}
+                onClick={() => {
+                  search.recent.remove(item.text);
+                  session.show('');
+                }}
+              />
+            </Tooltip>
+          </div>
+        );
+      case 'onlineTracks':
+        return (
+          <OnlineSuggestionRow
+            key={item.key}
+            item={item.track}
+            id={id}
+            selected={selected}
+            onOpen={() => {
+              session.select(item.key);
+              session.submit(session.draft, {
+                scope: 'online',
+                category: 'tracks',
+                focus: item.track.ref.id,
+              });
+            }}
+            onMenu={(at) => {
+              session.select(item.key);
+              closeMenus();
+              setOnlineMenu({ at, tracks: [item.track] });
+            }}
+          />
+        );
+      case 'onlineArtists':
+      case 'onlineAlbums': {
+        const target = item.group === 'onlineArtists' ? item.artist : item.album;
+        return (
+          <OnlineSuggestionRow
+            key={item.key}
+            item={target}
+            id={id}
+            selected={selected}
+            {...openObject(item.key, target)}
+          />
+        );
+      }
+      default:
+        return (
+          <SearchResultRow
+            key={item.key}
+            hit={item.hit}
+            id={id}
+            option
+            selected={selected}
+            onOpen={() => {
+              session.select(item.key);
+              session.activate(item.hit, session.draft);
+            }}
+            onMenu={(hit, at) => {
+              session.select(item.key);
+              openMenu(hit, at);
+            }}
+          />
+        );
+    }
+  };
+  const group = (name: SuggestionGroup, section: MessageKey) => {
+    const rows = session.suggestions.filter((item) => item.group === name);
+    if (!rows.length) return null;
+    const label = t(GROUP_LABELS[name]);
+    const more = link(name);
+    return (
+      <div key={name} role="group" aria-label={sections ? `${t(section)} ${label}` : label}>
+        {name !== 'recent' && (
+          <div className={styles.heading}>
+            {label}
+            {more?.text && (
+              <Link
+                className={classes.more}
+                onClick={() => session.submit(session.draft, more.target)}
+              >
+                {more.text}
+              </Link>
+            )}
+          </div>
+        )}
+        {rows.map(row)}
+      </div>
+    );
+  };
+  const onlineEmpty =
+    online.phase === 'ready' &&
+    online.artists.length + online.albums.length + online.tracks.length === 0;
   return (
     <Portal>
       <div
@@ -156,19 +350,7 @@ export function SearchFlyout() {
             <SearchInput mode="flyout" />
           </div>
         )}
-        <div className={styles.scope}>
-          <SegmentedTabs
-            label={t('online.scope')}
-            value={session.scope}
-            options={[
-              { value: 'library', label: t('online.scopeLibrary') },
-              { value: 'online', label: t('online.scopeOnline') },
-            ]}
-            onChange={(scope) => session.setScope(scope)}
-            nativeTabOrder
-          />
-        </div>
-        {!session.draft.trim() && (
+        {!draft && (
           <div className={styles.heading}>
             <span>{t('search.recent')}</span>
             <Tooltip content={t('search.clearHistory')} relationship="label">
@@ -186,175 +368,56 @@ export function SearchFlyout() {
             </Tooltip>
           </div>
         )}
-        <div className={styles.scroller}>
+        <div ref={scroller} className={styles.scroller}>
           <div
             id="global-search-suggestions"
             role="listbox"
             aria-label={t('search.suggestions')}
-            aria-busy={preview.status === 'loading'}
+            aria-busy={preview.status === 'loading' || online.phase === 'waiting'}
           >
-            {(['recent', 'best', 'albums', 'tracks', 'online'] as const).map((group) => {
-              const rows = session.suggestions.filter((row) => row.group === group);
-              if (!rows.length) return null;
-              const label = t(`search.${group === 'online' ? 'tracks' : group}`);
-              return (
-                <div key={group} role="group" aria-label={label}>
-                  {group !== 'recent' && (
-                    <div className={styles.heading}>
-                      {label}
-                      {group === 'online' && (
-                        <Link
-                          className={classes.more}
-                          onClick={() =>
-                            session.submit(session.draft, { scope: 'online', category: 'tracks' })
-                          }
-                        >
-                          {t('search.viewAll')}
-                        </Link>
-                      )}
-                      {group === 'albums' && (
-                        <Link
-                          className={classes.more}
-                          onClick={() =>
-                            session.submit(session.draft, { scope: 'library', category: 'albums' })
-                          }
-                        >
-                          {t(plural(albums.length, 'search.viewAlbumsOne', 'search.viewAlbums'), {
-                            count: albums.length,
-                          })}
-                        </Link>
-                      )}
-                      {group === 'tracks' && preview.total !== null && (
-                        <Link
-                          className={classes.more}
-                          onClick={() =>
-                            session.submit(session.draft, { scope: 'library', category: 'tracks' })
-                          }
-                        >
-                          {t(plural(preview.total, 'search.viewTracksOne', 'search.viewTracks'), {
-                            count: preview.total,
-                          })}
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                  {rows.map((row) =>
-                    row.online ? (
-                      <OnlineSuggestionRow
-                        key={row.key}
-                        track={row.online}
-                        id={searchOptionId(row.key)}
-                        selected={session.active === row.key}
-                        onOpen={() => {
-                          session.select(row.key);
-                          session.submit(session.draft, {
-                            scope: 'online',
-                            category: 'tracks',
-                            focus: row.online?.ref.id,
-                          });
-                        }}
-                        onMenu={(at) => {
-                          session.select(row.key);
-                          if (row.online) openOnlineMenu(row.online, at);
-                        }}
-                      />
-                    ) : row.hit ? (
-                      <SearchResultRow
-                        key={row.key}
-                        hit={row.hit}
-                        id={searchOptionId(row.key)}
-                        option
-                        selected={session.active === row.key}
-                        onOpen={() => {
-                          session.select(row.key);
-                          if (row.hit) session.activate(row.hit, session.draft);
-                        }}
-                        onMenu={(hit, at) => {
-                          session.select(row.key);
-                          openMenu(hit, at);
-                        }}
-                      />
-                    ) : (
-                      <div key={row.key} className={styles.history}>
-                        <div
-                          role="option"
-                          id={searchOptionId(row.key)}
-                          aria-selected={session.active === row.key}
-                          className={styles.word}
-                          data-selected={session.active === row.key || undefined}
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => session.accept(row)}
-                        >
-                          {row.text}
-                        </div>
-                        <Tooltip
-                          content={t('search.removeHistory', { text: row.text ?? '' })}
-                          relationship="label"
-                        >
-                          <Button
-                            appearance="subtle"
-                            size="small"
-                            icon={<Dismiss16Regular />}
-                            aria-label={t('search.removeHistory', { text: row.text ?? '' })}
-                            onClick={() => {
-                              search.recent.remove(row.text ?? '');
-                              session.show('');
-                            }}
-                          />
-                        </Tooltip>
-                      </div>
-                    ),
-                  )}
+            {/* 区标题只是给眼睛看的分隔，读屏从各组的名字里听到所属的区 */}
+            {sections && (
+              <div className={styles.section} aria-hidden>
+                {t('online.scopeLibrary')}
+              </div>
+            )}
+            {LIBRARY_GROUPS.map((name) => group(name, 'online.scopeLibrary'))}
+            {sections && (
+              <>
+                <div role="presentation">
+                  <SearchFeedback results={search.preview} />
                 </div>
-              );
-            })}
-          </div>
-          {!onlineScope && <SearchFeedback results={search.preview} />}
-          {onlineScope && !!draft && (
-            <div className={styles.notice} role="status">
-              {(online.status === 'idle' || online.status === 'loading') && (
-                <Spinner size="tiny" label={t('album.loading')} />
-              )}
-              {/* 三种失败同一个写法：先说发生了什么，再给一个能做的操作。 */}
-              {online.status === 'failed' &&
-                (online.failure === 'not-installed' ? (
-                  <>
-                    {t('online.setupTitle')}{' '}
-                    {/* 进结果页的在线音乐范围：那里的空态写体积与许可，确认后才下载 */}
-                    <Button
-                      size="small"
-                      onClick={() => session.submit(draft, { scope: 'online', category: 'all' })}
-                    >
-                      {t('online.downloadMore')}
-                    </Button>
-                  </>
-                ) : (
-                  <>
+                <div className={styles.section} data-second aria-hidden>
+                  {t('online.scopeOnline')}
+                </div>
+                {ONLINE_GROUPS.map((name) => group(name, 'online.scopeOnline'))}
+                {online.phase === 'waiting' && (
+                  <div className={styles.notice} role="status">
+                    <Spinner size="tiny" label={t('album.loading')} />
+                  </div>
+                )}
+                {online.phase === 'failed' && (
+                  <div className={styles.notice} role="status">
                     {t(
                       online.failure === 'backend-unavailable'
                         ? 'online.unavailableTitle'
                         : 'online.searchFailed',
                       { platform: onlinePlatform },
                     )}{' '}
-                    <Button
-                      size="small"
-                      onClick={() =>
-                        void (
-                          online.failure === 'backend-unavailable'
-                            ? musicStatus.reconnect()
-                            : Promise.resolve()
-                        ).then(() => search.onlinePreview.load(['track']))
-                      }
-                    >
+                    <Button size="small" onClick={session.retryOnline}>
                       {t('album.retry')}
                     </Button>
-                  </>
-                ))}
-              {online.status === 'ready' &&
-                online.items.length === 0 &&
-                t('online.noResults', { text: draft, platform: onlinePlatform })}
-            </div>
-          )}
+                  </div>
+                )}
+                {onlineEmpty && (
+                  <div className={styles.notice} role="status">
+                    {t('online.noResults', { text: draft, platform: onlinePlatform })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {!sections && <SearchFeedback results={search.preview} />}
           {recent.failed && !session.draft && (
             <div role="status" className={styles.notice}>
               {t('search.historyFailed')}{' '}
@@ -388,17 +451,17 @@ export function SearchFlyout() {
           }}
           onQueued={(ok) => setQueueNotice(ok ? null : 'online.queueFailed')}
         />
-        {!!session.draft.trim() && (
+        <OnlineObjectMenu
+          menu={objectMenu}
+          onClose={() => setObjectMenu(null)}
+          onFailed={setQueueNotice}
+        />
+        {!!draft && (
           <div className={styles.footer}>
             <Button
               appearance="subtle"
               icon={<ArrowRight16Regular />}
-              onClick={() =>
-                session.submit(
-                  undefined,
-                  onlineScope ? { scope: 'online', category: 'all' } : undefined,
-                )
-              }
+              onClick={() => session.submit()}
             >
               {t('search.viewAll')}
             </Button>

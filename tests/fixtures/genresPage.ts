@@ -6,6 +6,7 @@ import type { AnswerTable, HostParams } from './fakeHost.ts';
 import { numberParam, stringParam } from './hostAnswers.ts';
 import { albumRow, albumTrackRow, playlistRow } from './libraryRows.ts';
 import { collectPageErrors, installPageHost } from './pageHost.ts';
+import { wholeLibrary } from './wholeLibrary.ts';
 
 const ALBUMS = [
   albumRow('Donuts', 'J Dilla'),
@@ -69,20 +70,14 @@ const pathToHandle = new Map(
 );
 
 export function genresAnswers(): AnswerTable {
-  // 专用列表此刻的内容（handle），起播前核对行时照它答。
+  // 专用列表此刻的内容（handle），起播前核对行时照它答
   let filled: string[] = [];
   const view = playlistRow(1, LIBRARY_VIEW_PLAYLIST);
   return {
     library: {
       getAlbums: albumsAnswer(ALBUMS),
       getAlbumTracks: albumTracksAnswer,
-      getAll: {
-        success: true,
-        tracks: [...GENRES_TRACKS],
-        items: [...GENRES_TRACKS],
-        total: GENRES_TRACKS.length,
-        offset: 0,
-      },
+      search: wholeLibrary(GENRES_TRACKS),
       query: (params: HostParams) => {
         const all = hits(params);
         return {

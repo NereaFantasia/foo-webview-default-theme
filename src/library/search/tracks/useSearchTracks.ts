@@ -1,7 +1,7 @@
 import type { LibraryTrack } from 'foo-webview-sdk';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { albumKeyOf, trackAlbumKeyOf, type Album } from '../../../host/libraryContract.ts';
+import type { Album } from '../../../host/libraryContract.ts';
 import { choiceCodec, defineLocalPref } from '../../../kit/localPref.ts';
 import { useService } from '../../../kit/useService.ts';
 import { EXTENDED_COLUMNS, type ColumnId } from '../../../table/columns/columns.ts';
@@ -20,7 +20,7 @@ import { libraryTracksAtom, type LibraryTracksState } from '../../libraryTracks.
 import { playStatsAtom } from '../../playStats.ts';
 import { SONGS_DENSITIES, type SongsDensity } from '../../songs/songsPrefs.ts';
 import type { SongsRowsState } from '../../songs/songsRows.ts';
-import { buildSongsView, type SongsView } from '../../songs/songsView.ts';
+import { albumLookupOf, buildSongsView, type SongsView } from '../../songs/songsView.ts';
 import { useGenreValues } from '../../useGenreValues.ts';
 import { useTrackStatsStatus, type TrackStatsStatus } from '../../useTrackStats.ts';
 import { cycleSearchSort, type SearchTracksService } from './searchTracks.ts';
@@ -79,7 +79,8 @@ export interface SearchTracksModel {
   /** 曲目上下文菜单控制对象，供行右键与批量选区操作栏共用 */
   readonly menu: {
     readonly at: TablePoint | null;
-    open(target: TableMenuTarget, at: TablePoint): void;
+    /** `play` 是单选时「播放」做的事，由页面把「沿结果从这一首起播」交进来 */
+    open(target: TableMenuTarget, at: TablePoint, play?: (track: LibraryTrack) => void): void;
     close(): void;
     /** 校验当前操作曲目快照的时效性；若菜单打开后选区或数据代次发生变更则判定失效 */
     isCurrent(): boolean;
@@ -137,14 +138,10 @@ export function useSearchTracks(service: SearchTracksService, active: boolean): 
     selection.setTotal(rows.handles.length);
   }, [selection, rows.generation, rows.handles.length]);
 
-  const albumOf = useMemo(() => {
-    const index = new Map(albums.map((album) => [albumKeyOf(album), album]));
-    return (track: TableTrack): Album | undefined => {
-      const full = library.byHandle.get(track.handle);
-      const key = full ? trackAlbumKeyOf(full) : null;
-      return key ? index.get(key) : undefined;
-    };
-  }, [albums, library.byHandle]);
+  const albumOf = useMemo(
+    () => albumLookupOf(albums, library.byHandle),
+    [albums, library.byHandle],
+  );
 
   const [menuAt, setMenuAt] = useState<TablePoint | null>(null);
   const menuCurrent = useRef<() => boolean>(() => false);
@@ -177,7 +174,7 @@ export function useSearchTracks(service: SearchTracksService, active: boolean): 
     stats: statsStatus,
     menu: {
       at: menuAt,
-      open(target, at) {
+      open(target, at, play) {
         if (target.kind !== 'rows') return;
         const tracks = rowsOf(target.rows).flatMap((row) => view.trackAt(row) ?? []);
         if (tracks.length === 0) return;
@@ -186,7 +183,13 @@ export function useSearchTracks(service: SearchTracksService, active: boolean): 
         menuCurrent.current = () =>
           sameRanges(chosen, store.get(selection.state).ranges) &&
           store.get(service.rows).generation === generation;
-        void albumList.menu.prepare(tracks, view.trackAt(target.index), library.stamp);
+        const anchor = view.trackAt(target.index);
+        void albumList.menu.prepare(
+          tracks,
+          anchor,
+          library.stamp,
+          anchor && play && (() => play(anchor)),
+        );
         setMenuAt(at);
       },
       close: () => setMenuAt(null),

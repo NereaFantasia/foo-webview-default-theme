@@ -97,11 +97,12 @@ export function GenresDetail(props: GenresDetailProps) {
     tracks: readonly LibraryTrack[],
     anchor: LibraryTrack | undefined,
     point: TablePoint,
+    playHere?: () => void,
   ) => {
     if (tracks.length === 0) return;
     setMenuRows(model.rows.tracks);
     setMenuGroup(null);
-    void albumList.menu.prepare(tracks, anchor, model.rows.stamp);
+    void albumList.menu.prepare(tracks, anchor, model.rows.stamp, playHere);
     setAt(point);
   };
   return (
@@ -259,6 +260,7 @@ export function GenresDetail(props: GenresDetailProps) {
               tracks,
               item?.kind === 'row' ? model.rows.tracks[item.order] : undefined,
               point,
+              item?.kind === 'row' ? () => play(item.order) : undefined,
             );
           }}
         />

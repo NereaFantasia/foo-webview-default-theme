@@ -30,7 +30,7 @@ import {
 } from '../../fixtures/hostAnswers.ts';
 import { installFakeHost, type UnitHost } from '../../fixtures/unitHost.ts';
 
-/** 与装配层一样，提醒条件取自媒体库与播放统计。 */
+/** 与装配层一样，提醒条件取自媒体库与播放统计 */
 const REMINDERS = {
   playcountMissing: playcountMissingAtom,
   libraryNotConfigured: libraryNotConfiguredAtom,
@@ -60,7 +60,7 @@ function versionIs(host: UnitHost, version: string): void {
 async function start(host: UnitHost) {
   const store = createStore();
   const service = startInfoCenter(store, REMINDERS, host.fb, createMemoryConfigWriter(host.fb));
-  // 收听者登记在模块级，不释放会漏到后面的测试里。
+  // 收听者登记在模块级，不释放会漏到后面的测试里
   onTestFinished(() => service.dispose());
   await service.ready;
   await settle();
@@ -72,7 +72,7 @@ async function start(host: UnitHost) {
   };
 }
 
-/** 缺省组件清单为空，提醒应判为未安装。 */
+/** 缺省组件清单为空，提醒应判为未安装 */
 async function probePlaycount(host: UnitHost, store: ReturnType<typeof createStore>) {
   const stats = startPlayStats(store, host.fb);
   onTestFinished(() => stats.dispose());
@@ -182,10 +182,7 @@ describe('startInfoCenter', () => {
     const diagnostics = store.get(diagnosticsAtom);
     expect(diagnostics).toMatchObject({ pluginVersion: HOST_VERSION, isPortable: true });
     expect(diagnostics && diagnosticText(diagnostics)).toBe(
-      [
-        'foobar2000 v2.25 (64-bit, portable)',
-        `foo_ui_webview2 ${HOST_VERSION} (requires ${REQUIRED_HOST_VERSION} or later)`,
-      ].join('\n'),
+      ['foobar2000 v2.25 (64-bit, portable)', `foo_ui_webview2 ${HOST_VERSION}`].join('\n'),
     );
   });
 
@@ -403,7 +400,7 @@ describe('startInfoCenter', () => {
     await probePlaycount(host, again.store);
     expect(again.kinds()).toEqual([]);
 
-    versionIs(host, '2.2.0');
+    versionIs(host, '2.3.0');
     const upgraded = await start(host);
     await probePlaycount(host, upgraded.store);
     expect(upgraded.kinds()).toEqual(['playcountMissing']);
@@ -414,7 +411,7 @@ describe('startInfoCenter', () => {
       config: { [DISMISSED_KEY]: { libraryNotConfigured: '1.0.0' } },
     });
     const first = await start(host);
-    // 旧版本上关掉的那条本来就会再提示，不算。
+    // 旧版本上关掉的那条本来就会再提示，不算
     expect(first.store.get(dismissedCountAtom)).toBe(0);
     await probePlaycount(host, first.store);
     first.service.dismissReminder('playcountMissing');

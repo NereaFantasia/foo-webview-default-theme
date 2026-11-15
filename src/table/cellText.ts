@@ -20,7 +20,29 @@ export function discTrackText(
   return discCount > 1 && track.discNumber > 0 ? `${track.discNumber}.${padded}` : padded;
 }
 
-/** 年份：日期里第一个四位数（`2019`、`2019-05-01`、`2004.02.27` 都写 4 位年）；认不出时留空 */
+/** 路径最后一段：文件名带扩展名。流地址与归档里的条目也是这样取最后一段 */
+export function fileNameText(absolutePath: string): string {
+  return /[^/\\]*$/.exec(absolutePath)?.[0] ?? '';
+}
+
+/** 所在文件夹的名字：路径倒数第二段；文件直接在盘根或路径只有一段时留空 */
+export function folderNameText(absolutePath: string): string {
+  const parts = absolutePath.split(/[/\\]/).filter((part) => part !== '');
+  const name = parts[parts.length - 2] ?? '';
+  return /^[a-z]:$/i.test(name) ? '' : name;
+}
+
+/** 碟号；宿主对没有碟号的曲目答 0，那时留空 */
+export function discText(track: Pick<Track, 'discNumber'>): string {
+  return track.discNumber > 0 ? String(track.discNumber) : '';
+}
+
+/** 位深写成「24 bit」；读出的不是整数时（有损格式没有位深）留空 */
+export function bitDepthText(value: string | undefined): string {
+  return /^\d+$/.test(value ?? '') ? `${value} bit` : '';
+}
+
+/** 年份：日期里第一个四位数（`2019`、`2019-05-01`、`2004.02.27` 都写 4 位年），没有四位数时留空 */
 export function yearText(date: string | undefined): string {
   return /\d{4}/.exec(date ?? '')?.[0] ?? '';
 }

@@ -5,9 +5,27 @@ import {
   type BackendRequestOptions,
 } from '../server/backendConnection.ts';
 import {
+  readFavoriteKeys,
+  readFavoriteList,
+  readFavoriteRemoved,
+  readFavoriteStamps,
+  type FavoriteKeys,
+  type FavoriteKind,
+  type FavoriteList,
+  type FavoriteListRequest,
+  type FavoriteRemoveRequest,
+  type FavoriteStamp,
+  type FavoriteWriteRequest,
+} from '../server/musicFavorites.ts';
+import {
   readMusicArtistAlbums,
   type MusicArtistAlbumsRequest,
 } from '../server/musicArtistAlbums.ts';
+import {
+  readMusicDiscover,
+  type MusicDiscoverRequest,
+  type MusicDiscoverResults,
+} from '../server/musicDiscover.ts';
 import {
   readMusicLxHealth,
   readMusicLxSources,
@@ -75,6 +93,30 @@ export interface MusicClient {
     input: MusicArtistAlbumsRequest,
     options?: BackendRequestOptions,
   ): Promise<MusicSearchResult<'album'>>;
+  /** 网易云的公共推荐：横幅、榜单、推荐歌单、按地区的新歌与新碟；后端按类缓存 */
+  discover<K extends MusicDiscoverRequest['kind']>(
+    input: MusicDiscoverRequest & { readonly kind: K },
+    options?: BackendRequestOptions,
+  ): Promise<MusicDiscoverResults[K]>;
+  /** 本地收藏各类的身份与收藏时间（不带快照）；页面启动时读一次，心形的状态靠它 */
+  favoriteKeys(options?: BackendRequestOptions): Promise<FavoriteKeys>;
+  /** 一类收藏的一页条目，收藏时间新到旧 */
+  favoriteList<K extends FavoriteKind>(
+    input: FavoriteListRequest & { readonly kind: K },
+    options?: BackendRequestOptions,
+  ): Promise<FavoriteList<K>>;
+  /** 加入收藏：已有的只换快照、不动收藏时间。答复按请求里的顺序给各项的收藏时间 */
+  addFavorites<K extends FavoriteKind>(
+    input: FavoriteWriteRequest<K>,
+    options?: BackendRequestOptions,
+  ): Promise<readonly FavoriteStamp[]>;
+  /** 刷新收藏的快照：只换库里本来就有的，答复只列这些 */
+  refreshFavorites<K extends FavoriteKind>(
+    input: FavoriteWriteRequest<K>,
+    options?: BackendRequestOptions,
+  ): Promise<readonly FavoriteStamp[]>;
+  /** 取消收藏，答复是实际取消了几项 */
+  removeFavorites(input: FavoriteRemoveRequest, options?: BackendRequestOptions): Promise<number>;
   /** 查询序号大于 `after` 的音频流路由失败记录；`after` 传入上一轮响应中的 `latest` 标识 */
   failures(after: number, options?: BackendRequestOptions): Promise<MusicStreamFailures>;
   /** 网易云扫码登录流程：获取登录二维码凭证，随后根据 `key` 轮询扫码状态直至成功或超时过期 */
@@ -252,6 +294,70 @@ export function startMusicClient(connection: Pick<BackendConnection, 'request'>)
           return result?.items.every((album) => album.ref.platform === expected.ref.platform)
             ? result
             : null;
+        },
+        options,
+      );
+    },
+    discover(input, options) {
+      const expected =
+        'area' in input ? { kind: input.kind, area: input.area } : { kind: input.kind };
+      return request(
+        '/music/discover',
+        expected,
+        (data) => readMusicDiscover(data, input.kind),
+        options,
+      );
+    },
+    favoriteKeys: (options) => request('/music/favorites-keys', {}, readFavoriteKeys, options),
+    favoriteList(input, options) {
+      const expected = { kind: input.kind, cursor: input.cursor };
+      return request(
+        '/music/favorites-list',
+        expected,
+        (data) => readFavoriteList(data, input.kind),
+        options,
+      );
+    },
+    addFavorites(input, options) {
+      const expected = { kind: input.kind, items: [...input.items] };
+      return request(
+        '/music/favorites-add',
+        expected,
+        (data) => {
+          const stamps = readFavoriteStamps(data);
+          // 逐项对得上请求里的引用，顺序也一样
+          return stamps?.length === expected.items.length &&
+            stamps.every((stamp, index) => {
+              const item = expected.items[index];
+              return item !== undefined && sameRef(stamp.ref, item.ref);
+            })
+            ? stamps
+            : null;
+        },
+        options,
+      );
+    },
+    refreshFavorites(input, options) {
+      const expected = { kind: input.kind, items: [...input.items] };
+      return request(
+        '/music/favorites-refresh',
+        expected,
+        (data) => {
+          const stamps = readFavoriteStamps(data);
+          const asked = new Set(expected.items.map((item) => item.ref.id));
+          return stamps?.every((stamp) => asked.delete(stamp.ref.id)) ? stamps : null;
+        },
+        options,
+      );
+    },
+    removeFavorites(input, options) {
+      const expected = { kind: input.kind, refs: input.refs.map((ref) => ({ ...ref })) };
+      return request(
+        '/music/favorites-remove',
+        expected,
+        (data) => {
+          const removed = readFavoriteRemoved(data);
+          return removed !== null && removed <= expected.refs.length ? removed : null;
         },
         options,
       );

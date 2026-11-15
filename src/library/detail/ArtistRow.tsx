@@ -23,12 +23,14 @@ import { useDetailHeaderStyles } from './DetailHeader.tsx';
 import { fitCount } from './artistRowFit.ts';
 import styles from './ArtistRow.module.css';
 
-/** 详情页头展示的单项艺术家数据 */
+/** 详情页头展示的单项艺人数据 */
 export interface ArtistEntry {
   readonly key: string;
   readonly name: string;
   /** 目标对象导航引用；为 null 或不可用时渲染为纯文本 */
   readonly to: ObjectRef | null;
+  /** 名字后面的操作（在线艺人的关注键）；下拉里每行末尾也放一份 */
+  readonly follow?: ReactNode;
 }
 
 /** 溢出展开按钮预留宽度（按钮尺寸加间距，单位 px） */
@@ -54,7 +56,7 @@ const useStyles = makeStyles({
   slot: { width: '28px', height: '28px', fontSize: tokens.fontSizeBase200 },
 });
 
-/** 艺术家圆形头像：加载失败展示占位图标，支持传入 ref 供视口可见性监听 */
+/** 艺人圆形头像：加载失败展示占位图标，支持传入 ref 供视口可见性监听 */
 export function ArtistAvatar({
   src,
   ref,
@@ -87,7 +89,7 @@ export interface ArtistRowProps {
 }
 
 /**
- * 详情页头艺术家列表行
+ * 详情页头艺人列表行
  * 动态测算可用宽度并完整容纳胶囊项，溢出项整体隐藏并呈现展开菜单；单项或全部容纳时不显示展开按钮
  */
 export function ArtistRow({ artists, renderAvatar }: ArtistRowProps) {
@@ -145,6 +147,7 @@ export function ArtistRow({ artists, renderAvatar }: ArtistRowProps) {
             >
               {artist.name}
             </ObjectLink>
+            {artist.follow}
           </div>
         ))}
       </div>
@@ -175,6 +178,7 @@ export function ArtistRow({ artists, renderAvatar }: ArtistRowProps) {
                   }}
                 >
                   {artist.name}
+                  {artist.follow && <span className={styles.menuFollow}>{artist.follow}</span>}
                 </MenuItem>
               ))}
             </MenuList>

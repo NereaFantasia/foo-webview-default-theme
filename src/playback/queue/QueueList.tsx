@@ -60,6 +60,16 @@ export interface QueueListProps {
   readonly head?: (openCurrentMenu: (track: Track, at: RowPoint) => void) => ReactNode;
   /** 一行的高度，CSS 像素，缺省 48；各段的虚拟滚动与行高都按它走 */
   readonly rowHeight?: number;
+  /**
+   * 外框给的外观变量（`--queue-card-bg`、`--queue-head-height` 等，清单见 QueueRow、QueueList 的样式）。写在列表根与拖动副本上：
+   * 副本挂在浮层里，取不到外框上的变量。不传就是平铺的行，右侧卡这样
+   */
+  readonly variables?: Readonly<Record<`--${string}`, string>>;
+  /**
+   * 缺省为真。「接下来」与「前面的曲目」向来源读行的窗口各只有一份，同一时刻只服务一个在看的列表：另一个列表盖在这一个
+   * 上面时传假，它既不去读行，也不占窗口；变回真时重新读自己的那一段
+   */
+  readonly active?: boolean;
 }
 
 /**
@@ -84,6 +94,8 @@ function QueueListPage({
   showEarlier = true,
   sectionClear = true,
   head,
+  variables: appearance,
+  active = true,
 }: Omit<QueueListProps, 'rowHeight'>) {
   const rowHeight = useQueueRowHeight();
   const t = useAtomValueRawSync(translateAtom);
@@ -107,7 +119,7 @@ function QueueListPage({
     follow.current = true;
   }, []);
   const following = useCallback(() => follow.current, []);
-  const viewport = useQueueViewport(root, list, home, following);
+  const viewport = useQueueViewport(root, list, home, following, active);
   useQueuePin({
     block: earlier,
     follow,
@@ -115,7 +127,8 @@ function QueueListPage({
     source: upNext.list?.guid ?? null,
     current: currentTrack,
   });
-  useQueueStateMotion(root);
+  // 声明在 useQueueViewport 之后：同一次提交里阅读锚点先补滚动，补位再量位置
+  useQueueStateMotion(root, viewport.placed);
   const queuedList = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<QueueMenuTarget | null>(null);
   const [failed, setFailed] = useState(0);
@@ -254,6 +267,7 @@ function QueueListPage({
       selected={list.isSelected(row)}
       current={tabKey === row.key}
       lifted={drag?.lifted.has(row.key) ?? false}
+      edge={row.number === list.queued.length + upNext.total ? 'end' : undefined}
       onPointerDown={rowPointerDown}
       onPlay={rowPlay}
       onMenu={rowMenu}
@@ -266,6 +280,7 @@ function QueueListPage({
   });
   const empty = !upNext.refreshing && list.rows.length === 0 && upNext.total === 0;
   const variables: QueueVariables = {
+    ...appearance,
     '--queue-number-width': `${Math.max(2, String(Math.max(list.queued.length, upNext.sourceCount)).length)}ch`,
     '--queue-row-height': `${rowHeight}px`,
     '--queue-earlier':
@@ -284,7 +299,7 @@ function QueueListPage({
       )}
       {list.queued.length > 0 && (
         <section className={styles.section} data-queue-section="queued">
-          <div className={styles.head}>
+          <div className={styles.head} data-queue-head="queued">
             <span className={styles.label}>
               {t('queue.section')}
               {!sectionClear && <span className={styles.count}>{queuedCountText}</span>}
@@ -372,6 +387,7 @@ function QueueListPage({
       className={styles.root}
       style={variables}
       data-queue-page
+      data-queue-cards={appearance ? '' : undefined}
       tabIndex={tabKey ? -1 : 0}
       onFocus={() => {
         holding.current = true;
@@ -397,7 +413,9 @@ function QueueListPage({
       ) : (
         <div className={styles.plain}>{content}</div>
       )}
-      {showEarlier && <QueueEarlier root={root} block={earlier} perform={perform} onPlay={pin} />}
+      {showEarlier && (
+        <QueueEarlier root={root} block={earlier} perform={perform} onPlay={pin} active={active} />
+      )}
     </div>
   );
 }

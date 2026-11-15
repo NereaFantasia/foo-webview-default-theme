@@ -47,9 +47,10 @@ describe('曲目来源', () => {
 });
 
 describe('来源的能力', () => {
-  test('网络流不能同步打开，其余照本地；在线曲目一概不交给宿主与媒体库', () => {
+  test('网络流不能同步打开也不能整轨解码，其余照本地；在线曲目不交给宿主与媒体库，但能整轨解码', () => {
     expect(trackAbilities('http://radio.example/live')).toStrictEqual({
       opensLocally: false,
+      decodesAudio: false,
       hostCommands: true,
       libraryActions: true,
       hostArtwork: true,
@@ -57,6 +58,7 @@ describe('来源的能力', () => {
     });
     expect(trackAbilities(ONLINE)).toStrictEqual({
       opensLocally: false,
+      decodesAudio: true,
       hostCommands: false,
       libraryActions: false,
       hostArtwork: false,
@@ -69,6 +71,10 @@ describe('来源的能力', () => {
     const batch = batchAbilities(['file://E:/a.flac', ONLINE]);
     expect(batch.hostCommands).toBe(false);
     expect(batch.libraryActions).toBe(false);
+    expect(batch.decodesAudio).toBe(true);
+    expect(batchAbilities(['file://E:/a.flac', 'http://radio.example/live']).decodesAudio).toBe(
+      false,
+    );
     expect(Object.values(batchAbilities(['file://E:/a.flac'])).every(Boolean)).toBe(true);
     expect(Object.values(batchAbilities([])).every(Boolean)).toBe(true);
   });

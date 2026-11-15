@@ -15,6 +15,8 @@ import { ServicesContext, serviceMap } from '../../src/kit/useService.ts';
 import { startCommandRegistry, commandsKey } from '../../src/nav/commandRegistry.ts';
 import { CommandsContext } from '../../src/nav/useCommand.ts';
 import { InfoCenterButton } from '../../src/shell/info-center/InfoCenterButton.tsx';
+import { onboardingKey, type OnboardingService } from '../../src/settings/onboarding/onboarding.ts';
+import { OnboardingUpdateContext } from '../../src/settings/onboarding/onboardingSlots.ts';
 import { UpdateSettingsContext } from '../../src/settings/updateSettingsContext.ts';
 import { startChangelogView, changelogViewKey } from '../../src/update/changelogView.ts';
 import type { PublishedKey } from '../../src/update/contract.ts';
@@ -32,7 +34,28 @@ function Settings() {
   return use(UpdateSettingsContext);
 }
 
-export function mountChangelogPage(keys: readonly PublishedKey[], startup: ConfirmedStartup) {
+function OnboardingStep() {
+  return use(OnboardingUpdateContext);
+}
+
+/** 引导的第 4 步只用到 `save`，其余成员是接口要求的空实现 */
+const ONBOARDING: OnboardingService = {
+  state: atom({ open: true, step: 'update', direction: 'forward' }),
+  library: atom({ phase: 'reading' }),
+  refreshLibrary: () => {},
+  next: () => {},
+  back: () => {},
+  finish: async () => true,
+  save: async () => true,
+  dispose: () => {},
+};
+
+/** `page` 选择挂载设置页里的更新设置，还是引导第 4 步里的更新与本地服务卡 */
+export function mountChangelogPage(
+  keys: readonly PublishedKey[],
+  startup: ConfirmedStartup,
+  page: 'settings' | 'onboarding' = 'settings',
+) {
   const store = createStore();
   const writer = createMemoryConfigWriter(fb);
   const updater = startUpdater(store, { keys, writer, pause: async () => {} });
@@ -69,6 +92,7 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
     bindService(changelogViewKey, view),
     bindService(commandsKey, commands),
     bindService(infoCenterKey, info),
+    bindService(onboardingKey, ONBOARDING),
   ]);
   const element = document.createElement('div');
   document.body.append(element);
@@ -84,7 +108,7 @@ export function mountChangelogPage(keys: readonly PublishedKey[], startup: Confi
           >
             <ExternalLinkProvider service={links}>
               <UpdateRoot>
-                <Settings />
+                {page === 'settings' ? <Settings /> : <OnboardingStep />}
                 <InfoCenterButton />
               </UpdateRoot>
             </ExternalLinkProvider>

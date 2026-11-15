@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 import styles from './CommandBar.module.css';
+import { SEARCH_BASE_WIDTH, SEARCH_MAX_WIDTH, SearchWidthContext } from './commandBarSearch.ts';
 import type { WidthTier } from './useWidthTier.ts';
 
 export type CommandBarTier = 'wide' | 'medium' | 'narrow';
@@ -70,6 +71,9 @@ export function CommandBar({ tier, label, search, find, view, selection }: Comma
   const controls = useViewControlStyles();
   const classes = useStyles();
   const [searching, setSearching] = useState(false);
+  // 搜索框想要的宽度；只有宽档的定宽框会按它加宽，中档本来就占满余量
+  const [wanted, setWanted] = useState<number | null>(null);
+  const grown = tier === 'wide' && wanted !== null && wanted > SEARCH_BASE_WIDTH;
   const field = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   // 收回后焦点回到搜索键；只在用户收回时这样做，换档时不抢焦点
@@ -110,7 +114,7 @@ export function CommandBar({ tier, label, search, find, view, selection }: Comma
             collapse();
           }}
         >
-          {search.box}
+          <SearchWidthContext value={setWanted}>{search.box}</SearchWidthContext>
         </div>
       </div>
     );
@@ -130,10 +134,19 @@ export function CommandBar({ tier, label, search, find, view, selection }: Comma
     </Tooltip>
   );
   return (
-    <div className={styles.bar} data-tier={tier} data-command-bar={selection ? 'selection' : ''}>
+    <div
+      className={styles.bar}
+      data-tier={tier}
+      data-search-grown={grown ? '' : undefined}
+      data-command-bar={selection ? 'selection' : ''}
+    >
       {!selection && search && tier !== 'narrow' && (
-        <div className={styles.search} data-command-search>
-          {search.box}
+        <div
+          className={styles.search}
+          style={grown ? { flexBasis: `${Math.min(wanted, SEARCH_MAX_WIDTH)}px` } : undefined}
+          data-command-search
+        >
+          <SearchWidthContext value={setWanted}>{search.box}</SearchWidthContext>
         </div>
       )}
       <Toolbar aria-label={label} className={mergeClasses(classes.tools, styles.tools)}>

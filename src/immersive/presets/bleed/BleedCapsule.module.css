@@ -1,0 +1,102 @@
+/* 位置、宽度、底边由外框写进变量：`--bleed-capsule-left`（左缘）、`--bleed-capsule-width`、`--bleed-capsule-bottom`。
+   水平位置写成 `translate`，居中与常规互转时由视图过渡带着滑，跟封面同一时长与曲线
+
+   视图过渡进行时胶囊里的三块各自挂名字：玻璃面 `scene-capsule-glass`、头部、折叠部分。过渡的快照层压在所有活的内容之上，
+   不挂名字，胶囊就被满幅封面的快照盖在底下消失一阵。名字只在过渡进行时（根上有 `data-scene-transition`）才挂，
+   不是常挂：带名字的元素是 `backdrop-filter` 的背景根，常挂的话里面玻璃面的模糊就永久失效。名字不挂在胶囊根上：
+   带名字的祖先会让里面的毛玻璃在过渡开始的那一帧（名字已套上、快照层还没出来、页面照常画出的那一帧）退成平面，闪一下。
+   玻璃面自带 `backdrop-filter`，名字挂在它自己身上，模糊由过渡搬到它的快照组上，组画在封面的快照之上
+   （圆角、次序见 `sceneTransition.css`）。这些名字不能用在 CSS 过渡上：带名字的元素在新状态按此刻的实际位置取快照，
+   会与进行中的过渡冲突，所以位置的变化只走视图过渡，不再写 `transition: translate` */
+.capsule {
+  position: absolute;
+  bottom: var(--bleed-capsule-bottom);
+  left: 0;
+  box-sizing: border-box;
+  width: var(--bleed-capsule-width);
+  padding: var(--spacingVerticalMNudge) var(--spacingHorizontalM);
+  translate: var(--bleed-capsule-left) 0;
+  border-radius: var(--borderRadius3XLarge);
+  isolation: isolate;
+}
+
+:global(html[data-scene-transition]) :is(.head, .fold) {
+  view-transition-name: match-element;
+  view-transition-class: scene-capsule-part;
+}
+
+/* 玻璃面压在内容下面，材质由 `useBarSurface` 的类给 */
+.glass {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+}
+
+:global(html[data-scene-transition]) .glass {
+  view-transition-name: scene-capsule-glass;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  column-gap: var(--spacingHorizontalXS);
+  transition:
+    opacity var(--motion-faster) var(--curveLinear),
+    filter var(--motion-faster) var(--curveLinear);
+}
+
+/* 进度条预览时（里面出现 `data-previewing`）上半部分，也就是头部，淡到 35% 并模糊，歌词浮在它上面；
+   与播放栏胶囊悬停进度条时同一套，指针穿过去落到进度线上 */
+.capsule:has([data-previewing]) .head {
+  opacity: 0.35;
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+/* 折叠部分：高度在 0 与内容高之间走 `grid-template-rows`。收起是展开的倒放：时长同为 333 ms，曲线是展开曲线
+   （`curveDecelerateMid`）反过来（`--bleed-collapse-curve`，由 `capsuleMotion.ts` 算出）；内容淡入淡出同占
+   83 ms 到 250 ms 这一段（展开时晚 83 ms 淡入，收起时晚 83 ms 淡出，线性）。减弱动效时时长变量缩成 1 ms
+
+   折叠部分只在长高、合上的过程中裁切：`overflow: hidden` 在收起时立刻生效，展开时等玻璃长完再放开（`overflow` 的离散过渡）。
+   长完之后不裁，因为进度条预览的歌词要向上浮到头部上面，不能被它切掉
+
+   展开条件有三：指针在里面（`data-hover` 按 React 树算，键的提示与浮层也算里面；`:hover` 兜住指针本来就停在里面、
+   没触发进入事件的情况）、里面有键盘焦点、里面有展开着的菜单或浮层 */
+.fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-slow) var(--bleed-collapse-curve);
+}
+
+.foldInner {
+  min-height: 0;
+  padding-block: var(--spacingVerticalXXS);
+  margin-block: calc(-1 * var(--spacingVerticalXXS));
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    opacity var(--motion-fast) var(--curveLinear) var(--motion-faster),
+    overflow 0s allow-discrete;
+}
+
+.capsule:hover .fold,
+.capsule[data-hover] .fold,
+.capsule[data-open] .fold,
+.capsule:has(:focus-visible) .fold,
+.capsule:has([aria-expanded='true']) .fold {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--motion-slow) var(--curveDecelerateMid);
+}
+
+.capsule:hover .foldInner,
+.capsule[data-hover] .foldInner,
+.capsule[data-open] .foldInner,
+.capsule:has(:focus-visible) .foldInner,
+.capsule:has([aria-expanded='true']) .foldInner {
+  opacity: 1;
+  overflow: visible;
+  transition:
+    opacity var(--motion-fast) var(--curveLinear) var(--motion-faster),
+    overflow 0s var(--motion-slow) allow-discrete;
+}

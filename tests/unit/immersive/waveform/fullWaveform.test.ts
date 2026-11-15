@@ -7,13 +7,15 @@ import {
   startFullWaveform,
   type FullWaveformHost,
 } from '../../../../src/immersive/waveform/fullWaveform.ts';
+import type { OnlineAnalysis } from '../../../../src/host/onlineAnalysis.ts';
+import type { HoldTrack } from '../../../../src/server/holdTrack.ts';
 import { flush, startPlayingTrack, type PlayingTrack } from '../../../fixtures/playingTrack.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
 /**
  * 整轨波形的取数用注入的宿主替身测：`FullWaveformHost` 只有 `audio.generateFullWaveform` 一条，签名取自 SDK
- * 的 `fb`。SDK 在缓存没命中时自己等事件，对这里来说就是一个晚些才兑现的 Promise，替身用「悬着」表示。
- * 曲目由真的播放服务给，宿主替身推换曲事件。
+ * 的 `fb`。SDK 在缓存没命中时自己等事件，对这里来说就是一个晚些才兑现的 Promise，替身用「悬着」表示；
+ * 曲目由真的播放服务给，宿主替身推换曲事件
  */
 type Generate = FullWaveformHost['audio']['generateFullWaveform'];
 type Reply = Awaited<ReturnType<Generate>>;
@@ -47,9 +49,9 @@ function fakeWaveform() {
     set: (next: Mode) => {
       mode = next;
     },
-    /** 兑现最早那一个悬着的请求。 */
+    /** 兑现最早那一个悬着的请求 */
     release: (reply: Reply = READY) => pending.shift()?.resolve(reply),
-    /** 让最早那一个悬着的请求 reject：SDK 收到失败事件或等到超时就是这样。 */
+    /** 让最早那一个悬着的请求 reject：SDK 收到失败事件或等到超时就是这样 */
     fail: () => pending.shift()?.reject({ success: false, error: 'TIMEOUT' }),
   };
 }
@@ -59,10 +61,15 @@ function fakeTimers(): void {
   onTestFinished(() => void vi.useRealTimers());
 }
 
-async function setup(fake = fakeWaveform(), player?: PlayingTrack) {
+interface Online {
+  hold?: HoldTrack;
+  mode?: () => OnlineAnalysis;
+}
+
+async function setup(fake = fakeWaveform(), player?: PlayingTrack, online: Online = {}) {
   const playing = player ?? (await startPlayingTrack());
   const active = atom(true);
-  const service = startFullWaveform(playing.store, { host: fake.host, active });
+  const service = startFullWaveform(playing.store, { host: fake.host, active, ...online });
   onTestFinished(() => service.dispose());
   return {
     ...playing,
@@ -190,6 +197,29 @@ describe('startFullWaveform', () => {
     stop();
     await flush();
     expect(state()).toStrictEqual({ status: 'idle', rms: [] });
+  });
+
+  test.each([
+    ['hold', true, true],
+    ['segments', false, true],
+    ['off', false, false],
+  ] as const)('在线曲目选 %s：通知后端留这首 %s，向宿主问 %s', async (mode, notified, asked) => {
+    const online = 'http://127.0.0.1:51234/music/stream/wy/3347766479.flac?q=flac';
+    const fake = fakeWaveform();
+    const held: string[] = [];
+    const { play, state } = await setup(fake, undefined, {
+      mode: () => mode,
+      hold: async (path) => {
+        held.push(`${path}@${fake.calls.length}`);
+      },
+    });
+    play(makeTrack({ path: online, handle: online }));
+    await flush();
+    expect(held).toStrictEqual(notified ? [`${online}@0`] : []);
+    expect(fake.calls.map((call) => call.path)).toStrictEqual(asked ? [online] : []);
+    expect(state()).toStrictEqual(
+      asked ? { status: 'ready', rms: POINTS } : { status: 'failed', rms: [] },
+    );
   });
 
   test('释放后悬着的结果丢、pending 计时器不再响', async () => {

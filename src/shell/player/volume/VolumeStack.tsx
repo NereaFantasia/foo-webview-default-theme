@@ -9,7 +9,7 @@ import {
 import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactNode, Ref } from 'react';
 import { translateAtom } from '../../../i18n/locale.ts';
-import { outputDevicesAtom } from './outputDevices.ts';
+import { outputDevicesAtom } from '../../../playback/outputDevices.ts';
 import { PLAYER_KEY_ATTR, VOLUME_SLIDER_FOCUS } from '../playerFocus.ts';
 import type { VolumeSender } from '../../../playback/volume/volumeControl.ts';
 import type { VolumeScale } from '../../../playback/volumeScale.ts';

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { selectLastfmSource } from '../fixtures/biographySource.ts';
 import { openArtists } from '../fixtures/artistsPage.ts';
 import { hostFailure } from '../fixtures/hostAnswers.ts';
 import { BIOGRAPHY_PREFS_KEY } from '../../src/library/biography/biographyPrefs.ts';
@@ -6,18 +7,8 @@ import { LASTFM_KEY_PREF } from '../../src/library/biography/lastfm-api/lastfmKe
 import { apiReply, artistInfoSample } from '../fixtures/lastfmApiSamples.ts';
 import { artistAlbumTracks } from '../fixtures/artistsLibrary.ts';
 
-test('左栏分段选择保留键盘导航，排序字段、方向与列出依据独立选择', async ({ page }) => {
+test('墙上的排序字段、方向与列出依据独立选择', async ({ page }) => {
   const env = await openArtists(page);
-  const tabs = env.view.getByRole('tablist', { name: '艺人', exact: true });
-  const all = tabs.getByRole('tab', { name: /^全部/ });
-  await all.focus();
-  await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('Space');
-  await expect(tabs.getByRole('tab', { name: /^需要整理/ })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await all.click();
   const sort = env.view.getByRole('button', { name: '排序与艺人来源' });
   await sort.click();
   await page.getByRole('menuitemradio', { name: '专辑数', exact: true }).click();
@@ -43,17 +34,18 @@ test('左栏分段选择保留键盘导航，排序字段、方向与列出依�
   expect(env.errors).toEqual([]);
 });
 
-test('艺人同页切换、筛选和紧凑专辑列表', async ({ page }) => {
+test('墙上打开艺人详情、后退回墙与筛选 @smoke', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   const env = await openArtists(page);
+  await expect(env.artist('Shing02')).toBeVisible();
   await env.artist('Nujabes').click();
   await expect(env.view.getByRole('heading', { name: 'Nujabes', exact: true })).toBeVisible();
   const albums = env.view.locator('[data-artist-albums]');
   await expect(albums.getByRole('button', { name: /Metaphorical Music/ })).toBeVisible();
   await expect(albums.getByText('Lady Brown', { exact: true })).toHaveCount(0);
-  await expect(albums.getByRole('region', { name: '参与', exact: true })).toContainText(
-    'Luv(sic) Hexalogy',
-  );
+  await expect(env.view.locator('[data-artist-albums="guest"]')).toContainText('Luv(sic) Hexalogy');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(env.wall).toBeVisible();
   await env.view.getByRole('textbox', { name: '筛选艺人' }).fill('Shing');
   await expect(env.artist('Nujabes')).toHaveCount(0);
   await env.artist('Shing02').click();
@@ -61,18 +53,20 @@ test('艺人同页切换、筛选和紧凑专辑列表', async ({ page }) => {
   expect(env.errors).toEqual([]);
 });
 
-test('窄窗抽屉选择后保留详情，拉宽恢复列表，后退离开艺人页', async ({ page }) => {
-  const env = await openArtists(page, 900);
-  await env.view.getByRole('button', { name: '艺人列表', exact: true }).click();
-  const drawer = page.getByRole('dialog', { name: '艺人列表' });
-  await drawer.locator('[data-artist="Nujabes"]').click();
-  await expect(env.view.getByRole('heading', { name: 'Nujabes', exact: true })).toBeVisible();
-  await expect(drawer).not.toBeVisible();
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(env.list).toBeVisible();
-  await expect(env.artist('Nujabes')).toHaveAttribute('data-current', 'true');
+test('在详情页点侧边栏「艺人」回到墙，后退依次回到详情与墙', async ({ page }) => {
+  const env = await openArtists(page);
+  await env.artist('Nujabes').click();
+  const heading = env.view.getByRole('heading', { name: 'Nujabes', exact: true });
+  await expect(heading).toBeVisible();
+  await page
+    .getByRole('navigation', { name: '侧边栏' })
+    .getByRole('button', { name: '艺人', exact: true })
+    .click();
+  await expect(env.wall).toBeVisible();
   await page.keyboard.press('Alt+ArrowLeft');
-  await expect(env.view).toHaveCount(0);
+  await expect(heading).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(env.wall).toBeVisible();
   expect(env.errors).toEqual([]);
 });
 
@@ -121,6 +115,7 @@ test('关于按所选艺人取 API 正文，切人后不保留上一位正文', 
       language: 'zh',
       identities: ['Nujabes', 'Shing02'].map((artist) => ({ artist, sourceArtist: artist })),
     });
+    selectLastfmSource(host);
     host.config.set(LASTFM_KEY_PREF.key, '0123456789abcdef0123456789abcdef');
     host.answer('http.get', (params) => {
       const url = new URL(String(params['url']));
@@ -134,6 +129,7 @@ test('关于按所选艺人取 API 正文，切人后不保留上一位正文', 
   });
   await env.artist('Nujabes').click();
   await expect(env.view.getByText('Nujabes 的正文', { exact: true })).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');
   await env.artist('Shing02').click();
   await expect(env.view.getByText('Shing02 的正文', { exact: true })).toBeVisible();
   await expect(env.view.getByText('Nujabes 的正文', { exact: true })).toHaveCount(0);
@@ -160,7 +156,9 @@ test('署名口径改名先显示单值与多值分界，取消不写标签', as
   expect(env.errors).toEqual([]);
 });
 
-test('无图与有图共用宽幅布局且可播放；合辑保留四格封面', async ({ page }) => {
+test('没有照片时头像画人像占位且不拿专辑封面凑，仍可播放；合辑同样没有照片入口', async ({
+  page,
+}) => {
   const env = await openArtists(page, 1280, (host) => {
     host.answer('artwork.getForTrack', (params) => ({
       success: true,
@@ -172,34 +170,18 @@ test('无图与有图共用宽幅布局且可播放；合辑保留四格封面',
   });
   await env.artist('Nujabes').click();
   const header = env.view.locator('[data-artist-header]');
-  await expect(header.locator('[data-artist-photo-state="empty"]')).toBeVisible();
-  const trigger = header.getByRole('button', { name: '打开艺人照片', exact: true });
-  await expect(header).not.toHaveAttribute('data-compact', 'true');
-  await expect(trigger).toHaveCSS('height', '306px');
+  const avatar = header.getByRole('button', { name: '打开艺人照片', exact: true });
+  await expect(avatar).toHaveAttribute('data-artist-photo-state', 'empty');
+  await expect(avatar).toBeDisabled();
+  await expect(header.locator('[data-song-art]')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 800 });
-  await expect(trigger).toBeDisabled();
-  await expect(trigger).toHaveCSS('height', '216px');
   await expect(header.getByRole('button', { name: '播放', exact: true })).toBeEnabled();
+  await expect(header.getByRole('button', { name: '艺人照片', exact: true })).toBeDisabled();
   await header.getByRole('button', { name: '更多', exact: true }).click();
   await page.locator('[data-action="compilation"]').click();
-  await expect(header.getByText('合辑', { exact: true })).toBeVisible();
-  const tiles = header.locator('[data-song-art]');
-  await expect(tiles).toHaveCount(4);
-  expect(
-    await tiles.evaluateAll((nodes) =>
-      nodes.every((node) => {
-        const parent = node.parentElement?.getBoundingClientRect();
-        const box = node.getBoundingClientRect();
-        return (
-          parent &&
-          box.left >= parent.left &&
-          box.right <= parent.right &&
-          box.top >= parent.top &&
-          box.bottom <= parent.bottom
-        );
-      }),
-    ),
-  ).toBe(true);
-  await expect(header.locator('[data-artist-photo-state]')).toHaveCount(0);
+  await expect(header.getByRole('button', { name: '艺人照片', exact: true })).toHaveCount(0);
+  await expect(avatar).toHaveAttribute('data-artist-photo-state', 'empty');
+  await expect(header.locator('[data-song-art]')).toHaveCount(0);
+  await expect(env.view.getByRole('region', { name: '常听', exact: true })).toHaveCount(0);
   expect(env.errors).toEqual([]);
 });

@@ -2,6 +2,7 @@ import type { ConfigWriter } from '../../host/configWrite.ts';
 import { atom, type createStore } from 'jotai/vanilla';
 import { historyAtom, type NavHistoryService } from '../../nav/navHistory.ts';
 import { albumsAtom } from '../albums.ts';
+import { startAlbumCovers } from '../albumCovers.ts';
 import type { Album } from '../../host/libraryContract.ts';
 import { startCreditedArtists } from './artistIndex.ts';
 import { startArtistDetail } from './artistDetail.ts';
@@ -51,7 +52,6 @@ export function startArtists(store: ReturnType<typeof createStore>, deps: Artist
       complete: atom(
         (get) => get(albumsAtom).status === 'ready' && get(credited.state).rows !== null,
       ),
-      locale: deps.biography.locale,
       prefs,
     },
     selected,
@@ -88,6 +88,8 @@ export function startArtists(store: ReturnType<typeof createStore>, deps: Artist
     credited: atom((get) => get(credited.state).rows),
   });
   const writes = startArtistWrites(store);
+  // ponytail: 名额与专辑封面各算各的，宿主取图队列深 32；墙上专辑封面只给没有 artist 图的图块补，两份同时占满的时候少
+  const art = startAlbumCovers(store, undefined, { type: 'artist', limit: 8 });
   let disposed = false;
   return {
     store,
@@ -101,6 +103,8 @@ export function startArtists(store: ReturnType<typeof createStore>, deps: Artist
     compilation,
     actions,
     writes,
+    /** 墙上图块的 artist 图：按专辑取，与专辑封面同一套缓存与限流 */
+    art,
     commands: deps.commands,
     trackMenu: deps.trackMenu,
     openAlbum: deps.openAlbum,
@@ -126,6 +130,7 @@ export function startArtists(store: ReturnType<typeof createStore>, deps: Artist
       disposed = true;
       actions.dispose();
       writes.dispose();
+      art.dispose();
       online.dispose();
       biography.dispose();
       detail.dispose();

@@ -1,64 +1,39 @@
-import { Button, Spinner } from '@fluentui/react-components';
+import { Spinner } from '@fluentui/react-components';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
+import { useService } from '../../kit/useService.ts';
 import { createSnapshotSlot } from '../../nav/navHistory.ts';
 import type { PageProps } from '../../nav/places.ts';
-import { usePageSnapshot } from '../../nav/usePageSnapshot.ts';
-import { pageTransition } from '../../motion/pageTransition.ts';
-import { reducedMotionAtom } from '../../motion/reducedMotion.ts';
-import type { TablePoint } from '../../table/tableItems.ts';
-import type { TableSort } from '../../table/TrackTableHeader.tsx';
-import type { TrackFilter } from '../../track/trackFilter.ts';
-import { objectOpenerKey } from '../../nav/objectOpener.ts';
-import { useSearchSession } from './searchContext.ts';
-import { SearchFeedback } from './SearchFeedback.tsx';
-import { searchHitKey, type SearchHit } from './searchQuery.ts';
-import { SearchResultList } from './SearchResultList.tsx';
-import { SearchResultRow } from './SearchResultRow.tsx';
-import type { SearchResultsService } from './searchResults.ts';
-import { readSearchView, saveSearchView, type SearchView } from './results/searchView.ts';
-import { SearchViewSwitch } from './results/SearchViewSwitch.tsx';
+import { PageEntryContext, usePageSnapshot } from '../../nav/usePageSnapshot.ts';
+import { SEARCH_ONLINE } from '../../playback/searchOnlinePref.ts';
+import { ratingsKey } from '../../track/trackRatings.ts';
+import { albumDetailKey } from '../album-detail/albumDetail.ts';
+import { albumsAtom } from '../albums.ts';
+import { LibraryResults } from './LibraryResults.tsx';
 import { startSearchMenu, type SearchMenuService } from './menus/searchMenu.ts';
-import { SearchResultMenu } from './menus/SearchResultMenu.tsx';
-import { useViewControlStyles } from '../../theme/controlStyles.ts';
-import styles from './SearchPage.module.css';
-import { useService } from '../../kit/useService.ts';
-import { searchKey, type SearchCategory } from './searchServices.ts';
+import { unavailableCategories } from './online/OnlineControls.tsx';
 import type { OnlineCategory, OnlineSearch } from './online/onlineSearch.ts';
 import { OnlineResults, type OnlineResume } from './online/OnlineResults.tsx';
-import { albumDetailKey } from '../album-detail/albumDetail.ts';
-import { ratingsKey } from '../../track/trackRatings.ts';
-import { CommandBar, COMMAND_BAR_TIERS, type CommandBarTier } from '../../kit/CommandBar.tsx';
-import { useWidthTier } from '../../kit/useWidthTier.ts';
-import { useFilterSurface } from '../../track/FilterSurface.tsx';
+import { OnlineSection } from './online/OnlineSection.tsx';
 import { SearchCategoryTabs } from './SearchCategoryTabs.tsx';
-import { SearchFieldMenu } from './SearchFieldMenu.tsx';
-import { SearchHeader } from './SearchHeader.tsx';
-import { SEARCH_SCOPES, type SearchScope } from './searchQuery.ts';
+import { SearchHeader, type SearchRange } from './SearchHeader.tsx';
+import type { SearchResultsService } from './searchResults.ts';
+import { searchKey, type SearchCategory } from './searchServices.ts';
 import { startSearchTracks, type SearchTracksService } from './tracks/searchTracks.ts';
-import { SearchTracksBar, SearchTracksFilter, SearchTracksTable } from './tracks/SearchTracks.tsx';
-import { useSearchTracks } from './tracks/useSearchTracks.ts';
+import styles from './SearchPage.module.css';
 
-type Category = SearchCategory;
-interface SearchPageSnapshot {
-  readonly category: Category;
-  readonly top: number;
-  readonly active: string | null;
-  readonly view: SearchView;
-  readonly loaded: number;
-  readonly field: SearchScope;
-  /** 「曲目」一类的筛选与排序 */
-  readonly filter: TrackFilter;
-  readonly sort: TableSort | null;
-}
-const SLOT = createSnapshotSlot<SearchPageSnapshot>();
 type Scope = 'library' | 'online';
-/** 范围单独存：在线音乐范围里没有本地的滚动区，本地那份快照这时不登记 */
-const SCOPE_SLOT = createSnapshotSlot<{ readonly scope: Scope }>();
-const LIST_CELL = { width: null, height: 56, stretch: true } as const;
-const GRID_CELL = { width: 160, height: 208, stretch: true } as const;
-const playsOnEnter = (hit: SearchHit) => hit.kind === 'track';
+/** 各分类选的范围；没选过的是媒体库，歌单只有在线音乐 */
+type Scopes = Readonly<Partial<Record<Exclude<OnlineCategory, 'playlists'>, Scope>>>;
+/**
+ * 分类与各分类的范围单独存：在线音乐范围里没有本地的滚动区，本地那份快照这时不登记。
+ * 开着「搜索时包含在线音乐」时「全部」不分范围，媒体库与在线音乐合在一页
+ */
+const SCOPE_SLOT = createSnapshotSlot<{
+  readonly category: OnlineCategory;
+  readonly scopes: Scopes;
+}>();
 
 export function SearchPage({ place }: PageProps) {
   const search = useService(searchKey);
@@ -117,346 +92,150 @@ function SearchPageContent({
   readonly tracks: SearchTracksService;
 }) {
   const t = useAtomValueRawSync(translateAtom);
-  const viewControls = useViewControlStyles();
-  const session = useSearchSession();
   const search = useService(searchKey);
+  const store = useStore();
+  const request = useAtomValueRawSync(search.request);
+  const included = useAtomValueRawSync(SEARCH_ONLINE.atom);
+  const platform = useAtomValueRawSync(online.platform);
+  const catalog = useAtomValueRawSync(albumsAtom);
   const state = useAtomValueRawSync(results.state);
   const albums = useAtomValueRawSync(results.albums);
   const artists = useAtomValueRawSync(results.artists);
-  const best = useAtomValueRawSync(results.best);
-  const notice = useAtomValueRawSync(useService(objectOpenerKey).notice);
-  const playNotice = useAtomValueRawSync(search.notice);
-  const menuFailed = useAtomValueRawSync(menu.notice);
-  const reduced = useAtomValueRawSync(reducedMotionAtom);
-  const store = useStore();
-  const request = useAtomValueRawSync(search.request);
-  const [category, setCategory] = useState<Category>(() => {
-    const asked = store.get(search.request);
-    return asked?.text === text && asked.scope === 'library' ? asked.category : 'all';
-  });
-  const [scope, setScope] = useState<Scope>('library');
-  const field = useAtomValueRawSync(results.scope);
-  const chooseField = (next: SearchScope) => {
-    results.setScope(next);
-    tracks.setScope(next);
+  const onlineTotals = {
+    artists: useAtomValueRawSync(online.kinds.artist).total,
+    albums: useAtomValueRawSync(online.kinds.album).total,
+    tracks: useAtomValueRawSync(online.kinds.track).total,
   };
-  // 换 key 重挂在线结果，让它落在指定的分类上
-  const [onlineEntry, setOnlineEntry] = useState<{
-    readonly key: number;
-    readonly category: OnlineCategory;
-    readonly focus?: string;
-  }>({ key: 0, category: 'all' });
-  const [active, setActive] = useState<string | null>(null);
-  const [view, setView] = useState<SearchView>(readSearchView);
-  const [menuAt, setMenuAt] = useState<TablePoint | null>(null);
-  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const pending = useRef<SearchPageSnapshot | null>(null);
-  const lastCategory = useRef(`${category}:${view}`);
-  const ready = state.status !== 'loading' && state.status !== 'idle';
-  const artistHits = useMemo<SearchHit[]>(
-    () => artists.map((artist) => ({ kind: 'artist', artist })),
-    [artists],
-  );
-  const albumHits = useMemo<SearchHit[]>(
-    () => albums.map((album) => ({ kind: 'album', album })),
-    [albums],
-  );
-  const trackHits = useMemo<SearchHit[]>(
-    () => state.tracks.map((track) => ({ kind: 'track', track })),
-    [state.tracks],
-  );
-  const tracksModel = useSearchTracks(tracks, scope === 'library' && category === 'tracks');
-  const [measure, tier] = useWidthTier<CommandBarTier, HTMLDivElement>(COMMAND_BAR_TIERS);
-  // 结果页的筛选只弹出、不嵌入页面，所以没有要记住的固定与展开
-  const surface = useFilterSurface({
-    docked: false,
-    expanded: false,
-    narrow: tier === 'narrow',
-    onDock: () => {},
-    onExpand: () => {},
+  // 后退回来时直接以记下的分类与范围开始：先挂上「全部」再换过去，结果区会误播一次切换分类的上滑
+  const entry = useContext(PageEntryContext);
+  const [saved] = useState(() => (entry ? SCOPE_SLOT.values.get(entry) : undefined));
+  const [category, setCategory] = useState<OnlineCategory>(() => {
+    if (saved) return saved.category;
+    const asked = store.get(search.request);
+    return asked?.text === text ? asked.category : 'all';
   });
-  const preview = (hits: SearchHit[]) =>
-    hits.filter((hit) => !best || searchHitKey(hit) !== searchHitKey(best)).slice(0, 6);
-  const albumPreview = preview(albumHits);
-  const trackPreview = preview(trackHits);
+  const [scopes, setScopes] = useState<Scopes>(saved?.scopes ?? {});
+  // 换 key 重挂在线结果，让它按进来时带的曲目定位
+  const [onlineEntry, setOnlineEntry] = useState<{ readonly key: number; readonly focus?: string }>(
+    { key: 0 },
+  );
   usePageSnapshot(
     SCOPE_SLOT,
-    { capture: () => ({ scope }), restore: (snapshot) => setScope(snapshot.scope) },
-    true,
-  );
-  usePageSnapshot(
-    SLOT,
     {
-      capture: () => ({
-        category,
-        view,
-        top: scroller?.scrollTop ?? 0,
-        active,
-        loaded: state.tracks.length,
-        field,
-        filter: store.get(tracks.filter.state),
-        sort: store.get(tracks.sort),
-      }),
+      capture: () => ({ category, scopes }),
       restore: (snapshot) => {
-        pending.current = snapshot;
         setCategory(snapshot.category);
-        setView(snapshot.view);
-        results.setScope(snapshot.field);
-        tracks.setScope(snapshot.field);
-        tracks.filter.restore(snapshot.filter);
-        tracks.setSort(snapshot.sort);
+        setScopes(snapshot.scopes);
       },
     },
-    ready && !!scroller,
+    true,
   );
-  // 排在恢复现场的 effect 之前：同一次提交里恢复会先清掉 pending，排在后面就看不到它，返回时会误播切分类的上滑
-  useLayoutEffect(() => {
-    if (lastCategory.current === `${category}:${view}` || !scroller) return;
-    lastCategory.current = `${category}:${view}`;
-    if (pending.current || reduced || document.visibilityState !== 'visible') return;
-    const animations = pageTransition('refresh', 'forward', false).enter.map((motion) =>
-      scroller.animate(motion.keyframes, motion.options),
-    );
-    return () => {
-      for (const animation of animations) animation.cancel();
-    };
-  }, [category, view, scroller, reduced]);
-  useLayoutEffect(() => {
-    const saved = pending.current;
-    if (!saved || saved.category !== category || saved.view !== view || !scroller || !ready) return;
-    if (state.loadingMore) return;
-    if (
-      saved.loaded > state.tracks.length &&
-      state.total !== null &&
-      state.tracks.length < state.total &&
-      !state.moreFailed &&
-      !state.limited
-    ) {
-      void results.more(saved.loaded);
-      return;
-    }
-    pending.current = null;
-    setActive(saved.active);
-    scroller.scrollTop = saved.top;
-    if (saved.active && !session.open) {
-      const item = scroller.querySelector<HTMLElement>(
-        `[data-search-hit="${CSS.escape(encodeURIComponent(saved.active))}"]`,
-      );
-      (item ?? scroller.querySelector<HTMLElement>('[data-search-list]') ?? scroller).focus({
-        preventScroll: true,
-      });
-    }
-  }, [category, view, scroller, session.open, ready, results, state]);
-
-  const choose = (next: Category) => {
-    if (next === category) return;
-    menu.close();
-    setMenuAt(null);
-    setCategory(next);
-    setActive(null);
-    if (scroller) scroller.scrollTop = 0;
-  };
   // 切到媒体库范围时在线范围卸载，现场记在这里；指定了分类的进入不沿用它
   const onlineResume = useRef<OnlineResume | null>(null);
-  const openOnline = (next: OnlineCategory, focus?: string) => {
-    onlineResume.current = null;
-    setOnlineEntry((last) => ({ key: last.key + 1, category: next, focus }));
-  };
+  // 直接点页签落在媒体库；歌单只有在线音乐。从在线一区或下拉的链接进来时带上在线音乐
+  const chooseCategory = useCallback((next: OnlineCategory, scope: Scope = 'library') => {
+    setCategory(next);
+    if (next !== 'playlists')
+      setScopes((last) => (last[next] === scope ? last : { ...last, [next]: scope }));
+  }, []);
+  const toLibrary = useCallback(
+    (next: SearchCategory) => chooseCategory(next, 'library'),
+    [chooseCategory],
+  );
+  const toOnline = useCallback(
+    (next: OnlineCategory) => chooseCategory(next, 'online'),
+    [chooseCategory],
+  );
+  const merged = category === 'all' && included;
+  const scope: Scope =
+    category === 'playlists' ? 'online' : merged ? 'library' : (scopes[category] ?? 'library');
   const chooseScope = (next: Scope) => {
-    if (next === scope) return;
+    if (next === scope || category === 'playlists') return;
     menu.close();
-    setMenuAt(null);
-    setScope(next);
+    setScopes((last) => ({ ...last, [category]: next }));
   };
   // 下拉里的「查看 N 张」、播放来源「在线搜索」：页面已开着同一查询词时也要切过去；取走后清掉，返回时不再生效
   useLayoutEffect(() => {
     if (request?.text !== text) return;
     store.set(search.request, null);
-    chooseScope(request.scope);
-    if (request.scope === 'library') choose(request.category);
-    else openOnline(request.category, request.focus);
-  });
-  const activate = useCallback(
-    (hit: SearchHit, play = false) => {
-      setActive(searchHitKey(hit));
-      session.activate(hit, text, play);
-    },
-    [session, text],
-  );
-  const openMenu = useCallback(
-    (hit: SearchHit, at: TablePoint, selection: readonly SearchHit[] = [hit]) => {
-      if (hit.kind === 'artist') return;
-      setActive(searchHitKey(hit));
-      void menu.open(hit, selection);
-      setMenuAt(at);
-    },
-    [menu],
-  );
-  const row = (hit: SearchHit, tile = false) => (
-    <SearchResultRow
-      key={searchHitKey(hit)}
-      hit={hit}
-      tile={tile}
-      onActivate={activate}
-      onMenu={openMenu}
-    />
-  );
-  const fieldMenu = (
-    <SearchFieldMenu
-      scope={field}
-      scopes={SEARCH_SCOPES}
-      labelled={tier === 'wide'}
-      onScope={chooseField}
+    menu.close();
+    chooseCategory(request.category, request.scope);
+    if (request.scope === 'online') {
+      onlineResume.current = null;
+      setOnlineEntry((last) => ({ key: last.key + 1, focus: request.focus }));
+    }
+  }, [request, text, store, search, menu, chooseCategory]);
+
+  const known = catalog.status === 'ready' && !catalog.truncated;
+  const [libraryCount, onlineCount] =
+    category === 'artists'
+      ? [known ? artists.length : null, onlineTotals.artists]
+      : category === 'albums'
+        ? [known ? albums.length : null, onlineTotals.albums]
+        : category === 'tracks'
+          ? [state.total, onlineTotals.tracks]
+          : [null, null];
+  const range: SearchRange | null =
+    merged || category === 'playlists'
+      ? null
+      : { value: scope, library: libraryCount, online: onlineCount };
+  // 歌单只有在线音乐，所选来源搜不了时在哪个范围都标出来；其余分类只在在线音乐范围里标
+  const blocked = unavailableCategories(t, platform);
+  const unavailable =
+    scope === 'online' ? blocked : blocked.playlists ? { playlists: blocked.playlists } : {};
+  const renderTabs = (narrow: boolean) => (
+    <SearchCategoryTabs
+      category={category}
+      narrow={narrow}
+      unavailable={unavailable}
+      onChoose={(next) => chooseCategory(next)}
     />
   );
   return (
     <section className={styles.root} data-page="search" aria-label={t('place.search')}>
-      <SearchHeader text={text} scope={scope} results={results} onScope={chooseScope} />
-      {scope === 'library' ? (
-        <>
-          <div ref={measure} className={styles.controls} data-search-controls>
-            <SearchCategoryTabs category={category} narrow={tier === 'narrow'} onChoose={choose} />
-            <span className={styles.divider} aria-hidden />
-            {category === 'tracks' ? (
-              <SearchTracksBar
-                model={tracksModel}
-                surface={surface}
-                tier={tier}
-                field={fieldMenu}
-              />
-            ) : (
-              <CommandBar
-                tier={tier}
-                label={t('query.toolbar')}
-                find={fieldMenu}
-                view={
-                  <SearchViewSwitch
-                    view={view}
-                    onChange={(next) => {
-                      menu.close();
-                      setMenuAt(null);
-                      setView(next);
-                      saveSearchView(next);
-                    }}
-                  />
-                }
-              />
-            )}
-          </div>
-          {category === 'tracks' && <SearchTracksFilter model={tracksModel} surface={surface} />}
-          <div
-            ref={setScroller}
-            className={styles.scroller}
-            tabIndex={-1}
-            data-search-scroller
-            aria-busy={state.status === 'loading'}
-          >
-            {category === 'all' ? (
-              <div className={styles.overview}>
-                {best && (
-                  <section>
-                    <h2>{t('search.best')}</h2>
-                    {row(best)}
-                  </section>
-                )}
-                {albumPreview.length > 0 && (
-                  <section>
-                    <div className={styles.group}>
-                      <h2>{t('search.albums')}</h2>
-                      <Button
-                        className={viewControls.icon}
-                        appearance="subtle"
-                        size="small"
-                        onClick={() => choose('albums')}
-                      >
-                        {t('search.viewAll')}
-                      </Button>
-                    </div>
-                    <div className={view === 'grid' ? styles.albums : undefined}>
-                      {albumPreview.map((hit) => row(hit, view === 'grid'))}
-                    </div>
-                  </section>
-                )}
-                {trackPreview.length > 0 && (
-                  <section>
-                    <div className={styles.group}>
-                      <h2>{t('search.tracks')}</h2>
-                      <Button
-                        className={viewControls.icon}
-                        appearance="subtle"
-                        size="small"
-                        onClick={() => choose('tracks')}
-                      >
-                        {t('search.viewAll')}
-                      </Button>
-                    </div>
-                    <div className={view === 'grid' ? styles.albums : undefined}>
-                      {trackPreview.map((hit) => row(hit, view === 'grid'))}
-                    </div>
-                  </section>
-                )}
-              </div>
-            ) : category === 'tracks' ? (
-              <SearchTracksTable
-                model={tracksModel}
-                scroller={scroller}
-                label={t('search.tracks')}
-                empty={
-                  <SearchFeedback results={results} onSearchOnline={() => chooseScope('online')} />
-                }
-              />
-            ) : (
-              <SearchResultList
-                key={category}
-                items={
-                  category === 'artists'
-                    ? artistHits
-                    : category === 'albums'
-                      ? albumHits
-                      : trackHits
-                }
-                keyOf={searchHitKey}
-                cell={view === 'grid' ? GRID_CELL : LIST_CELL}
-                playsOnEnter={playsOnEnter}
-                renderItem={(hit, props) => (
-                  <SearchResultRow hit={hit} option tile={view === 'grid'} {...props} />
-                )}
-                label={t(`search.${category}`)}
-                scroller={scroller}
-                active={active}
-                onActive={setActive}
-                onActivate={activate}
-                view={view}
-                onMenu={openMenu}
-                onAll={async () => (category === 'artists' ? artistHits : albumHits)}
-              />
-            )}
-            {category !== 'tracks' && (
-              <SearchFeedback results={results} onSearchOnline={() => chooseScope('online')} />
-            )}
-            {menuFailed && (
-              <div role="status" className={styles.notice}>
-                {t('album.commandFailed')}
-              </div>
-            )}
-            {(notice || playNotice) && (
-              <div role="status" className={styles.notice}>
-                {t(notice ?? playNotice ?? 'album.playFailed')}
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
+      <SearchHeader
+        text={text}
+        scope={scope}
+        results={results}
+        range={range}
+        onScope={chooseScope}
+      />
+      {scope === 'online' || category === 'playlists' ? (
         <OnlineResults
           key={onlineEntry.key}
           text={text}
           search={online}
-          initial={onlineEntry.category}
+          category={category}
+          onCategory={toOnline}
+          renderTabs={renderTabs}
           focus={onlineEntry.focus}
           resume={onlineResume}
         />
+      ) : (
+        <LibraryResults
+          text={text}
+          results={results}
+          menu={menu}
+          tracks={tracks}
+          category={category}
+          onCategory={toLibrary}
+          renderTabs={renderTabs}
+          renderOnline={
+            merged
+              ? (scroller) => (
+                  <OnlineSection
+                    text={text}
+                    search={online}
+                    localTracks={state.tracks}
+                    scroller={scroller}
+                    onCategory={toOnline}
+                  />
+                )
+              : undefined
+          }
+          onSearchOnline={() => chooseScope('online')}
+        />
       )}
-      <SearchResultMenu menu={menu} at={menuAt} text={text} onClose={() => setMenuAt(null)} />
     </section>
   );
 }

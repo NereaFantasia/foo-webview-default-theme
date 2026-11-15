@@ -64,7 +64,9 @@ export interface PlaylistGroupsService {
   expandAll(guid: string): void;
   /**
    * 换分组依据：先让宿主按这一档重排这张列表，再取游程。游程只认相邻的行，顺序不对就碎成一堆单曲组
-   * 重排被拒（列表锁着）时照样换档重取，组按现有顺序算，碎一点但不是错的
+   * 选中当前这一档也重排：依据是各列表共用的偏好，换到别的列表、列表里加了曲目或点过列头之后，
+   * 顺序已经对不上它，只有再选一次能让它对上
+   * 重排被拒（列表锁着）时照样换档重取，组按现有顺序算；同一组被拆成几段由页面的横幅告知
    */
   setMode(guid: string, mode: number): Promise<void>;
   setEnabled(enabled: boolean): void;
@@ -268,9 +270,11 @@ export function startPlaylistGroups(
     },
     async setMode(guid, mode) {
       const current = store.get(prefs);
-      if (disposed || GROUP_MODES[mode] === undefined || current.mode === mode) return;
-      store.set(prefs, { ...current, mode });
-      persist();
+      if (disposed || GROUP_MODES[mode] === undefined) return;
+      if (current.mode !== mode) {
+        store.set(prefs, { ...current, mode });
+        persist();
+      }
       const sort = GROUP_MODES[mode]?.sort ?? '';
       const sorting = connected ? settle(() => host.playlist.sort(guid, sort, false)) : null;
       for (const entry of entries()) {

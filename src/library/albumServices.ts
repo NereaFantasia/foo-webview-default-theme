@@ -24,6 +24,7 @@ import { startAlbumMenu, type AlbumMenuFace, type AlbumMenuService } from './alb
 import { startAlbumSelection, type AlbumSelectionService } from './albums/albumSelection.ts';
 import { startBrowserPrefs, type BrowserPrefsService } from './albums/browserPrefs.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
+import type { LibraryMirrorSource } from './mirror/mirrorSource.ts';
 
 /** 专辑页用到的服务。随页面存活，离开专辑页也不停：回来时清单、封面与折叠都还在手上 */
 export interface AlbumServices {
@@ -58,9 +59,10 @@ export function startAlbumServices(
   tracks: TrackActionsService,
   host: AlbumServicesFace = fb,
   writer?: Pick<ConfigWriter, 'set'>,
+  mirror?: Pick<LibraryMirrorSource, 'albums'>,
 ): AlbumServices {
   const prefs = startBrowserPrefs(store, host, writer);
-  const browse = startAlbumBrowse(store, host, writer);
+  const browse = startAlbumBrowse(store, host, writer, mirror);
   const selection = startAlbumSelection(store);
   const covers = startAlbumCovers(store, host);
   const menu = startAlbumMenu(store, host);

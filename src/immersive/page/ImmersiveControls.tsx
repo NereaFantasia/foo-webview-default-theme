@@ -3,10 +3,12 @@ import { FullScreenMaximize20Regular, FullScreenMinimize20Regular } from '@fluen
 import { useAtomValueRawSync } from 'jotai/react';
 import type { FocusEvent } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
+import { backdropDegradedAtom } from '../backdrop/backdropState.ts';
+import { useControlKeyClasses } from '../scene/controlKeyStyles.ts';
 import { hostFullscreenAtom, type ImmersiveShell } from './immersiveShell.ts';
-import { useControlKeyClasses } from './controlKeyStyles.ts';
 import styles from './ImmersiveControls.module.css';
-import { ViewKey } from './ViewKey.tsx';
+import { BrowseKey } from './BrowseKey.tsx';
+import { SettingsKey } from './SettingsKey.tsx';
 
 export interface ImmersiveControlsProps {
   readonly shell: Pick<ImmersiveShell, 'toggleFullscreen' | 'leave'> | null;
@@ -14,28 +16,32 @@ export interface ImmersiveControlsProps {
   readonly shown: boolean;
   /** 焦点进出控件层时叫，参数是焦点此刻在不在层里 */
   readonly onFocusWithin: (inside: boolean) => void;
-  /** 场景里的元素挂进控制层的两个点：顶部居中放页签，左边视图键之后放预设场景自己的键；图纸场景不用，不给也行 */
+  /** 设置的编辑开着：顶部的键与页签全部让位，只留编辑条 */
+  readonly editing?: boolean;
+  /** 场景挂进控制层的三个点：顶部居中放页签，左边设置键之后放预设场景自己的键，编辑条放在页签的位置；不给也行 */
   readonly slotRefs?: {
     readonly tabs: (element: HTMLElement | null) => void;
     readonly views: (element: HTMLElement | null) => void;
+    readonly edit: (element: HTMLElement | null) => void;
   };
 }
 
 /**
- * 控件层：左边是视图键（切换图纸与歌词两种视图）与预设场景自己的键的挂载点，顶部居中是页签的挂载点，
- * 右边是全屏键与 Esc 胶囊。键都是 44 的 Acrylic 圆键，离顶 20（窗高不到 466 时 12）、离左右 32，上下居中线与页签行同线。全屏键切宿主主窗的全屏，
+ * 控件层：左边是设置键（进入设置的编辑）、浏览面板键与预设场景自己的键的挂载点，顶部居中是页签的挂载点与编辑条的挂载点，
+ * 右边是全屏键与 Esc 胶囊。编辑时两边的键与页签淡出、不接指针与焦点，顶部只剩编辑条。键都是 44 的 Acrylic 圆键，离顶 20（窗高不到 466 时 12）、离左右 32，上下居中线与页签行同线。全屏键切宿主主窗的全屏，
  * 宿主不在或这扇窗不支持全屏时不出；胶囊上只写 Esc，按它与按 Esc 一样是离开这一页。整层自己不接指针，只有键接，
  * 免得挡住场景里的件
  */
 export function ImmersiveControls({
   shell,
   shown,
+  editing = false,
   onFocusWithin,
   slotRefs,
 }: ImmersiveControlsProps) {
   const t = useAtomValueRawSync(translateAtom);
   const fullscreen = useAtomValueRawSync(hostFullscreenAtom);
-  const keys = useControlKeyClasses();
+  const keys = useControlKeyClasses(useAtomValueRawSync(backdropDegradedAtom));
   const fullscreenLabel = fullscreen ? t('immersive.exitFullscreen') : t('immersive.fullscreen');
   // 只有键盘带来的焦点算：鼠标点过的键会一直留着焦点，算上的话控件层与光标就再也不藏了
   // 焦点在层里的两颗键之间移动时不算离开
@@ -49,16 +55,24 @@ export function ImmersiveControls({
   return (
     <div
       className={styles.controls}
+      data-immersive-controls
       data-hidden={!shown || undefined}
       onFocus={onFocus}
       onBlur={onBlur}
     >
-      <div className={styles.leading}>
-        <ViewKey />
+      <div className={styles.leading} data-away={editing || undefined} inert={editing}>
+        <SettingsKey />
+        <BrowseKey />
         <div ref={slotRefs?.views} className={styles.viewsSlot} />
       </div>
-      <div ref={slotRefs?.tabs} className={styles.tabsSlot} />
-      <div className={styles.corner}>
+      <div
+        ref={slotRefs?.tabs}
+        className={styles.tabsSlot}
+        data-away={editing || undefined}
+        inert={editing}
+      />
+      <div ref={slotRefs?.edit} className={styles.editSlot} />
+      <div className={styles.corner} data-away={editing || undefined} inert={editing}>
         {fullscreen !== null && (
           <Tooltip content={fullscreenLabel} relationship="label">
             <Button

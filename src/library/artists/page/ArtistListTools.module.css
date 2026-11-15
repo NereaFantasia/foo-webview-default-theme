@@ -1,10 +1,18 @@
+/* 墙的页头下一行：筛选框与排序一组，「全部、需要整理」按内容宽排在后面，窄了换行 */
 .root {
-  padding: var(--spacingVerticalS) var(--spacingHorizontalL);
-  display: grid;
-  gap: var(--spacingVerticalS);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacingVerticalS) var(--spacingHorizontalM);
+  min-width: 0;
 }
 .filter {
   display: flex;
   gap: var(--spacingHorizontalS);
   min-width: 0;
+  max-width: 100%;
+}
+/* 「需要整理」靠右；换到第二行时也靠右 */
+.end {
+  margin-inline-start: auto;
 }

@@ -75,3 +75,29 @@ test('不同绘制间隔的减速位移相同，静态恢复直接采用当前�
   expect(sparse.speed).toBe(1);
   expect(sparse.rotation).toBe(position);
 });
+
+test('rate 只缩放时间的推进：缺省与显式 1 相同，2 倍快、半速慢', () => {
+  const base = createFlowMotion(),
+    explicit = createFlowMotion(),
+    twice = createFlowMotion(),
+    half = createFlowMotion();
+  for (let i = 0; i < 120; i++) {
+    advanceFlowMotion(base, 1000 / 60);
+    advanceFlowMotion(explicit, 1000 / 60, 1);
+    advanceFlowMotion(twice, 1000 / 60, 2);
+    advanceFlowMotion(half, 1000 / 60, 0.5);
+  }
+  expect(explicit).toEqual(base);
+  expect(twice.time).toBeCloseTo(base.time * 2, 1);
+  expect(half.time).toBeCloseTo(base.time / 2, 1);
+  expect(twice.gradient).toBeCloseTo(base.gradient * 2, 1);
+});
+
+test('rate 与暂停减速相乘：停稳在 8% 后 100 ms 的位移随倍率翻倍', () => {
+  const state = createFlowMotion();
+  setFlowPaused(state, true, true);
+  const position = () => (state.time / 0.016) * (1000 / 60) + state.remainder;
+  const before = position();
+  advanceFlowMotion(state, 100, 2);
+  expect(position() - before).toBeCloseTo(100 * 0.08 * 1.3 * 2);
+});

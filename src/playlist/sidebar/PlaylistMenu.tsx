@@ -17,6 +17,7 @@ import {
   Broom20Regular,
   Copy20Regular,
   Delete20Regular,
+  Edit20Regular,
   FolderOpen20Regular,
   LinkDismiss20Regular,
   List20Regular,
@@ -30,7 +31,9 @@ import { useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom } from '../../i18n/plural.ts';
 import { playlistsAtom } from '../../playback/playlists.ts';
+import { useRetained } from '../../kit/useRetained.ts';
 import { useService } from '../../kit/useService.ts';
+import { autoplaylistEditKey } from '../autoplaylistEdit.ts';
 import { playlistActionsKey } from '../playlistActions.ts';
 
 /** 右键落在哪、针对哪一张（GUID）；落在清单空白处时 `guid` 为 null */
@@ -66,8 +69,9 @@ function pointAt(x: number, y: number): PositioningVirtualElement {
  * 播放列表节的右键菜单与删除前的确认。菜单针对右键落在的那一张，不切换活动列表：右键一张列表本没打算
  * 去那里。落在清单空白处时换成新建、载入、保存全部三项
  *
- * 改内容的几项按锁置灰；只作用于活动列表的几项在别的列表上置灰，并提示先切过去。「转为普通列表」
- * 只在智能列表上出现。删除非空列表先确认：宿主没有回收站，删了就没了；空列表直接删
+ * 改内容的几项按锁置灰；只作用于活动列表的几项在别的列表上置灰，并提示先切过去。「编辑自动播放列表」
+ * 与「转为普通播放列表」只在自动播放列表上出现：编辑不按锁置灰（自动播放列表本身就是锁），对话框由装配层挂的
+ * 那一份开，不论当前在哪个页面。删除非空列表先确认：宿主没有回收站，删了就没了；空列表直接删
  *
  * 目标按 GUID 记：菜单开着时那张被删了，菜单直接收起；确认框开着时被删了，确认也不会删到别的列表上
  */
@@ -76,8 +80,12 @@ export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMe
   const plural = useAtomValueRawSync(pluralAtom);
   const { items, activeGuid } = useAtomValueRawSync(playlistsAtom);
   const actions = useService(playlistActionsKey);
+  const edit = useService(autoplaylistEditKey);
   const [confirming, setConfirming] = useState<Confirming>();
-  const entry = target?.guid ? items.find((item) => item.guid === target.guid) : undefined;
+  // 关闭时 `target` 先被清空：位置与菜单内容都按关闭前的那一份画到退场结束，否则菜单会先跳到左上角、
+  // 换成空白处的三项，再消失
+  const shown = useRetained(target);
+  const entry = shown?.guid ? items.find((item) => item.guid === shown.guid) : undefined;
   const gone = target !== null && target.guid !== null && entry === undefined;
   const locked = entry?.isLocked ?? false;
   const inactive = entry !== undefined && entry.guid !== activeGuid;
@@ -109,7 +117,7 @@ export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMe
           if (document.activeElement === document.body) target?.returnFocus?.focus();
         }}
         positioning={{
-          target: pointAt(target?.x ?? 0, target?.y ?? 0),
+          target: pointAt(shown?.x ?? 0, shown?.y ?? 0),
           position: 'below',
           align: 'start',
         }}
@@ -175,12 +183,17 @@ export function PlaylistMenu({ target, onClose, onRename, onCreate }: PlaylistMe
                   {t('playlist.save')}
                 </MenuItem>
                 {entry.isAutoplaylist && (
-                  <MenuItem
-                    icon={<List20Regular />}
-                    onClick={run(() => actions.convertToPlain(entry.guid))}
-                  >
-                    {t('playlist.convertToPlain')}
-                  </MenuItem>
+                  <>
+                    <MenuItem icon={<Edit20Regular />} onClick={run(() => edit.open(entry.guid))}>
+                      {t('playlistPage.editAutoplaylist')}
+                    </MenuItem>
+                    <MenuItem
+                      icon={<List20Regular />}
+                      onClick={run(() => actions.convertToPlain(entry.guid))}
+                    >
+                      {t('playlist.convertToPlain')}
+                    </MenuItem>
+                  </>
                 )}
               </>
             ) : (

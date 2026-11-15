@@ -5,6 +5,7 @@ import type { LocalLyricsService, LyricsTrack } from './lyricsLocal.ts';
 import { LYRICS_PRIORITY, type LyricsPrefs, type LyricsPrefsService } from './lyricsPrefs.ts';
 import { isWordLevel } from './lyricsText.ts';
 import type { LyricsCoverAccess } from './lyricsCandidateCovers.ts';
+import type { LyricsCacheService } from './lyricsCache.ts';
 import { lyricsVersion, type LyricsArchive, type LyricsReady } from './lyricsArchive.ts';
 import {
   startLyricsSearchSession,
@@ -43,6 +44,8 @@ export interface LyricsDeps {
   readonly local: Pick<LocalLyricsService, 'state' | 'refresh'>;
   readonly prefs: Pick<LyricsPrefsService, 'pref'>;
   readonly archive?: LyricsArchive;
+  /** 自动取词先问缓存、取到再写回；没有时每次都联网 */
+  readonly cache?: Pick<LyricsCacheService, 'lookup' | 'store'>;
 }
 
 export interface LyricsService {
@@ -84,6 +87,8 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
   let manualInput = '';
   let previewInput = '';
   let selection = 0;
+  /** 「重新读取」点在哪一首上：那一首的下一次取词绕过缓存 */
+  let fresh: string | null = null;
   const subject = atom((get) => lyricsTargetId(get(deps.track)));
   const offset = atom((get) => {
     const ready = get(state);
@@ -103,17 +108,28 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
     prefs: LyricsPrefs,
     localFailed: boolean,
     controller: AbortController,
+    identity: string,
   ): Promise<void> {
     let result: FoundLyrics | 'missing' | 'failed' | null;
+    const bypass = fresh === identity;
+    if (bypass) fresh = null;
     try {
-      const { createLyricsOnline } = await import('./online/lyricsOnline.ts');
+      const cached = bypass ? undefined : await deps.cache?.lookup(query, prefs);
       if (controller.signal.aborted) return;
-      search ??= createLyricsOnline(deps.host, await session.sources());
-      result = await search(query, prefs, controller.signal);
+      if (cached) result = cached;
+      else {
+        const { createLyricsOnline } = await import('./online/lyricsOnline.ts');
+        if (controller.signal.aborted) return;
+        search ??= createLyricsOnline(deps.host, await session.sources());
+        result = await search(query, prefs, controller.signal);
+        if (result && result !== 'failed') deps.cache?.store(query, prefs, result);
+      }
     } catch {
       result = 'failed';
     }
     if (disposed || controller.signal.aborted || request !== controller) return;
+    // 取到的歌词同时登记给手动搜索，搜索列表里这一条不再重取正文
+    if (result && typeof result === 'object') session.seed(result, identity);
     request = null;
     outcome =
       result && typeof result === 'object'
@@ -135,6 +151,7 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
       manualInput = identity;
       previewInput = '';
       chosen = null;
+      fresh = null;
       selection += 1;
     }
     if (!target || !store.get(deps.connected)) {
@@ -230,7 +247,7 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
     if (request) return;
     request = new AbortController();
     store.set(state, { status: 'loading', key: target.key, stage: 'online' });
-    void load(target, query, prefs, local.status === 'failed', request);
+    void load(target, query, prefs, local.status === 'failed', request, identity);
   }
 
   const offs = [
@@ -301,6 +318,8 @@ export function startLyrics(store: Store, deps: LyricsDeps): LyricsService {
     refresh() {
       if (disposed) return;
       chosen = null;
+      const target = store.get(deps.track);
+      fresh = target ? lyricsTargetId(target) : null;
       session.cancelSearch();
       cancel();
       input = '';

@@ -1,5 +1,5 @@
 /** 背景渲染器标识符列表；作为持久化契约不变更已发布键名 */
-export const BACKDROP_RENDERER_IDS = ['titanium', 'mesh', 'isolation'] as const;
+export const BACKDROP_RENDERER_IDS = ['titanium', 'mesh', 'isolation', 'flow'] as const;
 export type BackdropRendererId = (typeof BACKDROP_RENDERER_IDS)[number];
 
 /** 背景效果选项；支持选择具体渲染器或 off 纯底色模式，跨预设共享 */

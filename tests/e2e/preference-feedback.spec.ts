@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openSettings, enterSettings } from '../fixtures/settingsPage.ts';
+import { LASTFM_SOURCE_CONFIG } from '../fixtures/biographySource.ts';
 import { installPageHost } from '../fixtures/pageHost.ts';
 import { libraryAnswers, SAMPLE_ALBUMS } from '../fixtures/albumLibrary.ts';
 import { HOST_VERSION, hostFailure } from '../fixtures/hostAnswers.ts';
@@ -50,7 +51,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     const key = 'default-theme.color-mode.v1';
     await failBrowserWrites(page, key);
-    const settings = await openSettings(page);
+    const settings = await openSettings(page, {}, '外观');
     const chosen = scheme === 'light' ? '深色' : '浅色';
     await settings.choose('颜色模式', chosen);
     const card = settings.card('颜色模式');
@@ -59,7 +60,10 @@ for (const scheme of ['light', 'dark'] as const) {
       settings.radios('颜色模式').getByRole('radio', { name: chosen, exact: true }),
     ).toBeChecked();
     expect(await trustedValue(page, key)).toBeNull();
+    // 另一项偏好（「音量刻度」，位于「播放」）同样无法保存；回到「外观」后，颜色模式的提示仍保留
+    await settings.show('播放');
     await settings.choose('音量刻度', '按分贝（同 foobar2000）');
+    await settings.show('外观');
     await expect(card).toContainText('未能保存');
     await allowBrowserWrites(page);
     const retry = card.getByRole('button', { name: '重试保存' });
@@ -69,7 +73,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(retry).toBeFocused();
     expect(await trustedValue(page, key)).toBe(scheme === 'light' ? 'dark' : 'light');
     await page.reload();
-    await enterSettings(page);
+    await enterSettings(page, '外观');
     await expect(
       settings.radios('颜色模式').getByRole('radio', { name: chosen, exact: true }),
     ).toBeChecked();
@@ -146,9 +150,13 @@ test('宿主偏好保存失败汇总后重试，成功后原服务和页面一�
 
 test('设置页恢复提醒的保存失败就地显示，重试不再改提醒数量', async ({ page }) => {
   const key = 'defaultTheme.infoCenter.dismissed';
-  const settings = await openSettings(page, {
-    config: { [key]: { playcountMissing: HOST_VERSION } },
-  });
+  const settings = await openSettings(
+    page,
+    {
+      config: { [key]: { playcountMissing: HOST_VERSION } },
+    },
+    '常规',
+  );
   settings.host.answer('config.set', hostFailure('OPERATION_FAILED'));
   const card = settings.card('已关闭的提醒');
   await card.getByRole('button', { name: '恢复 已关闭的提醒' }).click();
@@ -165,7 +173,7 @@ test('设置页恢复提醒的保存失败就地显示，重试不再改提醒�
 
 test('存储初始化不可用时直接说明，修改仍生效但不显示无效的重试按钮', async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(navigator, 'locks', { value: undefined }));
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, {}, '外观');
   await page.locator('[data-info-center-trigger]').click();
   await expect(center(page)).toContainText('设置存储不可用');
   await expect(center(page)).toContainText('修改只在当前窗口生效');
@@ -181,7 +189,7 @@ test('存储初始化不可用时直接说明，修改仍生效但不显示无�
 test('Last.fm 设置卡收起后仍可重试保存，汇总不显示凭据，重试只保存', async ({ page }) => {
   const key = 'defaultTheme.online.lastfmKey';
   const chosen = '0123456789abcdef0123456789abcdef';
-  const settings = await openSettings(page);
+  const settings = await openSettings(page, { config: LASTFM_SOURCE_CONFIG }, '在线内容');
   await page.getByRole('switch', { name: '在线艺人简介', exact: true }).check();
   await expect
     .poll(() => settings.host.config.get('defaultTheme.online.biography'))

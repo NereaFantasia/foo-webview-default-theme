@@ -1,5 +1,5 @@
 import { useService } from '../../kit/useService.ts';
-import { lyricsDisplayKey, lyricsFontFamily } from '../../lyrics/lyricsDisplay.ts';
+import { immersiveFont, lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -53,6 +53,7 @@ export function LyricCard() {
   const t = useAtomValueRawSync(translateAtom);
   const displayService = useService(lyricsDisplayKey);
   const display = useAtomValueRawSync(displayService.display);
+  const { family, weight } = immersiveFont(display);
   const { state, source, lineCount } = useAtomValueRawSync(lyricLogAtom);
   const card = useAtomValueRawSync(lyricCardAtom);
   const synced = state === 'synced' ? card : null;
@@ -77,7 +78,8 @@ export function LyricCard() {
     card?.sub ?? null,
     lineCount,
     subSize,
-    display.fontFamily,
+    family,
+    weight,
   ]);
   const [fit, setFit] = useState<CardFit>(() => freshFit(key, CARD_MIN, subSize));
   if (fit.key !== key) setFit(freshFit(key, fit.width, subSize));
@@ -119,7 +121,7 @@ export function LyricCard() {
           <div
             ref={mainRef}
             className={`${styles.text} ${styles.main}`}
-            style={{ fontSize: `${fit.main}px`, fontFamily: lyricsFontFamily(display.fontFamily) }}
+            style={{ fontSize: `${fit.main}px`, ...lyricsFontStyle(family, weight) }}
             data-field="lyric-main"
           >
             {synced.main}
@@ -129,7 +131,7 @@ export function LyricCard() {
               ref={subRef}
               className={`${styles.text} ${styles.sub}`}
               data-kind={synced.subKind}
-              style={{ fontSize: `${fit.sub}px`, fontFamily: lyricsFontFamily(display.fontFamily) }}
+              style={{ fontSize: `${fit.sub}px`, ...lyricsFontStyle(family, weight) }}
               data-field="lyric-sub"
             >
               {synced.sub}

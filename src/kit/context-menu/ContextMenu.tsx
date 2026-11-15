@@ -17,6 +17,10 @@ export interface ContextMenuProps {
   readonly subtitle?: string;
   readonly items: readonly ContextMenuEntry[];
   readonly backLabel: string;
+  /** 不画菜单头：标题只作列表的无障碍名，适合没有操作对象的菜单 */
+  readonly headless?: boolean;
+  /** 菜单宽度上限，同时压低最小宽度 */
+  readonly widthLimit?: number;
   readonly surfaceMotion?: MenuProps['surfaceMotion'];
   readonly surfaceAttributes?: Readonly<Record<`data-${string}`, string | boolean>>;
   /** 执行前检查最新对象状态；不代替宿主的最终校验 */

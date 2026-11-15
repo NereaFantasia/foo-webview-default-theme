@@ -9,6 +9,7 @@ import {
   PLAYING_TRACK,
   switchPreference,
 } from '../fixtures/playerPage.ts';
+import { pressOn } from '../fixtures/pressOn.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
 const command = (label: string, commandId: number): MenuCommand => ({
@@ -138,6 +139,9 @@ test('扩展失败可重试，评分写完重开保持新值；播放栏换形�
   await expect(page.getByRole('menuitem', { name: '转换格式', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
+  // 菜单还开着，页面此刻不接指针：按它的键收起，再点一次重开
+  await pressOn(page, more);
+  await expect(menu).toHaveCount(0);
   await more.click();
   await menu.locator('[data-action="rating"]').click();
   await page.getByRole('menuitemradio', { name: '4 星', exact: true }).click();

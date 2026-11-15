@@ -12,7 +12,7 @@ import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom } from '../../i18n/plural.ts';
 import { CommandBar, type CommandBarTier } from '../../kit/CommandBar.tsx';
 import { FilterButton, type FilterSurfaceState } from '../../track/FilterSurface.tsx';
-import { QueryBox } from '../../track/QueryBox.tsx';
+import { QueryBox, type QueryBoxHandle } from '../../track/QueryBox.tsx';
 import { queryInputText } from '../../track/queryInput.ts';
 import { TrackSortMenu } from '../../track/TrackSortMenu.tsx';
 import { spanText } from '../../track/trackSpan.ts';
@@ -64,6 +64,7 @@ export function SongsHeader({
   const songs = useService(songsKey);
   const classes = useStyles();
   const input = useRef<HTMLInputElement>(null);
+  const queryBox = useRef<QueryBoxHandle>(null);
   const { rows, library, filter, query, view, run } = model;
   const numbers = new Intl.NumberFormat();
   const count = (n: number) =>
@@ -154,12 +155,14 @@ export function SongsHeader({
           box: (
             <QueryBox
               inputRef={input}
+              handle={queryBox}
               input={filter}
               scope={prefs.scope}
               invalid={rows.invalid && query.raw}
               menuOpen={queryOpen}
               placeholder={t('songs.filterShort')}
               label={t('songs.filter')}
+              playcountMissing={available === false}
               onChange={songs.filter.setQuery}
               onEnter={() => songs.rows.flush()}
               onScope={(scope) => songs.prefs.setScope(scope)}
@@ -185,13 +188,7 @@ export function SongsHeader({
       {rows.invalid && query.raw && (
         <div className={styles.invalid} role="status" data-songs-invalid>
           <span>{t('songs.queryInvalidDetail', { count: numbers.format(total) })}</span>
-          <Link
-            as="button"
-            onClick={() => {
-              input.current?.focus();
-              onQueryOpenChange(true);
-            }}
-          >
+          <Link as="button" onClick={() => queryBox.current?.openReference()}>
             {t('songs.queryHelp')}
           </Link>
         </div>

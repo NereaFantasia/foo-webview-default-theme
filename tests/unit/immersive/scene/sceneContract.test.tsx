@@ -28,8 +28,8 @@ function Good({ scene }: { scene: SceneView }) {
 const good: ContractPreset = { id: 'good', Template: Good };
 
 describe('结构契约的框架', () => {
-  it('场景状态遍历齐全：3 页 × 3 种侧栏方式 × 2 模式 × 3 种歌词 × 放不放得下', () => {
-    expect(allSceneViews()).toHaveLength(3 * 3 * 2 * 3 * 2);
+  it('场景状态遍历齐全：3 页 × 3 种侧栏方式 × 2 模式 × 3 种歌词 × 放不放得下 × 收起开关开关', () => {
+    expect(allSceneViews()).toHaveLength(3 * 3 * 2 * 3 * 2 * 2);
   });
 
   it('各状态下该有的元素', () => {

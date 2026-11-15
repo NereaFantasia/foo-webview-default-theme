@@ -3,7 +3,9 @@ import { fb } from 'foo-webview-sdk/bridge';
 import { settle } from '../host/hostCall.ts';
 import { trackPathOf } from '../host/libraryContract.ts';
 import { PLAY_LIMIT, replaceAndPlay, type LibraryViewFace } from '../playback/libraryView.ts';
+import { ALL_QUERY } from '../track/trackQuery.ts';
 import { TRACK_LIMIT } from './libraryTracks.ts';
+import type { LibraryMirrorSource } from './mirror/mirrorSource.ts';
 
 // 歌曲、流派与整库随机的起播和发送：按页面同一份查询与排序向宿主要路径，再整份交给列表。不走「转成自动列表再变
 // 回普通列表」：宿主转换后要过几百毫秒才把列表填满，立刻解除时列表还是空的
@@ -33,23 +35,41 @@ export type QueryPlayStart = { readonly row: number; readonly handle: string } |
 
 const PLAY_FIELDS = ['handle', 'path', 'subsong'];
 
-/** 按页面的查询与排序要回整份曲目，顺序与表格相同；读不到或有一首缺路径时为 null */
+/** 镜像能给次序的那一类请求（无过滤、排序列镜像认得）；给得出时与页面表格的次序同源 */
+export type QueryFillMirror = Pick<LibraryMirrorSource, 'order'>;
+
+/**
+ * 按页面的查询与排序要回整份曲目，顺序与表格相同；读不到或有一首缺路径时为 null。无过滤的整库请求先问镜像，
+ * 镜像读不到再问宿主
+ */
 async function queryTracks(
   host: QueryFillFace,
   fill: QueryFill,
+  mirror?: QueryFillMirror,
 ): Promise<readonly LibraryTrackPartial[] | null> {
-  const answer = await settle(() =>
-    host.library.query(fill.query, fill.sort, TRACK_LIMIT, PLAY_FIELDS),
-  );
-  if (!answer || answer.success === false) return null;
-  if (answer.tracks.some((track) => !track.path)) return null;
-  if (fill.arrange) {
-    const byHandle = new Map(answer.tracks.map((track) => [track.handle ?? '', track]));
-    const order = fill.arrange(answer.tracks.map((track) => track.handle ?? ''));
-    const arranged = order.flatMap((handle) => byHandle.get(handle) ?? []);
-    return arranged.length === answer.tracks.length ? arranged : answer.tracks;
+  const ordered = mirror && fill.query === ALL_QUERY ? await mirror.order(fill.sort, true) : null;
+  let tracks: readonly LibraryTrackPartial[];
+  if (ordered) {
+    tracks = ordered.handles.map((handle, at) => ({
+      handle,
+      path: ordered.paths[at] ?? '',
+      subsong: ordered.subsongs[at] ?? 0,
+    }));
+  } else {
+    const answer = await settle(() =>
+      host.library.query(fill.query, fill.sort, TRACK_LIMIT, PLAY_FIELDS),
+    );
+    if (!answer || answer.success === false) return null;
+    tracks = answer.tracks;
   }
-  return fill.descending ? [...answer.tracks].reverse() : answer.tracks;
+  if (tracks.some((track) => !track.path)) return null;
+  if (fill.arrange) {
+    const byHandle = new Map(tracks.map((track) => [track.handle ?? '', track]));
+    const order = fill.arrange(tracks.map((track) => track.handle ?? ''));
+    const arranged = order.flatMap((handle) => byHandle.get(handle) ?? []);
+    return arranged.length === tracks.length ? arranged : tracks;
+  }
+  return fill.descending ? [...tracks].reverse() : tracks;
 }
 
 const pathOf = (track: LibraryTrackPartial) =>
@@ -83,9 +103,10 @@ export async function playByQuery(
   fill: QueryFill,
   start: QueryPlayStart,
   current: () => boolean = () => true,
+  mirror?: QueryFillMirror,
 ): Promise<boolean> {
   if (!current()) return false;
-  const tracks = await queryTracks(host, fill);
+  const tracks = await queryTracks(host, fill, mirror);
   if (!tracks?.length || !current()) return false;
   if (start === 'shuffle') {
     return replaceAndPlay(host, shuffledSample(tracks).map(pathOf), 0, current);
@@ -105,9 +126,10 @@ export async function sendQueryToNew(
   name: string,
   fill: QueryFill,
   current: () => boolean = () => true,
+  mirror?: QueryFillMirror,
 ): Promise<boolean> {
   if (!current()) return false;
-  const tracks = await queryTracks(host, fill);
+  const tracks = await queryTracks(host, fill, mirror);
   if (!tracks?.length || !current()) return false;
   const created = await settle(() => host.playlist.create(name));
   if (!created || created.success === false) return false;
@@ -120,17 +142,18 @@ export async function sendQueryToNew(
 }
 
 /**
- * 按查询建一张自动播放列表并切为活动列表。自动列表只能按升序排，`descending` 不管；不锁定排序，用户可以自己重排
+ * 按查询建一张自动播放列表并切为活动列表。自动列表只能按升序排，`descending` 不管；`keepSorted` 缺省不锁定
+ * 排序，用户可以自己重排
  */
 export async function createQueryAutoplaylist(
   host: QueryFillFace,
   name: string,
-  fill: Pick<QueryFill, 'query' | 'sort'>,
+  fill: Pick<QueryFill, 'query' | 'sort'> & { readonly keepSorted?: boolean },
   current: () => boolean = () => true,
 ): Promise<boolean> {
   if (!current()) return false;
   const created = await settle(() =>
-    host.playlist.createAutoplaylist(name, fill.query, fill.sort, false),
+    host.playlist.createAutoplaylist(name, fill.query, fill.sort, fill.keepSorted ?? false),
   );
   if (!created || created.success === false) return false;
   if (!current()) {

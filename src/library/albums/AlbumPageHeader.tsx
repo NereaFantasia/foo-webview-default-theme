@@ -1,17 +1,9 @@
-import {
-  Button,
-  Input,
-  Title2,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-} from '@fluentui/react-components';
+import { Button, Title2, Tooltip, makeStyles } from '@fluentui/react-components';
 import {
   RecordRegular,
   ArrowShuffle20Regular,
   CheckmarkCircle16Regular,
   Play20Regular,
-  Search16Regular,
   TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
@@ -19,9 +11,12 @@ import { useRef, useState, type ReactNode } from 'react';
 import type { Translate } from '../../i18n/translate.ts';
 import { translateAtom } from '../../i18n/locale.ts';
 import { pluralAtom, type PluralPick } from '../../i18n/plural.ts';
-import { useCommand } from '../../nav/useCommand.ts';
 import { countRows } from '../../table/rangeSelection.ts';
 import { FilterButton, type FilterSurfaceState } from '../../track/FilterSurface.tsx';
+import { QueryBox, type QueryBoxHandle } from '../../track/QueryBox.tsx';
+import { QueryInvalidNotice } from '../../track/QueryInvalidNotice.tsx';
+import { queryInputText } from '../../track/queryInput.ts';
+import { playStatsAtom } from '../playStats.ts';
 import { albumBrowseAtom, type AlbumBrowseState } from './albumBrowse.ts';
 import styles from './AlbumPageHeader.module.css';
 import { AlbumViewPanel, SortMenu } from './AlbumPageTools.tsx';
@@ -48,7 +43,6 @@ import { Metadata, MetadataItem } from '../../kit/Metadata.tsx';
 
 const useStyles = makeStyles({
   title: { margin: 0, whiteSpace: 'nowrap' },
-  filter: { width: '100%', minWidth: 0 },
 });
 
 export interface AlbumPageHeaderProps {
@@ -120,18 +114,10 @@ export function AlbumPageHeader({ tier, surface }: AlbumPageHeaderProps) {
     : { tracks: null, selected: selectedAlbums };
   const classes = useStyles();
   const controls = useViewControlStyles();
-  const filter = useRef<HTMLInputElement>(null);
-  const { term } = browse;
+  const queryBox = useRef<QueryBoxHandle>(null);
+  const [queryOpen, setQueryOpen] = useState(false);
+  const { available } = useAtomValueRawSync(playStatsAtom);
   const playable = browse.phase !== 'loading' && browse.shown > 0;
-
-  // Esc 在筛选框里清空筛选词；框是空的就不认领，交给更低的层
-  useCommand({
-    id: 'album.filter.clear',
-    layer: 'input',
-    keys: [{ key: 'Escape' }],
-    enabled: () => term !== '' && document.activeElement === filter.current,
-    run: () => albums.browse.setTerm(''),
-  });
 
   const truncated = { truncated: list.truncated, count: list.albums.length };
   // 列表形态选中两首以上时，命令栏左半换成作用于这批曲目的选区操作；封面墙选的是专辑，沿用专辑菜单
@@ -167,17 +153,19 @@ export function AlbumPageHeader({ tier, surface }: AlbumPageHeaderProps) {
       }}
     />
   );
+  // 专辑页的普通搜索不分字段（专辑名等加曲目命中），所以不出范围
   const box = (
-    <Input
-      ref={filter}
-      className={mergeClasses(classes.filter, controls.field)}
-      role="searchbox"
-      contentBefore={<Search16Regular />}
+    <QueryBox
+      handle={queryBox}
+      input={browse.input}
+      scopes={false}
+      invalid={browse.invalid}
+      menuOpen={queryOpen}
       placeholder={t('album.filter')}
-      aria-label={t('album.filter')}
-      value={term}
-      onChange={(_, data) => albums.browse.setTerm(data.value)}
-      data-album-filter
+      label={t('album.filter')}
+      playcountMissing={available === false}
+      onChange={albums.browse.setInput}
+      onMenuOpenChange={setQueryOpen}
     />
   );
   return (
@@ -222,7 +210,7 @@ export function AlbumPageHeader({ tier, surface }: AlbumPageHeaderProps) {
       <CommandBar
         tier={tier}
         label={t('album.tools')}
-        search={{ box, active: term !== '' }}
+        search={{ box, active: queryInputText(browse.input) !== '' }}
         selection={selection || undefined}
         find={
           <FilterButton
@@ -238,6 +226,12 @@ export function AlbumPageHeader({ tier, surface }: AlbumPageHeaderProps) {
           </>
         }
       />
+      {browse.invalid && (
+        <QueryInvalidNotice
+          detail={t('album.queryInvalidDetail')}
+          onHelp={() => queryBox.current?.openReference()}
+        />
+      )}
       <TrackMenu at={moreAt} onClose={() => setMoreAt(null)} />
     </header>
   );

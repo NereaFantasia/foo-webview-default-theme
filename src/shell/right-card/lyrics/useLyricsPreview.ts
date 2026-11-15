@@ -17,8 +17,6 @@ export const LyricsPreviewContext = createContext<LyricsPreviewControls | null>(
 
 export function useLyricsPreview(enabled: boolean) {
   const root = useRef<HTMLElement>(null);
-  const toolbar = useRef<HTMLDivElement>(null);
-  const tabs = useRef<HTMLDivElement>(null);
   const { active, touch } = usePointerActivity(1500);
   // 滚动只让滚动条露出来，不唤出控件：纯文本歌词滚动时控件保持隐藏
   const { active: scrolling, touch: touchScroll } = usePointerActivity(1500);
@@ -31,27 +29,6 @@ export function useLyricsPreview(enabled: boolean) {
   useLayoutEffect(() => {
     if (enabled) touch();
   }, [enabled, touch]);
-
-  useLayoutEffect(() => {
-    const parent = root.current;
-    const top = toolbar.current;
-    const navigation = tabs.current;
-    if (!enabled || !parent || !navigation) return;
-    const measure = () => {
-      parent.style.setProperty(
-        '--lyrics-preview-top',
-        `${(top?.getBoundingClientRect().height ?? 0) + navigation.getBoundingClientRect().height}px`,
-      );
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (top) observer.observe(top);
-    observer.observe(navigation);
-    return () => {
-      observer.disconnect();
-      parent.style.removeProperty('--lyrics-preview-top');
-    };
-  }, [enabled]);
 
   useLayoutEffect(() => {
     if (visible) return;
@@ -105,8 +82,6 @@ export function useLyricsPreview(enabled: boolean) {
 
   return {
     root,
-    toolbar,
-    tabs,
     visible,
     scrollbarsVisible,
     pin,

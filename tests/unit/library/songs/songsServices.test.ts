@@ -24,7 +24,7 @@ function setup() {
     total: 1,
   }));
   const store = createStore();
-  const history = startNavHistory(store);
+  const history = startNavHistory(store, { id: 'albums' });
   const songs = startSongs(store, { history, record: () => {} }, host.fb);
   onTestFinished(() => songs.dispose());
   const queries = () => host.callsTo('library.query').map((call) => call['query']);
@@ -47,7 +47,12 @@ describe('歌曲页的装配', () => {
       advancedText: '',
       conditions: [],
       presets: new Set(),
-      facets: { genre: new Set(['Jazz', 'Hip-Hop']), decade: new Set(), artist: new Set() },
+      facets: {
+        genre: new Set(['Jazz', 'Hip-Hop']),
+        decade: new Set(),
+        artist: new Set(),
+        album: new Set(),
+      },
     });
     expect(store.get(songsFillAtom).query).toBe('(genre IS "Jazz" OR genre IS "Hip-Hop")');
     expect(store.get(historyAtom).place).toEqual({ id: 'songs' });

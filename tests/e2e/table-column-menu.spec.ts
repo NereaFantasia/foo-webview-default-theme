@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { collectPageErrors } from '../fixtures/pageHost.ts';
+import { pressOn } from '../fixtures/pressOn.ts';
 import {
   focusedColumn,
   gotoHarness,
@@ -11,7 +12,7 @@ import {
 } from '../fixtures/tableHarnessPage.ts';
 
 // 列头的勾选菜单：鼠标与键盘都能开、能勾，改了立刻落盘；关掉之后焦点回到哪里。菜单里只有列的勾选，排序与
-// 分组不在这里。
+// 分组不在这里
 
 let errors: string[] = [];
 
@@ -71,12 +72,16 @@ test('把焦点所在的那一列藏掉，关菜单后焦点回到表格', async
   await expect(grid(page)).toBeFocused();
 });
 
-test('菜单开着时点一行：菜单关掉，焦点留在表格上，键盘接着走', async ({ page }) => {
+test('菜单开着时点一行：只关菜单、那一行没选中；再点一行，焦点落在表格上，键盘接着走', async ({
+  page,
+}) => {
   await openTableHarness(page);
   await header(page, '专辑').click({ button: 'right' });
   await expect(page.getByRole('menu')).toBeVisible();
-  await row(page, 'Track 0003').click();
+  await pressOn(page, row(page, 'Track 0003'));
   await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(row(page, 'Track 0003')).toHaveAttribute('aria-selected', 'false');
+  await row(page, 'Track 0003').click();
   await expect(grid(page)).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(row(page, 'Track 0004')).toHaveAttribute('data-row-focus', 'true');

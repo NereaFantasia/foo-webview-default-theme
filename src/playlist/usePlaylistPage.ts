@@ -14,7 +14,7 @@ import type { GroupsPrefs } from './groups/playlistGroupsPrefs.ts';
 import type { PlaylistRowsState } from './playlistRowSource.ts';
 import { playlistsAtom } from '../playback/playlists.ts';
 import { buildPlaylistView, type PlaylistView } from './playlistView.ts';
-import { COLUMN_SORT, columnOfSortKey } from './sortPatterns.ts';
+import { COLUMN_SORT } from './sortPatterns.ts';
 import { useService } from '../kit/useService.ts';
 import { playlistRowsKey } from './playlistRows.ts';
 import { playlistPageKey } from './playlistPageServices.ts';
@@ -64,7 +64,8 @@ export interface PlaylistPageModel {
   readonly selection: RowSelection;
   readonly listMenu: ListMenu;
   readonly sort: TableSort | null;
-  onSort(column: ColumnId): void;
+  /** 单击列头：按这一列重排宿主列表。列表锁着（自动播放列表也算）时没有，列头不显示可排序 */
+  readonly onSort: ((column: ColumnId) => void) | undefined;
   /** 收起列头的排序记号：撤销、重做这类改了顺序、又不一定带来内容事件的命令之后调 */
   resetSort(): void;
   /** 表格画出来的显示位区间：换成行号交给行服务取页 */
@@ -160,9 +161,10 @@ export function usePlaylistPage(guid: string): PlaylistPageModel {
   const [mark, setMark] = useState<SortMark | null>(null);
   const sort =
     mark && rows.contentVersion <= mark.since + 1 && prefs.mode === mark.mode ? mark : null;
+  const locked = entry?.isLocked ?? true;
   const onSort = (column: ColumnId) => {
     const pattern = COLUMN_SORT[column];
-    if (!pattern || entry?.isLocked) return;
+    if (!pattern) return;
     const descending = sort?.column === column && !sort.descending;
     const since = rows.contentVersion;
     const { mode } = prefs;
@@ -194,20 +196,8 @@ export function usePlaylistPage(guid: string): PlaylistPageModel {
     groupsState: groups,
     groups: page.groups,
     tracks: page.tracks,
-    locked: entry?.isLocked ?? true,
-    onSorted: (pattern, descending) => {
-      const column = pattern ? columnOfSortKey(pattern) : null;
-      setMark(
-        column
-          ? {
-              column,
-              descending: descending ?? false,
-              since: rows.contentVersion,
-              mode: prefs.mode,
-            }
-          : null,
-      );
-    },
+    locked,
+    onReordered: () => setMark(null),
   });
   const grouped = view.shape === 'grouped' || view.shape === 'waiting';
   return {
@@ -223,7 +213,7 @@ export function usePlaylistPage(guid: string): PlaylistPageModel {
     selection,
     listMenu,
     sort,
-    onSort,
+    onSort: locked ? undefined : onSort,
     resetSort: () => setMark(null),
     onRange,
   };

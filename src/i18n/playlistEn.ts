@@ -1,5 +1,5 @@
 /**
- * 播放列表英文文案，供主英文包合入。
+ * 播放列表英文文案，供主英文包合入
  * `playlist.` 对应侧边栏列表项，`playlistPage.` 对应播放列表页面
  */
 export const playlistEn = {
@@ -39,22 +39,8 @@ export const playlistEn = {
   'playlistPage.matchCountOne': '{count} match',
   'playlistPage.filter': 'Search this playlist',
   'playlistPage.filterPlaceholder': 'Search tracks',
-  'playlistPage.listSort': 'Sort list',
+  'playlistPage.queryInvalidDetail': 'Invalid query. Still showing the previous results.',
   'playlistPage.play': 'Play',
-  'playlistPage.scope': 'Search in',
-  'playlistPage.scopeAll': 'All fields',
-  'playlistPage.scopeArtist': 'Artist',
-  'playlistPage.scopeTitle': 'Title',
-  'playlistPage.scopeAlbum': 'Album',
-  'playlistPage.scopeGenre': 'Genre',
-  'playlistPage.scopeDate': 'Date',
-  'playlistPage.scopeAlbumArtist': 'Album artist',
-  'playlistPage.scopeFilename': 'File name',
-  'playlistPage.scopeComment': 'Comment',
-  'playlistPage.clearFilter': 'Clear input',
-  'playlistPage.conditions': 'Filter conditions',
-  'playlistPage.conditionYear': 'Year',
-  'playlistPage.conditionRemove': 'Remove {condition}',
   'playlistPage.conditionsClear': 'Clear conditions',
   'playlistPage.filterBy': 'Filter',
   'playlistPage.filterArtist': 'Same artist',
@@ -79,6 +65,11 @@ export const playlistEn = {
   'playlistPage.commandFailed': 'The track action failed',
   'playlistPage.groupsUnavailable': 'Could not load groups. Showing tracks without grouping.',
   'playlistPage.groupsTooMany': 'Group limit exceeded. Showing tracks without grouping.',
+  'playlistPage.groupsLocked':
+    'This playlist cannot be sorted. Tracks are grouped in their current order.',
+  'playlistPage.groupsLockedAuto':
+    'This autoplaylist cannot be sorted. Tracks are grouped in their current order.',
+  'playlistPage.editAutoplaylist': 'Edit autoplaylist',
   'playlistPage.locateFailed': 'Could not find the playing track',
   'playlistPage.unknownGroup': 'Unknown',
   'playlistPage.remove': 'Remove from playlist',
@@ -87,19 +78,6 @@ export const playlistEn = {
   'playlistPage.ratingStars': '{count} stars',
   'playlistPage.ratingClear': 'Clear rating',
   'playlistPage.properties': 'Properties',
-  'playlistPage.sortAlbumArtist': 'Album artist',
-  'playlistPage.sortArtist': 'Artist',
-  'playlistPage.sortAlbum': 'Album',
-  'playlistPage.sortTrackNumber': 'Track number',
-  'playlistPage.sortTitle': 'Title',
-  'playlistPage.sortPath': 'Path',
-  'playlistPage.sortDate': 'Date',
-  'playlistPage.sortGenre': 'Genre',
-  'playlistPage.sortRating': 'Rating',
-  'playlistPage.sortBitrate': 'Bitrate',
-  'playlistPage.sortModified': 'Date modified',
-  'playlistPage.sortPlayCount': 'Play count',
-  'playlistPage.sortCodec': 'Codec',
   'playlistPage.groupAlbumSimple': 'Album',
   'playlistPage.groupAlbumArtistAlbumDisc': 'Album artist, album, disc',
   'playlistPage.groupAlbumArtist': 'Album artist',

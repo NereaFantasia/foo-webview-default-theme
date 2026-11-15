@@ -5,6 +5,7 @@ import {
   playByQuery,
   sendQueryToNew,
   type QueryFill,
+  type QueryFillMirror,
 } from '../../../src/library/libraryQueryFill.ts';
 import { TRACK_LIMIT } from '../../../src/library/libraryTracks.ts';
 import { LIBRARY_VIEW_PLAYLIST, PLAY_LIMIT } from '../../../src/playback/libraryView.ts';
@@ -31,7 +32,7 @@ const pathOf = (track: Song) =>
 
 /**
  * 专用列表在第 3 位；`library.query` 按 `songs` 的顺序答，`library.addToPlaylist` 把加进来的路径记成专用列表的
- * 内容，`getTracks` 照它答 handle。
+ * 内容，`getTracks` 照它答 handle
  */
 function hostWith(songs: readonly Song[] = ['a', 'b', 'c'].map((name) => song(name))) {
   const host = installFakeHost();
@@ -234,5 +235,52 @@ describe('按查询发送与建自动列表', () => {
       { name: '歌曲', query: FILL.query, sort: FILL.sort, keepSorted: false },
     ]);
     expect(host.callsTo('playlist.setActive')).toEqual([{ playlistGuid: '{5}' }]);
+  });
+});
+
+describe('无过滤的整库请求读镜像', () => {
+  const ALL_FILL: QueryFill = { query: 'ALL', sort: '%title%', descending: false };
+  const mirrorOf = (songs: readonly Song[] | null) => ({
+    order: vi.fn<QueryFillMirror['order']>(() =>
+      Promise.resolve(
+        songs && {
+          handles: songs.map((track) => track.handle),
+          paths: songs.map((track) => track.path),
+          subsongs: songs.map((track) => track.subsong),
+        },
+      ),
+    ),
+  });
+
+  it('次序和路径来自镜像，不问宿主 query；降序整份反过来', async () => {
+    const songs = [song('x'), song('y', 1), song('z')];
+    const { host, content } = hostWith(songs);
+    const mirror = mirrorOf(songs);
+    const start = { row: 0, handle: 'E:\\z' };
+    expect(
+      await playByQuery(host.fb, { ...ALL_FILL, descending: true }, start, () => true, mirror),
+    ).toBe(true);
+    expect(mirror.order).toHaveBeenCalledWith('%title%', true);
+    expect(host.callsTo('library.query')).toEqual([]);
+    expect(content()).toEqual(['file://E:/z', 'file://E:/y|subsong:1', 'file://E:/x']);
+  });
+
+  it('发送到新列表同样用镜像的次序', async () => {
+    const { host, content } = hostWith();
+    const mirror = mirrorOf([song('p'), song('q')]);
+    expect(await sendQueryToNew(host.fb, '新列表', ALL_FILL, () => true, mirror)).toBe(true);
+    expect(host.callsTo('library.query')).toEqual([]);
+    expect(content()).toEqual(['file://E:/p', 'file://E:/q']);
+  });
+
+  it('镜像读不到就问宿主；带条件的请求不问镜像', async () => {
+    const { host } = hostWith();
+    const mirror = mirrorOf(null);
+    expect(
+      await playByQuery(host.fb, ALL_FILL, { row: 0, handle: 'E:\\a' }, () => true, mirror),
+    ).toBe(true);
+    expect(host.callsTo('library.query')).toHaveLength(1);
+    await playByQuery(host.fb, FILL, { row: 0, handle: 'E:\\a' }, () => true, mirror);
+    expect(mirror.order).toHaveBeenCalledTimes(1);
   });
 });

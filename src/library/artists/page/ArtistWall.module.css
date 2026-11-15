@@ -1,0 +1,17 @@
+/* 墙的页头：标题与艺人总数同一行，与网格左缘对齐 */
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacingVerticalXXS) var(--spacingHorizontalMNudge);
+  min-width: 0;
+}
+.heading h1 {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  color: var(--colorNeutralForeground3);
+}

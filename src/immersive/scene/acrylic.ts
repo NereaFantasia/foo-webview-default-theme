@@ -1,17 +1,10 @@
 import { makeStyles, tokens } from '@fluentui/react-components';
-import {
-  CAPSULE_BLUR,
-  CAPSULE_FILTER,
-  CAPSULE_GRAIN,
-  capsuleTint,
-} from '../../theme/capsuleMaterial.ts';
+import { CAPSULE_FILTER, CAPSULE_GRAIN, capsuleTint } from '../../theme/capsuleMaterial.ts';
 import { useSceneFrame } from './sceneContext.ts';
 
 // 浮于内容上层的半透明条栏与面板复用胶囊材质规范（theme/capsuleMaterial.ts），对齐模糊、饱和度、着色与颗粒度；
 // 面板内容含文本与候选卡，着色浓度提升至 60%；性能降级或减弱透明度时回退至 94% 不透明度纯色且不叠加噪点
 export const ACRYLIC_FILTER = CAPSULE_FILTER;
-/** 纯高斯模糊滤镜（供侧栏列等无需色调调节的区域使用） */
-export const ACRYLIC_BLUR = CAPSULE_BLUR;
 export const ACRYLIC_PANEL_TINT = capsuleTint(tokens.colorNeutralBackground1, 60);
 export const ACRYLIC_SOLID_FILL = capsuleTint(tokens.colorNeutralBackground1, 94);
 /** 条栏与控制按键着色基准（中性底色 45% 不透明度） */

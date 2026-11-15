@@ -73,7 +73,7 @@
   border: var(--strokeWidthThin) solid var(--line);
   border-bottom-width: var(--strokeWidthThick);
   border-radius: var(--radius-control);
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-view-control);
   color: var(--text-secondary);
   font-family: var(--fontFamilyBase);
   font-size: var(--fontSizeBase200);
@@ -107,7 +107,7 @@
   border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
   border-bottom-color: var(--accent);
   border-radius: var(--radius-control);
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-view-control);
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--fontSizeBase200);

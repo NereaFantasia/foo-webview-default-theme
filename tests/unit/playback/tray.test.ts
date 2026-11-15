@@ -10,9 +10,11 @@ import {
   trayAtom,
   type TrayDeps,
 } from '../../../src/playback/tray.ts';
+import { accentRampAtom } from '../../../src/theme/accentState.ts';
+import { chooseBaseAccent, chooseCustomAccent } from '../../../src/theme/baseAccent.ts';
 import { watchColorScheme } from '../../../src/theme/colorScheme.ts';
 import { startBackdrop } from '../../../src/theme/backdrop.ts';
-import { themeFor } from '../../../src/theme/themes.ts';
+import { themeFor, themeWithRamp } from '../../../src/theme/themes.ts';
 import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
 import { fakeMedia } from '../../fixtures/fakeMedia.ts';
 import { hostFailure, isRecord } from '../../fixtures/hostAnswers.ts';
@@ -28,7 +30,7 @@ const DARK = '(prefers-color-scheme: dark)';
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const TRAY_METHODS = ['tray.create', 'tray.setMenuZones', 'tray.setTooltip', 'tray.destroy'];
 
-/** 同时起播放服务与托盘，不等就绪：扣留宿主应答的测试要在中途插手。 */
+/** 同时起播放服务与托盘，不等就绪：扣留宿主应答的测试要在中途插手 */
 function launch(host: UnitHost, client?: Parameters<typeof startOnlineTracks>[1]) {
   const store = createStore();
   const media = fakeMedia({ [DARK]: false });
@@ -54,7 +56,7 @@ async function start(host: UnitHost) {
   return launched;
 }
 
-/** 一次 `setMenuZones` 下发的三区各有哪些项的 id。 */
+/** 一次 `setMenuZones` 下发的三区各有哪些项的 id */
 function zonesOf(params: Record<string, unknown> | undefined): Record<string, string[]> {
   const idsOf = (items: unknown) =>
     Array.isArray(items) ? items.map((item) => String(isRecord(item) ? item['id'] : '')) : [];
@@ -135,6 +137,24 @@ describe('startTray', () => {
     expect(menus[1]?.['config']).toMatchObject({ backdropDarkMode: true });
   });
 
+  it('强调色变了整份重发：菜单里的品牌色（播放键、音量条）跟着主窗口，不停在青绿', async () => {
+    const host = installFakeHost();
+    const { store } = await start(host);
+    const teal = themeFor('light').colorBrandBackground;
+    expect(host.callsTo('tray.setMenuZones').at(-1)?.['config']).toMatchObject({
+      css: expect.stringContaining(teal),
+    });
+    vi.useFakeTimers();
+    chooseBaseAccent(store, 'custom', null);
+    chooseCustomAccent(store, '#c2185b', null);
+    await vi.advanceTimersByTimeAsync(MENU_COALESCE_MS);
+    const custom = themeWithRamp('light', store.get(accentRampAtom)).colorBrandBackground;
+    expect(custom).not.toBe(teal);
+    const menus = host.callsTo('tray.setMenuZones');
+    expect(menus).toHaveLength(2);
+    expect(menus[1]?.['config']).toMatchObject({ css: expect.stringContaining(custom) });
+  });
+
   it('上一次下发还没回来也照发，宿主留后一次；前一次的失败不记，最近一次的才记', async () => {
     vi.useFakeTimers();
     const host = installFakeHost();
@@ -147,7 +167,7 @@ describe('startTray', () => {
     await vi.advanceTimersByTimeAsync(MENU_COALESCE_MS);
     expect(menus.pending).toHaveLength(2);
     expect(menus.pending[1]?.['config']).toMatchObject({ backdropDarkMode: true });
-    // 宿主按先后作答：前一次的失败先到，那时后一次已经发出。
+    // 宿主按先后作答：前一次的失败先到，那时后一次已经发出
     menus.respond(0, hostFailure('OPERATION_FAILED'));
     menus.respond(0);
     await ready;
@@ -254,7 +274,7 @@ describe('startTray', () => {
 
   it('换了音量刻度：菜单按新刻度重发音量条的位置，之后的拖动也按新刻度换 dB', async () => {
     const host = installFakeHost();
-    // 满音量在两种刻度下都在最右端，换一个两种刻度下位置不同的音量。
+    // 满音量在两种刻度下都在最右端，换一个两种刻度下位置不同的音量
     host.answer('playback.getVolume', {
       success: true,
       volume: 10,
@@ -306,7 +326,7 @@ describe('startTray', () => {
       { button: 0, x: 10, y: 20 },
     ];
 
-    // 页面挂起期间的点击，在原生恢复窗口、页面重新可见之后才送达。
+    // 页面挂起期间的点击，在原生恢复窗口、页面重新可见之后才送达
     page.visibilityState = 'visible';
     for (const click of pendingClicks) host.emit('tray:click', click);
     await settle();

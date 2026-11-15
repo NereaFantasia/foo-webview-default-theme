@@ -1,20 +1,20 @@
 import { MUSIC_QUALITIES, type MusicTrack } from '../../server/musicObjects.ts';
 import {
-  artistNames,
-  bestQuality,
   ONLINE_TRACK_LAYOUTS,
   type OnlineColumn,
   type OnlineTrackLayout,
   type OnlineTrackSort,
-} from '../search/online/OnlineItems.tsx';
+} from '../search/online/onlineColumns.ts';
+import { artistNames, bestQuality } from '../search/online/OnlineItems.tsx';
 
-export type OnlineSortField = Exclude<OnlineColumn, 'cover' | 'menu'>;
+export type OnlineSortField = Exclude<OnlineColumn, 'cover' | 'menu' | 'favorite'>;
 
 /** 工具行里可选的排序字段，跟着这一种表的列走；第一项 `number` 是列表本来的顺序 */
 export function onlineSortFields(layout: OnlineTrackLayout): readonly OnlineSortField[] {
   const columns: readonly OnlineColumn[] = ONLINE_TRACK_LAYOUTS[layout];
   return columns.filter(
-    (column): column is OnlineSortField => column !== 'cover' && column !== 'menu',
+    (column): column is OnlineSortField =>
+      column !== 'cover' && column !== 'menu' && column !== 'favorite',
   );
 }
 
@@ -80,4 +80,14 @@ export function onlineListRows(
   };
   const sign = sort.descending ? -1 : 1;
   return [...shown].sort((a, b) => sign * compare(a, b) || at(a) - at(b));
+}
+
+/** 打乱顺序的副本，随机播放用 */
+export function shuffled<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index--) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[other]] = [copy[other] as T, copy[index] as T];
+  }
+  return copy;
 }

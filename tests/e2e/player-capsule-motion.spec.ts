@@ -181,7 +181,7 @@ for (const scheme of ['light', 'dark'] as const) {
       }
     });
     const player = await openPlayer(page);
-    await enterSettings(page);
+    await enterSettings(page, '外观');
     const expand = async (title: string) => {
       const toggle = page.getByRole('button', { name: title, exact: true });
       if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();

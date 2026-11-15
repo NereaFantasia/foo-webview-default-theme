@@ -1,5 +1,6 @@
 import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { entries, resetEventLog } from '../../../src/diagnostics/eventLog.ts';
 import type { BackendStatus } from '../../../src/update/backendBootstrap.ts';
 import { ROOT_URL, sha256 } from '../../../src/update/contract.ts';
 import { confirmedStartupAtom } from '../../../src/update/loaderConfirmation.ts';
@@ -450,5 +451,122 @@ describe('插件更新发起方', () => {
       path: `${env.prepared.directory}\\recover.cmd`,
     });
     expect(env.host.callsTo('misc.exit')).toEqual([]);
+  });
+
+  it('准备之后安装出错，复查后仍可更新并带着失败原因，再次安装时清除', async () => {
+    const env = await setup();
+    resetEventLog();
+    const request = env.request.getMockImplementation()!;
+    env.request.mockImplementation((path, body) =>
+      path === '/plugin/authorize'
+        ? Promise.reject(new Error('执行器已结束'))
+        : request(path, body),
+    );
+    await env.service.install(env.candidate.sha256);
+    expect(env.status()).toMatchObject({ phase: 'failed', detail: '执行器已结束' });
+    await env.service.check();
+    const failed = {
+      phase: 'available',
+      version: '2.1.0',
+      sha256: env.candidate.sha256,
+      failure: '执行器已结束',
+    };
+    await vi.waitFor(() => expect(env.status()).toEqual(failed));
+    expect(entries()).toEqual([
+      expect.objectContaining({
+        level: 'error',
+        tag: 'update',
+        event: 'plugin.failed',
+        fields: { detail: '执行器已结束' },
+      }),
+    ]);
+    env.request.mockImplementation(request);
+    await env.service.install(env.candidate.sha256);
+    expect(env.status()).toEqual({ phase: 'restarting', version: '2.1.0' });
+    await env.service.check();
+    await vi.waitFor(() =>
+      expect(env.status()).toEqual({
+        phase: 'available',
+        version: '2.1.0',
+        sha256: env.candidate.sha256,
+      }),
+    );
+  });
+
+  it('事务被取消并留下原因时，仍有候选也显示原因，日志只记一次且已脱敏', async () => {
+    const env = await setup();
+    resetEventLog();
+    env.setTransaction({
+      ...env.prepared,
+      phase: 'cancelled',
+      error: 'EPERM: operation not permitted, rename C:\\player\\components\\a.dll',
+    });
+    for (let round = 0; round < 2; round += 1) {
+      await env.service.check();
+      await vi.waitFor(() =>
+        expect(env.status()).toMatchObject({
+          phase: 'available',
+          failure: expect.stringContaining('EPERM'),
+        }),
+      );
+    }
+    expect(entries()).toEqual([
+      {
+        t: expect.any(Number),
+        level: 'warn',
+        tag: 'update',
+        event: 'plugin.cancelled',
+        fields: { version: '2.1.0', error: 'EPERM: operation not permitted, rename <path>' },
+      },
+    ]);
+  });
+
+  it('没有原因的取消不显示失败，回滚记为 error 级日志', async () => {
+    const env = await setup();
+    resetEventLog();
+    env.setTransaction({ ...env.prepared, phase: 'cancelled', error: null });
+    await env.service.check();
+    await vi.waitFor(() =>
+      expect(env.status()).toEqual({
+        phase: 'available',
+        version: '2.1.0',
+        sha256: env.candidate.sha256,
+      }),
+    );
+    expect(entries()).toEqual([]);
+    env.setTransaction({ ...env.prepared, phase: 'rolledBack', error: '启动确认超时' });
+    await env.service.check();
+    await vi.waitFor(() => expect(entries()).toHaveLength(1));
+    expect(entries()[0]).toMatchObject({ level: 'error', event: 'plugin.rolledBack' });
+  });
+
+  it('退出请求成功后宿主迟迟没有退出，复查能读到执行器的取消原因', async () => {
+    const env = await setup();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    await env.service.install(env.candidate.sha256);
+    expect(env.status()).toEqual({ phase: 'restarting', version: '2.1.0' });
+    env.setTransaction({ ...env.prepared, phase: 'waitingExit', running: true });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.waitFor(() =>
+      expect(env.status()).toMatchObject({
+        phase: 'transaction',
+        transaction: { phase: 'waitingExit' },
+      }),
+    );
+    env.setTransaction({
+      ...env.prepared,
+      phase: 'cancelled',
+      error: '原宿主身份无法确认，未强制结束',
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.waitFor(() =>
+      expect(env.status()).toMatchObject({
+        phase: 'available',
+        failure: '原宿主身份无法确认，未强制结束',
+      }),
+    );
   });
 });

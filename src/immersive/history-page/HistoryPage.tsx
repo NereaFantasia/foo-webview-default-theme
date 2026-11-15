@@ -16,8 +16,9 @@ import { useStableCallback } from '../../kit/useStableCallback.ts';
 import { QueueMenu, type QueueMenuTarget } from '../../playback/queue/QueueMenu.tsx';
 import { pathOf } from '../../playback/queue/queueMenu.ts';
 import { QueueRowHeightContext } from '../../playback/queue/queueRowHeight.ts';
-import { QueueRow, type RowPoint } from '../../playback/queue/QueueRow.tsx';
+import { QueueRow, type QueueRowProps, type RowPoint } from '../../playback/queue/QueueRow.tsx';
 import { queueKey } from '../../playback/queue/queueServices.ts';
+import { rowOffset } from '../../playback/queue/rowOffset.ts';
 import { queueReviewAtom } from '../../playback/queue/review/queueReview.ts';
 import {
   reviewRowAt,
@@ -26,8 +27,10 @@ import {
 } from '../../playback/queue/review/queueReviewModel.ts';
 import { useQueueReviewKeys } from '../../playback/queue/review/useQueueReviewKeys.ts';
 import { useQueueVirtualRows } from '../../playback/queue/useQueueVirtualRows.ts';
-import { ChipGroup, ChipKey } from '../scene/ColumnChips.tsx';
-import { SideColumn } from '../scene/SideColumn.tsx';
+import { CARD_VARIABLES } from '../scene/cardVariables.ts';
+import { CardColumn } from '../scene/CardColumn.tsx';
+import { ChipKey } from '../scene/ColumnChips.tsx';
+import { FloatingBar, FloatingPiece } from '../scene/FloatingBar.tsx';
 import styles from './HistoryPage.module.css';
 
 /** 历史行高规格（CSS 像素），与队列页对齐 */
@@ -35,6 +38,13 @@ export const HISTORY_ROW_HEIGHT = 56;
 
 /** 触底吸附判定阈值（像素）；满足时新记录到达自动跟随滚动 */
 const AT_BOTTOM_PX = 2;
+
+/** 整页是一组：最早一条与最近一条的外缘用大圆角（行卡两头大、中段小的规则） */
+function edgeOf(index: number, total: number): QueueRowProps['edge'] {
+  if (total === 1) return 'only';
+  if (index === 0) return 'start';
+  return index === total - 1 ? 'end' : undefined;
+}
 
 interface HistoryPageProps {
   /** 容器顶部偏移量与有效高度，与封面列对齐 */
@@ -46,7 +56,8 @@ interface HistoryPageProps {
  * 沉浸模式播放历史页
  *
  * 采用正序排列且默认贴底呈现最近已播曲目，仅渲染视口虚拟行，支持触底自动追加跟随与回溯滚动固定；
- * 顶部提供回位快捷键，行内支持重播、悬停评级与上下文菜单，配合键盘导航与顶部渐隐遮罩
+ * 行画成与队列页同样的卡（`scene/cardVariables.ts`），上下两端逐张淡出，用浏览器原生滚动；
+ * 回位快捷键是悬浮在列底的一块工具条，行内支持重播、悬停评级与上下文菜单，配合键盘导航
  */
 export function HistoryPage({ top, height }: HistoryPageProps) {
   const view = useAtomValueRawSync(queueReviewAtom);
@@ -62,7 +73,8 @@ function HistoryList({ view, top, height }: HistoryPageProps & { readonly view: 
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const services = useService(queueKey);
   const scroll = useRef<HTMLDivElement>(null);
-  const viewport = useQueueVirtualRows(scroll, view.total, scroll);
+  // 原生滚动：行卡带阴影，粘性视口的 `overflow: hidden` 会把阴影裁掉，行带的平移也会让文字在非整数缩放下发糊
+  const viewport = useQueueVirtualRows(scroll, view.total, scroll, { sticky: false });
   const [selected, setSelected] = useState<string | null>(null);
   const [menu, setMenu] = useState<QueueMenuTarget | null>(null);
   useStickToBottom(scroll, view.total, viewport.virtualizer);
@@ -107,6 +119,7 @@ function HistoryList({ view, top, height }: HistoryPageProps & { readonly view: 
   // 焦点漫游管理：Tab 键仅能聚焦选中行，无选中时默认落入首个可见行
   const tabKey = rows.find((row) => row && row.key === selected)?.key ?? rows.find(Boolean)?.key;
   const variables: CSSProperties & Record<`--${string}`, string> = {
+    ...CARD_VARIABLES,
     '--queue-number-width': `${Math.max(2, String(view.total).length)}ch`,
     '--queue-row-height': `${HISTORY_ROW_HEIGHT}px`,
   };
@@ -116,70 +129,69 @@ function HistoryList({ view, top, height }: HistoryPageProps & { readonly view: 
       behavior: reduced ? 'auto' : 'smooth',
     });
   return (
-    <SideColumn
+    <CardColumn
       element="history"
       top={top}
       height={height}
-      head={
-        <ChipGroup>
-          <ChipKey
-            icon={<Target20Regular />}
-            label={t('queue.review.locateLatest')}
-            disabled={view.total === 0}
-            onClick={locate}
-          />
-        </ChipGroup>
-      }
-      headLabel={t('queue.review.title')}
+      fade={HISTORY_ROW_HEIGHT}
       scrollerRef={scroll}
-      fadeEnd={false}
-      style={variables}
+      toolbar={
+        <FloatingBar label={t('queue.review.title')}>
+          <FloatingPiece position="only">
+            <ChipKey
+              icon={<Target20Regular />}
+              label={t('queue.review.locateLatest')}
+              disabled={view.total === 0}
+              onClick={locate}
+            />
+          </FloatingPiece>
+        </FloatingBar>
+      }
     >
-      <div
-        ref={viewport.element}
-        className={styles.list}
-        role="listbox"
-        aria-label={t('queue.review.title')}
-        style={{ height: viewport.height }}
-      >
-        <div ref={viewport.viewport} className={styles.viewport}>
-          <div ref={viewport.strip} className={styles.strip}>
-            {viewport.visible.map((slot, at) => {
-              const row = rows[at];
-              if (!row) return null;
-              return (
-                <div
-                  key={row.key}
-                  className={styles.row}
-                  data-queue-review-index={slot.index}
-                  style={{ transform: `translateY(${slot.start - viewport.margin}px)` }}
-                >
-                  <QueueRow
-                    kind="review"
-                    rowKey={row.key}
-                    number={slot.index + 1}
-                    track={row.track}
-                    selected={selected === row.key}
-                    current={tabKey === row.key}
-                    lifted={false}
-                    onPlay={rowPlay}
-                    onMenu={rowMenu}
-                    onFocus={rowFocus}
-                    onPointerDown={rowPointerDown}
-                  />
-                </div>
-              );
-            })}
-          </div>
+      <div className={styles.page} style={variables} data-queue-cards="">
+        <div
+          ref={viewport.element}
+          className={styles.list}
+          role="listbox"
+          aria-label={t('queue.review.title')}
+          style={{ height: viewport.height }}
+        >
+          {viewport.visible.map((slot, at) => {
+            const row = rows[at];
+            if (!row) return null;
+            return (
+              <div
+                key={row.key}
+                className={styles.row}
+                data-queue-review-index={slot.index}
+                style={rowOffset(slot.start - viewport.margin)}
+              >
+                <QueueRow
+                  kind="review"
+                  rowKey={row.key}
+                  number={slot.index + 1}
+                  track={row.track}
+                  selected={selected === row.key}
+                  current={tabKey === row.key}
+                  lifted={false}
+                  edge={edgeOf(slot.index, view.total)}
+                  onPlay={rowPlay}
+                  onMenu={rowMenu}
+                  onFocus={rowFocus}
+                  onPointerDown={rowPointerDown}
+                />
+              </div>
+            );
+          })}
         </div>
+        <QueueMenu
+          target={menu}
+          isCurrent={() => view.rows.some((row) => row.key === menu?.anchor.key)}
+          perform={(command) => void command()}
+          onClose={() => setMenu(null)}
+        />
       </div>
-      <QueueMenu
-        target={menu}
-        isCurrent={() => view.rows.some((row) => row.key === menu?.anchor.key)}
-        perform={(command) => void command()}
-        onClose={() => setMenu(null)}
-      />
-    </SideColumn>
+    </CardColumn>
   );
 }
 

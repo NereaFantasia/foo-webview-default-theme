@@ -6,6 +6,7 @@ import { trackKeyOf } from './playback/playbackContract.ts';
 import { playingAudibleAtom, playingTrackKeyAtom } from './playback/playingTrack.ts';
 import { TableContext } from './table/tableContext.ts';
 import { AppToasts } from './shell/AppToasts.tsx';
+import { EditContextMenu } from './kit/edit-menu/EditContextMenu.tsx';
 import type { AppServices } from './app/services.ts';
 import { MainWindow } from './shell/MainWindow.tsx';
 import { ShellSlotsContext } from './shell/shellSlots.ts';
@@ -18,7 +19,9 @@ import { VideoRoot } from './app/VideoRoot.tsx';
 import { TrackInfoRoot } from './app/TrackInfoRoot.tsx';
 import { HomeRoot } from './app/HomeRoot.tsx';
 import { UpdateRoot } from './app/UpdateRoot.tsx';
+import { LibraryMirrorRoot } from './app/LibraryMirrorRoot.tsx';
 import { OnboardingDialog } from './settings/onboarding/OnboardingDialog.tsx';
+import { AutoplaylistEditHost } from './playlist/PlaylistAutoplaylistEdit.tsx';
 import { WindowRoot } from './app/WindowRoot.tsx';
 import { LyricsRoot } from './app/LyricsRoot.tsx';
 import { ImmersiveSettingsContext } from './settings/immersiveSettingsContext.ts';
@@ -38,12 +41,13 @@ export function App({ services }: AppProps) {
   const table = useMemo(
     () => ({
       ratings: services.ratings,
+      fields: services.trackFields,
       playingKey: playingTrackKeyAtom,
       audible: playingAudibleAtom,
       trackKey: trackKeyOf,
       PlayingMark,
     }),
-    [services.ratings],
+    [services.ratings, services.trackFields],
   );
   const serviceTable = useMemo(() => serviceMap(services.bindings), [services]);
   return (
@@ -66,13 +70,17 @@ export function App({ services }: AppProps) {
                                 </Suspense>
                               }
                             >
-                              <ShellSlotsContext value={SHELL_SLOTS}>
-                                <WindowRoot>
-                                  <MainWindow />
-                                </WindowRoot>
-                              </ShellSlotsContext>
+                              <LibraryMirrorRoot>
+                                <ShellSlotsContext value={SHELL_SLOTS}>
+                                  <WindowRoot>
+                                    <MainWindow />
+                                  </WindowRoot>
+                                </ShellSlotsContext>
+                              </LibraryMirrorRoot>
                               <AppToasts />
+                              <EditContextMenu />
                               <OnboardingDialog />
+                              <AutoplaylistEditHost />
                             </ImmersiveSettingsContext>
                           </UpdateRoot>
                         </HomeRoot>

@@ -1,4 +1,4 @@
-/* 名字下面一行：左边是艺术家，右边是箭头。整行不换到第二行，放不下的整枚收起 */
+/* 名字下面一行：左边是艺人，右边是箭头。整行不换到第二行，放不下的整枚收起 */
 .row {
   display: flex;
   align-items: center;
@@ -55,4 +55,11 @@
 
 .placeholder {
   color: var(--text-muted);
+}
+
+/* 下拉里每行末尾的关注键靠右 */
+.menuFollow {
+  display: inline-flex;
+  margin-inline-start: auto;
+  padding-inline-start: var(--spacingHorizontalM);
 }

@@ -1,36 +1,27 @@
+import { Button, Title2, Tooltip, makeStyles } from '@fluentui/react-components';
 import {
-  Button,
-  Input,
-  Title2,
-  Tooltip,
-  makeStyles,
-  mergeClasses,
-} from '@fluentui/react-components';
-import {
-  Dismiss16Regular,
   Filter16Regular,
   LockClosed16Regular,
   Play20Regular,
-  Search16Regular,
   Sparkle16Regular,
   Clock16Regular,
   TextNumberListLtr16Regular,
 } from '@fluentui/react-icons';
 import type { PlaylistInfo } from 'foo-webview-sdk';
 import { useAtomValueRawSync } from 'jotai/react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { pluralAtom } from '../i18n/plural.ts';
-import { useCommand } from '../nav/useCommand.ts';
 import { durationText } from '../table/cellText.ts';
 import type { PlaylistFilterState } from './filter/playlistFilter.ts';
-import { QueryScopeMenu } from '../track/QueryScopeMenu.tsx';
+import { QueryBox, type QueryBoxHandle } from '../track/QueryBox.tsx';
+import { QueryInvalidNotice } from '../track/QueryInvalidNotice.tsx';
+import { queryInputText, type QueryInput } from '../track/queryInput.ts';
 import styles from './PlaylistPageHeader.module.css';
-import { COMMAND_BAR_TIERS, CommandBar, type CommandBarTier } from '../kit/CommandBar.tsx';
-import { useWidthTier } from '../kit/useWidthTier.ts';
+import { CommandBar, type CommandBarTier } from '../kit/CommandBar.tsx';
+import { FilterButton, type FilterSurfaceState } from '../track/FilterSurface.tsx';
 import { useService } from '../kit/useService.ts';
 import { playlistPageKey } from './playlistPageServices.ts';
-import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { Metadata, MetadataItem } from '../kit/Metadata.tsx';
 
 const useStyles = makeStyles({
@@ -41,8 +32,6 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     textOverflow: 'ellipsis',
   },
-  filter: { width: '100%', minWidth: 0 },
-  clear: { flexShrink: 0 },
 });
 
 export interface PlaylistPageHeaderProps {
@@ -57,17 +46,38 @@ export interface PlaylistPageHeaderProps {
   readonly view: (labelled: boolean) => ReactNode;
   /** 选中两首以上时的选区操作，代替命令栏左半的过滤框；没有选区时返回 false */
   readonly selection: (labelled: boolean) => ReactNode;
+  /** 页面量出来的命令栏宽度档，筛选浮层与页头共用这一档 */
+  readonly tier: CommandBarTier;
+  readonly surface: FilterSurfaceState;
+  /** 生效的预设与条件个数，写在筛选键的角标上 */
+  readonly conditions: number;
+  /** 装没装 foo_playcount；null 是还没探出来 */
+  readonly playcount: boolean | null;
   /** 播放键右边的 ⋯ */
   readonly children?: ReactNode;
 }
 
 /**
  * 播放列表页的页头。标题行左边是列表名、锁定与自动播放列表的记号，副题写首数、总时长与过滤命中数；右边是播放与 ⋯
- * 命令栏左边是页内过滤框，框尾写着按哪个字段找；右边是视图。播放列表的条件从行菜单添加，不出筛选键
- * 清空键与 Esc 只清过滤词，条件留着；框是空的 Esc 就不认领
+ * 命令栏左边是页内过滤框与筛选键：框尾写着按哪个字段找，也能切到高级查询（fb2k 查询交宿主求值），筛选键打开
+ * 常用预设与条件的浮层；右边是视图。清空键与 Esc 只清当前模式的文字，预设与条件留着；框是空的 Esc 就不认领
+ * 高级查询被宿主认不出时命令栏下面给一条提示，命中仍是上一次的
  */
 export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
-  const { guid, entry, total, filter, play, view, selection, children } = props;
+  const {
+    guid,
+    entry,
+    total,
+    filter,
+    play,
+    view,
+    selection,
+    tier,
+    surface,
+    conditions,
+    playcount,
+    children,
+  } = props;
   const t = useAtomValueRawSync(translateAtom);
   const plural = useAtomValueRawSync(pluralAtom);
   const playlistPage = useService(playlistPageKey);
@@ -75,58 +85,34 @@ export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
   useEffect(() => playlistPage.duration.acquire(guid), [playlistPage, guid]);
   const duration = useAtomValueRawSync(playlistPage.duration.stateOf(guid));
   const classes = useStyles();
-  const controls = useViewControlStyles();
-  const input = useRef<HTMLInputElement>(null);
-  const [measure, tier] = useWidthTier<CommandBarTier, HTMLElement>(COMMAND_BAR_TIERS);
-
-  useCommand({
-    id: `playlistPage.filter.clear.${guid}`,
-    layer: 'input',
-    keys: [{ key: 'Escape' }],
-    enabled: () => filter.query !== '' && document.activeElement === input.current,
-    run: () => playlistPage.filter.clearQuery(guid),
-  });
+  const queryBox = useRef<QueryBoxHandle>(null);
+  const [queryOpen, setQueryOpen] = useState(false);
 
   const length = duration === null ? '' : durationText(duration);
   const hits = filter.hits.length;
+  const queryInput: QueryInput = {
+    mode: filter.mode,
+    text: filter.query,
+    advancedText: filter.advancedText,
+  };
   const box = (
-    <Input
-      ref={input}
-      className={mergeClasses(classes.filter, controls.field)}
-      role="searchbox"
-      contentBefore={<Search16Regular />}
-      contentAfter={
-        <>
-          {filter.query !== '' && (
-            <Tooltip content={t('playlistPage.clearFilter')} relationship="label">
-              <Button
-                className={mergeClasses(classes.clear, controls.icon)}
-                appearance="transparent"
-                size="small"
-                icon={<Dismiss16Regular />}
-                onClick={() => {
-                  playlistPage.filter.clearQuery(guid);
-                  input.current?.focus();
-                }}
-                data-playlist-filter-clear
-              />
-            </Tooltip>
-          )}
-          <QueryScopeMenu scope={scope} onScope={playlistPage.filter.setScope} />
-        </>
-      }
+    <QueryBox
+      handle={queryBox}
+      input={queryInput}
+      scope={scope}
+      invalid={filter.invalid}
+      playcountMissing={playcount === false}
+      menuOpen={queryOpen}
       placeholder={t('playlistPage.filterPlaceholder')}
-      aria-label={t('playlistPage.filter')}
-      value={filter.query}
-      onChange={(_, data) => playlistPage.filter.setQuery(guid, data.value)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') playlistPage.filter.flush(guid);
-      }}
-      data-playlist-filter
+      label={t('playlistPage.filter')}
+      onChange={(next) => playlistPage.filter.setInput(guid, next)}
+      onEnter={() => playlistPage.filter.flush(guid)}
+      onScope={playlistPage.filter.setScope}
+      onMenuOpenChange={setQueryOpen}
     />
   );
   return (
-    <header ref={measure} className={styles.root} data-tier={tier}>
+    <header className={styles.root} data-tier={tier}>
       <div className={styles.titleRow}>
         <div className={styles.titles}>
           <Title2 as="h1" className={classes.title} title={entry?.name}>
@@ -180,10 +166,17 @@ export function PlaylistPageHeader(props: PlaylistPageHeaderProps) {
       <CommandBar
         tier={tier}
         label={t('query.toolbar')}
-        search={{ box, active: filter.query !== '' }}
+        search={{ box, active: queryInputText(queryInput) !== '' }}
+        find={<FilterButton state={surface} count={conditions} labelled={tier === 'wide'} />}
         selection={selection(tier === 'wide') || undefined}
         view={view(tier === 'wide')}
       />
+      {filter.invalid && (
+        <QueryInvalidNotice
+          detail={t('playlistPage.queryInvalidDetail')}
+          onHelp={() => queryBox.current?.openReference()}
+        />
+      )}
     </header>
   );
 }

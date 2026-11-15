@@ -2,23 +2,14 @@ import { Switch } from '@fluentui/react-components';
 import {
   Color20Regular,
   DarkTheme20Regular,
-  PanelBottom20Regular,
+  Image20Regular,
   Sparkle20Regular,
   ZoomIn20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
+import { ANIMATED_COVER_PREF, ANIMATED_COVER_STORAGE_KEY } from '../covers/animatedCover.ts';
 import type { MessageKey } from '../i18n/en.ts';
 import { translateAtom } from '../i18n/locale.ts';
-import {
-  choosePlayerBarStyle,
-  chooseCapsuleBlur,
-  capsuleBlurAtom,
-  CAPSULE_BLUR_STORAGE_KEY,
-  PLAYER_BAR_STYLES,
-  PLAYER_BAR_STORAGE_KEY,
-  playerBarStyleAtom,
-  type PlayerBarStyle,
-} from '../theme/playerBarStyle.ts';
 import {
   chooseCoverAccentEnabled,
   coverAccentEnabledAtom,
@@ -33,14 +24,16 @@ import {
   type ColorMode,
 } from '../theme/colorScheme.ts';
 import { SettingsCard } from './SettingsCard.tsx';
+import { PlayerBarCard } from './PlayerBarCard.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
+import { SettingsSubheading } from './SettingsSubheading.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
-import { SettingsChoice, type SettingsChoiceOption } from './SettingsChoice.tsx';
+import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsSelect } from './SettingsSelect.tsx';
 import { ColorModeThumb } from './thumbnails/ColorModeThumb.tsx';
-import { MiniWindow } from './thumbnails/MiniWindow.tsx';
 import { AccentExpander, useAccentSourceName } from './AccentExpander.tsx';
 import { BackdropExpander } from './BackdropExpander.tsx';
+import { FontCard } from './FontCard.tsx';
 import { chooseSurfaceTint, surfaceTintAtom, SURFACE_TINT_KEY } from '../theme/surfaceTint.ts';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
 import { useService } from '../kit/useService.ts';
@@ -55,6 +48,7 @@ import {
   MOTION_CHOICES,
   MOTION_STORAGE_KEY,
   motionChoiceAtom,
+  reducedMotionAtom,
   systemReducedMotionAtom,
   type MotionChoice,
 } from '../motion/reducedMotion.ts';
@@ -137,16 +131,35 @@ function MotionCard() {
   );
 }
 
+/** 动图封面的开关；动效被减弱时它不起作用，说明行直接写出来 */
+function AnimatedCoverCard() {
+  const t = useAtomValueRawSync(translateAtom);
+  const on = useAtomValueRawSync(ANIMATED_COVER_PREF.atom);
+  const reduced = useAtomValueRawSync(reducedMotionAtom);
+  const store = useStore();
+  return (
+    <SettingsCard
+      icon={<Image20Regular />}
+      title={t('settings.animatedCover')}
+      description={t(reduced ? 'settings.animatedCoverReduced' : 'settings.animatedCoverDetail')}
+      feedback={<LocalSaveNotice keys={[ANIMATED_COVER_STORAGE_KEY]} />}
+    >
+      {({ labelId, descriptionId }) => (
+        <Switch
+          checked={on}
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          onChange={(_, data) => ANIMATED_COVER_PREF.set(store, data.checked)}
+        />
+      )}
+    </SettingsCard>
+  );
+}
+
 const MODE_LABELS: Readonly<Record<ColorMode, MessageKey>> = {
   system: 'settings.colorModeSystem',
   light: 'settings.colorModeLight',
   dark: 'settings.colorModeDark',
-};
-
-const STYLE_LABELS: Readonly<Record<PlayerBarStyle, MessageKey>> = {
-  bottom: 'settings.playerBarBottom',
-  titlebar: 'settings.playerBarTitlebar',
-  capsule: 'settings.playerBarCapsule',
 };
 
 /** 深浅模式。跟随系统时说明行写出此刻实际是哪一档；手选了一档就不必再写 */
@@ -175,55 +188,6 @@ export function ColorModeCard() {
           }))}
           value={mode}
           onChange={(value) => chooseColorMode(store, value)}
-        />
-      )}
-    </SettingsCard>
-  );
-}
-
-/** 播放栏位置的三张缩略图单选项；设置页与新人引导共用 */
-export function usePlayerBarOptions(): readonly SettingsChoiceOption<PlayerBarStyle>[] {
-  const t = useAtomValueRawSync(translateAtom);
-  return PLAYER_BAR_STYLES.map((value) => ({
-    value,
-    label: t(STYLE_LABELS[value]),
-    preview: <MiniWindow bar={value} />,
-  }));
-}
-
-/** 播放栏放在窗口底部、标题栏里，还是浮在内容卡底部的胶囊，换了即时生效 */
-function PlayerBarCard() {
-  const t = useAtomValueRawSync(translateAtom);
-  const style = useAtomValueRawSync(playerBarStyleAtom);
-  const blur = useAtomValueRawSync(capsuleBlurAtom);
-  const options = usePlayerBarOptions();
-  const store = useStore();
-  return (
-    <SettingsCard
-      icon={<PanelBottom20Regular />}
-      title={t('settings.playerBar')}
-      block
-      feedback={<LocalSaveNotice keys={[PLAYER_BAR_STORAGE_KEY, CAPSULE_BLUR_STORAGE_KEY]} />}
-      footer={
-        style !== 'bottom' && (
-          <SettingsRow title={t('settings.capsuleBlur')}>
-            {({ labelId }) => (
-              <Switch
-                checked={blur}
-                aria-labelledby={labelId}
-                onChange={(_, data) => chooseCapsuleBlur(store, data.checked)}
-              />
-            )}
-          </SettingsRow>
-        )
-      }
-    >
-      {(ids) => (
-        <SettingsChoice
-          {...ids}
-          options={options}
-          value={style}
-          onChange={(value) => choosePlayerBarStyle(store, value)}
         />
       )}
     </SettingsCard>
@@ -290,14 +254,19 @@ function SurfaceTintCard() {
 
 /** 外观偏好即时生效；本地颜色偏好在未连接宿主时也能修改 */
 export function AppearanceSection() {
+  const t = useAtomValueRawSync(translateAtom);
   return (
     <>
+      <SettingsSubheading>{t('settings.subColor')}</SettingsSubheading>
       <ColorModeCard />
       <AccentExpander />
       <BackdropExpander />
       <SurfaceTintCard />
+      <SettingsSubheading>{t('settings.subInterface')}</SettingsSubheading>
       <PlayerBarCard />
       <MotionCard />
+      <AnimatedCoverCard />
+      <FontCard />
       <ZoomCard />
     </>
   );

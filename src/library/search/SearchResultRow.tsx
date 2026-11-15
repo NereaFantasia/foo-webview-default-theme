@@ -120,7 +120,7 @@ export const SearchResultRow = memo(function SearchResultRow({
       ? artistCounts.join(' · ')
       : hit.kind === 'album'
         ? [albumArtistOf(hit.album), albumYearOf(hit.album)].filter(Boolean).join(' · ')
-        : [hit.track.artist, hit.track.album].filter(Boolean).join(' · ');
+        : [hit.track.artist, hit.track.album].filter(Boolean).join(' - ');
   const content = (
     <>
       {hit.kind === 'artist' ? (
@@ -186,12 +186,17 @@ export const SearchResultRow = memo(function SearchResultRow({
           if (event.button === 0) event.preventDefault();
         }}
         onClick={(event) => {
-          if (event.detail < 2)
-            onSelect?.(hit, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey });
+          const ctrl = event.ctrlKey || event.metaKey;
+          if (event.detail < 2) onSelect?.(hit, { ctrl, shift: event.shiftKey });
+          // 连点的后几下不再开，第一下已经开了；修饰键留给多选
+          if (event.detail > 1 || ctrl || event.shiftKey) return;
+          // 下拉里的行只带 onOpen；结果页里专辑与艺人单击即开，曲目仍是双击播放
+          if (onOpen) onOpen();
+          else if (hit.kind !== 'track') onActivate?.(hit, false);
         }}
         onDoubleClick={(event) => {
-          if (!event.ctrlKey && !event.metaKey && !event.shiftKey)
-            onActivate?.(hit, hit.kind === 'track');
+          if (hit.kind === 'track' && !event.ctrlKey && !event.metaKey && !event.shiftKey)
+            onActivate?.(hit, true);
         }}
         onContextMenu={contextMenu}
       >

@@ -7,7 +7,7 @@ import {
   Options20Regular,
 } from '@fluentui/react-icons';
 import { useAtomValueRawSync, useStore } from 'jotai/react';
-import { useState, type ReactElement } from 'react';
+import { useContext, useState, type ReactElement } from 'react';
 import { flushSync } from 'react-dom';
 import { translateAtom } from '../i18n/locale.ts';
 import { SegmentedTabs } from '../kit/SegmentedTabs.tsx';
@@ -25,11 +25,14 @@ import type { TraySwitch } from '../playback/traySwitches.ts';
 import { openLibraryPreferences } from '../host/libraryContract.ts';
 import { openPreferences } from './hostActions.ts';
 import { LanguageCard } from './LanguageCard.tsx';
+import { LyricsCacheCard } from './LyricsCacheCards.tsx';
+import { RemindersCard } from './RemindersCard.tsx';
+import { LibraryMirrorSettingsContext } from './libraryMirrorSettingsContext.ts';
 import { SettingsActionCard } from './SettingsActionCard.tsx';
 import { SettingsCard, type SettingsCardIds } from './SettingsCard.tsx';
 import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
-import styles from './GeneralSection.module.css';
+import { SettingsSubheading } from './SettingsSubheading.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { LocalSaveNotice } from './SettingsSaveNotice.tsx';
 import { StartPlaceThumb } from './thumbnails/StartPlaceThumb.tsx';
@@ -169,16 +172,22 @@ function StartPlaceCard() {
 }
 
 /**
- * 「常规」一组：界面语言、启动时打开、托盘；末尾「相关设置」是去 foobar2000 自己的设置的两个入口
+ * 「常规」一组：界面语言、启动时打开、托盘；「数据」收着媒体库缓存、歌词缓存和已关闭的提醒；末尾「相关设置」是去 foobar2000 自己的设置的两个入口
  */
 export function GeneralSection() {
   const t = useAtomValueRawSync(translateAtom);
+  const mirrorCard = useContext(LibraryMirrorSettingsContext);
   return (
     <>
+      <SettingsSubheading>{t('settings.subApp')}</SettingsSubheading>
       <LanguageCard />
       <StartPlaceCard />
       <TrayExpander />
-      <h3 className={styles.subheading}>{t('settings.related')}</h3>
+      <SettingsSubheading>{t('settings.data')}</SettingsSubheading>
+      {mirrorCard}
+      <LyricsCacheCard />
+      <RemindersCard />
+      <SettingsSubheading>{t('settings.related')}</SettingsSubheading>
       <SettingsActionCard
         icon={<FolderOpen20Regular />}
         title={t('settings.libraryFolders')}

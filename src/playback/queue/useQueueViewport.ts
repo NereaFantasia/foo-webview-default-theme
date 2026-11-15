@@ -15,18 +15,16 @@ export function useQueueViewport(
   home: () => number = () => 0,
   /** 当前卡正跟着置顶：这时阅读锚点不管，以置顶为准 */
   following: () => boolean = () => false,
+  /** 假时不向来源读行（见 `QueueListProps.active`） */
+  active = true,
 ) {
   const { upNext } = useService(queueKey);
   const view = useAtomValueRawSync(upNextAtom);
   const total = view.total;
-  const viewport = useQueueVirtualRows(root, total);
-  useQueueScrollAnchor(
-    root,
-    view.refreshing,
-    home,
-    () => Math.abs(viewport.measureMargin() - viewport.margin) < 1,
-    following,
-  );
+  const viewport = useQueueVirtualRows(root, total, undefined, { sticky: false });
+  // 行已按此刻的偏移排好：上方内容刚变了高时，行要到下一次提交才跟上
+  const placed = () => Math.abs(viewport.measureMargin() - viewport.margin) < 1;
+  useQueueScrollAnchor(root, view.refreshing, home, placed, following);
   const { visible, virtualizer } = viewport;
   const [requested, requestFocus] = useState<{
     index: number;
@@ -36,8 +34,8 @@ export function useQueueViewport(
   const first = visible[0]?.index ?? 0;
   const last = Math.min(total - 1, visible.at(-1)?.index ?? first);
   useEffect(() => {
-    if (total && last >= first) void upNext.readRange(first, last);
-  }, [upNext, first, last, view.version, view.refreshing, total]);
+    if (active && total && last >= first) void upNext.readRange(first, last);
+  }, [upNext, active, first, last, view.version, view.refreshing, total]);
   useEffect(() => {
     const scroller = root.current?.parentElement;
     const cancel = () => requestFocus(null);
@@ -78,6 +76,7 @@ export function useQueueViewport(
   return {
     ...viewport,
     total,
+    placed,
     navigate(pick: (index: number) => number, shift: boolean) {
       const current = list.current ? list.rowOf(list.current) : undefined;
       const position =

@@ -1,24 +1,19 @@
-/* 列表整页按总数占高度，最近一首贴底。列、渐隐与滚动容器在 `scene/SideColumn`；虚拟列表自己管滚动位置，
-   不要浏览器的滚动锚定 */
+/* 列表整页按总数占高度，最近一首贴底。列与滚动容器在 `scene/CardColumn`，上下两端的渐隐也在那里；虚拟列表自己管滚动位置，
+   不要浏览器的滚动锚定。包它的一层是卡片外观变量的挂载点（`data-queue-cards`），并给列的上下两端留白：
+   上面留一条渐隐带，静止时最早一条落在带下面；下面给悬浮工具条让位，滚到底时最近一首不被盖住 */
+.page {
+  padding-block: var(--queue-pad-top, 0) var(--queue-pad-bottom, 0);
+}
+
 .list {
   position: relative;
   overflow-anchor: none;
 }
 
-.viewport {
-  position: sticky;
-  top: 0;
-  overflow: hidden;
-}
-
-/* 行带不设 will-change：单独成合成层后按小数偏移摆放，125% 这类缩放下文字发虚 */
-.strip {
-  position: relative;
-}
-
+/* 行用 `top` 定位：渐隐的滚动时间线按布局位置算行的进出，不认 `transform`（`playback/queue/rowOffset.ts`） */
 .row {
   position: absolute;
-  top: 0;
+  top: var(--row-y, 0);
   width: 100%;
   height: var(--queue-row-height);
 }

@@ -1,7 +1,7 @@
 import type { PlaylistInfo } from 'foo-webview-sdk';
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import type { PlaylistActions } from '../playlistActions.ts';
-import { isOwnSlot, landingIndex } from './playlistReorder.ts';
+import { isOwnSlot, landingIndex } from '../../kit/listReorder.ts';
 
 /**
  * 把一张挪到插入位，拖动松手与 Alt+↑ / Alt+↓ 共用。焦点跟着被挪的那一行走：各行按 GUID 做 key，React

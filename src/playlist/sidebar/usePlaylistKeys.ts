@@ -2,9 +2,9 @@ import type { PlaylistInfo } from 'foo-webview-sdk';
 import type { RefObject } from 'react';
 import type { KeyChord } from '../../nav/commandRegistry.ts';
 import { useCommand } from '../../nav/useCommand.ts';
-import { stepSlot } from './playlistReorder.ts';
+import { stepSlot } from '../../kit/listReorder.ts';
 import type { PlaylistDraft, PlaylistRename } from './SidebarPlaylists.tsx';
-import type { PlaylistReorder } from './usePlaylistReorder.ts';
+import type { ListReorder } from '../../kit/useListReorder.ts';
 
 /** 焦点在播放列表节的某一行时改名。设置页的快捷键一览也取这几份 */
 export const RENAME_KEYS: readonly KeyChord[] = [{ key: 'F2' }];
@@ -14,7 +14,7 @@ export const MOVE_DOWN_KEYS: readonly KeyChord[] = [{ key: 'ArrowDown', alt: tru
 
 export interface PlaylistKeysOptions {
   readonly scroller: RefObject<HTMLElement | null>;
-  readonly reorder: PlaylistReorder;
+  readonly reorder: ListReorder;
   readonly rename: PlaylistRename;
   readonly draft: PlaylistDraft;
   /** 此刻的完整清单，按序号排 */
@@ -47,9 +47,11 @@ function focusedNameInput(scroller: RefObject<HTMLElement | null>): HTMLInputEle
 }
 
 /**
- * 播放列表节的按键，都登记在命令登记处：焦点在某一行时 F2 改名（拖动中不接）、Alt+↑ / Alt+↓ 调整顺序；
- * 改名与新建的名字框里回车提交、Esc 取消；筛选框里 Esc 收起；拖动中 Esc 取消拖动
- * 右键菜单的 Menu 键与 Shift+F10 不在这里：浏览器把它们合成成 `contextmenu`，由那一行自己接
+ * 播放列表节的按键，都登记在命令登记处：
+ * - 焦点在某一行时，F2 改名（拖动中不接收）、Alt+↑ / Alt+↓ 调整顺序
+ * - 改名与新建的名字框里，回车提交、Esc 取消；筛选框里 Esc 收起；拖动中 Esc 取消拖动
+ *
+ * 右键菜单的 Menu 键与 Shift+F10 不在这里：浏览器把它们合成为 `contextmenu`，由那一行自己接收
  */
 export function usePlaylistKeys(options: PlaylistKeysOptions): void {
   const { scroller, reorder, rename, draft, items, canReorder, move, closeFilter } = options;

@@ -16,9 +16,11 @@ interface PhotoListProps {
   readonly top: number;
   readonly t: BiographyTranslate;
   readonly onRetry?: () => void;
+  /** 认定、取正文、取艺术照里还有没做完的：照片框先占住位置，免得晚到的照片把下面的内容顶下去 */
+  readonly searching?: boolean;
 }
 
-function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps) {
+function BiographyPhotoList({ state, service, top, t, onRetry, searching }: PhotoListProps) {
   const viewControls = useViewControlStyles();
   const [selected, setSelected] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -29,8 +31,16 @@ function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps)
   );
   const photo = photos[index];
   if (!artist) return null;
-  if (!photo && !state.loading && !state.failed && !state.onlineLoading && !state.onlineProblem)
+  if (
+    !photo &&
+    !searching &&
+    !state.loading &&
+    !state.failed &&
+    !state.onlineLoading &&
+    !state.onlineProblem
+  )
     return null;
+  const waiting = state.loading || state.onlineLoading || searching;
   return (
     <div className={styles.root} data-biography-photos>
       <div className={styles.frame}>
@@ -48,10 +58,13 @@ function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps)
           </button>
         ) : (
           <div className={styles.photo}>
-            <BiographyPhotoImage label={artist} missing={t('biography.noPhotos')} />
+            <BiographyPhotoImage
+              label={artist}
+              missing={t(waiting ? 'biography.onlinePhotoLoading' : 'biography.noPhotos')}
+            />
           </div>
         )}
-        {(state.loading || state.onlineLoading) && (
+        {waiting && (
           <div className={styles.loading}>
             <Spinner
               size="tiny"
@@ -106,7 +119,12 @@ function BiographyPhotoList({ state, service, top, t, onRetry }: PhotoListProps)
         )}
       </div>
       {photo?.sourceUrl && (
-        <BiographyPhotoSource key={photo.sourceUrl} url={photo.sourceUrl} t={t} />
+        <BiographyPhotoSource
+          key={photo.sourceUrl}
+          url={photo.sourceUrl}
+          name={photo.album}
+          t={t}
+        />
       )}
       {photo && (
         <BiographyPhotoViewer

@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { LIBRARY_VIEW_PLAYLIST } from '../../../src/playback/libraryView.ts';
 import {
-  INSERT_NEXT_BATCH,
-  queueLast,
-  queueNext,
   readSendTargets,
   sendToNewPlaylist,
   sendToPlaylist,
 } from '../../../src/track/trackListActions.ts';
-import { hostFailure, listParam } from '../../fixtures/hostAnswers.ts';
+import { hostFailure } from '../../fixtures/hostAnswers.ts';
 import { playlistGuid, playlistRow } from '../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
@@ -24,81 +21,6 @@ function hostWithView(trackCount = 10) {
   host.answer('playlist.getAll', { success: true, playlists, count: playlists.length });
   return host;
 }
-
-describe('queueNext', () => {
-  it('直接按路径入队，不写入或读取专用列表', async () => {
-    const host = hostWithView(10);
-    expect(await queueNext(host.fb, paths(2))).toBe(true);
-    expect(host.callsTo('queue.insertNext')).toEqual([
-      {
-        paths: paths(2),
-        position: 0,
-      },
-    ]);
-    expect(host.callsTo('library.addToPlaylist')).toEqual([]);
-    expect(host.callsTo('playlist.getAll')).toEqual([]);
-  });
-
-  it('每次至多 256 条分批发，后一批插在前一批落下的位置之后', async () => {
-    const host = hostWithView(0);
-    // 替身按宿主的样子答：已在队列里的算挪动，新的算插入。
-    host.answer('queue.insertNext', (params) => {
-      const count = listParam(params, 'paths').length;
-      const moved = count === INSERT_NEXT_BATCH ? 6 : 0;
-      return {
-        success: true,
-        insertedCount: count - moved,
-        movedCount: moved,
-        queueCount: count,
-        invalidCount: 0,
-        contentVersion: '1',
-      };
-    });
-    expect(await queueNext(host.fb, paths(600))).toBe(true);
-    const calls = host.callsTo('queue.insertNext');
-    expect(calls.map((call) => listParam(call, 'paths').length)).toEqual([256, 256, 88]);
-    expect(calls.map((call) => call['position'])).toEqual([0, 256, 512]);
-    expect(listParam(calls[1]!, 'paths')[0]).toEqual(paths(600)[256]);
-    expect(listParam(calls[2]!, 'paths').at(-1)).toEqual(paths(600)[599]);
-  });
-
-  it('某一批失败即停', async () => {
-    const host = hostWithView(0);
-    let calls = 0;
-    host.answer('queue.insertNext', () => {
-      calls += 1;
-      return calls === 2
-        ? hostFailure('INVALID_PARAMS')
-        : {
-            success: true,
-            insertedCount: 256,
-            movedCount: 0,
-            queueCount: 256,
-            invalidCount: 0,
-            contentVersion: '1',
-          };
-    });
-    expect(await queueNext(host.fb, paths(700))).toBe(false);
-    expect(host.callsTo('queue.insertNext')).toHaveLength(2);
-  });
-
-  it('专用列表不可写也不影响入队', async () => {
-    const host = hostWithView();
-    host.answer('library.addToPlaylist', hostFailure('LOCKED'));
-    expect(await queueNext(host.fb, paths(2))).toBe(true);
-    expect(host.callsTo('library.addToPlaylist')).toEqual([]);
-  });
-});
-
-describe('queueLast', () => {
-  it('按路径插入当前队尾，不改专用列表', async () => {
-    const host = hostWithView(4);
-    host.answer('queue.getCount', { success: true, count: 7, hasItems: true });
-    expect(await queueLast(host.fb, paths(3))).toBe(true);
-    expect(host.callsTo('queue.insertNext')).toEqual([{ paths: paths(3), position: 7 }]);
-    expect(host.callsTo('library.addToPlaylist')).toEqual([]);
-  });
-});
 
 describe('发送到', () => {
   it('目标清单按 GUID 认，带锁定标记，不列主题的专用列表；读不到就是空的', async () => {

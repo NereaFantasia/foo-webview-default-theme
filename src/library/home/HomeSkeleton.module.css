@@ -1,0 +1,65 @@
+/* 各件的外框与间距照读到后的版式，读到数据换成真内容时位置不动 */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXXS);
+  min-width: 0;
+}
+
+/* 文字行与读到后同高，条在行里垂直居中 */
+.line {
+  display: flex;
+  align-items: center;
+  height: var(--tile-line);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  min-width: 0;
+}
+
+.track {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  height: 60px;
+  border-bottom: var(--strokeWidthThin) solid var(--line-subtle);
+  padding: 0 var(--spacingHorizontalXS) 0 var(--spacingHorizontalS);
+}
+
+.rank {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+  min-width: 0;
+  height: 230px;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--spacingVerticalL) var(--spacingHorizontalL) var(--spacingVerticalM);
+  background-color: var(--bg-view-control);
+}
+
+.lead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.quick {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  min-width: 0;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--borderRadiusMedium);
+  padding-inline-end: var(--spacingHorizontalMNudge);
+  background-color: var(--bg-view-control);
+}

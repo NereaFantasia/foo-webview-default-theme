@@ -9,6 +9,7 @@ import {
   type Album,
   type LibraryEventsFace,
 } from '../host/libraryContract.ts';
+import type { LibraryMirrorSource } from './mirror/mirrorSource.ts';
 
 /**
  * 一次取全的上限。宿主不夹 `limit`，库大过它时答 `hasMore`，界面据此提示「只显示前 N 张」，
@@ -73,7 +74,11 @@ export interface AlbumsService {
  * 启动专辑清单服务：先订库变更，再初读，两者之间的变化才不会漏；变更按 1 s 合并后整份重拉
  * 重拉期间旧清单留着、状态不退回 loading，否则每次库变更网格都闪一次骨架；晚到的旧应答丢掉
  */
-export function startAlbums(store: Store, host: AlbumsFace = fb): AlbumsService {
+export function startAlbums(
+  store: Store,
+  host: AlbumsFace = fb,
+  mirror?: Pick<LibraryMirrorSource, 'albums'>,
+): AlbumsService {
   store.set(stateAtom, INITIAL);
   let disposed = false;
   let generation = 0;
@@ -97,6 +102,19 @@ export function startAlbums(store: Store, host: AlbumsFace = fb): AlbumsService 
     }
     if (!enabled.enabled) {
       store.set(stateAtom, { ...INITIAL, status: 'ready', enabled: false });
+      return;
+    }
+    // 镜像追平了宿主就由镜像分组给出，不占宿主主线程；读不到（没建好、落后、后端没连）退回宿主
+    const mirrored = mirror ? await mirror.albums() : null;
+    if (stale()) return;
+    if (mirrored) {
+      store.set(stateAtom, {
+        status: 'ready',
+        enabled: true,
+        albums: mirrored,
+        total: mirrored.length,
+        truncated: false,
+      });
       return;
     }
     // 宿主只在 offset 为 0、不带 includeTracks、query / sort / includeCover 都相同且上次取的是整份时

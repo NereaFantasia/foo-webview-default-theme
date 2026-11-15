@@ -5,6 +5,7 @@ import type { LyricsTarget } from './lyricsService.ts';
 import type { LyricsContent } from './lyricsText.ts';
 import type { LyricsHttpHost } from './online/lyricsHttp.ts';
 import { startLyricsCandidateCovers, type LyricsCoverTarget } from './lyricsCandidateCovers.ts';
+import type { FoundLyrics } from './online/lyricsSearch.ts';
 import type {
   LyricsCandidate,
   LyricsFetchResult,
@@ -215,6 +216,13 @@ export function startLyricsSearchSession(
     },
     cancelSearch,
     sources: loadSources,
+    /** 自动取词取到的这一条：登记成可预览的候选并带上正文，只对当前曲目有效 */
+    seed(found: FoundLyrics, subject: string) {
+      if (disposed || subject !== identity) return;
+      const id = lyricsCandidateId(found.candidate);
+      candidates.set(id, found.candidate);
+      bodies.set(id, found.content);
+    },
     candidate: (id: string) => candidates.get(id),
     async search(keywords: string, force = false) {
       const target = store.get(deps.track);

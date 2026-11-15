@@ -65,6 +65,8 @@ export interface SearchResultListProps<T> {
    * 列头：行跟着页面滚时吸在滚动元素的顶上，行的可见区从它下面开始，行不会从它底下透出来，所以它不用铺底
    */
   readonly header?: ReactNode;
+  /** 选中的项变了：按列表次序交出此刻选着的那些（收藏页据此换命令栏）；不给就不报 */
+  onSelected?(items: readonly T[]): void;
 }
 
 export function SearchResultList<T>({
@@ -82,6 +84,7 @@ export function SearchResultList<T>({
   onMenu,
   onAll,
   header,
+  onSelected,
 }: SearchResultListProps<T>) {
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -91,6 +94,15 @@ export function SearchResultList<T>({
   const [stored, setSelection] = useState(() => emptySelection<string>());
   const selection = pruneSelection(stored, order);
   if (selection !== stored) setSelection(selection);
+  // 选中的项变了才报；用最新的列表与回调，不因它们换了身份重报
+  const reported = useRef({ hits, keyOf, onSelected });
+  useEffect(() => {
+    reported.current = { hits, keyOf, onSelected };
+  });
+  useEffect(() => {
+    const { hits: current, keyOf: key, onSelected: report } = reported.current;
+    report?.(current.filter((hit) => selection.selected.has(key(hit))));
+  }, [selection.selected]);
   const request = useRef(0);
   useEffect(
     () => () => {

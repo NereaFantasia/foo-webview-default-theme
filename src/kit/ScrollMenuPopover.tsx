@@ -7,18 +7,18 @@ import {
 } from '@fluentui/react-components';
 import { Menu } from '../motion/Surfaces.tsx';
 import { useLayoutEffect, useRef } from 'react';
-import { useContextMenuViewport } from './context-menu/useContextMenuViewport.ts';
-import { contextMenuBounds } from './context-menu/contextMenuGeometry.ts';
+import { useScrollMenuBounds } from './context-menu/useScrollMenuBounds.ts';
 import { useContextMenuStyles } from './context-menu/contextMenuStyles.ts';
 import { pageContextMenu, revealContextMenuItem } from './context-menu/contextMenuKeyboard.ts';
 
-/** 空间不足时允许菜单移过锚点，与对象菜单使用相同的视口留边 */
+/** 空间不足时允许菜单移过锚点，留边与对象菜单一致，且不压到标题栏 */
 export function ScrollMenu({ positioning, ...props }: MenuProps) {
+  const { boundaryPadding } = useScrollMenuBounds();
   return (
     <Menu
       {...props}
       positioning={{
-        overflowBoundaryPadding: 12,
+        overflowBoundaryPadding: boundaryPadding,
         shiftToCoverTarget: true,
         ...resolvePositioningShorthand(positioning),
       }}
@@ -28,10 +28,9 @@ export function ScrollMenu({ positioning, ...props }: MenuProps) {
 
 /** 与对象菜单共用可用区域和命令区滚动，长菜单不推动页面 */
 export function ScrollMenuPopover({ children, className, style, ...props }: MenuPopoverProps) {
-  const viewport = useContextMenuViewport();
   const classes = useContextMenuStyles();
   const list = useRef<HTMLDivElement>(null);
-  const bounds = contextMenuBounds(viewport, 12);
+  const { bounds } = useScrollMenuBounds();
   useLayoutEffect(() => {
     const active = document.activeElement;
     if (list.current && active instanceof HTMLElement && list.current.contains(active))

@@ -87,7 +87,7 @@ describe('places', () => {
       'not json',
       JSON.stringify(fields.slice(0, 7)),
       JSON.stringify(['qq', ...fields.slice(1)]),
-      JSON.stringify(fields.map((value, index) => (index === 2 ? 'singles' : value))),
+      JSON.stringify(fields.map((value, index) => (index === 2 ? 'songs' : value))),
       JSON.stringify(fields.map((value, index) => (index === 6 ? 'yes' : value))),
       JSON.stringify(fields.map((value, index) => (index === 7 ? ['karaoke'] : value))),
       JSON.stringify(fields.map((value, index) => (index === 7 ? ['live', 'live'] : value))),

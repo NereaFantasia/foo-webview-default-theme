@@ -1,6 +1,9 @@
 import { Button, FluentProvider, makeStyles, tokens } from '@fluentui/react-components';
+import { Checkmark16Regular, Copy16Regular } from '@fluentui/react-icons';
 import { useEffect, useState } from 'react';
 import { BUILTIN_MESSAGES, createTranslate, resolveBuiltin } from '../i18n/translate.ts';
+import { runtimeLogReport } from '../settings/about.ts';
+import { useCopyAction } from '../settings/useCopyAction.ts';
 import { darkTheme, lightTheme } from '../theme/themes.ts';
 import styles from './StartupNotice.module.css';
 
@@ -27,6 +30,7 @@ export function StartupNotice({ state, onRetry, onCommitted }: StartupNoticeProp
   }, [onCommitted]);
   const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const classes = useStyles();
+  const { outcome, copy } = useCopyAction();
   const locale = resolveBuiltin(navigator.language);
   const t = createTranslate(BUILTIN_MESSAGES[locale], {});
   useEffect(() => {
@@ -61,13 +65,27 @@ export function StartupNotice({ state, onRetry, onCommitted }: StartupNoticeProp
           <h1 className={styles.title}>{title}</h1>
           <p className={styles.detail}>{detail}</p>
           {(state === 'failed' || state === 'startFailed' || state === 'panelUnconfirmed') && (
-            <Button appearance="primary" onClick={onRetry}>
-              {t(
-                state === 'startFailed' || state === 'panelUnconfirmed'
-                  ? 'startup.reload'
-                  : 'startup.retry',
+            <div className={styles.actions}>
+              {state !== 'failed' && (
+                // 重新加载会清掉内存里的日志，复制放在它前面
+                <Button
+                  appearance="outline"
+                  icon={outcome === 'copied' ? <Checkmark16Regular /> : <Copy16Regular />}
+                  onClick={() => void copy(runtimeLogReport(null))}
+                >
+                  {t(
+                    outcome === 'copied'
+                      ? 'startup.copied'
+                      : outcome === 'failed'
+                        ? 'startup.copyFailed'
+                        : 'startup.copy',
+                  )}
+                </Button>
               )}
-            </Button>
+              <Button appearance="primary" onClick={onRetry}>
+                {t(state === 'failed' ? 'startup.retry' : 'startup.reload')}
+              </Button>
+            </div>
           )}
         </section>
       </main>

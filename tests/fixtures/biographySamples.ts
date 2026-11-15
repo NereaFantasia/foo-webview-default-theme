@@ -1,7 +1,9 @@
 import {
+  lastfmAttribution,
   lastfmBiographyUrl,
   lastfmArtistUrl,
   type BiographyDocument,
+  type BiographyFetchResult,
   type BiographyLanguage,
 } from '../../src/library/biography/biographyModel.ts';
 import { makeTrack } from './tracks.ts';
@@ -40,13 +42,17 @@ export function biographyDocument(
   language: BiographyLanguage = 'zh',
   text = '第一段简介。\n\n第二段简介。',
 ): BiographyDocument {
+  const license = { name: 'CC BY-SA 3.0', url: 'https://creativecommons.org/licenses/by-sa/3.0/' };
   return {
+    source: 'lastfm',
+    sourceId: artist,
     artist,
     language,
     paragraphs: text.split('\n\n'),
     url: lastfmBiographyUrl(artist, language),
-    license: 'CC BY-SA 3.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',
+    attribution: lastfmAttribution(artist, language, license),
+    license: license.name,
+    licenseUrl: license.url,
   };
 }
 
@@ -77,4 +83,56 @@ export function biographyHtml(
     </head><body><div class="wiki-content">${body}</div>
     <div class="wiki-legal"><a href="http://creativecommons.org/licenses/by-sa/3.0/legalcode">
     Creative Commons Attribution-ShareAlike</a></div></body></html>`;
+}
+
+export function appleArtistUrl(id: string, slug = 'nirvana'): string {
+  return `https://music.apple.com/cn/artist/${slug}/${id}`;
+}
+
+/** Apple 来源取数成功的结果：简介与曲风一起到，`text` 为空表示这一页没有简介 */
+export function appleFetchResult(
+  id: string,
+  language: BiographyLanguage,
+  text = 'A grunge band.',
+  name = 'Nirvana',
+): BiographyFetchResult {
+  const url = appleArtistUrl(id);
+  const now = Date.now();
+  const expiresAt = now + 60_000;
+  const document: BiographyDocument | null = text
+    ? {
+        source: 'apple',
+        sourceId: id,
+        artist: name,
+        language,
+        textLanguage: 'en',
+        paragraphs: [text],
+        url,
+        attribution: { name: 'Apple Music', url },
+      }
+    : null;
+  return {
+    ok: true,
+    store: true,
+    entry: {
+      source: 'apple',
+      sourceId: id,
+      artist: name,
+      language,
+      fetchedAt: now,
+      expiresAt,
+      document,
+      details: {
+        source: 'apple',
+        artist: name,
+        language,
+        url,
+        fetchedAt: now,
+        expiresAt,
+        tags: ['Rock'],
+        counters: [],
+        similar: [],
+      },
+    },
+  };
 }

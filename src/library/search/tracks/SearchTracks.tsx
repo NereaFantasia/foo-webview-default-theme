@@ -299,7 +299,9 @@ export function SearchTracksTable({
           const track = view.trackAt(index);
           if (track) void search.play({ kind: 'track', track });
         }}
-        onMenu={model.menu.open}
+        onMenu={(target, at) =>
+          model.menu.open(target, at, (track) => void search.play({ kind: 'track', track }))
+        }
       />
       <TrackMenu at={model.menu.at} onClose={model.menu.close} isCurrent={model.menu.isCurrent} />
     </>

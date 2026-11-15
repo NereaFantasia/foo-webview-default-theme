@@ -40,8 +40,6 @@ type Shown =
 export interface TrackInfoProps {
   /** 尺寸档位，由预设模板按窗口高度映射分配 */
   readonly size: InfoSize;
-  /** 水平对齐方式；分栏视图默认靠左，居中视图与封面流居中对齐 */
-  readonly align?: 'start' | 'center';
   /** 标题溢出策略；scroll 为跑马灯滚动，clip 为省略截断；减弱动效时统一截断 */
   readonly overflow?: 'scroll' | 'clip';
 }
@@ -58,7 +56,7 @@ const MENU_SCOPE = {
  * 首行渲染曲名与音质/音频规格徽标，次行呈现艺人、专辑链接与实时评级，宽度受限时按预设优先级阶梯折叠次要信息；
  * 支持当前播放与封面流浏览曲目无缝切换，伴随平滑文字翻页退换动效，容器尺寸变更时动态更新档位而不重挂组件
  */
-export function TrackInfo({ size, align = 'start', overflow = 'scroll' }: TrackInfoProps) {
+export function TrackInfo({ size, overflow = 'scroll' }: TrackInfoProps) {
   const t = useAtomValueRawSync(translateAtom);
   const liveTrack = useAtomValueRawSync(currentTrackAtom);
   const { format: liveFormat } = useAtomValueRawSync(nowPlayingAtom);
@@ -91,7 +89,6 @@ export function TrackInfo({ size, align = 'start', overflow = 'scroll' }: TrackI
       aria-label={t('player.nowPlaying')}
       data-scene-element="info"
       data-size={size}
-      data-align={align}
       data-rating-host
       {...menu.trigger}
     >
@@ -124,7 +121,7 @@ export function TrackInfo({ size, align = 'start', overflow = 'scroll' }: TrackI
           ))}
       </div>
       <div ref={subRow} className={styles.subRow}>
-        <TrackByline hint="title" className={styles.sub} track={track} />
+        <TrackByline className={styles.sub} track={track} />
         {parts.rating && (
           <span className={styles.rating}>
             <NowPlayingRating size="large" track={track} />

@@ -70,7 +70,7 @@ function failureOf(error: unknown): MusicClientFailureCode {
 }
 
 /**
- * 维护在线艺人专辑页签数据
+ * 维护在线艺人的专辑数据
  * 首页即时响应，后续页面串行加载以遵守上游频率限制；单艺人请求支持独立 AbortController 取消
  * 本地后端端口连接就绪后自动触发活跃订阅重试；上游错误不自动重试以防限流
  */

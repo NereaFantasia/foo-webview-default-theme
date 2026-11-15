@@ -16,7 +16,7 @@ import { playlistsAtom } from '../../playback/playlists.ts';
 import { createDragHover, type DragHoverSpot } from './dragHover.ts';
 import { historyAtom, historyKey } from '../../nav/navHistory.ts';
 import { PANE_ONLY_ATTR } from '../../nav/sidebar/paneFades.ts';
-import { PLACE_LABELS } from '../../nav/places.ts';
+import { PLACE_LABELS, type PlaceId } from '../../nav/places.ts';
 import styles from './SidebarRail.module.css';
 import { SidebarIcon } from '../../nav/sidebar/SidebarIcon.tsx';
 import { SidebarItem } from '../../nav/sidebar/SidebarItem.tsx';
@@ -71,8 +71,10 @@ const PANE_ONLY = { [PANE_ONLY_ATTR]: true };
  * 播放列表节收成一个图标，点它在右边弹出列表浮层；拖着专辑或文件停在它上面也会弹出。有列表在播时它的
  * 右上角点小圆点。选中与展开态同一套：浅底加竖条，正在看一张列表时亮
  * 播放列表图标
+ *
+ * `omit` 里的地点不列出：浏览面板承载不了视频与设置
  */
-export function SidebarRail() {
+export function SidebarRail({ omit }: { readonly omit?: ReadonlySet<PlaceId> }) {
   const slots = useShellSlots();
   const showSearch = slots.useShowSearch();
   const t = useAtomValueRawSync(translateAtom);
@@ -149,6 +151,7 @@ export function SidebarRail() {
     };
   }, [hover]);
 
+  const listed = (item: SidebarEntry) => !omit?.has(item.place);
   const entry = (item: SidebarEntry, dot = false, paneOnly = false) => (
     <SidebarItem
       key={item.id}
@@ -187,8 +190,8 @@ export function SidebarRail() {
       />
       {TOP_ITEMS.map((item) => entry(item))}
       <NavDivider className={classes.divider} {...PANE_ONLY} />
-      {/* 资料库那一节在展开态里收着时，这几项也只在图标态里有。 */}
-      {LIBRARY_ITEMS.map((item) => entry(item, false, !sections.library))}
+      {/* 资料库那一节在展开态里处于收起时，这几项只在图标态里出现 */}
+      {LIBRARY_ITEMS.filter(listed).map((item) => entry(item, false, !sections.library))}
       <NavDivider className={classes.divider} {...PANE_ONLY} />
       <div ref={anchor} className={styles.anchor} {...PANE_ONLY}>
         <SidebarItem
@@ -206,7 +209,7 @@ export function SidebarRail() {
           }}
         />
       </div>
-      <div className={styles.footer}>{entry(SETTINGS_ITEM)}</div>
+      {listed(SETTINGS_ITEM) && <div className={styles.footer}>{entry(SETTINGS_ITEM)}</div>}
       {flyout && (
         <slots.PlaylistFlyout
           anchor={anchor}

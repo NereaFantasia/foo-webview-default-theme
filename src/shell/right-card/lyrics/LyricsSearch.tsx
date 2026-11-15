@@ -56,7 +56,9 @@ export function LyricsSearch({
     restore: (value) => {
       pendingSnapshot.current = value;
       setKeywords(value.keywords);
-      void service.search(value.keywords);
+      // 手里的结果已经是这个查询的就不重搜：重搜会把列表换掉，刚恢复的滚动位置与焦点又丢了
+      if (result.status !== 'ready' || result.keywords.trim() !== value.keywords.trim())
+        void service.search(value.keywords);
     },
   });
   useLayoutEffect(() => {

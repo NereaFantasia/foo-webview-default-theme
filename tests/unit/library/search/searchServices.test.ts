@@ -96,6 +96,31 @@ describe('结果页的在线结果', () => {
     expect(search.online('陈奕迅')).not.toBe(first);
   });
 
+  it('结果页接过下拉为同一查询词取到的类别，只为其余类别向平台要', async () => {
+    const asked: string[] = [];
+    const music: Music = {
+      async search(input) {
+        asked.push(`${input.query}:${input.kind}`);
+        return { items: [], nextCursor: null, total: 0, discardedCount: 0 };
+      },
+    };
+    const { store, search } = setup(music);
+    search.onlinePreview.setText('陈奕迅');
+    search.onlinePreview.load(['artist', 'album', 'track']);
+    const { kinds } = search.onlinePreview;
+    await vi.waitFor(() =>
+      expect([
+        store.get(kinds.artist).status,
+        store.get(kinds.album).status,
+        store.get(kinds.track).status,
+      ]).toEqual(['ready', 'ready', 'ready']),
+    );
+    const page = search.online('陈奕迅');
+    page.load(['artist', 'album', 'track', 'playlist']);
+    await vi.waitFor(() => expect(store.get(page.kinds.playlist).status).toBe('ready'));
+    expect(asked).toEqual(['陈奕迅:artist', '陈奕迅:album', '陈奕迅:track', '陈奕迅:playlist']);
+  });
+
   it('下拉里的在线预览与结果页读同一个所选来源，各自按它搜', async () => {
     const asked: string[] = [];
     const music: Music = {

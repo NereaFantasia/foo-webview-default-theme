@@ -1,6 +1,7 @@
 import { createElement, StrictMode, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createStore } from 'jotai/vanilla';
+import { recordError } from '../diagnostics/globalErrors.ts';
 import { startWindowMode, windowModeAtom } from '../host/windowMode.ts';
 import { BUILTIN_MESSAGES, createTranslate, resolveBuiltin } from '../i18n/translate.ts';
 import { StartupNotice, type StartupNoticeState } from './StartupNotice.tsx';
@@ -98,8 +99,9 @@ export function startFrontend(container: HTMLElement) {
           }),
         ),
       );
-    } catch {
+    } catch (error) {
       if (!disposed) {
+        recordError('start', error);
         startFailed = true;
         notice('startFailed');
       }

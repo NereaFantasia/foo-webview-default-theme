@@ -1,0 +1,51 @@
+/* 设置编辑里预设单选、恢复默认与起始页这几块；参数行与分组的版式在 `SettingsRows.module.css` */
+/* 预设一行：线框缩略图、名字、选中的勾 */
+.preset {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--text-primary);
+}
+
+.thumb {
+  flex: none;
+  width: 48px;
+  height: 32px;
+  border-radius: var(--borderRadiusLarge);
+  color: var(--text-primary);
+  background-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 15%, transparent);
+}
+
+.name {
+  flex: 1 1 auto;
+  text-align: start;
+}
+
+.tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.reset {
+  align-self: flex-start;
+}
+
+/* 起始页：标签一行，下面并排三个带图标的标签键 */
+.start {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+  padding-block: var(--spacingVerticalXS);
+  color: var(--text-secondary);
+  font-size: var(--fontSizeBase300);
+}
+
+.startChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalXS);
+}

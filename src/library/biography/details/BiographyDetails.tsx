@@ -72,7 +72,7 @@ export function BiographyDetails({
       )}
       {!!details?.tags.length && (
         <div className={styles.tags}>
-          <span>{t('biography.tags')}</span>
+          <span>{t(details.source === 'apple' ? 'biography.genres' : 'biography.tags')}</span>
           <span>{details.tags.join(' · ')}</span>
         </div>
       )}

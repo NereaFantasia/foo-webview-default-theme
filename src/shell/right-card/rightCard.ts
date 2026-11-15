@@ -40,7 +40,7 @@ const navigationAtom = atom<RightCardNavigation>({
   arrival: null,
 });
 
-/** 做好了、能停上去的几页；其余几页在分页栏里置灰 */
+/** 做好了、能停上去的几页 */
 export const READY_PAGES: ReadonlySet<RightCardPage> = new Set(['queue', 'bio', 'info', 'lyrics']);
 
 export const RIGHT_CARD_STORAGE_KEY = 'default-theme.right-card.v1';
@@ -117,8 +117,6 @@ export interface RightCardService {
   toggle(page: RightCardPage): void;
   /** 关闭时以浮层预览，不改变停靠偏好；再次悬停可切换预览页 */
   peek(page: RightCardPage): void;
-  /** 分页栏换页：卡照开着，只换页 */
-  select(page: RightCardPage): void;
   close(): void;
   /** 拖宽中每跨一个整像素调一次；和此刻一样就不写 */
   setWidth(width: number): void;
@@ -193,9 +191,6 @@ export function startRightCard(
       if (current.form !== 'none' && !current.peeking) return;
       if (current.prefs.page !== page) history.navigate({ id: page });
       store.set(overlayAtom, 'peek');
-    },
-    select(page) {
-      if (READY_PAGES.has(page)) history.navigate({ id: page });
     },
     close() {
       if (store.get(overlayAtom)) {

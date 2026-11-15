@@ -50,7 +50,7 @@ async function change(page: Page, method: string, value: string | boolean) {
   );
 }
 
-test('默认关闭，确认身份后显示完整正文与出处许可', async ({ page }) => {
+test('默认关闭，确认身份后显示完整正文与出处许可 @smoke', async ({ page }) => {
   const host = await start(page);
   await expect(page.getByText('在线简介未开启')).toBeVisible();
   expect(host.callsTo('http.get')).toEqual([]);

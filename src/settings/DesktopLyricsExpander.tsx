@@ -3,15 +3,14 @@ import { Subtitles20Regular } from '@fluentui/react-icons';
 import { hexFromArgb, TonalPalette } from '@material/material-color-utilities';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../i18n/locale.ts';
+import { FontPicker } from '../kit/FontPicker.tsx';
 import { useService } from '../kit/useService.ts';
 import { desktopLyricsKey, DESKTOP_LYRICS_SUNG_STEP } from '../lyrics/desktop/desktopLyrics.ts';
 import {
   DESKTOP_LYRICS_ALIGNS,
   DESKTOP_LYRICS_BACKGROUNDS,
   DESKTOP_LYRICS_PALETTES,
-  DESKTOP_LYRICS_MOTION_PRESETS,
   DESKTOP_LYRICS_PREF,
-  DESKTOP_LYRICS_SIZES,
   type DesktopLyricsPref,
 } from '../lyrics/desktop/desktopLyricsPrefs.ts';
 import { accentRampAtom } from '../theme/accentState.ts';
@@ -19,13 +18,14 @@ import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { darkTheme } from '../theme/themes.ts';
 import { AlignIcon } from './AlignIcon.tsx';
 import { ColorPicker } from './ColorPicker.tsx';
+import { DesktopMotionRows, DesktopSizeRows } from './DesktopLyricsRows.tsx';
+import { FontWeightRow } from './FontWeightRow.tsx';
 import styles from './DesktopLyricsExpander.module.css';
 import { SettingsChoice } from './SettingsChoice.tsx';
 import { SettingsExpander } from './SettingsExpander.tsx';
 import { SettingsRow } from './SettingsRow.tsx';
 import { SettingsSaveNotice } from './SettingsSaveNotice.tsx';
 import { SettingsSegmented } from './SettingsSegmented.tsx';
-import { SettingsSelect } from './SettingsSelect.tsx';
 import { DesktopLyricsThumb } from './thumbnails/DesktopLyricsThumb.tsx';
 import { useSettingsLayout } from './useSettingsLayout.ts';
 
@@ -101,37 +101,24 @@ export function DesktopLyricsExpander() {
         />
       )}
     >
-      <SettingsRow title={t('lyrics.preset')} field>
+      <DesktopMotionRows pref={pref} update={update} />
+      <SettingsRow title={t('desktopLyrics.font')} field>
         {(ids) => (
-          <SettingsSelect
+          <FontPicker
             {...ids}
-            value={pref.motionPreset}
-            options={DESKTOP_LYRICS_MOTION_PRESETS.map((value) => ({
-              value,
-              label: t(`lyrics.preset.${value}`),
-            }))}
-            onChange={(motionPreset) => update({ motionPreset })}
+            value={pref.fontFamily}
+            defaultLabel={t('lyrics.followInterface')}
+            fill={compact}
+            onChange={(fontFamily) => update({ fontFamily })}
           />
         )}
       </SettingsRow>
-      <SettingsRow title={t('desktopLyrics.size')} field>
-        {() => (
-          <SettingsSegmented
-            label={t('desktopLyrics.size')}
-            value={pref.size}
-            options={DESKTOP_LYRICS_SIZES.map((value) => ({
-              value,
-              label: t(`desktopLyrics.size.${value}`),
-              icon: (
-                <span className={`${styles.aa} ${styles[value]}`} aria-hidden>
-                  Aa
-                </span>
-              ),
-            }))}
-            onChange={(size) => update({ size })}
-          />
-        )}
-      </SettingsRow>
+      <FontWeightRow
+        family={pref.fontFamily}
+        weight={pref.fontWeight}
+        onChange={(fontWeight) => update({ fontWeight })}
+      />
+      <DesktopSizeRows pref={pref} update={update} />
       <SettingsRow title={t('desktopLyrics.align')} field>
         {() => (
           <SettingsSegmented

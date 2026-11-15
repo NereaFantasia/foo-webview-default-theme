@@ -2,7 +2,7 @@ import { FluentProvider, makeStyles, mergeClasses } from '@fluentui/react-compon
 import { PlaybackClock } from 'foo-webview-sdk/bridge';
 import { Provider, useAtomValueRawSync } from 'jotai/react';
 import { createStore } from 'jotai/vanilla';
-import { createElement, StrictMode } from 'react';
+import { createElement, StrictMode, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DesktopLyricsWindow } from '../lyrics/desktop/DesktopLyricsWindow.tsx';
 import { startDesktopLyricsPopup } from '../lyrics/desktop/desktopLyricsPopup.ts';
@@ -10,6 +10,7 @@ import { reducedMotionAtom, watchReducedMotion } from '../motion/reducedMotion.t
 import { MOTION_VARIABLES, REDUCED_MOTION_VARIABLES } from '../motion/timing.ts';
 import { browserMatchMedia } from '../theme/mediaQuery.ts';
 import { ROLE_VALUES, roleProperties } from '../theme/roles.ts';
+import { fontStack } from '../theme/fontStack.ts';
 import { darkTheme } from '../theme/themes.ts';
 import '../styles/global.css';
 
@@ -22,9 +23,18 @@ const useStyles = makeStyles({
 function Root(props: Parameters<typeof DesktopLyricsWindow>[0]) {
   const classes = useStyles();
   const reduced = useAtomValueRawSync(reducedMotionAtom);
+  const view = useAtomValueRawSync(props.popup.view);
+  // 弹窗读不到主窗口的偏好：界面字体由主窗口随显示参数下发
+  const theme = useMemo(
+    () => ({
+      ...darkTheme,
+      fontFamilyBase: fontStack({ latin: view?.uiFont ?? '', cjk: view?.cjkFont ?? '' }),
+    }),
+    [view?.uiFont, view?.cjkFont],
+  );
   return createElement(
     FluentProvider,
-    { theme: darkTheme, className: mergeClasses(classes.root, reduced && classes.reduced) },
+    { theme, className: mergeClasses(classes.root, reduced && classes.reduced) },
     createElement(DesktopLyricsWindow, props),
   );
 }

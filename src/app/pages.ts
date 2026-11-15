@@ -9,6 +9,7 @@ import { SettingsPage } from '../settings/SettingsPage.tsx';
 import { SearchPage } from '../library/search/SearchPage.tsx';
 import type { PageProps, PlaceId } from '../nav/places.ts';
 import { ARTISTS_PAGES } from '../library/artists/page/ArtistsPage.tsx';
+import { FavoritesPage } from '../library/favorites/FavoritesPage.tsx';
 import { HomePage } from '../library/home/HomePage.tsx';
 import { ChannelPage } from '../library/home/ChannelPage.tsx';
 import { OnlineListPage } from '../library/online/OnlineListPage.tsx';
@@ -26,6 +27,7 @@ const VideoPage = deferPage(() =>
 export const PAGES: Partial<Record<PlaceId, ComponentType<PageProps>>> = {
   ...ARTISTS_PAGES,
   home: HomePage,
+  favorites: FavoritesPage,
   onlineList: OnlineListPage,
   onlineAlbums: OnlineAlbumsPage,
   channel: ChannelPage,

@@ -24,6 +24,11 @@ export interface BiographyArticleProps {
   readonly factsUrl?: string;
   readonly artistImages?: ReadonlyMap<string, string>;
   readonly artistLinks?: ReadonlyMap<string, () => void>;
+  /**
+   * 来源行末的「不是这位」，只在 Apple 来源下给：正文来自 Apple 时换 Apple 认的那位，来自 Last.fm 的补全时
+   * 停用这位艺人的补全
+   */
+  readonly onNotThis?: () => void;
   readonly t: BiographyTranslate;
   onOpen(url: string): void;
 }
@@ -31,6 +36,7 @@ export interface BiographyArticleProps {
 export function BiographyArticle(props: BiographyArticleProps) {
   const { document, details, t, onOpen } = props;
   const classes = useStyles();
+  const license = document?.attribution.license;
   const hasContent =
     document ||
     props.facts.length ||
@@ -41,7 +47,7 @@ export function BiographyArticle(props: BiographyArticleProps) {
   return (
     <div className={styles.root} data-biography-article>
       {document && (
-        <div className={styles.body} lang={document.language}>
+        <div className={styles.body} lang={document.textLanguage ?? document.language}>
           <div className={styles.text}>
             {document.paragraphs.map((paragraph, index) => (
               <p key={index}>
@@ -70,12 +76,24 @@ export function BiographyArticle(props: BiographyArticleProps) {
               <>
                 <span>{t('biography.textSource')} </span>
                 <Link className={classes.source} onClick={() => onOpen(document.url)}>
-                  {t('biography.source')}
+                  {document.source === 'lastfm' ? t('biography.source') : document.attribution.name}
                 </Link>
-                {' · '}
-                <Link className={classes.source} onClick={() => onOpen(document.licenseUrl)}>
-                  {document.license}
-                </Link>
+                {license && (
+                  <>
+                    {' · '}
+                    <Link className={classes.source} onClick={() => onOpen(license.url)}>
+                      {license.name}
+                    </Link>
+                  </>
+                )}
+                {props.onNotThis && (
+                  <>
+                    {' · '}
+                    <Link className={classes.source} onClick={props.onNotThis}>
+                      {t('biography.appleNotThis')}
+                    </Link>
+                  </>
+                )}
               </>
             )}
             {props.factsUrl && (
@@ -95,7 +113,7 @@ export function BiographyArticle(props: BiographyArticleProps) {
               </>
             )}
           </div>
-          {details && (
+          {details?.source === 'lastfm' && (
             <div>
               <Link className={classes.source} onClick={() => onOpen(details.url)}>
                 {t('biography.detailsSource')}

@@ -4,6 +4,7 @@ import {
 } from '../../kit/ScrollMenuPopover.tsx';
 import { MenuList } from '@fluentui/react-components';
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useRetained } from '../../kit/useRetained.ts';
 import { MENU_SURFACE_MOTION } from '../../motion/MenuMotion.tsx';
 import { useColumnChecklist } from './ColumnChecklist.tsx';
 import type { ColumnsModel } from './columnsModel.ts';
@@ -32,9 +33,11 @@ export function ColumnMenu({ at, columns, root, onClose }: ColumnMenuProps) {
     const active = document.activeElement;
     returnTo.current = active instanceof HTMLElement && active !== document.body ? active : null;
   }, [open]);
+  // 关闭时落点先被清空，退场动画里菜单要按关闭前的落点画，不然会跳到左上角再消失
+  const shownAt = useRetained(at);
   const target = useMemo(
-    () => at && { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
-    [at],
+    () => shownAt && { getBoundingClientRect: () => new DOMRect(shownAt.x, shownAt.y, 0, 0) },
+    [shownAt],
   );
   return (
     <Menu
