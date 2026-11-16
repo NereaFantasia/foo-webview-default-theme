@@ -376,3 +376,115 @@ test('章节子曲目从章节起点出画面，同一文件换章节沿用已�
   expect(fixture.host.callsTo('media.getStreamUrl')).toHaveLength(issued);
   expect(fixture.host.callsTo('media.getContainerInfo')).toHaveLength(probed);
 });
+
+test('键位：M 静音、数字与 Home 跳转、J / L 跳 10 秒、Shift+N / Shift+P 切曲', async ({ page }) => {
+  const fixture = await openVideo(page);
+  await page.getByRole('region', { name: '视频', exact: true }).focus();
+  await page.keyboard.press('m');
+  await expect.poll(() => fixture.calls('playback.toggleMute').length).toBe(1);
+  // 时长 60 秒：数字 n 跳到 n0%
+  for (const [key, position] of [
+    ['5', 30],
+    ['l', 40],
+    ['j', 30],
+    ['Home', 0],
+    ['9', 54],
+  ] as const) {
+    await page.keyboard.press(key);
+    await expect.poll(() => fixture.state.position).toBe(position);
+  }
+  await page.keyboard.press('Shift+N');
+  await expect.poll(() => fixture.calls('playback.next').length).toBe(1);
+  await page.keyboard.press('Shift+P');
+  await expect.poll(() => fixture.calls('playback.previous').length).toBe(1);
+  expect(fixture.calls('playback.toggleMute')).toHaveLength(1);
+});
+
+test('按住空格只切换一次播放状态', async ({ page }) => {
+  const fixture = await openVideo(page);
+  await page.getByRole('region', { name: '视频', exact: true }).focus();
+  // 同一个键连续 down 就是自动重复
+  for (let count = 0; count < 4; count += 1) await page.keyboard.down(' ');
+  await page.keyboard.up(' ');
+  await expect.poll(() => fixture.calls('playback.playOrPause').length).toBe(1);
+  expect(fixture.calls('playback.playOrPause')).toHaveLength(1);
+});
+
+test('画面上单击播放 / 暂停、双击全屏、滚轮调音量；控制条上的点击不算', async ({ page }) => {
+  const fixture = await openVideo(page);
+  const picture = page.locator('video[data-visible]');
+  await expect(picture).toBeVisible();
+  await picture.click();
+  await expect.poll(() => fixture.calls('playback.playOrPause').length).toBe(1);
+  await picture.dblclick();
+  await expect.poll(() => fixture.host.callsTo('window.enterFullscreen').length).toBe(1);
+  // 单击推迟 250 ms 才执行，双击要撤销它：等过这段时间再确认没有多出播放命令
+  await page.waitForTimeout(400);
+  expect(fixture.calls('playback.playOrPause')).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-expanded]')).toHaveCount(0);
+
+  await picture.hover();
+  await page.mouse.wheel(0, -100);
+  await expect.poll(() => fixture.calls('playback.volumeUp').length).toBe(1);
+  // 触控板的小幅滚动累计到一档才算
+  for (let count = 0; count < 3; count += 1) await page.mouse.wheel(0, 40);
+  await expect.poll(() => fixture.calls('playback.volumeDown').length).toBe(1);
+
+  await page
+    .locator('[data-video-controls]')
+    .getByRole('button', { name: '前进 5 秒', exact: true })
+    .click();
+  await expect.poll(() => fixture.state.position).toBe(10);
+  await page.waitForTimeout(400);
+  expect(fixture.calls('playback.playOrPause')).toHaveLength(1);
+});
+
+test('播放栏在标题栏时，视频键自己退出拖动区，否则点击到不了页面', async ({ page }) => {
+  await choosePlayerBar(page, 'titlebar');
+  await openVideo(page);
+  const entry = page.locator('header [data-video-entry]');
+  await expect(entry).toBeVisible();
+  expect(
+    await entry.evaluate((element) =>
+      getComputedStyle(element).getPropertyValue('-webkit-app-region'),
+    ),
+  ).toBe('no-drag');
+});
+
+test('内嵌的视频页四周让出阅读面的细边，不盖住主视图边框', async ({ page }) => {
+  await openVideo(page);
+  // 几何本身就是被测行为：边线画在阅读面最外的一圈，页面压在上面就看不见了
+  const gaps = await page.getByRole('region', { name: '视频', exact: true }).evaluate((element) => {
+    let card = element.parentElement;
+    while (card && !card.querySelector(':scope > [data-reading-surface]'))
+      card = card.parentElement;
+    const surface = card?.querySelector(':scope > [data-reading-surface]');
+    if (!surface) return null;
+    const outer = surface.getBoundingClientRect();
+    const inner = element.getBoundingClientRect();
+    return [
+      inner.left - outer.left,
+      inner.top - outer.top,
+      outer.right - inner.right,
+      outer.bottom - inner.bottom,
+    ];
+  });
+  expect(gaps).not.toBeNull();
+  // 细边 1 像素；布局有子像素误差，取一半作界
+  for (const gap of gaps ?? []) expect(gap).toBeGreaterThanOrEqual(0.5);
+});
+
+test('播放流媒体时，打开所在文件夹与画面相关的操作都置灰', async ({ page }) => {
+  const fixture = await openVideo(page);
+  const region = page.getByRole('region', { name: '视频', exact: true });
+  const controls = page.locator('[data-video-controls]');
+  await expect(region.getByRole('button', { name: '打开所在文件夹', exact: true })).toBeEnabled();
+  fixture.state.track = makeTrack({ path: 'https://radio.example/live', duration: 0 });
+  await fixture.host.emit('playback:trackChanged', fixture.state.track);
+  await expect(page.getByRole('group', { name: '此曲目没有视频', exact: true })).toBeVisible();
+  await expect(region.getByRole('button', { name: '打开所在文件夹', exact: true })).toBeDisabled();
+  for (const name of ['画面适配', '全窗口', '全屏']) {
+    await expect(controls.getByRole('button', { name, exact: true })).toBeDisabled();
+  }
+});

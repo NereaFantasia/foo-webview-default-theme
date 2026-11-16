@@ -9,13 +9,12 @@ import { lyricsKey } from '../lyrics/lyricsService.ts';
 import { lyricsSettingsKey } from '../lyrics/lyricsSettings.ts';
 import { desktopLyricsKey } from '../lyrics/desktop/desktopLyrics.ts';
 import { lyricsPrefsKey, LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY } from '../lyrics/lyricsPrefs.ts';
-import { lyricsMotionKey, LYRICS_MOTION_KEY } from '../lyrics/lyricsMotion.ts';
+import { lyricsMotionKey, LYRICS_VIEW_MOTION_KEYS } from '../lyrics/lyricsMotion.ts';
 import { lyricsCacheKey, LYRICS_CACHE_PREF_KEY } from '../lyrics/lyricsCache.ts';
 import {
   lyricsDisplayKey,
-  LYRICS_ALIGN_KEY,
-  LYRICS_DISPLAY_KEY,
-  LYRICS_TYPOGRAPHY_KEY,
+  LYRICS_PROCESSING_KEY,
+  LYRICS_VIEW_KEYS,
 } from '../lyrics/lyricsDisplay.ts';
 import { currentTrackAtom, playbackTrackStatusAtom } from '../playback/playback.ts';
 import { playbackCanSeekAtom, playbackConnectedAtom } from '../playback/playerAtoms.ts';
@@ -32,6 +31,11 @@ const LyricsPage = lazy(() =>
     default: LyricsPage,
   })),
 );
+
+/** 主窗口歌词栏写入的显示存档键，保存失败时在歌词栏提示。沉浸视图存档的保存失败只在设置页提示 */
+const MAIN_DISPLAY_KEYS = [LYRICS_VIEW_KEYS.main, LYRICS_PROCESSING_KEY];
+const DISPLAY_KEYS = [...Object.values(LYRICS_VIEW_KEYS), LYRICS_PROCESSING_KEY];
+const MOTION_KEYS = Object.values(LYRICS_VIEW_MOTION_KEYS);
 
 const useStyles = makeStyles({
   loading: {
@@ -54,11 +58,9 @@ function LyricsContent({
   const prefSaves = useAtomValueRawSync(integration.prefs.persistence.state);
   const displaySaves = useAtomValueRawSync(integration.display.persistence.state);
   const archiveSaves = useAtomValueRawSync(integration.archive.persistence.state);
-  const saveFailed = [
-    ...prefSaves.values(),
-    ...displaySaves.values(),
-    ...archiveSaves.values(),
-  ].some((state) => state.status === 'failed');
+  const saveFailed =
+    [...prefSaves.values(), ...archiveSaves.values()].some((state) => state.status === 'failed') ||
+    MAIN_DISPLAY_KEYS.some((key) => displaySaves.get(key)?.status === 'failed');
   const active = useAtomValueRawSync(integration.active);
   const connected = useAtomValueRawSync(playbackConnectedAtom);
   const trackStatus = useAtomValueRawSync(playbackTrackStatusAtom);
@@ -88,7 +90,7 @@ function LyricsContent({
             />
             <SettingsSaveNotice
               persistence={integration.display.persistence}
-              keys={[LYRICS_DISPLAY_KEY, LYRICS_TYPOGRAPHY_KEY, LYRICS_ALIGN_KEY]}
+              keys={MAIN_DISPLAY_KEYS}
             />
             <SettingsSaveNotice
               persistence={integration.archive.persistence}
@@ -113,18 +115,12 @@ function LyricsSettingsContent({ integration }: { readonly integration: LyricsIn
             persistence={integration.prefs.persistence}
             keys={[LYRICS_PREFS_KEY, LYRICS_PRIORITY_KEY]}
           />
-          <SettingsSaveNotice
-            persistence={integration.motion.persistence}
-            keys={[LYRICS_MOTION_KEY]}
-          />
+          <SettingsSaveNotice persistence={integration.motion.persistence} keys={MOTION_KEYS} />
           <SettingsSaveNotice
             persistence={integration.cache.persistence}
             keys={[LYRICS_CACHE_PREF_KEY]}
           />
-          <SettingsSaveNotice
-            persistence={integration.display.persistence}
-            keys={[LYRICS_DISPLAY_KEY, LYRICS_TYPOGRAPHY_KEY, LYRICS_ALIGN_KEY]}
-          />
+          <SettingsSaveNotice persistence={integration.display.persistence} keys={DISPLAY_KEYS} />
         </>
       }
     />
@@ -146,7 +142,7 @@ export function LyricsRoot({
     if (store.get(rightCard.card.view).form !== 'docked') rightCard.card.close();
     settingsNav.open('lyrics');
   };
-  // 桌面歌词的设置键与菜单项经服务要求打开设置，同样跳到「歌词」组
+  // 桌面歌词的设置键与菜单项经服务请求打开设置，同样跳到「歌词」分区
   const desktopRequests = useAtomValueRawSync(useService(desktopLyricsKey).settingsRequests);
   const handledRequests = useRef(desktopRequests);
   const openSettingsRef = useRef(openSettings);

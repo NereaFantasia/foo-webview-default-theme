@@ -1,0 +1,72 @@
+/* 两种尺寸的字号、行高、内边距、斜边宽度与规格文字不同，用途见 `FormatBadgeProps.size` */
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.badge[data-size='small'] {
+  --badge-pad: var(--spacingHorizontalXS);
+  --badge-slant: 4px;
+  column-gap: var(--spacingHorizontalXS);
+  font-size: var(--fontSizeBase100);
+  line-height: 14px;
+}
+
+.badge[data-size='medium'] {
+  --badge-pad: var(--spacingHorizontalSNudge);
+  --badge-slant: 5px;
+  column-gap: var(--spacingHorizontalSNudge);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+/* 描边画在这一层，只画一次；`overflow` 裁剪使金块的右侧圆角与外框一致 */
+.tag {
+  display: inline-flex;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: var(--strokeWidthThin) solid var(--line);
+  border-radius: var(--borderRadiusMedium);
+  color: var(--text-secondary);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.badge[data-hires] .tag {
+  border-color: color-mix(in srgb, var(--colorPaletteMarigoldBorder2) 70%, transparent);
+}
+
+.codec {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--badge-pad);
+}
+
+/* 金块左边斜切，斜边就是它与编码框的交界。两侧内边距各加斜边宽度的一半，使文字到斜边中线的距离等于普通内边距 */
+.codec:has(+ .tier) {
+  padding-inline-end: calc(var(--badge-pad) + var(--badge-slant) / 2);
+}
+
+.tier {
+  display: flex;
+  align-items: center;
+  margin-inline-start: calc(var(--badge-slant) * -1);
+  padding: 0 var(--badge-pad) 0 calc(var(--badge-pad) + var(--badge-slant) / 2);
+  background: color-mix(in srgb, var(--colorPaletteMarigoldBackground2) 85%, transparent);
+  clip-path: polygon(var(--badge-slant) 0, 100% 0, 100% 100%, 0 100%);
+  color: var(--colorPaletteMarigoldForeground2);
+}
+
+.detail {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.badge[data-size='small'] .detail {
+  color: var(--text-muted);
+}
+
+.badge[data-size='medium'] .detail {
+  font-size: 12px;
+  font-weight: var(--fontWeightRegular);
+}

@@ -234,6 +234,27 @@ describe('startCommandRegistry', () => {
     expect(seen).toEqual([true, undefined]);
   });
 
+  it('按键分派时 run 拿到这次按键，一条命令认领几个键时靠它分辨；鼠标键分派时拿不到', () => {
+    const commands = startCommandRegistry(null);
+    const seen: (string | undefined)[] = [];
+    commands.register({
+      id: 'digits',
+      layer: 'place',
+      keys: [{ key: '1' }, { key: '2' }],
+      buttons: [3],
+      run: (input) => seen.push(input?.key),
+    });
+    commands.dispatchKey(key('2'));
+    commands.dispatchKey(key('1'));
+    commands.dispatchButton({
+      type: 'mouseup',
+      button: 3,
+      defaultPrevented: false,
+      preventDefault() {},
+    });
+    expect(seen).toEqual(['2', '1', undefined]);
+  });
+
   describe('挂在目标上', () => {
     it('键盘在冒泡阶段接手，接手了才拦缺省', () => {
       const { target, fire } = fakeTarget();

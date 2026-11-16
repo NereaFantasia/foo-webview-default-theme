@@ -46,7 +46,8 @@ export interface CommandSpec {
    * 并拦下缺省，冒泡阶段的分派就此跳过。拖动进行中的取消用它，只许 gesture 层
    */
   readonly early?: boolean;
-  run(): void;
+  /** 按键分派时带上这次按键，一条命令认领几个键时靠它分辨；鼠标键分派时没有 */
+  run(input?: KeyInput): void;
 }
 
 /** 分派按键用到的几项；浏览器的 `KeyboardEvent` 满足它 */
@@ -144,9 +145,9 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
     return null;
   }
 
-  function runPicked(spec: CommandSpec | null): string | null {
+  function runPicked(spec: CommandSpec | null, key?: KeyInput): string | null {
     if (!spec) return null;
-    spec.run();
+    spec.run(key);
     return spec.id;
   }
 
@@ -173,6 +174,7 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
       if (input.defaultPrevented || input.isComposing) return null;
       return runPicked(
         pick((spec) => spec.keys?.some((chord) => sameChord(chord, input)) ?? false, input),
+        input,
       );
     },
     dispatchButton(input) {
@@ -205,7 +207,7 @@ export function startCommandRegistry(target: InputTarget | null): CommandRegistr
         (candidate.keys?.some((chord) => sameChord(chord, event)) ?? false),
       event,
     );
-    if (runPicked(spec)) event.preventDefault();
+    if (runPicked(spec, event)) event.preventDefault();
   }
 
   /**

@@ -16,7 +16,8 @@ import type { UpNextTrack } from '../../playback/queue/upNextModel.ts';
 import { useDisplayTrack } from '../../track/displayTrack.ts';
 import { NowPlayingRating } from '../../track/NowPlayingRating.tsx';
 import { TrackByline } from '../../track/TrackByline.tsx';
-import { formatBadge, type FormatReading } from '../../track/trackFormat.ts';
+import { FormatBadge } from '../../track/FormatBadge.tsx';
+import type { FormatReading } from '../../track/trackFormat.ts';
 import { coverflowSelectionAtom } from '../scene/coverflowAtoms.ts';
 import styles from './TrackInfo.module.css';
 import {
@@ -76,7 +77,6 @@ export function TrackInfo({ size, overflow = 'scroll' }: TrackInfoProps) {
   const { track } = shown;
   const full = shown.kind === 'live' ? shown : null;
   const parts = partsOf(tier);
-  const badge = full?.track ? formatBadge(full.track, full.format) : null;
   const menu = useNowPlayingMenu(full?.track ?? null, MENU_SCOPE);
   const online = full?.track ? trackOrigin(full.track.path) === 'online' : false;
   const scroll = overflow === 'scroll';
@@ -110,13 +110,14 @@ export function TrackInfo({ size, overflow = 'scroll' }: TrackInfoProps) {
               <QualityButton track={full.track} size="large" />
             </span>
           ) : (
-            badge && (
-              <span className={styles.badge} data-format-badge>
-                <span className={styles.codec}>{badge.codec}</span>
-                {parts.detail && badge.detail && (
-                  <span className={styles.detail}>{badge.detail}</span>
-                )}
-              </span>
+            full?.track && (
+              <FormatBadge
+                className={styles.badge}
+                track={full.track}
+                reading={full.format}
+                size="medium"
+                showDetail={parts.detail}
+              />
             )
           ))}
       </div>

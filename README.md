@@ -73,6 +73,15 @@ https://github.com/user-attachments/assets/3d3e6ab5-0ad8-48af-b1f5-dcde3ca725c5
 
 Requires foo_ui_webview2 2.2.0 or later, running as the standalone window (`Webview2 UI` as the default user interface). In DUI and CUI panels the theme only shows a notice that panels are not supported.
 
+**With the installer (recommended)**
+
+1. Download `foo-webview-default-theme-setup-<version>.exe` from [Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases) and run it. Choose the foobar2000 folder; the installer adds the component and the theme without changing foobar2000's configuration.
+2. Start foobar2000 and, when it asks which user interface module to use, select Webview2 UI.
+
+The installer is unsigned, so Windows SmartScreen asks for confirmation: choose More info, then Run anyway. It needs x64 Windows and foobar2000 2.0 or later; 32-bit and 64-bit foobar2000 are both supported.
+
+**Manually**
+
 1. Download `foo-webview-default-theme-<version>.zip` from [Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
 2. Extract it to `<profile>\webview-ui\<template>\` so that `index.html` sits directly in that folder.
 3. Select the template on the foo_ui_webview2 preferences page, then restart foobar2000.

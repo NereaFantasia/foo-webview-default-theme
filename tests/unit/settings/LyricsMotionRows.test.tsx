@@ -1,40 +1,33 @@
 // @vitest-environment jsdom
 import { Provider } from 'jotai/react';
-import { atom, createStore } from 'jotai/vanilla';
+import { createStore } from 'jotai/vanilla';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { translateAtom } from '../../../src/i18n/locale.ts';
 import { ServicesContext, serviceMap } from '../../../src/kit/useService.ts';
 import {
   LYRICS_MOTION_PRESET_VALUES,
   lyricsMotionKey,
+  startLyricsMotion,
   type LyricsMotion,
-  type LyricsMotionPref,
-  type LyricsMotionService,
 } from '../../../src/lyrics/lyricsMotion.ts';
-import { LyricsMotionExpander } from '../../../src/settings/LyricsMotionExpander.tsx';
+import type { LyricsView } from '../../../src/lyrics/lyricsSettings.ts';
+import { LyricsMotionRows } from '../../../src/settings/LyricsMotionRows.tsx';
 
 interface ActEnvironment {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 }
 
-function mount(motion: LyricsMotion) {
+/** 先改 `customized` 视图的动效，再渲染 `view` 视图的各行 */
+function mount(
+  motion: LyricsMotion,
+  customized: LyricsView = 'main',
+  view: LyricsView = customized,
+) {
   const store = createStore();
-  const pref = atom<LyricsMotionPref>({ preset: 'custom', custom: motion });
-  const service: LyricsMotionService = {
-    persistence: {
-      state: atom(new Map()),
-      retry: vi.fn(() => Promise.resolve(true)),
-      settled: vi.fn(() => Promise.resolve()),
-    },
-    ready: Promise.resolve(),
-    pref,
-    motion: atom(motion),
-    choosePreset: vi.fn(),
-    customize: vi.fn(),
-    dispose: vi.fn(),
-  };
+  const service = startLyricsMotion(store);
+  service.customize(motion, customized);
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -46,13 +39,10 @@ function mount(motion: LyricsMotion) {
         createElement(
           ServicesContext,
           { value: serviceMap([{ key: lyricsMotionKey, value: service }]) },
-          createElement(LyricsMotionExpander),
+          createElement(LyricsMotionRows, { view }),
         ),
       ),
     );
-  });
-  act(() => {
-    container.querySelector<HTMLButtonElement>('[data-settings-toggle]')?.click();
   });
   const t = store.get(translateAtom);
   return {
@@ -61,6 +51,7 @@ function mount(motion: LyricsMotion) {
     spins: () => [...container.querySelectorAll<HTMLInputElement>('input[role="spinbutton"]')],
     unmount: () => {
       act(() => root.unmount());
+      service.dispose();
       container.remove();
     },
   };
@@ -68,27 +59,16 @@ function mount(motion: LyricsMotion) {
 
 const AMLL = LYRICS_MOTION_PRESET_VALUES.amll;
 
-describe('歌词动效卡：从属项按条件出现，不置灰', () => {
+describe('歌词动效各行：从属项按条件出现，不置灰', () => {
   let environment: ActEnvironment;
 
   beforeEach(() => {
     environment = globalThis as ActEnvironment;
     environment.IS_REACT_ACT_ENVIRONMENT = true;
-    // jsdom 没有网页动画接口，展开区的滑出动画用它占位
-    Object.defineProperty(Element.prototype, 'animate', {
-      configurable: true,
-      value: vi.fn(() => ({ finished: Promise.resolve(), cancel() {} })),
-    });
-    Object.defineProperty(Element.prototype, 'getAnimations', {
-      configurable: true,
-      value: () => [],
-    });
   });
 
   afterEach(() => {
     delete environment.IS_REACT_ACT_ENVIRONMENT;
-    Reflect.deleteProperty(Element.prototype, 'animate');
-    Reflect.deleteProperty(Element.prototype, 'getAnimations');
   });
 
   it('弹簧与缩放都开：有缩放弹簧的质量、阻尼、刚度，没有过渡时长与曲线', () => {
@@ -134,5 +114,15 @@ describe('歌词动效卡：从属项按条件出现，不置灰', () => {
       expect(view.spins().every((input) => !input.disabled)).toBe(true);
       view.unmount();
     }
+  });
+
+  it('各行读的是所属视图自己的动效，另一视图关了弹簧不影响它', () => {
+    const own = mount({ ...AMLL, spring: false }, 'immersive');
+    expect(own.shown('lyrics.transitionMs')).toBe(true);
+    own.unmount();
+    const other = mount({ ...AMLL, spring: false }, 'immersive', 'main');
+    expect(other.shown('lyrics.transitionMs')).toBe(false);
+    expect(other.shown('lyrics.mass')).toBe(true);
+    other.unmount();
   });
 });

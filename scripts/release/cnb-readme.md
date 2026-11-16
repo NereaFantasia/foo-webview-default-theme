@@ -14,6 +14,10 @@ Default Theme is the default theme for the foobar2000 component foo_ui_webview2,
 
 需要 foo_ui_webview2 2.2.0 或更高版本，并以独立窗口运行。
 
+推荐用安装器：从 Releases 下载 `foo-webview-default-theme-setup-<版本>.exe` 并运行，选择 foobar2000 所在的目录；启动 foobar2000，出现询问用户界面模块的对话框时选择 Webview2 UI。安装器未签名，Windows SmartScreen 会请求确认。
+
+手动安装：
+
 1. 从 Releases 下载 `foo-webview-default-theme-<版本>.zip`。
 2. 解压到 `<profile>\webview-ui\<模板名>\`，`index.html` 应直接位于该目录。
 3. 在 foo_ui_webview2 的首选项页选择该模板，重启 foobar2000。
@@ -23,6 +27,10 @@ Default Theme is the default theme for the foobar2000 component foo_ui_webview2,
 ## Installation
 
 Requires foo_ui_webview2 2.2.0 or later, running as the standalone window.
+
+With the installer (recommended): download `foo-webview-default-theme-setup-<version>.exe` from Releases and run it, choosing the foobar2000 folder; then start foobar2000 and, when it asks which user interface module to use, select Webview2 UI. The installer is unsigned, so Windows SmartScreen asks for confirmation.
+
+Manually:
 
 1. Download `foo-webview-default-theme-<version>.zip` from Releases.
 2. Extract it to `<profile>\webview-ui\<template>\` so that `index.html` sits directly in that folder.

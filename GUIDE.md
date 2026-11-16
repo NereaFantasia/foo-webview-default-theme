@@ -2,9 +2,19 @@ English | [中文](./GUIDE.zh-CN.md)
 
 # Default Theme User Guide
 
-Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.4.0.
+Default Theme is the default theme for [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2), providing a standalone window interface for foobar2000. This guide covers theme version 0.4.1.
 
 ## Installation
+
+### Install with the installer
+
+Download `foo-webview-default-theme-setup-0.4.1.exe` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases) and run it. Choose the foobar2000 folder. The installer adds the foo_ui_webview2 component and the theme without changing foobar2000's configuration. A component of the same or a newer version is kept, and an existing theme is left as it is.
+
+Start foobar2000 and, when it asks which user interface module to use, select `Webview2 UI`. If it does not ask and the interface does not change, select `Webview2 UI` as the user interface under `File > Preferences > Display`.
+
+The installer is unsigned, so Windows SmartScreen asks for confirmation: choose More info, then Run anyway. It needs x64 Windows and foobar2000 2.0 or later; 32-bit and 64-bit foobar2000 are both supported. If WebView2 Runtime is missing, the installer says so and can open the download page, and installation continues.
+
+To install without the installer, follow the manual steps below.
 
 ### Install the component
 
@@ -14,14 +24,14 @@ After installing the component, select `Webview2 UI` as the user interface in fo
 
 ### Install the theme
 
-1. Download `foo-webview-default-theme-0.4.0.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
+1. Download `foo-webview-default-theme-0.4.1.zip` from [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) or the [CNB mirror](https://cnb.cool/foo-ui-webview2/default-theme/-/releases).
 2. Open `File > Preferences > Display > WebView2 UI`. Use template management to create a new template for the theme, then open its folder.
 3. Extract the installation package into that folder, replacing the new template's placeholder page. Keep `index.html` directly inside the template folder, not an extra subfolder.
 4. Select that template in preferences, apply the settings and restart foobar2000.
 
 Template folders are stored under `<profile>\webview-ui\<template>\`. Opening the folder from the component preferences helps avoid placing files in another foobar2000 installation's profile.
 
-`fe-0.4.0.zip` contains the frontend update, `be-0.4.0.zip` contains the local service, and runtime parts provide its execution environment. The updater handles these files; they are not first-install packages. GitHub's `Source code` archives are not installable themes either.
+`fe-0.4.1.zip` contains the frontend update, `be-0.4.1.zip` contains the local service, and runtime parts provide its execution environment. The updater handles these files; they are not first-install packages. GitHub's `Source code` archives are not installable themes either.
 
 ## First Launch
 

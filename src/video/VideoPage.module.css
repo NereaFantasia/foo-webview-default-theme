@@ -1,8 +1,10 @@
 /* 内嵌时整页从卡片上缘铺到下缘：页头条停靠在上，画面在下。绝对定位跳出中央区各层的上内边距，
-   页头条自己按导航行的占位留位置；全窗口时同一层改成盖住整个窗口 */
+   页头条自己按导航行的占位留位置；四周让出阅读面的细边，圆角与阅读面的填充层一致，画面不盖住边线。
+   全窗口时同一层改成盖住整个窗口 */
 .page {
   position: absolute;
-  inset: 0;
+  inset: var(--strokeWidthThin);
+  border-radius: calc(var(--radius-card) - 2 * var(--strokeWidthThin));
   display: flex;
   flex-direction: column;
   container: video-stage / inline-size;
@@ -11,7 +13,9 @@
 }
 .page[data-expanded] {
   position: fixed;
+  inset: 0;
   z-index: 100;
+  border-radius: 0;
 }
 .body {
   position: relative;
@@ -26,6 +30,11 @@
 }
 .stage:not([data-controls]) {
   cursor: none;
+}
+/* 画面区接鼠标操作；控制条与标题条是它的兄弟，点它们不会冒泡到这里 */
+.surface {
+  position: absolute;
+  inset: 0;
 }
 /* 全窗口时盖在画面上的标题条，窗口三键在它右端 */
 .overlay {

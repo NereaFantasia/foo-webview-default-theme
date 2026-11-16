@@ -1,5 +1,6 @@
 import { atom } from 'jotai/vanilla';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
+import { HZ_MAX } from '../../../../src/immersive/paper/paperScale.ts';
 import { SPECTRUM_BARS } from '../../../../src/immersive/spectrum/spectrumBars.ts';
 import {
   BARS_FFT_SIZE,
@@ -14,6 +15,7 @@ import {
   maxFrequencyOf,
   smoothingFor,
   startSpectrumHistory,
+  spectrumBarAxis,
   spectrumStatusAtom,
 } from '../../../../src/immersive/spectrum/spectrumHistory.ts';
 import { spectrumAnswer } from '../../../fixtures/audioAnswers.ts';
@@ -27,8 +29,8 @@ import {
 } from '../../../fixtures/spectrumHost.ts';
 
 /**
- * 频谱取数的门控、订阅与历史缓冲，替身与起服务的助手在 `fixtures/spectrumHost.ts`。两份订阅的结局与退订
- * （`spectrumFeed.ts`）经服务一起测；拉取节奏本身的用例在 `spectrumPull.test.ts`。
+ * 频谱取数的闸、订阅与历史缓冲，替身与启动服务的辅助函数在 `fixtures/spectrumHost.ts`。
+ * 两份订阅的结果与退订（`spectrumFeed.ts`）经服务一并测试，拉取节奏本身的用例在 `spectrumPull.test.ts`
  */
 afterEach(() => {
   vi.useRealTimers();
@@ -80,7 +82,7 @@ test('发布首帧时同步隐藏，旧回调不能重新挂计时或保留帧',
   x.spectrum.dispose();
 });
 
-/** 只换 setTimeout：帧时钟与 flush 用的 setImmediate 照走真的。 */
+/** 只替换 setTimeout，帧时钟与 flush 使用的 setImmediate 仍为真实实现 */
 const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 
 const subscribeOptions = (fftSize: number) => ({
@@ -266,7 +268,7 @@ test('逐带平滑按帧距折算：60 Hz 一帧留一个系数、30 fps 一帧�
   const fake = fakeHost();
   const { spectrum, frames } = startSpectrum(fake);
   await flush();
-  // 柱高按 −60…0 dB 线性铺：0 dB 换成柱高 1、−60 dB 换成 0。
+  // 柱高按 −60…0 dB 线性换算：0 dB 对应柱高 1，−60 dB 对应 0
   const playLevel = (level: number) => {
     fake.play(-60 + 60 * level);
     fake.playBars(-60 + 60 * level);
@@ -285,7 +287,7 @@ test('逐带平滑按帧距折算：60 Hz 一帧留一个系数、30 fps 一帧�
   playLevel(1);
   await frames.step(SMOOTHING_STALE_MS + 1);
   expect(firstBar(), '停发后再来的帧照收不混').toBe(1);
-  // 帧距：起步按拉取帧率，之后每帧向实测靠 0.2；超过 1 s 的不算数。
+  // 帧距：初值按拉取帧率计算，之后每帧向实测值靠近 0.2，超过 1 s 的帧距不计入
   const before = spectrum.interval();
   fake.play(0.5);
   await frames.step(50);
@@ -399,7 +401,7 @@ test('频谱柱吃自己那份订阅的频点帧、并带换成柱高写进缓�
   expect(spectrum.frame()?.values).toHaveLength(FAKE_FFT_SIZE / 2 - 1);
   expect(spectrum.frame()?.values[0]).toBe(-10);
   expect(spectrum.history.bands).toBe(SPECTRUM_BARS);
-  // 第 0 带取频点 1 的 −30 dB，落在 −60…0 的正中。
+  // 第 0 带取频点 1 的 −30 dB，位于 −60…0 的正中
   expect(Math.abs((spectrum.history.row(0)[0] ?? -1) - 0.5)).toBeLessThan(1e-6);
 });
 
@@ -578,4 +580,11 @@ test('山脊图关着时柱那份被拒：按主订阅被拒处理，报 unavail
   expect(fake.open()).toHaveLength(0);
   expect(fake.subscriptions[0]?.closes).toBe(1);
   expect(fake.pulls).toStrictEqual([]);
+});
+
+test('横轴右端是 Nyquist 与 HZ_MAX 中较小的一个：44.1 kHz 不变，高采样率不再随采样率延伸', () => {
+  expect(spectrumBarAxis(22050).edges[SPECTRUM_BARS]).toBe(22050);
+  for (const nyquist of [48000, 96000, 384000]) {
+    expect(spectrumBarAxis(nyquist).edges[SPECTRUM_BARS], `${nyquist} Hz`).toBe(HZ_MAX);
+  }
 });

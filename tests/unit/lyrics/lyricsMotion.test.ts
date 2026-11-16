@@ -1,16 +1,18 @@
 import { createMemoryConfigWriter } from '../../fixtures/dataWriter.ts';
-import { createStore } from 'jotai/vanilla';
+import { atom, createStore } from 'jotai/vanilla';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import {
   LYRICS_MOTION_PRESET_VALUES,
   parseLyricsMotion,
+  type LyricsPlacement,
   startLyricsMotion,
+  LYRICS_VIEW_MOTION_KEYS,
 } from '../../../src/lyrics/lyricsMotion.ts';
 import type { ConfigValue } from '../../fixtures/hostAnswers.ts';
 import { flush } from '../../fixtures/playingTrack.ts';
 import { installFakeHost } from '../../fixtures/unitHost.ts';
 
-const KEY = 'defaultTheme.lyrics.motion';
+const KEY = LYRICS_VIEW_MOTION_KEYS.main;
 const { amll: AMLL, winui: WINUI } = LYRICS_MOTION_PRESET_VALUES;
 
 async function setup(saved?: ConfigValue) {
@@ -28,6 +30,47 @@ async function setup(saved?: ConfigValue) {
 }
 
 describe('lyrics motion', () => {
+  it('两处动效分别保存，恢复一处默认保留另一处自定义', async () => {
+    const env = await setup();
+    env.service.choosePreset('winui');
+    env.service.customize({ blur: false, hidePassedLines: true }, 'immersive');
+    await env.service.persistence.settled();
+    expect(env.motion()).toEqual(WINUI);
+    expect(env.host.config.get(LYRICS_VIEW_MOTION_KEYS.immersive)).toMatchObject({
+      preset: 'custom',
+      custom: { blur: false, hidePassedLines: true },
+    });
+    expect(await env.service.reset('main')).toBe(true);
+    expect(env.motion()).toEqual(AMLL);
+    expect(env.host.config.get(LYRICS_VIEW_MOTION_KEYS.immersive)).toMatchObject({
+      preset: 'custom',
+      custom: { hidePassedLines: true },
+    });
+  });
+  it('传入位置时各视图的当前行位置取自它，切预设与动效参数都不改位置', async () => {
+    const host = installFakeHost({ config: {} });
+    const store = createStore();
+    const main = atom<LyricsPlacement>({ alignAnchor: 'top', alignPosition: 0.2 });
+    const immersive = atom<LyricsPlacement>({ alignAnchor: 'bottom', alignPosition: 0.8 });
+    const service = startLyricsMotion(store, host.fb, createMemoryConfigWriter(host.fb), {
+      main,
+      immersive,
+    });
+    onTestFinished(() => service.dispose());
+    await service.ready;
+    expect(store.get(service.motion)).toMatchObject({ alignAnchor: 'top', alignPosition: 0.2 });
+    service.choosePreset('winui', 'immersive');
+    service.customize({ hidePassedLines: true }, 'immersive');
+    expect(store.get(service.views.immersive.motion)).toMatchObject({
+      ...WINUI,
+      hidePassedLines: true,
+      alignAnchor: 'bottom',
+      alignPosition: 0.8,
+    });
+    store.set(main, { alignAnchor: 'center', alignPosition: 0.5 });
+    expect(store.get(service.motion)).toMatchObject({ alignAnchor: 'center', alignPosition: 0.5 });
+  });
+
   it('缺省是 AMLL 档；WinUI 3 档关弹簧、模糊与缩放，行移动走点到点曲线 500 ms', async () => {
     const env = await setup();
     expect(env.pref().preset).toBe('amll');

@@ -8,7 +8,7 @@ import {
   openSettings,
 } from '../fixtures/settingsPage.ts';
 
-// 设置页的缩略图单选与图标分段：选中即生效、方向键换项、状态随偏好走
+// 设置页的缩略图单选与图标分段：选中即生效，方向键切换选项，选中状态与偏好保持一致
 
 const PLAYER_BAR_KEY = 'default-theme.player-bar.v1';
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), PLAYER_BAR_KEY);
@@ -38,7 +38,7 @@ test('播放栏位置：方向键在三张缩略图之间换，点缩略图与�
   await page.keyboard.press('ArrowRight');
   await expect(group.getByRole('radio', { name: '标题栏' })).toBeChecked();
   await expect.poll(() => stored(page)).toBe('titlebar');
-  // 缩略图是单选的 label：点它换到第三项
+  // 缩略图是单选框的 label，点击它切换到第三项
   await group.locator('label[aria-hidden]').nth(2).click();
   await expect(group.getByRole('radio', { name: '胶囊' })).toBeChecked();
 });
@@ -54,7 +54,7 @@ test('颜色模式：三张缩略图，选中即生效，跟随系统时说明�
   await expect(settings.card('颜色模式')).not.toContainText('当前：');
 });
 
-/** 缩略图方框与里面的播放键，各取中心 */
+/** 缩略图方框与其中播放键的中心点 */
 async function playThumbCenters(page: Page) {
   return page.locator('[data-play-thumb]').evaluateAll((buttons) =>
     buttons.map((button) => {
@@ -224,27 +224,29 @@ test('沉浸视图：歌词样式的视图背景是五张缩略图，进入时�
   expect(settings.errors).toEqual([]);
 });
 
-test('歌词：文字对齐是图标分段，当前行位置是三张缩略图，对齐位置在同一张卡的底部', async ({
+test('歌词：文字对齐是图标分段，当前行位置是三张缩略图，对齐位置紧跟在缩略图下面', async ({
   page,
 }) => {
   const settings = await openSettings(page, {}, '歌词');
-  const tabs = page.getByRole('tablist', { name: '文字对齐', exact: true });
+  // 沉浸视图歌词有同名的控件，因此只在主视图歌词的卡中查找
+  const main = page
+    .locator('[data-settings-expander]')
+    .filter({ has: page.getByText('主视图歌词', { exact: true }) });
+  const tabs = main.getByRole('tablist', { name: '文字对齐', exact: true });
   await expect(tabs.getByRole('tab')).toHaveCount(3);
   await expect(tabs.getByRole('tab', { name: '居左' })).toHaveAttribute('aria-selected', 'true');
-  await settings.choose('文字对齐', '居中');
+  await tabs.getByRole('tab', { name: '居中' }).click();
   await expect(tabs.getByRole('tab', { name: '居中' })).toHaveAttribute('aria-selected', 'true');
 
-  const anchors = settings.radios('当前行位置');
+  const anchors = main.getByRole('radiogroup', { name: '当前行位置', exact: true });
   await expect(anchors.getByRole('radio')).toHaveCount(3);
   await expect(anchors.getByRole('radio', { name: '中部' })).toBeChecked();
-  await settings.choose('当前行位置', '底部');
+  await anchors.getByRole('radio', { name: '底部' }).check();
   await expect(anchors.getByRole('radio', { name: '底部' })).toBeChecked();
-  await expect(
-    settings.card('当前行位置').getByRole('spinbutton', { name: '对齐位置 (%)' }),
-  ).toBeVisible();
+  await expect(main.getByRole('spinbutton', { name: '对齐位置 (%)' })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 800 });
-  await expect(page.getByRole('radiogroup', { name: '文字对齐', exact: true })).toBeVisible();
+  await expect(main.getByRole('radiogroup', { name: '文字对齐', exact: true })).toBeVisible();
   expect(settings.errors).toEqual([]);
 });
 

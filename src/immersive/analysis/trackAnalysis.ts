@@ -1,4 +1,6 @@
 import { atom, type Atom } from 'jotai/vanilla';
+import { log } from '../../diagnostics/eventLog.ts';
+import { rejectionCode } from '../../diagnostics/hostFailures.ts';
 import { currentTrackAtom } from '../../playback/playback.ts';
 import { trackKeyOf } from '../../playback/playbackContract.ts';
 import { playbackConnectedAtom } from '../../playback/playerAtoms.ts';
@@ -20,26 +22,18 @@ import {
   type WaveformBands,
 } from '../waveform/waveformBands.ts';
 
-/**
- * 整轨分析：按段取一遍 PCM、分一遍频，同时得出整轨波形的分频结果与逐拍拍点（`tempoSegments.ts`，变速曲逐段）
- * 宿主连上、且调用方要的时候（选的画法吃分频，或 BPM 格在画面上）才取；换曲、不再要或释放时中止在途的取数、
- * 丢掉算到一半的结果
- * 没有来源、或来源报整个页面都取不了 PCM（`PcmUnavailableError`）时状态为 `unavailable`，画法菜单据此不提供
- * 分频的几种；后者在本实例里不再尝试
- * 结果与失败都按曲目记最近一份：在画法之间来回切、关了再开，同一首不重取
- */
 export type WaveformBandsStatus = 'unavailable' | 'idle' | 'loading' | 'ready' | 'failed';
 
 export interface PcmTrack {
-  /** fb2k 存的路径（`file://`、`file-relative://` 或网址），用来分辨本地媒体与网络流 */
+  /** foobar2000 记录的路径（`file://`、`file-relative://` 或网址），用于区分本地媒体与网络流 */
   path: string;
-  /** 交给宿主的曲目路径：分轨自带 `|subsong:N` */
+  /** 传给宿主的曲目标识，分轨带 `|subsong:N` 后缀 */
   handle: string;
-  /** 秒；按它分段、分窗，没有或不大于 0 时这首判取不了 */
+  /** 时长（秒），用于分段与分窗。缺失或不大于 0 时，该曲目视为无法分析 */
   duration?: number;
 }
 
-/** 整个页面都取不了 PCM（没有宿主、运行时不支持共享缓冲）；只是这一首取不了的，来源给 `null` */
+/** 整个页面都无法取得 PCM，如没有宿主或运行时不支持共享缓冲。仅单首无法取得时，来源返回 `null` */
 export class PcmUnavailableError extends Error {
   constructor(message = 'PCM is not available in this page') {
     super(message);
@@ -47,7 +41,7 @@ export class PcmUnavailableError extends Error {
   }
 }
 
-/** 取一首歌 `range`（秒）这一段的 PCM；`signal` 中止时放弃。这首取不了（网络流、解不了）给 `null` */
+/** 读取曲目在 `range`（秒）内的 PCM，`signal` 中止时放弃。单首无法取得时（网络流、无法解码）返回 `null` */
 export type PcmSource = (
   track: PcmTrack,
   range: { start: number; end: number },
@@ -60,16 +54,16 @@ export type TrackAnalysisDeps = Pick<SegmentOptions, 'render' | 'segmentSeconds'
 
 export interface TrackAnalysisModel {
   readonly status: WaveformBandsStatus;
-  /** 当前曲目的分频结果；还没有时为 `null` */
+  /** 当前曲目的分频结果，尚未得到时为 `null` */
   readonly bands: WaveformBands | null;
-  /** 当前曲目的逐拍结果；还没有、或跟不出节拍时为 `null`。显著度够不够用由调用方判 */
+  /** 当前曲目的逐拍结果。尚未得到或无法跟踪节拍时为 `null`，节拍显著度是否足够由调用方判断 */
   readonly beats: BeatTrack | null;
 }
 
 export interface TrackAnalysisOptions {
-  /** 调用方要不要结果：选的画法吃分频，或 BPM 格在画面上 */
+  /** 调用方是否需要结果：所选画法使用分频，或画面上有 BPM 格时为真 */
   wanted: Atom<boolean>;
-  /** `null` 时状态恒为 `unavailable` */
+  /** 为 `null` 时状态始终为 `unavailable` */
   source: PcmSource | null;
   deps?: TrackAnalysisDeps;
 }
@@ -84,8 +78,14 @@ interface Result {
   beats: BeatTrack | null;
 }
 
+/**
+ * 整轨分析与量表读数（`trackDynamics.ts`）的耗时达到该值（毫秒）时写入运行日志。
+ * 计算期间格子显示 `—`，界面上无法区分仍在计算还是已经失败
+ */
+export const SLOW_ANALYSIS_MS = 30_000;
+
 const stateAtom = atom<TrackAnalysisModel>({ status: 'unavailable', bands: null, beats: null });
-// 退出后重新进入也须等上一段离线渲染结束；完成即撤掉引用，不缓存音频
+// 按 store 记录进行中的离线渲染。离线渲染无法中断，退出视图后重新进入也须等它结束。渲染完成即删除记录，不缓存音频
 const renderingByStore = new WeakMap<Store, Promise<BandSignals>>();
 
 export const trackAnalysisAtom: Atom<TrackAnalysisModel> = atom((get) => get(stateAtom));
@@ -96,7 +96,17 @@ const modelOf = (status: WaveformBandsStatus, result: Result | null): TrackAnaly
   beats: result?.beats ?? null,
 });
 
-/** 跟着 `currentTrackAtom` 与 `wanted` 取数；编辑标签不重取 */
+/**
+ * 启动整轨分析：按段读取一遍 PCM 并分频，同时得出整轨波形的分频结果与逐拍拍点（变速曲逐段计算，见 `tempoSegments.ts`）
+ *
+ * 宿主已连接且 `wanted` 为真时，为当前曲目计算结果，编辑标签不触发重算。
+ * 换曲、断开连接、`wanted` 变化或释放时，中止进行中的取数并丢弃未完成的结果。
+ * 服务只保留最近算完的一首（包括失败的结果），当前曲目与它相同时直接沿用，不重新取数。
+ *
+ * 没有来源，或来源报告整个页面都无法取得 PCM（`PcmUnavailableError`）时，状态为 `unavailable`，整轨波形据此不打开画法菜单。
+ * 出现 `PcmUnavailableError` 后，本实例不再请求 PCM。
+ * 取数失败、页面无法取得 PCM 与分析过慢都写入运行日志，字段不含曲目路径与标题
+ */
 export function startTrackAnalysis(
   store: Store,
   options: TrackAnalysisOptions,
@@ -113,7 +123,7 @@ export function startTrackAnalysis(
   let unavailable = source === null;
   let disposed = false;
   let last: Result | null = null;
-  // 上一次看到的输入；还没看过时为 null
+  // 上一次处理的输入，尚未处理时为 null
   let input: { key: string; want: boolean } | null = null;
 
   function stop(): void {
@@ -122,7 +132,14 @@ export function startTrackAnalysis(
     inflight = null;
   }
 
-  async function load(target: PcmTrack, key: string, id: number, from: PcmSource): Promise<void> {
+  async function load(
+    target: PcmTrack & { sampleRate?: number },
+    key: string,
+    id: number,
+    from: PcmSource,
+  ): Promise<void> {
+    const startedAt = performance.now();
+    const rate = target.sampleRate ?? 0;
     const controller = new AbortController();
     inflight = controller;
     const duration = target.duration ?? 0;
@@ -154,16 +171,18 @@ export function startTrackAnalysis(
     } catch (error) {
       if (id !== token) return;
       if (error instanceof PcmUnavailableError) {
+        log.warn('host', 'analysis.unavailable', { rate, reason: error.message });
         unavailable = true;
         inflight = null;
         store.set(stateAtom, modelOf('unavailable', null));
         return;
       }
+      log.warn('host', 'analysis.failed', { code: rejectionCode(error), rate });
       result = null;
     }
     if (id !== token) return;
     inflight = null;
-    // 逐段找拍分几次跑完、中间让出主线程；换曲后停下，结果丢掉
+    // 找拍分多次执行，其间让出主线程。换曲后停止并丢弃结果
     const beatTrack =
       result && energies
         ? await findBeats(onsetStrength(energies), framesPerSecond(energies.sampleRate), {
@@ -171,6 +190,8 @@ export function startTrackAnalysis(
           })
         : null;
     if (id !== token) return;
+    const ms = Math.round(performance.now() - startedAt);
+    if (ms >= SLOW_ANALYSIS_MS) log.warn('host', 'analysis.slow', { ms, rate });
     last = { key, bands: result, beats: beatTrack };
     store.set(stateAtom, modelOf(result ? 'ready' : 'failed', last));
   }
@@ -195,7 +216,7 @@ export function startTrackAnalysis(
     store.set(stateAtom, modelOf('loading', null));
     const rendering = renderingByStore.get(store);
     if (rendering) {
-      // 离线渲染不能中断；当前段结束前不再解码，恢复只重算最新仍需要的曲目
+      // 离线渲染无法中断。当前段渲染结束前不开始新的解码，结束后只为届时仍需要的曲目重新计算
       const id = token;
       const resume = () => {
         if (disposed || id !== token) return;
@@ -208,7 +229,7 @@ export function startTrackAnalysis(
     void load(track, key, token, source);
   }
 
-  // 先订阅再初读
+  // 先订阅，再读取初值
   const offs = [
     store.sub(currentTrackAtom, follow),
     store.sub(playbackConnectedAtom, follow),

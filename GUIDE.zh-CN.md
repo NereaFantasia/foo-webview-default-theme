@@ -2,9 +2,19 @@
 
 # Default Theme 使用教程
 
-Default Theme 是 [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2) 的默认主题，为 foobar2000 提供独立窗口界面。本教程适用于主题 0.4.0。
+Default Theme 是 [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webview2) 的默认主题，为 foobar2000 提供独立窗口界面。本教程适用于主题 0.4.1。
 
 ## 安装
+
+### 用安装器安装
+
+从 [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) 或 [CNB 镜像](https://cnb.cool/foo-ui-webview2/default-theme/-/releases)下载 `foo-webview-default-theme-setup-0.4.1.exe` 并运行，选择 foobar2000 所在的目录。安装器装入 foo_ui_webview2 组件与主题，不改动 foobar2000 的配置。已有同版本或更新的组件时保留，已装过主题时保持原样。
+
+启动 foobar2000，出现询问用户界面模块的对话框时，选择 `Webview2 UI`。没有出现该对话框、界面也没有变化时，到 `File > Preferences > Display` 把用户界面改为 `Webview2 UI`。
+
+安装器未签名，Windows SmartScreen 会请求确认：点「更多信息」，再选「仍要运行」。需要 x64 Windows 和 foobar2000 2.0 或更高版本，32 位与 64 位的 foobar2000 都支持。缺少 WebView2 Runtime 时，安装器会提示并可打开下载页，安装照常继续。
+
+不用安装器时，按下面的步骤手动安装。
 
 ### 安装组件
 
@@ -14,14 +24,14 @@ Default Theme 是 [foo_ui_webview2](https://github.com/NereaFantasia/foo_ui_webv
 
 ### 安装主题
 
-1. 从 [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) 或 [CNB 镜像](https://cnb.cool/foo-ui-webview2/default-theme/-/releases)下载 `foo-webview-default-theme-0.4.0.zip`。
+1. 从 [GitHub Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) 或 [CNB 镜像](https://cnb.cool/foo-ui-webview2/default-theme/-/releases)下载 `foo-webview-default-theme-0.4.1.zip`。
 2. 打开 `File > Preferences > Display > WebView2 UI`，在模板管理中为主题新建一个模板，再打开它的文件夹。
 3. 将安装包内容解压到该文件夹，覆盖新建模板的占位页。`index.html` 必须直接位于模板文件夹内，不要多套一层文件夹。
 4. 在首选项中确认选中该模板，应用设置，重启 foobar2000。
 
 模板目录位于 `<profile>\webview-ui\<模板名>\`。从组件首选项打开文件夹，可避免把文件放进另一份 foobar2000 的配置目录。
 
-`fe-0.4.0.zip` 是前端更新包，`be-0.4.0.zip` 是本地服务包，运行时分块用于准备运行环境；这些文件均由更新器处理，不用于首次安装。GitHub 的 `Source code` 归档也不是可直接安装的主题。
+`fe-0.4.1.zip` 是前端更新包，`be-0.4.1.zip` 是本地服务包，运行时分块用于准备运行环境；这些文件均由更新器处理，不用于首次安装。GitHub 的 `Source code` 归档也不是可直接安装的主题。
 
 ## 第一次启动
 

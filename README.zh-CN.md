@@ -73,6 +73,15 @@ https://github.com/user-attachments/assets/3d3e6ab5-0ad8-48af-b1f5-dcde3ca725c5
 
 需要 foo_ui_webview2 2.2.0 或更高版本，并以独立窗口运行（默认用户界面选 `Webview2 UI`）。在 DUI、CUI 面板中，主题只显示不支持面板的说明。
 
+**用安装器（推荐）**
+
+1. 从 [Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) 或 [CNB 镜像](https://cnb.cool/foo-ui-webview2/default-theme/-/releases)下载 `foo-webview-default-theme-setup-<版本>.exe` 并运行，选择 foobar2000 所在的目录。安装器装入组件与主题，不改动 foobar2000 的配置。
+2. 启动 foobar2000，出现询问用户界面模块的对话框时，选择 Webview2 UI。
+
+安装器未签名，Windows SmartScreen 会请求确认：点「更多信息」，再选「仍要运行」。需要 x64 Windows 和 foobar2000 2.0 或更高版本，32 位与 64 位的 foobar2000 都支持。
+
+**手动安装**
+
 1. 从 [Releases](https://github.com/NereaFantasia/foo-webview-default-theme/releases) 或 [CNB 镜像](https://cnb.cool/foo-ui-webview2/default-theme/-/releases)下载 `foo-webview-default-theme-<版本>.zip`。
 2. 解压到 `<profile>\webview-ui\<模板名>\`，`index.html` 应直接位于该目录。
 3. 在 foo_ui_webview2 的首选项页选择该模板，重启 foobar2000。

@@ -58,3 +58,9 @@ export function formatBadge(
   }
   return { codec, detail: rate };
 }
+
+/** 高解析度无损：位深大于 16 或采样率高于 48 kHz。有损、编码方式取不到或还在取时为 false */
+export function isHiRes(track: Pick<Track, 'sampleRate'>, reading: FormatReading): boolean {
+  if (typeof reading === 'string' || reading.lossless !== true) return false;
+  return (reading.bits ?? 0) > 16 || track.sampleRate > 48_000;
+}

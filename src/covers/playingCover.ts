@@ -19,13 +19,13 @@ export interface PlayingCoverInput {
 }
 
 export interface PlayingCoverOptions {
-  /** 取曲目封面，在线曲目也认得。 */
+  /** 读取曲目封面，支持在线曲目 */
   artwork: TrackArtwork;
   analysis?: Pick<CoverAnalysis, 'read'>;
   storage?: PrefStorage | null;
 }
 
-/** 只消费已确认的曲目身份；播放状态由上层注入，不从业务目录反向读取。 */
+/** 启动正在播放曲目的封面取色。只使用已确认的曲目身份，播放状态由上层注入，不从业务目录反向读取 */
 export function startPlayingCover(
   store: ReturnType<typeof createStore>,
   input: Atom<PlayingCoverInput>,
@@ -40,13 +40,17 @@ export function startPlayingCover(
   let generation = 0;
   let followed: string | undefined;
 
-  function publish(profile: CoverProfile | null, url = ''): void {
+  /** 有地址时附上地址所属曲目的身份，供沉浸视图的背景判断能否直接使用 */
+  const coverState = (url: string, profile: CoverProfile | null, key: string) =>
+    url ? { url, profile, key } : { url, profile };
+
+  function publish(profile: CoverProfile | null, url = '', key = ''): void {
     publishCoverProfile(store, profile);
-    store.set(backgroundCoverAtom, { url, profile });
+    store.set(backgroundCoverAtom, coverState(url, profile, key));
     saveCoverProfile(profile, storage);
   }
 
-  async function refresh(handle: string, mine: number): Promise<void> {
+  async function refresh(key: string, handle: string, mine: number): Promise<void> {
     if (!handle) {
       publish(null);
       return;
@@ -55,10 +59,10 @@ export function startPlayingCover(
       const answer = await settle(() => artwork.urlOf(handle, 'front', { maxSize: 512 }));
       if (disposed || mine !== generation) return;
       const url = answer && answer.success !== false && answer.available ? answer.dataUrl : '';
-      // 原图解码与像素分析独立，取色失败不能撤掉仍可显示的封面。
-      store.set(backgroundCoverAtom, { url, profile: store.get(coverProfileAtom) });
+      // 原图解码与像素分析相互独立，取色失败时不移除仍可显示的封面
+      store.set(backgroundCoverAtom, coverState(url, store.get(coverProfileAtom), key));
       const profile = url ? await analysis.read(url).catch(() => null) : null;
-      if (!disposed && mine === generation) publish(profile, url);
+      if (!disposed && mine === generation) publish(profile, url, key);
     } catch {
       if (!disposed && mine === generation) publish(null);
     }
@@ -74,7 +78,7 @@ export function startPlayingCover(
     const key = source.status === 'ready' ? source.key : '';
     if (key === followed) return;
     followed = key;
-    void refresh(key ? source.handle : '', ++generation);
+    void refresh(key, key ? source.handle : '', ++generation);
   }
   const off = store.sub(input, follow);
   follow();

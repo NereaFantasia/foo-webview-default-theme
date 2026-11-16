@@ -6,6 +6,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startLibraryMirror } from '../../library/libraryMirror.ts';
 import {
+  LIBRARY_STATS_PAGE,
+  readLibraryStatsPage,
+  readLibraryStatsStatus,
+} from '../../../src/server/libraryStatsProtocol.ts';
+import {
   LIBRARY_MIRROR_SCHEMA,
   MIRROR_SORT_COLUMNS,
   readMirrorAlbums,
@@ -93,6 +98,94 @@ function titles(mirror: Mirror, sort: MirrorSortColumn, descending = false, limi
 }
 
 const stem = (handle: string) => /\\([^\\]+)\.flac$/.exec(handle)?.[1] ?? handle;
+
+describe('媒体库播放统计缓存', () => {
+  const stats = (mirror: Mirror) => {
+    const status = readLibraryStatsStatus(mirror.request('stats-status', {}));
+    if (!status) throw new Error('状态无效');
+    return status;
+  };
+  const begin = (mirror: Mirror) => {
+    const status = readLibraryStatsStatus(mirror.request('stats-begin', stats(mirror)));
+    if (!status) throw new Error('状态无效');
+    return status.generation;
+  };
+  const row = (name: string, playCount = 1) => ({
+    handle: name,
+    path: `file://\\\\nas\\music\\${name}.cue|subsong:2`,
+    success: true,
+    playCount,
+  });
+
+  it('重启后统计与修订号保留，增量写入和删除一起生效', async () => {
+    const path = await directory();
+    const first = startLibraryMirror(path);
+    const generation = begin(first);
+    first.request('stats-put', { generation, rows: [row('a'), row('b')] });
+    first.request('stats-commit', { generation, epoch: 'E1', revision: 10 });
+    first.dispose();
+    const mirror = open(path);
+    expect(stats(mirror)).toMatchObject({ ready: true, epoch: 'E1', revision: 10 });
+    expect(
+      readLibraryStatsPage(mirror.request('stats-page', { generation, after: '' }))?.rows,
+    ).toEqual([row('a'), row('b')]);
+    mirror.request('stats-apply', {
+      generation,
+      epoch: 'E1',
+      revision: 11,
+      rows: [row('b', 9)],
+      removed: ['a'],
+    });
+    expect(
+      readLibraryStatsPage(
+        mirror.request('stats-page', { generation: stats(mirror).generation, after: '' }),
+      )?.rows,
+    ).toEqual([row('b', 9)]);
+    expect(stats(mirror).revision).toBe(11);
+  });
+
+  it('写入未收尾不能读取，旧窗口不能覆盖新一代，清空媒体库缓存同时清空统计', async () => {
+    const mirror = open(await directory());
+    const first = begin(mirror);
+    mirror.request('stats-put', { generation: first, rows: [row('old')] });
+    expect(() => mirror.request('stats-page', { generation: first, after: '' })).toThrow();
+    const second = begin(mirror);
+    expect(() =>
+      mirror.request('stats-commit', { generation: first, epoch: 'E', revision: 1 }),
+    ).toThrow();
+    mirror.request('stats-put', { generation: second, rows: [row('new')] });
+    mirror.request('stats-commit', { generation: second, epoch: 'E', revision: 2 });
+    expect(
+      readLibraryStatsPage(mirror.request('stats-page', { generation: second, after: '' }))?.rows,
+    ).toEqual([row('new')]);
+    mirror.request('clear', {});
+    expect(stats(mirror)).toMatchObject({ ready: false, epoch: '', revision: 0 });
+  });
+
+  it('统计分页无遗漏，非法批次整批拒绝', async () => {
+    const mirror = open(await directory());
+    const generation = begin(mirror);
+    const rows = Array.from({ length: LIBRARY_STATS_PAGE + 1 }, (_, index) =>
+      row(String(index).padStart(5, '0')),
+    );
+    expect(() => mirror.request('stats-put', { generation, rows })).toThrow();
+    expect(() =>
+      mirror.request('stats-put', {
+        generation,
+        rows: [row('bad'), { ...row('negative'), playCount: -1 }],
+      }),
+    ).toThrow();
+    mirror.request('stats-put', { generation, rows: rows.slice(0, LIBRARY_STATS_PAGE) });
+    mirror.request('stats-put', { generation, rows: rows.slice(LIBRARY_STATS_PAGE) });
+    mirror.request('stats-commit', { generation, epoch: 'E', revision: 1 });
+    const page = readLibraryStatsPage(mirror.request('stats-page', { generation, after: '' }));
+    expect(page?.rows).toEqual(rows.slice(0, LIBRARY_STATS_PAGE));
+    const tail = readLibraryStatsPage(
+      mirror.request('stats-page', { generation, after: page?.next }),
+    );
+    expect(tail).toEqual({ rows: rows.slice(LIBRARY_STATS_PAGE), next: null });
+  });
+});
 
 function status(mirror: Mirror) {
   return readMirrorStatus(mirror.request('status', {}));

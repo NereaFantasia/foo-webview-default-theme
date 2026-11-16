@@ -1,5 +1,6 @@
 import { atom } from 'jotai/vanilla';
-import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
+import { entries, resetEventLog } from '../../../../src/diagnostics/eventLog.ts';
 import { PcmUnavailableError } from '../../../../src/immersive/analysis/trackAnalysis.ts';
 import {
   measureTrack,
@@ -14,12 +15,14 @@ import { flush, startPlayingTrack } from '../../../fixtures/playingTrack.ts';
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
 /**
- * 整轨读数用假的 PCM 来源测：来源按区间现造 48 kHz 立体声 1 kHz 正弦（峰值 −23 dBFS，响度正好 −23 LUFS），
- * 记下每次要的区间、中止信号与释放次数。让出主线程换成立即兑现的 Promise。曲目由真的播放服务给。
+ * 用假的 PCM 来源测试整轨读数：来源按区间生成 48 kHz 立体声 1 kHz 正弦（峰值 −23 dBFS，响度正好 −23 LUFS），
+ * 并记录每次请求的区间、中止信号与释放次数。让出主线程替换为立即兑现的 Promise，曲目由真实的播放服务提供
  */
 const RATE = 48000;
 const LEVEL = 10 ** (-23 / 20);
 const now = (): Promise<void> => Promise.resolve();
+
+beforeEach(resetEventLog);
 
 function fakeSource(options: { rate?: (start: number) => number; hold?: boolean } = {}) {
   const ranges: [number, number][] = [];
@@ -268,5 +271,57 @@ describe('startTrackDynamics', () => {
     await flush();
     expect(source).toHaveBeenCalledTimes(1);
     expect(x.model().status).toBe(status);
+  });
+
+  describe('运行日志', () => {
+    const logged = () => entries().map((entry) => ({ event: entry.event, ...entry.fields }));
+
+    test('取数失败：记错误码与采样率，不记消息里的曲目路径', async () => {
+      const { model } = await setup(async () => {
+        throw Object.assign(new Error('E:/Music/a.flac 解码失败'), { code: 'DECODE_FAILED' });
+      });
+      await flush();
+      expect(model().status).toBe('failed');
+      expect(logged()).toStrictEqual([
+        { event: 'dynamics.failed', code: 'DECODE_FAILED', rate: RATE },
+      ]);
+    });
+
+    test('整个页面取不了：记一次宿主给的原因，之后换曲不再取也不再记', async () => {
+      const reason = 'This WebView2 runtime cannot share buffers with pages';
+      const { play } = await setup(async () => {
+        throw new PcmUnavailableError(reason);
+      });
+      await flush();
+      play(B);
+      await flush();
+      expect(logged()).toStrictEqual([{ event: 'dynamics.unavailable', rate: RATE, reason }]);
+    });
+
+    test('耗时到 30 s 记 dynamics.slow，不到不记', async () => {
+      let clock = 0;
+      let step = 10_000;
+      const timer = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+      onTestFinished(() => timer.mockRestore());
+      const fake = fakeSource();
+      const { play } = await setup((track, range, signal) => {
+        clock += step;
+        return fake.source(track, range, signal);
+      });
+      await flush();
+      step = 29_999;
+      play(B);
+      await flush();
+      expect(logged(), 'A 分三段读，共 30 s；B 一段 29.999 s').toStrictEqual([
+        { event: 'dynamics.slow', ms: 30_000, rate: RATE },
+      ]);
+    });
+
+    test('这首本来就取不了（来源给 null）：failed 但不记', async () => {
+      const { model } = await setup(async () => null);
+      await flush();
+      expect(model().status).toBe('failed');
+      expect(logged()).toStrictEqual([]);
+    });
   });
 });

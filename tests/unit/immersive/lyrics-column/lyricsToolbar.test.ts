@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FONT_SIZE_STEP,
   TOOLBAR_HEIGHT,
   formatOffset,
-  stepFontSize,
   stepOffset,
+  stepScale,
   toolbarFormOf,
   toolbarRoomOf,
   toolbarSubjectsOf,
@@ -39,21 +38,20 @@ describe('工具条的排法档位', () => {
   });
 });
 
-describe('字号步进', () => {
-  it('每次 2 px，夹在 12 到 48 之间', () => {
-    expect(FONT_SIZE_STEP).toBe(2);
-    expect(stepFontSize(22, 1)).toBe(24);
-    expect(stepFontSize(22, -1)).toBe(20);
-    expect(stepFontSize(12, -1)).toBe(12);
-    expect(stepFontSize(48, 1)).toBe(48);
-    expect(stepFontSize(47, 1)).toBe(48);
+describe('缩放步进', () => {
+  it('每次 5 个百分点，夹在 50% 到 225% 之间', () => {
+    expect(stepScale(100, 1)).toBe(105);
+    expect(stepScale(100, -1)).toBe(95);
+    expect(stepScale(50, -1)).toBe(50);
+    expect(stepScale(225, 1)).toBe(225);
+    expect(stepScale(222, 1)).toBe(225);
   });
 
   it('一次几格（滚轮）按格数算，夹在范围内', () => {
-    expect(stepFontSize(22, 3)).toBe(28);
-    expect(stepFontSize(22, -2)).toBe(18);
-    expect(stepFontSize(46, 5)).toBe(48);
-    expect(stepFontSize(14, -5)).toBe(12);
+    expect(stepScale(100, 3)).toBe(115);
+    expect(stepScale(100, -2)).toBe(90);
+    expect(stepScale(215, 5)).toBe(225);
+    expect(stepScale(60, -5)).toBe(50);
   });
 });
 

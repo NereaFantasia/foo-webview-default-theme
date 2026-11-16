@@ -1,0 +1,5 @@
+/* 放在标题栏时落在整条拖动区里：键不自己退出拖动，宿主就把按下当成拖动窗口，点击到不了页面 */
+.entry {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

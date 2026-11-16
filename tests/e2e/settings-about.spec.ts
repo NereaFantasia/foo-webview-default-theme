@@ -44,13 +44,17 @@ test('快捷键一览：按所在的地方分小节，键帽写出按法；卡�
   await expect(head).toHaveAttribute('aria-expanded', 'true');
   const rows = page.locator('[data-settings-shortcut]');
   await expect(rows).toHaveCount(SHORTCUT_ROWS);
-  await expect(rows.filter({ hasText: '后退' }).locator('kbd')).toHaveText([
+  // 视频页一节里也有「后退 5 秒」「前进 5 秒」，按全局一节取
+  const globalRows = page
+    .getByRole('region', { name: '全局', exact: true })
+    .locator('[data-settings-shortcut]');
+  await expect(globalRows.filter({ hasText: '后退' }).locator('kbd')).toHaveText([
     'Alt',
     '←',
     '鼠标后退键',
   ]);
-  await expect(rows.filter({ hasText: '后退' })).toContainText('或');
-  await expect(rows.filter({ hasText: '前进' }).locator('kbd')).toHaveText([
+  await expect(globalRows.filter({ hasText: '后退' })).toContainText('或');
+  await expect(globalRows.filter({ hasText: '前进' }).locator('kbd')).toHaveText([
     'Alt',
     '→',
     '鼠标前进键',

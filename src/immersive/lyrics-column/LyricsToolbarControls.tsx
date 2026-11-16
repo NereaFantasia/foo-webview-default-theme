@@ -19,29 +19,29 @@ import { translateAtom } from '../../i18n/locale.ts';
 import { useService } from '../../kit/useService.ts';
 import {
   lyricsDisplayKey,
+  lyricsScaleFontSize,
+  lyricsScalePercent,
   LYRICS_ALIGNS,
-  LYRICS_FONT_SIZE_RANGE,
+  LYRICS_SCALE_RANGE,
   type LyricsAlign,
 } from '../../lyrics/lyricsDisplay.ts';
 import { lyricsKey } from '../../lyrics/lyricsService.ts';
 import { createWheelStepper } from '../../playback/volume/wheelSteps.ts';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import styles from './LyricsToolbar.module.css';
-import { FONT_SIZE_STEP, formatOffset, stepFontSize, stepOffset } from './lyricsToolbar.ts';
+import { formatOffset, stepOffset, stepScale } from './lyricsToolbar.ts';
 import { RomanizationIcon } from './RomanizationIcon.tsx';
 import { useToolsStyles } from './toolsStyles.ts';
 
-/** 控件排布模式：tile 适用于宽档磁贴布局，panel 适用于下拉面板竖向布局 */
+/** 控件的形态：`tile` 用于宽档的磁贴，`panel` 用于弹出面板里的竖排 */
 export type ControlLayout = 'tile' | 'panel';
 
-/** 译文与音译开关布局形态：tall 适用于宽档整高图标，icon 适用于窄档图标，panel 适用于面板开关行 */
+/** 开关与对齐控件的形态：`tall` 用于宽档的整高图标键，`icon` 用于中档与窄档的图标键，`panel` 用于面板里的一行 */
 export type ToggleLayout = 'tall' | 'icon' | 'panel';
 
 /**
- * 歌词字号调节控件
- *
- * 磁贴形态展示名称、数值与步进按键；面板形态呈现单行滑块与读数；
- * 支持鼠标滚轮以 2px 步进平滑调节（换算逻辑对齐 wheelSteps 步进器）
+ * 沉浸视图歌词的缩放控件，形态由 `layout` 决定。
+ * 在控件上滚动滚轮按缩放步长调节，滚轮的步数换算与其他步进器相同（`createWheelStepper`）
  */
 export function FontSizeControl({
   layout,
@@ -54,13 +54,14 @@ export function FontSizeControl({
   const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
-  const { fontSize } = useAtomValueRawSync(service.display);
+  const percent = lyricsScalePercent(useAtomValueRawSync(service.immersiveDisplay).fontSize);
   const [stepper] = useState(createWheelStepper);
-  const { min, max } = LYRICS_FONT_SIZE_RANGE;
-  const set = (size: number) => void service.update({ fontSize: size });
+  const { min, max, step } = LYRICS_SCALE_RANGE;
+  const set = (value: number) =>
+    void service.update({ fontSize: lyricsScaleFontSize(value) }, 'immersive');
   const onWheel = (event: WheelEvent<HTMLElement>) => {
     const steps = stepper(event);
-    if (available && steps !== 0) set(stepFontSize(fontSize, steps));
+    if (available && steps !== 0) set(stepScale(percent, steps));
   };
   const slider = (
     <Slider
@@ -68,32 +69,32 @@ export function FontSizeControl({
       size="small"
       min={min}
       max={max}
-      step={FONT_SIZE_STEP}
-      value={fontSize}
+      step={step}
+      value={percent}
       disabled={!available}
-      aria-label={t('lyrics.fontSize')}
+      aria-label={t('lyrics.zoom')}
       onChange={(_, data) => set(data.value)}
     />
   );
   if (layout === 'panel')
     return (
       <div className={styles.row} onWheel={onWheel}>
-        <span>{t('lyrics.fontSize')}</span>
+        <span>{t('lyrics.zoom')}</span>
         {slider}
-        <span className={styles.rowValue}>{fontSize}</span>
+        <span className={styles.rowValue}>{percent}%</span>
       </div>
     );
   return (
     <div
       className={mergeClasses(styles.tile, styles.tileFont)}
       role="group"
-      aria-label={t('lyrics.fontSize')}
+      aria-label={t('lyrics.zoom')}
       data-disabled={!available || undefined}
       onWheel={onWheel}
     >
       <div className={styles.tileHead}>
-        <span>{t('lyrics.fontSize')}</span>
-        <span className={styles.tileValue}>{fontSize}</span>
+        <span>{t('lyrics.zoom')}</span>
+        <span className={styles.tileValue}>{percent}%</span>
       </div>
       <div className={styles.tileBody}>
         <Tooltip content={t('lyrics.fontSmaller')} relationship="label">
@@ -102,8 +103,8 @@ export function FontSizeControl({
             size="small"
             shape="rounded"
             className={mergeClasses(classes.fontStep, controls.icon)}
-            disabled={!available || fontSize <= min}
-            onClick={() => set(stepFontSize(fontSize, -1))}
+            disabled={!available || percent <= min}
+            onClick={() => set(stepScale(percent, -1))}
           >
             A−
           </Button>
@@ -115,8 +116,8 @@ export function FontSizeControl({
             size="small"
             shape="rounded"
             className={mergeClasses(classes.fontStep, classes.fontStepLarge, controls.icon)}
-            disabled={!available || fontSize >= max}
-            onClick={() => set(stepFontSize(fontSize, 1))}
+            disabled={!available || percent >= max}
+            onClick={() => set(stepScale(percent, 1))}
           >
             A+
           </Button>
@@ -128,7 +129,10 @@ export function FontSizeControl({
 
 const STEPS = [-0.5, -0.1, 0.1, 0.5] as const;
 
-/** 时间校正：块里是名字加数值（不为零时带恢复键）、下面四个步进，面板里是大号数值、四个步进与恢复原时间 */
+/**
+ * 歌词的时间校正控件，形态由 `layout` 决定。两种形态都有四个步进键与恢复原时间的按钮，
+ * 磁贴形态只在校正值不为零时显示恢复键
+ */
 export function TimingControl({
   layout,
   available,
@@ -209,10 +213,9 @@ export function TimingControl({
 }
 
 /**
- * 译文与音译开关控件
+ * 沉浸视图歌词的译文或音译开关，形态由 `layout` 决定
  *
- * 宽档渲染为整高图标按钮，窄档渲染为标准图标，面板内渲染为开关行；
- * 当前曲目缺失对应歌词属性时禁用但保持可聚焦与悬浮提示
+ * `available` 为假时禁用。按钮形态仍可获得焦点并显示悬浮提示，面板形态的开关不可获得焦点
  */
 export function DisplayToggle({
   field,
@@ -227,10 +230,10 @@ export function DisplayToggle({
   const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
-  const checked = useAtomValueRawSync(service.display)[field];
+  const checked = useAtomValueRawSync(service.immersiveDisplay)[field];
   const labelId = useId();
   const label = t(`lyrics.${field}`);
-  const toggle = () => void service.update({ [field]: !checked });
+  const toggle = () => void service.update({ [field]: !checked }, 'immersive');
   const translation = field === 'showTranslation';
   const icon = translation ? <Translate20Regular /> : <RomanizationIcon />;
   const tool = translation ? 'translation' : 'romanization';
@@ -269,10 +272,11 @@ const ALIGN_ICONS: Readonly<Record<LyricsAlign, ReactElement>> = {
 };
 
 /**
- * 文字对齐控件
+ * 沉浸视图歌词的文字对齐控件
  *
- * 条上是一个轮换键：图标是当前的对齐，点一下换到下一种（居左、居中、居右）；面板里是三个并排的图标键，
- * 选中的那个按下。没有歌词时置灰，保持可聚焦与悬浮提示
+ * 工具条上是一个轮换键，图标表示当前的对齐方式，点击后依次换到居左、居中、居右。
+ * 面板里是三个并排的图标键，当前方式处于按下状态。
+ * `available` 为假时禁用，但仍可获得焦点并显示悬浮提示
  */
 export function AlignControl({
   layout,
@@ -285,9 +289,9 @@ export function AlignControl({
   const classes = useToolsStyles();
   const controls = useViewControlStyles();
   const service = useService(lyricsDisplayKey);
-  const { align } = useAtomValueRawSync(service.display);
+  const { align } = useAtomValueRawSync(service.immersiveDisplay);
   const labelId = useId();
-  const set = (next: LyricsAlign) => void service.update({ align: next });
+  const set = (next: LyricsAlign) => void service.update({ align: next }, 'immersive');
   if (layout === 'panel')
     return (
       <div className={styles.row}>

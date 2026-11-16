@@ -1,4 +1,5 @@
-/* 场景动作过渡期间：根不截图，页面照常实时绘制；过渡的伪元素不接指针；已在场元素点到点移动的时长与曲线由脚本写进变量 */
+/* 场景动作的视图过渡期间，根元素不生成快照，页面照常实时绘制。
+   过渡的伪元素不接收指针。已在场元素点到点移动的时长与曲线由脚本写入变量 */
 html[data-scene-transition] {
   view-transition-name: none;
 }
@@ -16,11 +17,21 @@ html[data-scene-transition]::view-transition-group(*) {
   animation-timing-function: var(--scene-glide-easing);
 }
 
-/* 快照组的叠放次序。组按名字出现的先后叠，只在新状态里才有名字的元素排在最后（退出 Coverflow 回满幅封面时的封面），
-   会盖住排在前面的页签、键与胶囊，所以次序用 `z-index` 定死：胶囊的玻璃面最低，往上依次是胶囊的头部与折叠部分、
-   页签与编辑槽、键、浮层。
-   带名字的毛玻璃元素自己的 `backdrop-filter` 由过渡搬到它的快照组上，组画在封面的快照之上、取得到封面，只是组不带圆角：
-   玻璃面的圆角由胶囊写进 `--scene-capsule-radius`，键都是圆或胶囊形 */
+/* 视图过渡中具名元素的通用规则
+
+   过渡的伪元素树显示在所有活动内容之上。过渡期间须保持可见的元素（页签、键、胶囊、编辑条、浮层）都要具名，
+   否则会被满幅封面的快照盖住，直到过渡结束才重新出现。
+   名称只在过渡进行时挂载：具名元素是 `backdrop-filter` 的背景根，名称一直挂着会使它上面与内部的毛玻璃失去模糊。
+   名称只挂在过渡进行中不会被移除的元素上。具名元素在动画阶段从 DOM 移除时，浏览器会提前结束整次过渡，动画不再播放。
+   提示气泡、菜单等点击后才移除的表面因此不能直接具名。
+
+   带毛玻璃的具名元素，其 `backdrop-filter` 由过渡转移到它的快照组上。组绘制在封面的快照之上，能取到封面，但组不带圆角。
+   圆角由元素经 `useRootRadius` 写到根变量中（胶囊 `--scene-capsule-radius`、编辑条 `--scene-edit-bar-radius`），
+   键都是圆形或胶囊形。
+
+   快照组按名称出现的先后叠放。只在新状态中具名的元素排在最后，如退出 Coverflow 回到满幅封面时的封面，
+   会盖住排在前面的页签、键与胶囊。因此叠放次序用 `z-index` 固定：胶囊的玻璃面最低，往上依次是胶囊的头部与折叠部分、
+   页签与编辑条、键、浮层 */
 html[data-scene-transition]::view-transition-group(scene-capsule-glass) {
   z-index: 1;
   border-radius: var(--scene-capsule-radius, 0);
@@ -34,6 +45,10 @@ html[data-scene-transition]::view-transition-group(*.scene-top) {
   z-index: 3;
 }
 
+html[data-scene-transition]::view-transition-group(*.scene-edit-bar) {
+  border-radius: var(--scene-edit-bar-radius, 0);
+}
+
 html[data-scene-transition]::view-transition-group(*.scene-key) {
   z-index: 4;
   border-radius: 9999px;
@@ -43,8 +58,9 @@ html[data-scene-transition]::view-transition-group(scene-overlay) {
   z-index: 5;
 }
 
-/* 信息行在居中与常规里对齐不同，新旧两份画面叠着淡变会同时出现两份字：缩成一次短淡变，位置照常点到点移动。
-   默认的叠加混合（plus-lighter，两份的不透明度加起来始终是 1）是靠默认动画挂上的，换掉动画要自己补回 */
+/* 信息行在居中与常规布局中的对齐方式不同，新旧画面叠加淡变时会同时出现两份文字。
+   因此信息行只做一次短淡变，位置照常点到点移动。
+   默认动画附带叠加混合（plus-lighter，两份画面的不透明度之和始终为 1），替换动画后须重新指定 */
 html[data-scene-transition]::view-transition-old(scene-info),
 html[data-scene-transition]::view-transition-new(scene-info) {
   mix-blend-mode: plus-lighter;
@@ -58,8 +74,8 @@ html[data-scene-transition]::view-transition-new(scene-info) {
   animation: scene-fade-in var(--scene-fade-duration) linear both;
 }
 
-/* 当前封面没有可配对的旧画面时（退出 Coverflow 时正在播放的封面不在视图内，名字已经放掉），模板里的封面短淡入，
-   不用过渡默认的时长，跟侧封面的淡出同一个节奏 */
+/* 当前封面没有可配对的旧画面时（退出 Coverflow 时正在播放的封面不在视图内，名称已释放），新状态中的封面短淡入，
+   不使用过渡的默认时长，与侧封面的淡出节奏一致 */
 html[data-scene-transition]::view-transition-new(scene-cover):only-child {
   animation: scene-fade-in var(--scene-fade-duration) linear both;
 }

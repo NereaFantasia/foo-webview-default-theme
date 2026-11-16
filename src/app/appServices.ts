@@ -20,13 +20,23 @@ import { desktopLyricsKey, startDesktopLyrics } from '../lyrics/desktop/desktopL
 import { currentTrackAtom } from '../playback/playback.ts';
 import { accentRampAtom } from '../theme/accentState.ts';
 import { migrateColumnPreferences } from '../table/columns/columnMigration.ts';
+import { fb } from 'foo-webview-sdk/bridge';
+import { migrateLyricsViewPreferences } from '../lyrics/lyricsViewMigration.ts';
 
 /**
- * 先读完浏览器偏好的可信副本、装上页面的偏好存储，再建服务：各服务同步读到的就是可信值
- * 颜色存档在渲染前同步恢复，播放订阅与应用服务一起释放
+ * 先完成偏好迁移，读完浏览器偏好的可信副本并装上页面的偏好存储，再创建服务，各服务同步读到的即是可信值。
+ * 颜色存档在渲染前同步恢复，播放订阅随应用服务一起释放
  */
 export async function startAppServices(): Promise<AppServices> {
   const dataWriter = startBrowserDataWriter();
+  if (fb.isAvailable()) {
+    const lyricsMigration = await migrateLyricsViewPreferences(dataWriter, fb);
+    // 写锁或存储不可用时任何偏好都写不进去，跳过迁移，下次启动再迁；
+    // 其他失败时迁移可能只完成一部分，继续启动会覆盖未迁移的存档，因此停止启动
+    if (!lyricsMigration.success && lyricsMigration.reason !== 'unavailable') {
+      throw new Error('歌词设置迁移失败');
+    }
+  }
   const migration = await migrateColumnPreferences(dataWriter);
   const prefs = await openBrowserPrefStorage(
     migration.success

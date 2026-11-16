@@ -28,6 +28,7 @@ import { useAtomValueRawSync } from 'jotai/react';
 import type { ReactElement } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { MENU_SURFACE_MOTION } from '../motion/MenuMotion.tsx';
+import { VIDEO_SEEK_SECONDS } from '../nav/videoKeys.ts';
 import type { VideoBindings } from './videoContext.ts';
 import styles from './VideoControls.module.css';
 
@@ -120,7 +121,7 @@ export function VideoControls({
                 className={styles.secondary}
                 label={t('video.back')}
                 icon={<Rewind20Regular />}
-                onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
+                onClick={() => bindings.seekBy(-VIDEO_SEEK_SECONDS)}
                 disabled={!playback.canSeek}
               />
               <Key
@@ -134,7 +135,7 @@ export function VideoControls({
                 className={styles.secondary}
                 label={t('video.forward')}
                 icon={<FastForward20Regular />}
-                onClick={() => bindings.seek(Math.min(playback.duration, playback.position + 5))}
+                onClick={() => bindings.seekBy(VIDEO_SEEK_SECONDS)}
                 disabled={!playback.canSeek}
               />
               <Key
@@ -190,16 +191,14 @@ export function VideoControls({
                       </MenuItem>
                       <MenuItem
                         icon={<Rewind20Regular />}
-                        onClick={() => bindings.seek(Math.max(0, playback.position - 5))}
+                        onClick={() => bindings.seekBy(-VIDEO_SEEK_SECONDS)}
                         disabled={!playback.canSeek}
                       >
                         {t('video.back')}
                       </MenuItem>
                       <MenuItem
                         icon={<FastForward20Regular />}
-                        onClick={() =>
-                          bindings.seek(Math.min(playback.duration, playback.position + 5))
-                        }
+                        onClick={() => bindings.seekBy(VIDEO_SEEK_SECONDS)}
                         disabled={!playback.canSeek}
                       >
                         {t('video.forward')}

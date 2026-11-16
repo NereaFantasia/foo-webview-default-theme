@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useService } from '../kit/useService.ts';
 import { lyricsKey } from './lyricsService.ts';
 import { lyricsDisplayKey, lyricsFontStyle } from './lyricsDisplay.ts';
+import type { LyricsView } from './lyricsSettings.ts';
 import { createLyricsTimeline, type LyricsCue } from './lyricsTimeline.ts';
 import { playbackAtom } from '../playback/playback.ts';
 import { trackKeyOf } from '../playback/playbackContract.ts';
@@ -15,13 +16,15 @@ import { textSwapMotion, type MotionTrack } from '../playback/now-playing/swapMo
 import type { SeekPreview } from '../playback/seek/useSeekPreview.ts';
 import styles from './SeekLyrics.module.css';
 
-function useLyricsPreview(target: SeekPreview | null) {
+function useLyricsPreview(target: SeekPreview | null, view: LyricsView) {
   const lyrics = useService(lyricsKey);
   const displayService = useService(lyricsDisplayKey);
   const state = useAtomValueRawSync(lyrics.state);
   const subject = useAtomValueRawSync(lyrics.subject);
   const offset = useAtomValueRawSync(lyrics.offset);
-  const display = useAtomValueRawSync(displayService.display);
+  const display = useAtomValueRawSync(
+    view === 'immersive' ? displayService.immersiveDisplay : displayService.display,
+  );
   const playback = useAtomValueRawSync(playbackAtom);
   const content =
     state.status === 'ready' && state.key === trackKeyOf(playback.track) ? state.content : null;
@@ -74,7 +77,7 @@ interface TextFrame {
   readonly direction: 'next' | 'previous' | 'none';
 }
 
-/** 两行作为同一组换位；连续跨句读取当前画面后接续，不排队播放经过的句子 */
+/** 两行作为一组切换。连续跨越多句时，从当前画面接着切换，不依次播放经过的句子 */
 function PreviewText({ content }: { readonly content: PreviewContent }) {
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const [frame, setFrame] = useState<TextFrame>({
@@ -191,10 +194,12 @@ function PreviewText({ content }: { readonly content: PreviewContent }) {
 
 interface SeekLyricsProps {
   readonly target: SeekPreview | null;
+  /** 预览使用哪个视图的歌词字体与副行开关 */
+  readonly view?: LyricsView;
 }
 
-export function SeekLyrics({ target }: SeekLyricsProps) {
-  const content = useLyricsPreview(target);
+export function SeekLyrics({ target, view = 'main' }: SeekLyricsProps) {
+  const content = useLyricsPreview(target, view);
   return (
     <div className={styles.inline} data-visible={content.visible || undefined}>
       <PreviewText content={content} />
@@ -219,8 +224,8 @@ const useStyles = makeStyles({
   },
 });
 
-export function SeekLyricsPopover({ target }: SeekLyricsProps) {
-  const content = useLyricsPreview(target);
+export function SeekLyricsPopover({ target, view = 'main' }: SeekLyricsProps) {
+  const content = useLyricsPreview(target, view);
   const classes = useStyles();
   return (
     <>

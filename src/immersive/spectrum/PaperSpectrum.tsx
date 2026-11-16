@@ -27,19 +27,20 @@ const DB_TICKS = [0, -10, -20, -30, -40, -50, -60] as const;
 /** 纵轴刻度：`level` 是柱高（0…1） */
 const AMPLITUDE_TICKS = DB_TICKS.map((db) => ({ label: `${db}`, level: levelOfDb(db) }));
 const CAPTION = 'band power · dB';
-/** 轴说明左缘在 200 刻度右边这么远（CSS 像素），让开刻度字 */
+/** 轴说明排在 200 Hz 刻度之后，左缘与该刻度相距 `CAPTION_GAP`（CSS 像素），以免压住刻度文字 */
 const CAPTION_AFTER_HZ = 200;
 const CAPTION_GAP = 40;
-/** 每格一条格线：格高按刻度数分 */
+/** 每格一条格线，格高按刻度数等分 */
 const PLOT_STYLE: CSSProperties & Record<`--${string}`, string> = {
   '--grid-step': `${100 / (AMPLITUDE_TICKS.length - 1)}%`,
 };
-/** 峰值点的高度（CSS 像素）与它在柱顶之上留的缝 */
+/** 峰值点的高度，以及它与柱顶之间的间隙（CSS 像素） */
 const PEAK_MARK = 2;
 const PEAK_GAP = 1;
 
 const playStateAtom = atom((get) => get(playbackAtom).state);
-// 横轴右端是可视化流采样率的一半，以帧自报的为准；帧里没有时按曲目标称采样率估，输出链里有重采样时这个估值会偏
+// 可视化流的 Nyquist（采样率的一半）以帧报告的值为准。帧中没有该值时按曲目的标称采样率估算，输出链中有重采样时估值会有偏差。
+// 横轴右端另以 `HZ_MAX` 为上限，见 `spectrumBarAxis`
 const nyquistAtom = atom((get) => {
   const reported = get(spectrumMaxFrequencyAtom);
   if (reported !== null) return reported;
@@ -49,26 +50,28 @@ const nyquistAtom = atom((get) => {
 
 interface Phase {
   readonly status: SpectrumStatus;
-  /** 在播放出帧 */
+  /** 正在播放且有频谱帧 */
   readonly on: boolean;
-  /** 暂停中；停止不算 */
+  /** 处于暂停状态，停止不计入 */
   readonly paused: boolean;
 }
 
 /**
- * 图纸频谱：上方 Hz 刻度按柱的横轴落位（低频一个频点一根柱、往上按对数，`barAxis.ts`），中间 200 根柱，
- * 左侧纵轴每 10 dB 一格（带内频点功率之和）。轴说明跟在 200 刻度后面：低频段按频点铺开之后，
- * 20 与 200 两个刻度之间窄到放不下它，高采样率时更窄。没有取数时柱区右上角写一行说明
+ * 图纸频谱：上方是 Hz 刻度，中间是 200 根柱，左侧纵轴每 10 dB 一格（带内频点功率之和）
  *
- * 文字与轴线是 DOM，只有柱画在 canvas 上。柱缓冲与帧距从 `useViewServices().spectrum` 现读，不经 React 状态：
- * 每来一帧排一次重画，柱的推进（回落、峰值点、暂停定格、断点后缓起音）在 `spectrumMotion.ts`
- * 断点来自 `usePlaybackJumps`，另把「从没在出帧变成在播放出帧」也算一次；缓起音的时长取 `DURATION_MS.normal`
+ * Hz 刻度按柱的横轴定位：低频段一个频点一根柱，往上按对数分（`barAxis.ts`）。
+ * 轴说明排在 200 刻度之后：低频段按频点展开后，20 与 200 两个刻度之间放不下轴说明，采样率越高间距越窄。
+ * 没有频谱数据时，柱区右上角显示一行说明。
  *
- * 柱与峰值点共用一条竖向渐变：柱区底边 `--colorNeutralForeground2`，顶边 `--paper-ink`，柱越高顶上的颜色越浓
- * canvas 读不到 CSS 变量，尺寸、舞台缩放、封面 ramp、深浅档变了都按新尺寸重开 canvas、重读颜色；
- * 柱的推进状态跟着组件走，不随之清零
+ * 文字与轴线是 DOM，只有柱绘制在 canvas 上。柱缓冲与帧距直接从 `useViewServices().spectrum` 读取，不经 React 状态。
+ * 每收到一帧安排一次重绘。柱的变化（回落、峰值点、暂停定格、跳转后的缓升）由 `spectrumMotion.ts` 计算。
+ * 跳转来自 `usePlaybackJumps`，从没有频谱帧变为正在播放且有频谱帧时也按一次跳转处理。缓升的时长取 `DURATION_MS.normal`。
  *
- * 几何全由放件的外框经 `--spectrum-*` 变量给（见样式表），件里不写缺省
+ * 柱与峰值点共用一条竖向渐变：柱区底边为 `--colorNeutralForeground2`，顶边为 `--paper-ink`，柱越高，顶端颜色越接近 `--paper-ink`。
+ * canvas 读不到 CSS 变量，因此尺寸、舞台缩放、封面色阶或深浅色方案变化时，按新尺寸重设 canvas 并重新读取颜色。
+ * 柱的变化状态属于组件，重设 canvas 时不清零。
+ *
+ * 几何尺寸全部由放置它的外框经 `--spectrum-*` 变量提供（见样式表），组件内不写缺省值
  */
 export function PaperSpectrum() {
   const store = useStore();
@@ -91,7 +94,7 @@ export function PaperSpectrum() {
   }, [nyquist, plotWidth]);
   const captionLeft = (ticks.find((tick) => tick.hz === CAPTION_AFTER_HZ)?.x ?? 0) + CAPTION_GAP;
 
-  // `ramp` 与 `scheme` 在这里只当重开的时机：它们变了之后 canvas 的颜色要重读
+  // `ramp` 与 `scheme` 在这里只用作重设的时机：它们变化后须重新读取 canvas 的颜色
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -166,7 +169,7 @@ export function PaperSpectrum() {
       const style = getComputedStyle(canvas);
       const ink = style.getPropertyValue('--paper-ink').trim();
       const low = style.getPropertyValue('--colorNeutralForeground2').trim() || ink;
-      // `addColorStop` 收到空串会抛错：取不到数据墨时不建渐变
+      // `addColorStop` 收到空串会抛错，因此读不到 `--paper-ink` 时不创建渐变
       if (!ctx || height === 0 || !ink) {
         fill = ink;
         return;
@@ -177,7 +180,7 @@ export function PaperSpectrum() {
       fill = gradient;
     };
 
-    // 重设 canvas 的物理尺寸会清空它：在这一回调里当场补画，不留一帧空白
+    // 重设 canvas 的物理尺寸会清空画面，因此在同一回调中立即重绘，不出现空白帧
     const observer = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
       if (!box || !running()) return;
@@ -201,7 +204,7 @@ export function PaperSpectrum() {
       if (next.paused && !last.paused) motion.pause(now, smooth());
       else if (!next.paused && last.paused) motion.resume(now);
       if (next.status === 'idle' || next.status === 'unavailable') motion.release();
-      // 开始在播放出帧算断点；从暂停恢复不算，柱接着暂停前的画面走
+      // 开始播放并有频谱帧时按一次跳转处理。从暂停恢复不算，柱从暂停前的画面继续
       if (next.on && !last.on && !last.paused) soften();
       else schedule();
       last = next;
@@ -264,7 +267,7 @@ export function PaperSpectrum() {
         ))}
       </div>
       <div className={styles.plot} style={PLOT_STYLE}>
-        {/* canvas 在前：文字叠在柱上面，满幅的柱不会盖掉轴说明。 */}
+        {/* canvas 在前，文字叠在柱上方，满高的柱不会盖住轴说明 */}
         <canvas ref={canvasRef} className={styles.bars} aria-hidden />
         <span className={styles.caption} style={{ left: captionLeft }} aria-hidden>
           {CAPTION}

@@ -3,8 +3,8 @@ import { openPlayer, type PlayerPage } from '../fixtures/playerPage.ts';
 import { answerLargeQueue, QUEUE_LIST_GUID, queueScroller } from '../fixtures/rightCardPage.ts';
 import { makeTrack } from '../fixtures/tracks.ts';
 
-// 预设场景里预设 1「分栏」的几何：封面列与侧栏的位置、封面边长、侧栏收起时的居中、页签与更多菜单里的侧栏开关、
-// 当前封面的共享名字只有一个。只量框的位置与大小，观感由用户实机看
+// 预设场景中预设 1「分栏」的几何：封面列与侧栏的位置、封面边长、侧栏收起时的居中、页签与「更多」菜单中的侧栏开关，
+// 以及当前封面的共享名称只有一个。用例只测量元素框的位置与大小，不检查观感
 
 const SCENE_KEY = 'default-theme.immersive.scene.v1';
 const COLLAPSE_KEY = 'default-theme.immersive.collapseWithoutLyrics.v1';
@@ -17,11 +17,11 @@ async function openPresets(
     readonly width?: number;
     readonly height?: number;
     readonly lyrics?: boolean;
-    /** 宿主支持全屏：视图里出全屏键 */
+    /** 宿主支持全屏，视图中显示全屏键 */
     readonly fullscreen?: boolean;
   } = {},
 ): Promise<PlayerPage> {
-  // 这份用例里没有歌词时自动居中的几条要靠「无歌词时收起侧栏」开着（偏好缺省是关）
+  // 本文件中「没有歌词时自动居中」的几条用例依赖「无歌词时收起侧栏」开启，该偏好缺省为关
   await page.addInitScript(
     ([scene, collapse]) => {
       localStorage.setItem(scene, 'presets');
@@ -62,7 +62,7 @@ async function openPresets(
       windowId: 'main',
     });
   }
-  // 启动时那一次读歌词答的是缺省的失败，换一首才会重新读
+  // 启动时那次读取歌词返回缺省的失败应答，换曲后才会重新读取
   const next = makeTrack({ path: 'file://E:/Music/Other/02 Other.flac', title: 'Other' });
   player.state.track = next;
   await player.host.emit('playback:trackChanged', next);
@@ -74,7 +74,7 @@ async function openPresets(
     Reflect.apply(open, harness, []);
   });
   await expect(page.locator('[data-scene="presets"] [data-preset="split"]')).toBeVisible();
-  // 进视图的过渡带缩放，边框要等它播完才是排版值；播完前量到的是缩放中的框（399.86 对 400 这类）
+  // 进入视图的过渡带缩放，播完后元素框才是排版值。播完前测得的是缩放中的框，如 399.86 与 400 之差
   await page.evaluate(async () => {
     const view = document.querySelector('[data-scene="presets"]')?.closest('section');
     const playing = view?.getAnimations() ?? [];
@@ -121,7 +121,7 @@ test('封面列整组的上沿与高度是算出来的：封面上沿、传输�
     await expect
       .poll(async () => (await box(element(page, 'cover'))).y, { message: `${width} × ${height}` })
       .toBe(top);
-    // 队列页刚换进来时有上移 20 px 的页内过渡，播完才落在排版值上
+    // 队列页刚切换进来时有上移 20 px 的页内过渡，播完后才位于排版位置
     await expect
       .poll(async () => (await box(element(page, 'queue'))).y, {
         message: `${width} × ${height} 队列页的列上沿`,
@@ -147,7 +147,7 @@ test('窗高跨过字号档的界限：曲目信息元素原地换档，不重�
   expect(await info.evaluate((node) => Reflect.get(node, 'keptAcrossResize'))).toBe(true);
 });
 
-/** 打开更多键的菜单，点其中的侧栏开关；菜单里是「展开侧栏」还是「收起侧栏」由此刻是否居中定 */
+/** 打开「更多」键的菜单并点击侧栏开关。菜单项是「展开侧栏」还是「收起侧栏」，取决于当前是否居中 */
 async function toggleSidebar(page: Page, name: '展开侧栏' | '收起侧栏') {
   await element(page, 'more').getByRole('button').click();
   await page.getByRole('menuitem', { name }).click();
@@ -172,7 +172,7 @@ test('点队列页签：侧栏换成队列页，歌词栏撤掉；更多菜单�
   await openPresets(page);
   await page.getByRole('tab', { name: /队列/ }).click();
   await expect(element(page, 'queue')).toBeVisible();
-  // 沉浸视图里的滚动区不显示滚动条
+  // 沉浸视图中的滚动区不显示滚动条
   for (const name of ['queue']) {
     const width = await element(page, name).evaluate(
       (node) => getComputedStyle(node).scrollbarWidth,
@@ -189,7 +189,7 @@ test('点队列页签：侧栏换成队列页，歌词栏撤掉；更多菜单�
   await expect(element(page, 'history')).toHaveCount(0);
 });
 
-/** 打开队列页：在播的是 `total` 首大列表里的第 `index` 首（缺省第 30 首），侧栏换成队列页 */
+/** 打开队列页：正在播放的是 `total` 首列表中的第 `index` 首（缺省为第 30 首），侧栏切换为队列页 */
 async function openQueueAtCurrent(page: Page, total = 200, index = 30): Promise<PlayerPage> {
   const player = await openPresets(page);
   answerLargeQueue(player.host, total);
@@ -200,7 +200,7 @@ async function openQueueAtCurrent(page: Page, total = 200, index = 30): Promise<
     playlistGuid: QUEUE_LIST_GUID,
     index,
   });
-  // 「接下来」只在播放跟随光标关着时推得出来；启动时读到的是缺省的失败，要靠事件告诉它
+  // 只有「播放跟随光标」关闭时才能推算「接下来」。启动时读到的是缺省的失败应答，须由事件通知关闭状态
   await player.host.waitForListener('playback:followCursorChanged');
   await player.host.emit('playback:followCursorChanged', { enabled: false });
   player.state.track = makeTrack({
@@ -220,7 +220,7 @@ test('队列页往下滚：「接下来」的节头与行一样随位置淡出�
   const opacity = () => head.evaluate((node) => Number(getComputedStyle(node).opacity));
   await expect(head).toBeVisible();
   await expect.poll(opacity).toBe(1);
-  // 节头卡高 48，往上滚半张卡：它露在整组上沿之外一半，不透明度随之降到一半上下
+  // 节头卡高 48，向上滚动半张卡，使它有一半超出整组的上沿，不透明度随之降到一半左右
   await queueScroller(page).evaluate((box) => {
     box.scrollTop += 24;
   });
@@ -228,7 +228,7 @@ test('队列页往下滚：「接下来」的节头与行一样随位置淡出�
   await expect.poll(opacity).toBeGreaterThan(0.1);
 });
 
-// 队列只有几首、全在列里放得下时，列表下面不该还有一截能滚的空白；前面还有已播的曲目时，能滚的量就是那一段的高度
+// 队列只有几首且都能放进列中时，列表下方不应留有可滚动的空白。前面还有已播放的曲目时，可滚动的距离等于那一段的高度
 test('队列页内容比列短：没有前面的曲目时不能滚动', async ({ page }) => {
   await openQueueAtCurrent(page, 4, 0);
   const scroller = queueScroller(page);
@@ -257,12 +257,12 @@ interface TreeLayer {
   readonly height: number;
 }
 
-/** 渐隐属性之外，关键帧对象里自带的几个键 */
+/** 关键帧对象中除渐隐属性以外自带的键 */
 const KEYFRAME_META = new Set(['offset', 'computedOffset', 'easing', 'composite']);
 
-// 渐隐动画能和滚动一起在合成线程上算，靠的是三个前提，而不是某个视觉数值：滚动容器自己是合成滚动、`opacity` 只由一个
-// 动画管、`opacity` 不和 `filter` 写在同一个动画里。任何一条被破坏，动画回到主线程，主线程忙时赶不上滚动，卡在滚动区
-// 裁切线上露出来。这里直接断言前提，不量像素
+// 渐隐动画能与滚动一起在合成线程上计算，取决于三个前提，而不是某个视觉数值：滚动容器本身是合成滚动，
+// `opacity` 只由一个动画控制，`opacity` 与 `filter` 不写在同一个动画里。任何一条不满足，动画都会回到主线程，
+// 主线程繁忙时跟不上滚动，滚动区的裁切线处会露出未渐隐的内容。因此用例直接断言这三个前提，不测量像素
 test('队列页上下渐隐：滚动容器是合成滚动，每张卡的 opacity 只由一个滚动时间线动画管', async ({
   page,
 }) => {
@@ -290,7 +290,7 @@ test('队列页上下渐隐：滚动容器是合成滚动，每张卡的 opacity
   expect(written.every((animation) => animation.properties.length === 1)).toBe(true);
   expect(written.filter((animation) => animation.properties[0] === 'opacity')).toHaveLength(1);
 
-  // 滚动容器是合成滚动：渲染进程里有一层与它的可视宽、滚动高同大
+  // 滚动容器是合成滚动：渲染进程中有一个图层，大小等于它的可视宽度与滚动高度
   const scroller = queueScroller(page);
   const size = await scroller.evaluate((box) => ({
     width: box.clientWidth,
@@ -317,7 +317,7 @@ test('队列页上下渐隐：滚动容器是合成滚动，每张卡的 opacity
 
 test('队列页往上滚后点「定位当前」：滚回前面的曲目整段藏在上方的位置', async ({ page }) => {
   const player = await openQueueAtCurrent(page);
-  // 前面那一段整段在上方时，滚动位置就等于这一段的高。平时这一段不可见、一行也不渲染，仅由它的高度撑开
+  // 前面一段整体位于上方时，滚动位置等于这一段的高度。这一段平时不可见，不渲染任何行，只由高度撑开
   const earlierHeight = () =>
     page.evaluate(
       () => document.querySelector<HTMLElement>('[data-queue-earlier]')?.offsetHeight ?? 0,
@@ -341,10 +341,11 @@ test('队列页往上滚后点「定位当前」：滚回前面的曲目整段�
 test('右侧卡开着队列，进沉浸视图在队列页滚到远处再退出：右侧卡的行还在，不是一屏占位行', async ({
   page,
 }) => {
-  // 「接下来」的读取窗口只有一份，同一时刻只服务一个在看的列表；沉浸视图盖着时右侧卡不去抢，退出后要重新读
+  // 「接下来」的读取窗口只有一份，同一时刻只服务一个正在显示的列表。沉浸视图遮住右侧卡时，右侧卡不占用读取窗口，
+  // 退出视图后须重新读取
   const player = await openQueueAtCurrent(page, 3000);
   await stepHistory(page, 'back');
-  // 试验页没有后端，启动遮罩一直在，盖着右侧卡的键
+  // 试验页没有后端，启动遮罩一直存在，会遮住右侧卡的键
   await page.evaluate(() => document.getElementById('server-loading')?.remove());
   await page.locator('[data-right-card-key="queue"]').click();
   const cardRows = () =>
@@ -369,7 +370,7 @@ test('右侧卡开着队列，进沉浸视图在队列页滚到远处再退出�
   expect(player.errors).toEqual([]);
 });
 
-/** 经试验页挂的 `__immersive.back()`、`forward()` 走历史的后退与前进，与鼠标侧键同一条路 */
+/** 经试验页提供的 `__immersive.back()` 与 `forward()` 后退或前进，与鼠标侧键使用同一路径 */
 async function stepHistory(page: Page, direction: 'back' | 'forward') {
   await page.evaluate((name) => {
     const harness: unknown = Reflect.get(window, '__immersive');
@@ -470,7 +471,7 @@ test('悬停进度线：线上出竖标、线不变粗，上方弹出那一刻�
   const track = await box(slider);
   const thickness = (await box(groove)).height;
   await expect(marker).not.toHaveAttribute('data-visible', 'true');
-  // 175 s 的曲目，歌词在 1、5、9 s 起：悬停在 7 s 处是第二句
+  // 曲目长 175 s，歌词分别从 1、5、9 s 开始：悬停在 7 s 处对应第二句
   const x = track.x + track.width * (7 / 175);
   await page.mouse.move(x, track.y + track.height / 2);
   const popover = page.locator('[data-seek-lyrics]');
@@ -505,7 +506,7 @@ test('进度线的命中区只有线上下各 8：时间行不接指针，元素
   expect(hit.height, '线 6 加上下各 8').toBe(22);
   expect((await box(progress)).height, '含下面的时间行').toBe(44);
   const x = hit.x + hit.width / 2;
-  // 命中区的下沿以内还触发；下沿以外（时间行）不触发
+  // 命中区下沿以内仍会触发，下沿以外（时间行）不触发
   await page.mouse.move(x, hit.y + hit.height - 2);
   await expect(marker).toHaveAttribute('data-visible', 'true');
   await page.mouse.move(x, hit.y + hit.height + 6);
@@ -534,12 +535,12 @@ test('曲名放不下时按传送带滚：后面接一份相同的字，停顿�
     const [lead, , tail] = nodes.map((node) => node.getBoundingClientRect());
     return { origin: lead?.left ?? 0, loop: (tail?.left ?? 0) - (lead?.left ?? 0) };
   });
-  // 停顿 3 s 之后才滚
+  // 停顿 3 s 后才开始滚动
   const inner = clip.locator('> span');
   await expect
     .poll(() => inner.evaluate((node) => node.getAnimations().length), { timeout: 8000 })
     .toBeGreaterThan(0);
-  // 跳到滚完前一瞬：第二份正好落在第一份初始位置
+  // 跳到滚动结束前的瞬间：第二份文字正好位于第一份的初始位置
   const end = await inner.evaluate((node) => {
     const animation = node.getAnimations()[0];
     const timing = animation?.effect?.getComputedTiming();
@@ -549,7 +550,7 @@ test('曲名放不下时按传送带滚：后面接一份相同的字，停顿�
     return { tail: tail?.left ?? 0, duration: Number(timing?.duration) };
   });
   expect(end.tail).toBeCloseTo(rest.origin, 0);
-  // 28 号字的速度是 36 × 28 ÷ 13 像素每秒
+  // 28 号字的滚动速度为 36 × 28 ÷ 13 像素每秒
   expect(end.duration).toBeCloseTo((rest.loop / ((36 * 28) / 13)) * 1000, -2);
   await change('Short', 4);
   await expect(clip).toHaveCount(0);
@@ -560,7 +561,7 @@ test('收起侧栏：侧栏朝正中线缩着收起，播完再卸；再展开�
 }) => {
   await openPresets(page);
   const phased = page.locator('[data-preset="split"] [data-phase]');
-  // 挂载时开着的侧栏不算进场
+  // 挂载时已打开的侧栏不计为进场
   await expect(phased).toHaveCount(0);
   await toggleSidebar(page, '收起侧栏');
   await expect(phased).toHaveAttribute('data-phase', 'leave');
@@ -572,7 +573,7 @@ test('收起侧栏：侧栏朝正中线缩着收起，播完再卸；再展开�
       pointerEvents: style.pointerEvents,
       animation: style.animationName,
       duration: style.animationDuration,
-      // 缩放原点落在栏宽的 1/11 处，也就是窗口正中线
+      // 缩放原点位于栏宽的 1/11 处，即窗口的中线
       origin: Number.parseFloat(style.transformOrigin) / node.getBoundingClientRect().width,
     };
   });
@@ -581,10 +582,10 @@ test('收起侧栏：侧栏朝正中线缩着收起，播完再卸；再展开�
   expect(leaving.pointerEvents).toBe('none');
   expect(leaving.animation).toContain('side-shrink');
   expect(leaving.animation).toContain('side-fade-out');
-  // 位移与缩放 500 ms，淡出 334 ms，两个时长都放慢到五成
+  // 位移与缩放 500 ms，淡出 334 ms，两个时长都是按 0.5 倍速放慢后的值
   expect(seconds(leaving.duration)).toEqual([0.5, 0.334]);
   expect(leaving.origin).toBeCloseTo(1 / 11, 1);
-  // 侧栏是页面里的活元素，过渡层里没有它的名字
+  // 侧栏是页面中的活动元素，过渡层中没有它的名称
   expect(
     await page.evaluate(() =>
       document.getAnimations().some((animation) => {
@@ -593,7 +594,7 @@ test('收起侧栏：侧栏朝正中线缩着收起，播完再卸；再展开�
       }),
     ),
   ).toBe(false);
-  // 播完才卸
+  // 动画播完后才卸载
   await expect(phased).toHaveCount(0, { timeout: 3000 });
   await expect(element(page, 'lyrics')).toHaveCount(0);
 
@@ -608,10 +609,41 @@ test('收起侧栏：侧栏朝正中线缩着收起，播完再卸；再展开�
   expect(seconds(entering.duration)).toEqual([0.5, 0.166]);
 });
 
-/** 一串计算出来的动画时长（秒），取到毫秒：`calc(250ms / 0.3)` 算出来不是整毫秒 */
+/** 把计算得到的一组动画时长（秒）舍入到毫秒：`calc(250ms / 0.3)` 的结果不是整毫秒 */
 function seconds(durations: string): number[] {
   return durations.split(',').map((value) => Math.round(Number.parseFloat(value) * 1000) / 1000);
 }
+
+test('悬停着提示点 Coverflow 键：提示气泡中途被移除，视图过渡仍播满，不被提前结束', async ({
+  page,
+}) => {
+  // 记录每次视图过渡从就绪到结束的时长：具名元素在过渡进行中被移除时，浏览器会提前结束整次过渡
+  await page.addInitScript(() => {
+    const original = document.startViewTransition.bind(document);
+    const runs: number[] = [];
+    Reflect.set(window, '__transitionRuns', runs);
+    Reflect.set(document, 'startViewTransition', (update: () => void) => {
+      const transition = original(update);
+      transition.ready.then(
+        () => {
+          const readyAt = performance.now();
+          void transition.finished.then(() => runs.push(performance.now() - readyAt));
+        },
+        () => undefined,
+      );
+      return transition;
+    });
+  });
+  await openPresets(page);
+  const key = page.locator('[data-coverflow-key]');
+  await key.hover();
+  await expect(page.getByRole('tooltip')).toBeVisible();
+  await key.click();
+  const runs = () => page.evaluate(() => Reflect.get(window, '__transitionRuns') as number[]);
+  await expect.poll(async () => (await runs()).length).toBe(1);
+  // 过渡的位移时长为 500 ms，被提前结束时测得的时长远小于该值
+  expect((await runs())[0]).toBeGreaterThan(400);
+});
 
 test('减弱动效：收起的侧栏当帧卸，不留退场', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -661,12 +693,12 @@ test('歌词工具条：宽档放得下全部键，窗宽 1280 与宽档下限 1
         return Math.round(bar.x + bar.width - (last.x + last.width));
       })
       .toBeGreaterThanOrEqual(0);
-    const font = await box(toolbar(page).getByRole('group', { name: '字号 (px)' }));
+    const font = await box(toolbar(page).getByRole('group', { name: '歌词缩放' }));
     const timing = await box(toolbar(page).getByRole('group', { name: '时间校正' }));
     expect(timing.width, String(width)).toBeCloseTo(163, 0);
     expect(font.width, String(width)).toBeGreaterThanOrEqual(100);
     const slider = await box(
-      toolbar(page).getByRole('group', { name: '字号 (px)' }).getByRole('slider'),
+      toolbar(page).getByRole('group', { name: '歌词缩放' }).getByRole('slider'),
     );
     expect(slider.width, String(width)).toBeGreaterThanOrEqual(36);
   }
@@ -694,27 +726,25 @@ test('歌词工具条：歌词没有译文和音译时两个开关都在，都�
     await expect(tool(page, name)).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('歌词工具条：字号块两端的 A− 与 A+ 每次 2 px，到 12 或 48 时置灰，滑块与滚轮调的是同一个值', async ({
-  page,
-}) => {
+test('歌词工具条：缩放块两端的 A− 与 A+ 每次 5%，滑块与滚轮调的是同一个值', async ({ page }) => {
   await openPresets(page);
-  const group = toolbar(page).getByRole('group', { name: '字号 (px)' });
-  await expect(group).toContainText('22');
+  const group = toolbar(page).getByRole('group', { name: '歌词缩放' });
+  await expect(group).toContainText('100%');
   await group.getByRole('button', { name: '增大字号' }).click();
-  await expect(group).toContainText('24');
+  await expect(group).toContainText('105%');
   await group.getByRole('button', { name: '减小字号' }).click();
   await group.getByRole('button', { name: '减小字号' }).click();
-  await expect(group).toContainText('20');
+  await expect(group).toContainText('95%');
   await group.getByRole('slider').focus();
   await page.keyboard.press('ArrowRight');
-  await expect(group).toContainText('22');
-  // 往上滚加、往下减，一格 2 px
+  await expect(group).toContainText('100%');
+  // 向上滚动增大，向下滚动减小，每格 5%
   const rect = await box(group);
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.wheel(0, -100);
-  await expect(group).toContainText('24');
+  await expect(group).toContainText('105%');
   await page.mouse.wheel(0, 100);
-  await expect(group).toContainText('22');
+  await expect(group).toContainText('100%');
 });
 
 test('歌词工具条：校正块的步进与恢复键', async ({ page }) => {
@@ -747,11 +777,11 @@ test('歌词工具条：窗宽 700 时字号与校正收成图标键，点开是
   page,
 }) => {
   await openPresets(page, { width: 700, height: 600 });
-  await expect(toolbar(page).getByRole('group', { name: '字号 (px)' })).toHaveCount(0);
+  await expect(toolbar(page).getByRole('group', { name: '歌词缩放' })).toHaveCount(0);
   await expect(tool(page, 'font')).toBeVisible();
   await expect(tool(page, 'timing')).toBeVisible();
   await tool(page, 'font').click();
-  const panel = page.getByRole('dialog', { name: '字号 (px)' });
+  const panel = page.getByRole('dialog', { name: '歌词缩放' });
   await expect(panel.getByRole('slider')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);

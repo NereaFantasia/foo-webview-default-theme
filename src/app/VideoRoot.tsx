@@ -3,10 +3,12 @@ import { atom } from 'jotai/vanilla';
 import { CapsuleVolume } from '../shell/player/volume/CapsuleVolume.tsx';
 import { SEEK_FOCUS } from '../shell/player/playerFocus.ts';
 import { SeekBar } from '../playback/seek/SeekBar.tsx';
+import { createSeekStepper } from '../playback/seekStepper.ts';
 import { currentTrackAtom, playbackAtom } from '../playback/playback.ts';
 import { displayTitle, nowPlayingAtom } from '../playback/now-playing/nowPlaying.ts';
 import { trackKeyOf } from '../playback/playbackContract.ts';
 import { CaptionButtons } from '../shell/CaptionButtons.tsx';
+import { infoFilePath } from '../shell/track-info/trackInfoModel.ts';
 import type { AppServices } from './services.ts';
 import { VideoContext, type VideoPlayback } from '../video/videoContext.ts';
 import { startVideo, type VideoService } from '../video/videoService.ts';
@@ -48,7 +50,7 @@ export function VideoRoot({
           duration: value.duration,
           title: value.track ? displayTitle(value.track) : '',
           cover: cover.key === trackKeyOf(value.track) ? cover.cover : null,
-          file: value.track?.absolutePath || null,
+          file: value.track ? infoFilePath(value.track) : null,
         };
       }),
     [],
@@ -58,6 +60,8 @@ export function VideoRoot({
     setService(next);
     return () => next.dispose();
   }, [store]);
+  const stepper = useMemo(() => createSeekStepper(store, playback), [store, playback]);
+  useEffect(() => stepper.release, [stepper]);
   return (
     <VideoContext
       value={
@@ -73,7 +77,8 @@ export function VideoRoot({
               toggle: () => void playback.playOrPause(),
               previous: () => void playback.previous(),
               next: () => void playback.next(),
-              seek: (seconds) => void playback.seek(seconds),
+              seekBy: stepper.by,
+              seekTo: stepper.to,
               browse: () => void folders.browseVideo(store.get(state).file),
               reveal: async () => {
                 const file = store.get(state).file;
@@ -82,6 +87,7 @@ export function VideoRoot({
                 return result === 'done' || result === 'external';
               },
               stepVolume: (up) => void playback.stepVolume(up),
+              toggleMute: () => void playback.toggleMute(),
               open: () => history.navigate({ id: 'video' }, 'drill'),
               close: closeVideo,
             }

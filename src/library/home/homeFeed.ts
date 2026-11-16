@@ -1,10 +1,17 @@
 import { fb } from 'foo-webview-sdk/bridge';
-import { atom, type createStore } from 'jotai/vanilla';
+import { atom, type Atom, type createStore } from 'jotai/vanilla';
 import { settle } from '../../host/hostCall.ts';
 import { hasPlaycountComponent } from '../../host/playcountComponent.ts';
 import { waitForHost } from '../../host/waitForHost.ts';
 import { albumsAtom } from '../albums.ts';
-import { LIBRARY_COALESCE_MS, onLibraryChanged, trackPathOf } from '../../host/libraryContract.ts';
+import {
+  LIBRARY_COALESCE_MS,
+  onLibraryChanged,
+  onLibraryStatsRefresh,
+  trackPathOf,
+} from '../../host/libraryContract.ts';
+import type { BackendConnection } from '../../server/backendConnection.ts';
+import { createHomeStatsCache } from './homeStatsCache.ts';
 import { libraryTracksAtom, type LibraryTracksService } from '../libraryTracks.ts';
 import {
   EMPTY_HOME_STATISTICS,
@@ -31,20 +38,34 @@ const INITIAL: HomeFeedState = {
   failure: null,
 };
 
-/** 播放统计还在读，靠统计的几行先占骨架；没装播放统计组件的机器这几行本来就不出，不占 */
+/** 播放统计仍在读取时为真，依赖统计的几行先显示骨架。未安装播放统计组件时这几行不显示，也不占位 */
 export function feedLoading(state: Pick<HomeFeedState, 'status' | 'available'>): boolean {
   return state.available !== false && (state.status === 'idle' || state.status === 'loading');
 }
 
-export const HOME_STATS_BATCH = 500;
+/** 宿主同步处理统计请求，限制单批工作量，并在批间留出交互时间 */
+export const HOME_STATS_BATCH = 20;
+const STATS_PAUSE_MS = 16;
 const MAX_RECOVERY_CALLS = 32;
-export type HomeFeedHost = Pick<typeof fb, 'config' | 'playcount' | 'on' | 'ready' | 'isAvailable'>;
+export type HomeFeedHost = Pick<
+  typeof fb,
+  'config' | 'playcount' | 'library' | 'on' | 'ready' | 'isAvailable'
+>;
 
-/** 已显示的统计只标记待刷新；用户显式刷新才换序，正在操作的条目不随播放事件移动 */
+interface HomeStatsBackend extends Pick<BackendConnection, 'request' | 'port'> {
+  readonly enabled?: Atom<boolean>;
+  readonly ready?: Promise<void>;
+}
+
+/**
+ * 启动首页的播放统计。统计显示后，播放事件只把它标记为待刷新，用户显式刷新时才重新排序，
+ * 正在操作的条目不会因播放事件而移动
+ */
 export function startHomeFeed(
   store: ReturnType<typeof createStore>,
   tracks: Pick<LibraryTracksService, 'want' | 'retry'>,
   host: HomeFeedHost = fb,
+  backend?: HomeStatsBackend,
 ) {
   const state = atom<HomeFeedState>(INITIAL);
   let disposed = false;
@@ -59,7 +80,18 @@ export function startHomeFeed(
   let reported = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let waiter: ReturnType<typeof waitForHost> | undefined;
+  let cancelPause: (() => void) | undefined;
+  const cache = createHomeStatsCache(
+    host,
+    backend,
+    () =>
+      !!backend &&
+      store.get(backend.port) !== null &&
+      (!backend.enabled || store.get(backend.enabled)),
+  );
   const offs: (() => void)[] = [];
+  if (backend) offs.push(store.sub(backend.port, invalidate));
+  if (backend?.enabled) offs.push(store.sub(backend.enabled, invalidate));
   const patch = (change: Partial<HomeFeedState>) =>
     store.set(state, { ...store.get(state), ...change });
 
@@ -104,14 +136,14 @@ export function startHomeFeed(
     if (disposed || !wanted) return;
     generation += 1;
     computing = false;
+    cancelPause?.();
     clearTimeout(timer);
     patch({ dirty: true });
-    if (!published)
-      timer = setTimeout(() => {
-        timer = undefined;
-        void compute();
-      }, LIBRARY_COALESCE_MS);
-    else if (!probing) patch({ status: 'ready' });
+    timer = setTimeout(() => {
+      timer = undefined;
+      void compute();
+    }, LIBRARY_COALESCE_MS);
+    if (published && !probing) patch({ status: 'ready' });
   }
 
   async function compute() {
@@ -124,8 +156,7 @@ export function startHomeFeed(
       probing ||
       timer !== undefined ||
       store.get(state).available !== true ||
-      computing ||
-      published
+      computing
     )
       return;
     if (source.status === 'failed') {
@@ -139,13 +170,32 @@ export function startHomeFeed(
     if (source.status !== 'ready' || catalog.status !== 'ready') return;
     const mine = ++generation;
     computing = true;
-    patch({ status: 'loading' });
+    if (!published) patch({ status: 'loading' });
     const current = () => !disposed && mine === generation;
+    await backend?.ready;
+    if (!current()) return;
     const rows = [...source.byHandle.values()];
-    const statistics = new Map<string, HomePlaycountRow>();
+    const cached = await cache.read(rows, current);
+    if (!current()) return;
+    const byPath = new Map(rows.map((row) => [trackPathOf(row), row.handle]));
+    const statistics = new Map<string, HomePlaycountRow>(
+      [...cached.rows.values()].map((row) => [row.path, row]),
+    );
     let recoveryCalls = MAX_RECOVERY_CALLS;
     async function readBatch(paths: string[], offset: number): Promise<boolean> {
       if (!current()) return false;
+      if (offset > 0) {
+        await new Promise<void>((resolve) => {
+          const pause = setTimeout(done, STATS_PAUSE_MS);
+          function done() {
+            clearTimeout(pause);
+            cancelPause = undefined;
+            resolve();
+          }
+          cancelPause = done;
+        });
+        if (!current()) return false;
+      }
       const answer = await read(
         'playcount.getBatch',
         () => host.playcount.getBatch(paths),
@@ -159,7 +209,7 @@ export function startHomeFeed(
       if (!answer) return false;
       if (answer.success === false) {
         if (answer.code !== 'PERMISSION_DENIED') return false;
-        // 权限拒绝发生在整批校验阶段。拆批隔离坏路径，限制额外调用，避免整库被拒时逐首重试
+        // 权限拒绝发生在整批校验阶段。把批次一分为二以找出无权访问的路径，额外调用的次数有上限，整库都被拒绝时不会逐首重试
         if (paths.length > 1 && recoveryCalls >= 2) {
           recoveryCalls -= 2;
           const middle = Math.floor(paths.length / 2);
@@ -171,8 +221,13 @@ export function startHomeFeed(
         return true;
       }
       const requested = new Set(paths);
-      for (const row of answer.results)
-        if (row.success && requested.has(row.path)) statistics.set(row.path, row);
+      for (const row of answer.results) {
+        const handle = byPath.get(row.path);
+        if (row.success && requested.has(row.path) && handle !== undefined) {
+          statistics.set(row.path, row);
+          cached.rows.set(handle, { ...row, handle, success: true });
+        }
+      }
       const missing = paths.findIndex((path) => !statistics.has(path));
       if (missing >= 0)
         report(
@@ -184,12 +239,15 @@ export function startHomeFeed(
         );
       return true;
     }
-    for (let offset = 0; offset < rows.length; offset += HOME_STATS_BATCH) {
-      const paths = rows.slice(offset, offset + HOME_STATS_BATCH).map(trackPathOf);
+    for (let offset = 0; offset < cached.pending.length; offset += HOME_STATS_BATCH) {
+      const paths = cached.pending.slice(offset, offset + HOME_STATS_BATCH).map(trackPathOf);
       if (!(await readBatch(paths, offset))) break;
     }
     if (!current()) return;
+    await cache.save(cached, current);
+    if (!current()) return;
     computing = false;
+    if (published) return;
     const unreadCount = rows.filter((track) => !statistics.has(trackPathOf(track))).length;
     if (rows.length > 0 && unreadCount === rows.length)
       return patch({ status: 'failed', failure: 'statistics', unreadCount });
@@ -207,6 +265,7 @@ export function startHomeFeed(
     if (disposed) return;
     wanted = true;
     generation += 1;
+    cancelPause?.();
     const mine = ++probeGeneration;
     clearTimeout(timer);
     timer = undefined;
@@ -228,6 +287,7 @@ export function startHomeFeed(
     if (!connected) {
       connected = true;
       offs.push(onLibraryChanged(host, invalidate));
+      offs.push(onLibraryStatsRefresh(host, invalidate));
       offs.push(host.on('playback:trackChanged', invalidate));
       offs.push(host.on('metadb:changed', invalidate));
     }
@@ -243,7 +303,7 @@ export function startHomeFeed(
     const available = hasPlaycountComponent(installed.components);
     patch({ available, status: available ? 'loading' : 'ready', unreadCount: 0 });
     if (!available) return;
-    // 探测可能重跑（见 `probeGeneration`）；整库曲目只登记一次，到 dispose 才释放
+    // 探测可能重新执行（见 `probeGeneration`）。整库曲目只登记一次，dispose 时才释放
     releaseTracks ??= tracks.want();
     if (store.get(libraryTracksAtom).status === 'failed') await tracks.retry();
     if (disposed || mine !== probeGeneration) return;
@@ -271,6 +331,7 @@ export function startHomeFeed(
       generation += 1;
       probeGeneration += 1;
       clearTimeout(timer);
+      cancelPause?.();
       waiter?.cancel();
       releaseTracks?.();
       releaseTracks = undefined;

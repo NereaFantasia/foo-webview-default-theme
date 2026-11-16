@@ -1,6 +1,6 @@
 import type { settingsEn } from './settingsEn.ts';
 
-/** 设置界面的简体中文文案，供主中文包合入 */
+/** 设置页的简体中文文案，合并进中文总包 */
 export const settingsZhCN: Record<keyof typeof settingsEn, string> = {
   'settings.nav': '设置分类',
   'settings.groupGeneral': '常规',
@@ -172,6 +172,7 @@ export const settingsZhCN: Record<keyof typeof settingsEn, string> = {
   'settings.shortcuts': '键盘与鼠标',
   'settings.shortcutsGlobal': '全局',
   'settings.shortcutsImmersive': '沉浸视图',
+  'settings.shortcutsVideo': '视频页',
   'settings.shortcutsPlaylists': '侧边栏的播放列表',
   'settings.shortcutBack': '后退',
   'settings.shortcutForward': '前进',
@@ -179,9 +180,15 @@ export const settingsZhCN: Record<keyof typeof settingsEn, string> = {
   'settings.shortcutRename': '重命名',
   'settings.shortcutMoveUp': '上移',
   'settings.shortcutMoveDown': '下移',
+  'settings.shortcutVolumeUp': '音量增大',
+  'settings.shortcutVolumeDown': '音量减小',
   'settings.shortcutOr': '或',
   'settings.mouseBack': '鼠标后退键',
   'settings.mouseForward': '鼠标前进键',
+  'settings.mouseClickVideo': '点击画面',
+  'settings.mouseDoubleClickVideo': '双击画面',
+  'settings.mouseWheelUpVideo': '在画面上向上滚动滚轮',
+  'settings.mouseWheelDownVideo': '在画面上向下滚动滚轮',
   'settings.version': '版本',
   'settings.versionTheme': '默认主题 {version}',
   'settings.versionBuild': '{foobar}（{bits} 位）',
@@ -243,6 +250,7 @@ export const settingsZhCN: Record<keyof typeof settingsEn, string> = {
   'settings.subVolume': '音量',
   'settings.subLyricsSources': '来源',
   'settings.subLyricsDisplay': '显示',
+  'settings.subLyricsShared': '共用',
   'settings.subImmersiveView': '视图',
   'settings.subImmersiveBackdrop': '背景与性能',
 };

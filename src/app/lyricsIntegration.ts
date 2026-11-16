@@ -36,7 +36,7 @@ export function startLyricsIntegration(
   }: Pick<AppServices, 'store' | 'configWriter'> & {
     readonly rightCard: Pick<AppServices['rightCard'], 'card'>;
     readonly playback: Pick<AppServices['playback'], 'seek'>;
-    /** 没有时歌词缓存不可用，取词照常 */
+    /** 本地后端。未提供时歌词缓存不可用，取词照常进行 */
     readonly backend?: AppServices['backend'];
   },
   host: typeof fb = fb,
@@ -48,7 +48,7 @@ export function startLyricsIntegration(
   const track = atom<LyricsTarget | null>((get) => {
     const current = get(currentTrackAtom);
     if (!current) return null;
-    // 只要平台与 ID，补全与否不相干
+    // 只需要平台与 ID，与曲目信息是否已补全无关
     const online = onlineSourceOf(current.path, NO_UNBLOCKED)?.ref;
     return {
       key: trackKeyOf(current),
@@ -77,15 +77,15 @@ export function startLyricsIntegration(
   const immersiveActive = atom(
     (get) => get(visible) && get(mainHistoryAtom).place.id === 'nowPlaying',
   );
-  // 取词需求包含沉浸视图与开着的桌面歌词，但被沉浸视图遮住的预览播放器仍使用自己的可见状态
+  // 取词需求包括沉浸视图与已打开的桌面歌词。被沉浸视图遮住的预览播放器仍使用自身的可见状态
   const wanted = atom(
     (get) =>
       get(active) ||
       ((get(immersiveActive) || get(desktopLyricsPrefAtom).open) && get(playbackConnectedAtom)),
   );
   const prefs = startLyricsPrefs(store, host, configWriter);
-  const motion = startLyricsMotion(store, host, configWriter);
   const display = startLyricsDisplay(store, host, configWriter);
+  const motion = startLyricsMotion(store, host, configWriter, display.views);
   const local = startLocalLyrics(store, { host, track, connected: playbackConnectedAtom });
   const archive = startLyricsArchive(store, track, host, configWriter);
   const cache = startLyricsCache(store, backend, host, configWriter);
@@ -104,7 +104,7 @@ export function startLyricsIntegration(
     lyrics: service,
     active: immersiveActive,
     offset: service.offset,
-    display: display.display,
+    display: display.immersiveDisplay,
   });
   const history = rightCard.card.history;
   const stopSubjects = (
@@ -123,7 +123,7 @@ export function startLyricsIntegration(
     history.subjectsChanged();
   });
   const clock = new PlaybackClock();
-  // 进入沉浸视图时同样重新对准：它看不见的这段时间里时钟没人校准
+  // 进入沉浸视图时同样重新校准时钟：视图不可见期间没有任何一方校准时钟
   const stopActive = [active, immersiveActive].map((viewActive) =>
     store.sub(viewActive, () => {
       if (store.get(viewActive)) void clock.resync();

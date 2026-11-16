@@ -29,7 +29,7 @@ async function setMode(page: Page, view: Locator, mode: 'advanced' | 'text') {
   await page.locator(`[data-query-mode="${mode}"]`).click();
 }
 
-/** 输入框里留给文字的宽度，像素 */
+/** 输入框中留给文字的宽度（像素） */
 const typingWidth = (input: Locator) =>
   input.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -37,8 +37,8 @@ const typingWidth = (input: Locator) =>
   });
 
 /**
- * 播放列表页的命令栏档位，档位尚未跟上当前宽度时返回 null。命令栏按 `[data-playlist-toolbar]` 的内容宽分档，
- * 阈值与 `COMMAND_BAR_TIERS` 相同。换宽后，档位要等尺寸监听与重新渲染完成才更新
+ * 播放列表页的命令栏档位，档位尚未随当前宽度更新时返回 null。命令栏按 `[data-playlist-toolbar]` 的内容宽度分档，
+ * 阈值与 `COMMAND_BAR_TIERS` 相同。宽度变化后，档位要等尺寸监听与重新渲染完成才更新
  */
 const settledTier = (view: Locator) =>
   view.evaluate((root) => {
@@ -51,7 +51,7 @@ const settledTier = (view: Locator) =>
     return bar.getAttribute('data-tier') === tier ? tier : null;
   });
 
-/** 命令栏是一行：高不超过 40，栏里的键都在栏内 */
+/** 命令栏只占一行：高度不超过 40，所有键都位于栏内 */
 const barFits = (view: Locator) =>
   view.locator('[data-command-bar]').evaluate((bar) => {
     const bounds = bar.getBoundingClientRect();
@@ -133,7 +133,7 @@ test('组词期间不请求、不执行回车或 Esc，结束组词才发布最�
   await songs.box.press('Enter');
   await songs.box.press('Escape');
   await expect(songs.box).toHaveValue('mass');
-  // 超过查询去抖窗口仍不能发送组词中间态
+  // 超过查询的去抖时长后，仍不发送输入法组词过程中的中间文字
   await page.waitForTimeout(400);
   expect(songs.host.callsTo('library.query')).toHaveLength(before);
   await songs.box.fill('massive');

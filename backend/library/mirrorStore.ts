@@ -16,6 +16,7 @@ import {
 } from '../../src/server/libraryMirrorProtocol.ts';
 import { albumsOf, artistsOf } from './mirrorGroups.ts';
 import { openRanks } from './mirrorRanks.ts';
+import { openLibraryStatsStore } from './libraryStatsStore.ts';
 import {
   RANK_COLLATOR,
   RANK_COLUMN,
@@ -95,7 +96,10 @@ const SCHEMA = `
   ) WITHOUT ROWID;
 `;
 
-/** 专辑键同宿主的折叠规则：优先 `albumId`，否则（专辑名，第一个专辑艺人，没有则第一个艺人）；没有专辑名不归任何专辑 */
+/**
+ * 专辑键沿用宿主的归并规则：优先使用 `albumId`，否则取（专辑名，第一个专辑艺人）。
+ * 没有专辑艺人时取第一个艺人，没有专辑名的曲目不属于任何专辑
+ */
 function albumArtistOf(track: MirrorTrack): string {
   return track.albumArtists[0] ?? track.artists[0] ?? '';
 }
@@ -179,9 +183,11 @@ function rowOf(row: Record<string, unknown>): MirrorRow {
 }
 
 /**
- * 媒体库镜像（SQLite）：镜像与宿主版本一致的凭据是（纪元，修订号），增量写入将行与新修订号置于同一事务；
- * 整库重建分三步执行，行携带新代次标记陆续写入，收尾事务统一清理旧代、计算排序秩并更新纪元与修订号；
- * 重建未收尾（`ready` 为假）时不可读，页面回退走宿主；数据库打不开时改用内存库
+ * 打开媒体库镜像（SQLite）。镜像与宿主版本一致的依据是（纪元，修订号）
+ *
+ * 增量写入把行与新修订号放在同一事务中。整库重建分三步：行带着新的代次陆续写入，
+ * 收尾事务清除旧代的行、计算排序秩，并更新纪元与修订号。
+ * 重建尚未收尾（`ready` 为假）时镜像不可读，页面改为读取宿主。数据库无法打开时改用内存库
  */
 export function openMirrorStore(path: string) {
   let db: DatabaseSync;
@@ -197,6 +203,7 @@ export function openMirrorStore(path: string) {
   }
   db.exec(SCHEMA);
   const ranks = openRanks(db);
+  const stats = openLibraryStatsStore(db);
   const readMeta = db.prepare('SELECT value FROM meta WHERE key = ?');
   const writeMeta = db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)');
   const meta = (key: string, fallback: string): string => {
@@ -204,7 +211,8 @@ export function openMirrorStore(path: string) {
     return typeof value === 'string' ? value : fallback;
   };
   const setMeta = (key: string, value: string | number) => void writeMeta.run(key, String(value));
-  // 秩是按比较器排出来存下的：区域、ICU 或 CLDR 版本变了，旧秩与新插入值的次序就不一致，只能丢掉重建
+  // 排序秩由比较器算出后持久保存。区域设置、ICU 或 CLDR 的版本变化后，旧秩与新写入值的次序不再一致，
+  // 因此清空镜像，之后整库重建
   const collation = `${RANK_COLLATOR.resolvedOptions().locale}|icu ${String(process.versions.icu)}|cldr ${String(process.versions.cldr)}`;
   if (meta('schema', '') !== String(LIBRARY_MIRROR_SCHEMA) || meta('collation', '') !== collation) {
     db.exec('DELETE FROM tracks; DELETE FROM track_artists; DELETE FROM ranks; DELETE FROM meta');
@@ -232,14 +240,14 @@ export function openMirrorStore(path: string) {
   const selectRows = db.prepare(
     'SELECT * FROM tracks WHERE handle IN (SELECT value FROM json_each(?))',
   );
-  /** 这个连接上已经确认建好的排序索引；丢索引时清空 */
+  /** 本连接上已确认建立的排序索引，删除索引时清空 */
   const indexed = new Set<string>();
   const pages = new Map<string, ReturnType<DatabaseSync['prepare']>>();
 
   const ready = () => meta('ready', '0') === '1';
   const count = () => Number(countAll.get()?.n ?? 0);
 
-  /** 数据库文件加预写日志占的磁盘字节数 */
+  /** 数据库文件与预写日志占用的磁盘字节数 */
   function fileBytes(): number {
     if (!persistent) return 0;
     return [path, `${path}-wal`].reduce((sum, file) => {
@@ -251,12 +259,12 @@ export function openMirrorStore(path: string) {
     }, 0);
   }
 
-  /** 整库重写之后预写日志有几十 MiB，不截断它就一直占着盘 */
+  /** 截断预写日志。整库重写后预写日志会增长到几十 MiB，不截断就一直占用磁盘 */
   function shrinkLog(): void {
     try {
       db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch {
-      // 有读取占着时截不动，下次整库重建再截
+      // 截断失败不影响写入，下一次整库重建收尾或清空镜像时再次截断
     }
   }
 
@@ -268,7 +276,7 @@ export function openMirrorStore(path: string) {
       return result;
     } catch (error) {
       db.exec('ROLLBACK');
-      // 秩的缓存可能已经含有回滚掉的值
+      // 排序秩的缓存可能已包含被回滚的值，因此重置
       ranks.reset();
       throw error;
     }
@@ -306,7 +314,7 @@ export function openMirrorStore(path: string) {
     return Number(meta('gen', '0'));
   }
 
-  /** keyset 翻页：`columns` 是要读的列，排序列自动补上（游标要用）；`rows` 最多 `maxLimit` 行 */
+  /** 按 keyset 翻页。`columns` 是要读取的列，排序列会自动补上，供游标使用。`rows` 最多 `maxLimit` 行 */
   function scan(request: MirrorPageRequest, columns: string, maxLimit: number) {
     if (!ready()) throw new Error('镜像还没有建好');
     const limit = Math.min(maxLimit, Math.max(1, request.limit));
@@ -340,6 +348,7 @@ export function openMirrorStore(path: string) {
   }
 
   return {
+    stats,
     status(): MirrorStatus {
       return {
         schema: LIBRARY_MIRROR_SCHEMA,
@@ -351,7 +360,7 @@ export function openMirrorStore(path: string) {
       };
     },
 
-    /** 增量：纪元或修订号对不上时不写，答 `stale: true`，由页面重新对账 */
+    /** 写入增量。镜像未就绪，或纪元、修订号与请求不符时不写入，返回 `stale: true`，由页面重新对账 */
     apply(request: MirrorApplyRequest): MirrorApplyReply {
       if (
         !ready() ||
@@ -391,7 +400,7 @@ export function openMirrorStore(path: string) {
       });
     },
 
-    /** 开始整库重建：收尾前镜像不可读，返回新一代的代次 */
+    /** 开始整库重建，返回新的代次。收尾之前镜像不可读 */
     rebuildBegin(): number {
       dropIndexes();
       const gen = generation() + 1;
@@ -400,7 +409,7 @@ export function openMirrorStore(path: string) {
       return gen;
     },
 
-    /** 重建中写一批行，库序从 `indexFrom` 起 */
+    /** 重建期间写入一批行，库序从 `indexFrom` 开始 */
     rebuildPut(gen: number, tracks: readonly MirrorTrack[], indexFrom: number): number {
       building(gen);
       return transaction(() => {
@@ -409,7 +418,7 @@ export function openMirrorStore(path: string) {
       });
     },
 
-    /** 重建收尾：清掉旧代的行，排秩，设上纪元与修订号，之后才可读 */
+    /** 完成重建：清除旧代的行，计算排序秩，写入纪元与修订号。完成后镜像才可读 */
     rebuildCommit(gen: number, epoch: string, revision: number): number {
       building(gen);
       const total = transaction(() => {
@@ -436,7 +445,7 @@ export function openMirrorStore(path: string) {
       return { rows: rows.map(rowOf), next, total: count() };
     },
 
-    /** 同 `page`，但只取句柄（`paths` 为真时再取路径与 subsong），一页可以大得多 */
+    /** 与 `page` 相同，但只读取句柄，`paths` 为真时另取路径与 subsong。每页的上限因此大得多 */
     order(request: MirrorOrderRequest): MirrorOrder {
       const columns = request.paths ? 'handle, path, subsong' : 'handle';
       const { rows, next } = scan(request, columns, MIRROR_ORDER_LIMIT);
@@ -471,6 +480,7 @@ export function openMirrorStore(path: string) {
 
     clear(): void {
       transaction(() => {
+        stats.clear();
         db.exec('DELETE FROM tracks; DELETE FROM track_artists; DELETE FROM ranks');
         setMeta('ready', 0);
         setMeta('epoch', '');

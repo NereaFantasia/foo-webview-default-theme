@@ -19,7 +19,8 @@ import { roleVar } from '../../theme/roles.ts';
 import { CapsuleVolume } from './volume/CapsuleVolume.tsx';
 import { NowPlayingMenu } from '../../playback/now-playing/NowPlayingMenu.tsx';
 import { useNowPlayingMenu } from '../../playback/now-playing/useNowPlayingMenu.ts';
-import { displayTitle } from '../../playback/now-playing/nowPlaying.ts';
+import { trackOrigin } from '../../host/trackOrigin.ts';
+import { displayTitle, nowPlayingAtom } from '../../playback/now-playing/nowPlaying.ts';
 import { NowPlayingEntry } from './now-playing/NowPlayingEntry.tsx';
 import { NowPlayingRating } from '../../track/NowPlayingRating.tsx';
 import { QualityButton } from '../../playback/now-playing/QualityButton.tsx';
@@ -37,6 +38,7 @@ import {
   VOLUME_SLIDER_FOCUS,
 } from './playerFocus.ts';
 import { SeekBar } from '../../playback/seek/SeekBar.tsx';
+import { FormatBadge } from '../../track/FormatBadge.tsx';
 import { TrackByline } from '../../track/TrackByline.tsx';
 import { TruncatedText } from '../../kit/TruncatedText.tsx';
 import { useOpenNowPlaying } from './now-playing/useOpenNowPlaying.ts';
@@ -147,7 +149,7 @@ function ImmersiveKey() {
 /**
  * 底部通栏：位于窗口最下方、侧边栏与内容卡之下，与标题栏一样直接放在窗口材质上。
  * 上一行是已播时间、进度线与总长。下一行左边是封面、曲名与艺人、专辑（`TrackByline`）。
- * 曲名后面跟着星级，没评分也常驻，在线曲目则显示音质标记。
+ * 曲名后面跟着星级，没评分也常驻，再是音质标记：本地曲目是格式标记（`FormatBadge`），在线曲目是音质键。
  * 正中是播放控制组（在窗口居中），右边是输出设备、音量，以及桌面歌词、迷你播放器、沉浸键。
  * 输出设备键点开设备列表，封面与沉浸键进入沉浸视图，迷你键把主窗口缩成迷你播放器。
  * 右侧卡的入口（歌词、队列）在标题栏，不在这一条上
@@ -165,7 +167,9 @@ export function PlayerBar() {
   const { tier } = useAtomValueRawSync(sidebarViewAtom);
   const { sender, scale } = useVolumeControl();
   const text = useRef<HTMLDivElement>(null);
-  const track = useTextSwap(live, [text], true);
+  const { format: liveFormat } = useAtomValueRawSync(nowPlayingAtom);
+  // 格式标记与曲名同一行，退场期间也照上一首的写
+  const { track, format } = useTextSwap({ track: live, format: liveFormat }, [text], true);
   const menu = useNowPlayingMenu(track, PLAYER_MENU_SCOPE);
   const wide = tier === 'wide';
   return (
@@ -202,7 +206,12 @@ export function PlayerBar() {
                 text={track ? displayTitle(track) : t('player.idle')}
               />
               {tier !== 'hidden' && <NowPlayingRating size="small" track={track} />}
-              {tier !== 'hidden' && <QualityButton track={track} {...QUALITY_FOCUS} />}
+              {tier !== 'hidden' &&
+                (track && trackOrigin(track.path) === 'online' ? (
+                  <QualityButton track={track} {...QUALITY_FOCUS} />
+                ) : (
+                  track && <FormatBadge track={track} reading={format} size="small" />
+                ))}
             </div>
             <TrackByline className={styles.byline} track={track} />
           </div>

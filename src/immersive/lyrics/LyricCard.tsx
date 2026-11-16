@@ -1,5 +1,5 @@
 import { useService } from '../../kit/useService.ts';
-import { immersiveFont, lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
+import { lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { translateAtom } from '../../i18n/locale.ts';
@@ -16,11 +16,11 @@ const MAIN_FIT = { max: LYRIC_FONT.main, min: LYRIC_FONT.minMain, step: 1 };
 const SUB_FIT = { max: LYRIC_FONT.sub, min: LYRIC_FONT.minSub, step: 1 };
 
 /**
- * 字号与卡宽分两步量：`font` 按原字号排、量出超宽的行按比例降字号；`width` 按降好的字宽定卡宽
- * 两步都在布局副作用里做完，画出来的第一帧就是量好的样子
+ * 字号与卡宽分两步测量：`font` 先按原字号排版，按比例缩小超宽行的字号。`width` 按缩小后的字宽确定卡宽。
+ * 两步都在布局副作用中完成，首次绘制的画面已是测量后的结果
  */
 interface CardFit {
-  /** 量的是哪一份内容；内容一变从 `font` 重来 */
+  /** 所测量内容的标识，内容变化后从 `font` 重新开始 */
   key: string;
   step: 'font' | 'width' | 'done';
   main: number;
@@ -36,24 +36,24 @@ const freshFit = (key: string, width: number, sub: number): CardFit => ({
   width,
 });
 
-/** 两行里较宽的一行（不超过正文宽上限）加内边距，夹在卡宽上下限之间；没有正文的一行卡取下限 */
+/** 卡宽：两行中较宽的一行（不超过 `LYRIC_TEXT_WIDTH`）加内边距，限制在 `CARD_MIN` 与 `CARD_MAX` 之间。没有正文时取下限 */
 function cardWidth(main: HTMLElement | null, sub: HTMLElement | null): number {
   const text = Math.max(main?.scrollWidth ?? 0, sub?.scrollWidth ?? 0);
   return Math.min(CARD_MAX, Math.max(CARD_MIN, Math.min(text, LYRIC_TEXT_WIDTH) + CARD_PADDING));
 }
 
 /**
- * full 档舞台底部的歌词卡。主行是当前行（热色）；副行有译文放译文，没有放下一句（颜色更弱）；
- * 首行之前与无词时卡不出，无时间轴时一行卡只写「纯文本 · n 行」
+ * full 档舞台底部的歌词卡。主行是当前行，使用热色。副行有译文时显示译文，没有译文时显示下一句，颜色更弱。
+ * 第一行开始之前与没有歌词时不显示。没有时间轴时只显示一行「纯文本 · n 行」，其他状态显示对应的状态文字
  *
- * 卡宽随字：两行里较宽的一行加左内边距 46 与右内边距 46 + 34，夹在 420…1520 之间；字宽超过 1394 时
- * 按比例降字号（主行最低 20、副行最低 16），仍超就尾部省略
+ * 卡宽随文字变化：两行中较宽的一行加内边距，限制在 420 到 1520 之间。
+ * 字宽超过 1394 时按比例缩小字号（主行最低 20，副行最低 16），仍然超出时截断并显示省略号
  */
 export function LyricCard() {
   const t = useAtomValueRawSync(translateAtom);
   const displayService = useService(lyricsDisplayKey);
-  const display = useAtomValueRawSync(displayService.display);
-  const { family, weight } = immersiveFont(display);
+  const display = useAtomValueRawSync(displayService.immersiveDisplay);
+  const { fontFamily: family, fontWeight: weight } = display;
   const { state, source, lineCount } = useAtomValueRawSync(lyricLogAtom);
   const card = useAtomValueRawSync(lyricCardAtom);
   const synced = state === 'synced' ? card : null;
@@ -100,7 +100,7 @@ export function LyricCard() {
           min: Math.min(subSize, SUB_FIT.min),
         })
       : fit.sub;
-    // 字号没降就不用按新字号再排一遍，眼下量到的字宽就是终值
+    // 字号没有缩小时不必按新字号重新排版，当前测得的字宽即为最终值
     if (mainSize === fit.main && fittedSub === fit.sub) {
       setFit({ ...fit, step: 'done', width: cardWidth(main, sub) });
     } else {

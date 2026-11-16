@@ -46,19 +46,20 @@ import { usePanelSurface, useToolsStyles } from './toolsStyles.ts';
 
 type PanelName = 'font' | 'timing' | 'more';
 
-/** 折叠收起状态下的图标展示：与右侧卡歌词页图标保持一致 */
+/** 工具条收起后显示的图标，与右侧卡歌词页的图标相同 */
 const CollapsedIcon = CommentText20Regular;
 
-/** 工具栏按钮分组配置 */
+/** 工具条上的一组按钮，组与组之间有分隔线 */
 interface Group {
   readonly node: ReactNode;
   readonly className?: string;
 }
 
 /**
- * 弹出式子面板按钮：面板内展示对应控件的垂直排列形态
+ * 打开子面板的按钮，面板里是对应控件的竖排形态
  *
- * 主题层把整窗算好的面板实底色经上下文交给浮层，浮层会写成行内变量，覆盖这里的 Acrylic 着色，因此这块面板不取该色
+ * 主题层经上下文把整窗计算好的面板实底色交给浮层，浮层会把它写成行内变量，覆盖这里的 Acrylic 着色。
+ * 因此这块面板把上下文置空，不使用该颜色
  */
 function PanelKey({
   name,
@@ -73,7 +74,7 @@ function PanelKey({
   readonly current: PanelName | null;
   readonly label: string;
   readonly icon: ReactElement;
-  /** 是否有可用操作对象：不可用时按钮置灰禁用，保持悬浮提示响应 */
+  /** 当前歌词是否支持面板里的操作。为假时按钮禁用，但仍可获得焦点并显示悬浮提示 */
   readonly available: boolean;
   onChange(panel: PanelName | null): void;
   readonly children: ReactNode;
@@ -110,7 +111,7 @@ function PanelKey({
   );
 }
 
-/** 排布按钮分组并渲染分割线 */
+/** 依次排出各组按钮，组与组之间加分隔线 */
 function joinGroups(groups: readonly Group[]): ReactNode {
   return groups.map((group, index) => (
     <Fragment key={index}>
@@ -121,13 +122,14 @@ function joinGroups(groups: readonly Group[]): ReactNode {
 }
 
 /**
- * 歌词元素顶部工具栏：集成搜索、译文与音译开关、文字对齐、字号与时间轴校正、折叠收起及歌词设置
+ * 歌词栏顶部的工具条：搜索、译文与音译开关、文字对齐、缩放、时间校正、收起与歌词设置
  *
- * 宽度与水平位置对齐歌词排版区域，按可用宽度排布为宽档（双行磁贴）、中档（图标按键加小面板）
- * 或窄档（折叠更多面板）。无可用操作对象时保持控件占位并禁用，避免界面跳变
+ * 工具条的宽度与位置对齐歌词排版区，按可用宽度分为三档（`toolbarFormOf`）：宽档是双行磁贴，
+ * 中档是图标键加小面板，窄档把多数控件收进「更多」面板。
+ * 当前歌词不支持的控件保持占位并禁用，排布不随曲目变化。
  *
- * 外壳尺寸随状态平滑过渡，内部包含三层交叉淡变（常规按键层、折叠收起层与搜索输入层），
- * 搜索展开时 Esc 优先收起搜索面板。键盘焦点位于工具栏内部或下拉面板开启期间，工具栏保持常驻
+ * 常规按键、收起后的图标与搜索框分为三层，切换时交叉淡变，外框尺寸随之过渡。
+ * 搜索展开时 Esc 先收起搜索。焦点在工具条内或面板打开时，工具条保持显示
  */
 export function LyricsToolbar({ active }: { readonly active: boolean }) {
   const t = useAtomValueRawSync(translateAtom);
@@ -148,7 +150,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
   const form = width > 0 ? toolbarFormOf(width) : null;
   const searching = useAtomValueRawSync(lyricsSearchOpenAtom);
   const setSearching = (open: boolean) => setLyricsSearchOpen(store, open);
-  // 预留退场过渡时长以完整播放搜索层淡出动效；开启当帧即刻就绪
+  // 搜索关闭后保留挂载一段过渡时长，使搜索层的淡出完整播放。打开时当帧挂载
   const searchPresent = usePresence(searching, motionDuration(DURATION_MS.fast, reduced)).mounted;
   const [resultsHost, setResultsHost] = useState<HTMLDivElement | null>(null);
   const [panel, setPanel] = useState<PanelName | null>(null);
@@ -156,18 +158,18 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
   const collapseKey = useRef<HTMLButtonElement>(null);
   const miniKey = useRef<HTMLButtonElement>(null);
   const refocus = useRef<'search' | 'collapse' | 'mini' | null>(null);
-  // 工具栏卸载时同步重置搜索状态；搜索开启期间侧栏不触发因无歌词导致的自动居中
+  // 工具条卸载时关闭搜索。搜索开着期间，侧栏不会因没有歌词而自动居中
   useLayoutEffect(() => () => setLyricsSearchOpen(store, false), [store]);
   const collapsed = collapsedPref && !searching;
   const mode = searching ? 'searching' : collapsed ? 'collapsed' : 'open';
-  // 操作对象缺失、排布切换或工具栏折叠时自动收起面板
+  // 当前歌词不支持面板的操作、排布换档或工具条收起时，面板关闭
   const reachable: Record<PanelName, boolean> = {
     font: form === 'medium' && subjects.font,
     timing: form === 'medium' && subjects.timing,
     more: form === 'narrow',
   };
   const openPanel = mode === 'open' && panel !== null && reachable[panel] ? panel : null;
-  // 控件被置为 inert 时将焦点平滑流转至接替控件
+  // 焦点所在的控件变为 inert 时，把焦点移到接替它的控件
   useLayoutEffect(() => {
     const target = refocus.current;
     if (!target) return;
@@ -187,7 +189,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
   };
   const wide = form === 'wide';
   const key = mergeClasses(classes.key, controls.icon);
-  // 宽档排布下使用整高图标按钮，文本说明由悬浮提示提供
+  // 宽档使用整高的图标按钮，名称由悬浮提示显示
   const actionKey = wide ? mergeClasses(key, classes.tall) : key;
   const groups: Group[] = [
     {
@@ -206,7 +208,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
       ),
     },
   ];
-  // 无可用对象时保持禁用占位以稳定排布；窄档仅保留译文切换，音译收纳至更多面板
+  // 窄档的条上只保留译文开关，音译开关与对齐收进「更多」面板
   const toggleLayout = wide ? 'tall' : 'icon';
   groups.push({
     className: wide ? styles.toggles : undefined,
@@ -243,7 +245,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
           <PanelKey
             name="font"
             current={openPanel}
-            label={t('lyrics.fontSize')}
+            label={t('lyrics.zoom')}
             icon={<TextFontSize20Regular />}
             available={subjects.font}
             onChange={setPanel}
@@ -293,7 +295,7 @@ export function LyricsToolbar({ active }: { readonly active: boolean }) {
       data-collapsed={mode === 'collapsed' || undefined}
       data-open={openPanel !== null || searching || undefined}
       onKeyDown={(event) => {
-        // 搜索展开时 Esc 优先收起搜索面板并阻止冒泡，避免误退沉浸视图
+        // 搜索展开时 Esc 先收起搜索，并标记事件已处理（preventDefault），沉浸视图因此不会同时退出
         if (event.key !== 'Escape' || event.defaultPrevented || !searching) return;
         if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
         event.preventDefault();

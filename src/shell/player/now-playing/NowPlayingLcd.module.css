@@ -80,25 +80,3 @@
   filter: blur(4px);
   pointer-events: none;
 }
-
-.badge {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--spacingHorizontalXS);
-  font-size: var(--fontSizeBase100);
-  line-height: 14px;
-}
-
-.codec {
-  padding: 0 var(--spacingHorizontalXS);
-  border: var(--strokeWidthThin) solid var(--line);
-  border-radius: var(--borderRadiusMedium);
-  color: var(--text-secondary);
-  font-weight: var(--fontWeightSemibold);
-}
-
-.detail {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}

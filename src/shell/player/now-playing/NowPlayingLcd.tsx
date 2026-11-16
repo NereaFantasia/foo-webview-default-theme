@@ -21,7 +21,7 @@ import {
   QUALITY_FOCUS,
 } from '../playerFocus.ts';
 import { ScrubSeek, type ScrubState } from '../ScrubSeek.tsx';
-import { formatBadge } from '../../../track/trackFormat.ts';
+import { FormatBadge } from '../../../track/FormatBadge.tsx';
 import { TrackByline } from '../../../track/TrackByline.tsx';
 import { TruncatedText } from '../../../kit/TruncatedText.tsx';
 import { useTextSwap } from '../../../playback/now-playing/useTextSwap.ts';
@@ -64,7 +64,6 @@ export function NowPlayingLcd() {
     [titleRow, subRow],
     scrub !== 'on',
   );
-  const badge = track ? formatBadge(track, format) : null;
   const menu = useNowPlayingMenu(track, PLAYER_MENU_SCOPE);
   return (
     <div
@@ -89,12 +88,7 @@ export function NowPlayingLcd() {
           {track && trackOrigin(track.path) === 'online' ? (
             <QualityButton track={track} {...QUALITY_FOCUS} />
           ) : (
-            badge && (
-              <span className={styles.badge} data-format-badge>
-                <span className={styles.codec}>{badge.codec}</span>
-                {badge.detail && <span className={styles.detail}>{badge.detail}</span>}
-              </span>
-            )
+            track && <FormatBadge track={track} reading={format} size="small" />
           )}
         </div>
         <div ref={subRow} className={`${styles.subRow} ${styles.soft}`}>

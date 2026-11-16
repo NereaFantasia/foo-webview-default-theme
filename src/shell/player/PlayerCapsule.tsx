@@ -9,7 +9,8 @@ import { roleVar } from '../../theme/roles.ts';
 import { CapsuleVolume } from './volume/CapsuleVolume.tsx';
 import { NowPlayingMenu } from '../../playback/now-playing/NowPlayingMenu.tsx';
 import { useNowPlayingMenu } from '../../playback/now-playing/useNowPlayingMenu.ts';
-import { displayTitle } from '../../playback/now-playing/nowPlaying.ts';
+import { trackOrigin } from '../../host/trackOrigin.ts';
+import { displayTitle, nowPlayingAtom } from '../../playback/now-playing/nowPlaying.ts';
 import { NowPlayingEntry } from './now-playing/NowPlayingEntry.tsx';
 import { NowPlayingRating } from '../../track/NowPlayingRating.tsx';
 import { QualityButton } from '../../playback/now-playing/QualityButton.tsx';
@@ -24,6 +25,7 @@ import {
   QUALITY_FOCUS,
 } from './playerFocus.ts';
 import { ScrubSeek, type ScrubState } from './ScrubSeek.tsx';
+import { FormatBadge } from '../../track/FormatBadge.tsx';
 import { TrackByline } from '../../track/TrackByline.tsx';
 import { TruncatedText } from '../../kit/TruncatedText.tsx';
 import { useTextSwap } from '../../playback/now-playing/useTextSwap.ts';
@@ -52,7 +54,7 @@ interface PlayerCapsuleProps {
  * 宽窗宽 680，641–1007 宽 600，卡片窄到放不下时撑满卡宽
  *
  * 左端是圆形封面（按下进入沉浸视图），中间是曲名与艺人、专辑（`TrackByline`）两行。
- * 曲名后面跟着星级，在线曲目则显示音质标记。右边是播放控制组与「音量、⋯」两组。
+ * 曲名后面跟着星级，再是音质标记：本地曲目是格式标记（`FormatBadge`），在线曲目是音质键。右边是播放控制组与「音量、⋯」两组。
  * 贴底有一条细的进度线，可点击、可拖动，悬停时进入悬停态（`ScrubSeek`），封面以外的内容模糊变淡。
  * 窗口 ≤ 640 时胶囊撑满卡宽、左右各留 16，去掉播放顺序键、音量键、星级与音质标记。
  * 过长的曲名截断，右缘渐隐，定时滚动一遍，悬停显示全文。过长的署名艺人与专辑各自用省略号截断，名字始终可点，星级不让位。
@@ -106,7 +108,13 @@ export function PlayerCapsule({ visible }: PlayerCapsuleProps) {
   const classes = useStyles();
   const [scrub, setScrub] = useState<ScrubState | undefined>(undefined);
   const text = useRef<HTMLDivElement>(null);
-  const track = useTextSwap(live, [text], scrub !== 'on');
+  const { format: liveFormat } = useAtomValueRawSync(nowPlayingAtom);
+  // 格式标记与曲名同一行，退场期间也照上一首的写
+  const { track, format } = useTextSwap(
+    { track: live, format: liveFormat },
+    [text],
+    scrub !== 'on',
+  );
   const menu = useNowPlayingMenu(track, PLAYER_MENU_SCOPE);
   if (!present) return null;
   return (
@@ -132,7 +140,12 @@ export function PlayerCapsule({ visible }: PlayerCapsuleProps) {
             text={track ? displayTitle(track) : t('player.idle')}
           />
           {!compact && <NowPlayingRating size="compact" track={track} />}
-          {!compact && <QualityButton track={track} {...QUALITY_FOCUS} />}
+          {!compact &&
+            (track && trackOrigin(track.path) === 'online' ? (
+              <QualityButton track={track} {...QUALITY_FOCUS} />
+            ) : (
+              track && <FormatBadge track={track} reading={format} size="small" />
+            ))}
         </div>
         <TrackByline pointerOnly className={styles.byline} track={track} />
       </div>

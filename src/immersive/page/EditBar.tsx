@@ -16,9 +16,10 @@ import { Menu, TabList } from '../../motion/Surfaces.tsx';
 import { useViewControlStyles } from '../../theme/controlStyles.ts';
 import { useBarSurface } from '../scene/acrylic.ts';
 import { useSceneTabStyles } from '../scene/tabStyles.ts';
+import { useRootRadius } from '../scene/useRootRadius.ts';
 import styles from './EditBar.module.css';
 
-/** 编辑条上的一个分类：标识与已经翻译好的名字 */
+/** 编辑条上的一个分类：标识与已翻译的名称 */
 export interface EditCategory {
   readonly id: string;
   readonly label: string;
@@ -26,23 +27,24 @@ export interface EditCategory {
 
 export interface EditBarProps {
   readonly categories: readonly EditCategory[];
-  /** 当前停在哪个分类 */
+  /** 当前选中的分类 */
   readonly value: string;
   onSelect(id: string): void;
   onCancel(): void;
   onDone(): void;
-  /** 退出编辑后的退场里为真：淡出，不接指针与焦点 */
+  /** 退出编辑后的退场期间为真，此时编辑条淡出，不接收指针与焦点 */
   readonly leaving?: boolean;
 }
 
 const GROUP = 'category';
 
 /**
- * 设置编辑条：顶部正中的一条 Acrylic，左边是分类页签，右边是「取消」与「完成」
+ * 设置编辑条：顶部正中的一条 Acrylic，左侧是分类页签，右侧是「取消」与「完成」
  *
- * 页签与侧栏的「歌词 队列 历史」同款（`scene/tabStyles.ts`），方向键在分类之间移动；「完成」是主按钮，按仓库对话框的顺序排在最右。
- * 窗口窄到放不下整排页签时（样式里按窗宽切换），页签收成一颗写着当前分类名的菜单键，点开是分类的单选菜单。
- * 两种形态都渲染，藏起的那一种不占位、不接焦点
+ * 页签与侧栏的「歌词 队列 历史」样式相同（`scene/tabStyles.ts`），方向键在分类之间移动。
+ * 「完成」是主按钮，按仓库对话框的按钮顺序排在最右。
+ * 窗口过窄、放不下整排页签时（样式按窗口宽度切换），页签收成一个显示当前分类名的菜单键，点击后弹出分类的单选菜单。
+ * 两种形态都会渲染，隐藏的一种不占位，也不接收焦点
  */
 export function EditBar({
   categories,
@@ -54,6 +56,7 @@ export function EditBar({
 }: EditBarProps) {
   const t = useAtomValueRawSync(translateAtom);
   const surface = useBarSurface();
+  const radius = useRootRadius('--scene-edit-bar-radius');
   const tabs = useSceneTabStyles();
   const controls = useViewControlStyles();
   const current = categories.find((category) => category.id === value) ?? categories[0];
@@ -63,6 +66,7 @@ export function EditBar({
   };
   return (
     <div
+      ref={radius}
       className={mergeClasses(styles.bar, surface)}
       role="group"
       aria-label={t('immersive.settings')}

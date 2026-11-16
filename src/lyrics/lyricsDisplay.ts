@@ -4,17 +4,14 @@ import type {
   MaskObsceneWordsMode,
 } from '@applemusic-like-lyrics/core';
 import { atom } from 'jotai/vanilla';
-import {
-  defineConfigPref,
-  oneOf,
-  startConfigPrefs,
-  type ConfigPrefFace,
-} from '../host/configPref.ts';
+import { defineConfigPref, startConfigPrefs, type ConfigPrefFace } from '../host/configPref.ts';
 import type { ConfigWriter } from '../host/configWrite.ts';
 import { serviceKey } from '../kit/serviceKey.ts';
 import type { Store } from '../kit/store.ts';
 import { fontStyleOf, fontWeightOf } from '../kit/variableFont.ts';
 import { fontNameOf } from '../theme/fontStack.ts';
+import { LYRICS_ALIGN_ANCHORS, type LyricsAlignAnchor } from './lyricsMotion.ts';
+import type { LyricsView } from './lyricsSettings.ts';
 
 export const LYRICS_OPTIMIZATIONS = [
   'normalizeSpaces',
@@ -28,11 +25,11 @@ export const LYRICS_ALIGNS = ['left', 'center', 'right'] as const;
 export type LyricsAlign = (typeof LYRICS_ALIGNS)[number];
 
 export interface LyricsTypography {
-  /** 正在播放面板的歌词字体；空串沿用界面字体 */
+  /** 字体名称，空串表示沿用界面字体 */
   readonly fontFamily: string;
-  /** 字重，只对可变字体有意义；null 沿用继承的字重 */
+  /** 字重，只对可变字体生效。null 表示沿用继承的字重 */
   readonly fontWeight: number | null;
-  /** null 沿用播放器的副行比例，其他值为 CSS 像素 */
+  /** 译文字号（CSS 像素），null 表示沿用播放器的副行比例 */
   readonly translationFontSize: number | null;
   readonly showTranslation: boolean;
   readonly showRomanization: boolean;
@@ -47,11 +44,8 @@ export const DEFAULT_LYRICS_TYPOGRAPHY: LyricsTypography = {
 };
 
 export interface LyricsDisplay extends LyricsTypography {
-  /** 沉浸视图的歌词字体；空串跟随正在播放面板的字体与字重 */
-  readonly immersiveFontFamily: string;
-  readonly immersiveFontWeight: number | null;
   readonly fontSize: number;
-  /** 歌词的水平对齐；经每行的对唱标记实现，见 `alignLyricLines` */
+  /** 歌词的水平对齐，通过每行的对唱标记实现，见 `alignLyricLines` */
   readonly align: LyricsAlign;
   readonly autoSeek: boolean;
   readonly overscan: number;
@@ -61,13 +55,32 @@ export interface LyricsDisplay extends LyricsTypography {
   readonly optimize: Readonly<Record<(typeof LYRICS_OPTIMIZATIONS)[number], boolean>>;
 }
 
-/** 歌词字号的取值范围，CSS 像素 */
+/** 歌词字号的取值范围（CSS 像素） */
 export const LYRICS_FONT_SIZE_RANGE = { min: 12, max: 48 } as const;
+/** 沉浸视图的缩放比例（百分比），100% 对应 22 像素的存档字号 */
+export const LYRICS_SCALE_RANGE = { min: 50, max: 225, step: 5 } as const;
+
+export function lyricsScalePercent(fontSize: number): number {
+  return Math.round((fontSize / DEFAULT_LYRICS_DISPLAY.fontSize) * 100);
+}
+
+export function lyricsScaleFontSize(percent: number): number {
+  return (DEFAULT_LYRICS_DISPLAY.fontSize * percent) / 100;
+}
+
+export interface LyricsViewAppearance extends LyricsTypography {
+  readonly fontSource: 'interface' | 'main' | 'custom';
+  /** 存档字号。沉浸视图以 22 为缩放基准，实际字号由版式计算 */
+  readonly fontSize: number;
+  readonly align: LyricsAlign;
+  readonly backgroundLast: boolean;
+  readonly positionMode: 'layout' | 'custom';
+  readonly alignAnchor: LyricsAlignAnchor;
+  readonly alignPosition: number;
+}
 
 export const DEFAULT_LYRICS_DISPLAY: LyricsDisplay = {
   ...DEFAULT_LYRICS_TYPOGRAPHY,
-  immersiveFontFamily: '',
-  immersiveFontWeight: null,
   fontSize: 22,
   align: 'left',
   autoSeek: true,
@@ -106,8 +119,6 @@ export function parseLyricsDisplay(raw: unknown): LyricsDisplay {
   const maskChar = field(raw, 'maskChar');
   return {
     ...parseTypography(raw),
-    immersiveFontFamily: fontNameOf(field(raw, 'immersiveFontFamily')),
-    immersiveFontWeight: fontWeightOf(field(raw, 'immersiveFontWeight')),
     fontSize: number(
       field(raw, 'fontSize'),
       d.fontSize,
@@ -139,14 +150,12 @@ function parseTypography(raw: unknown): LyricsTypography {
   };
 }
 
-/** 保留原存储格式，字体与副行偏好、对齐各用另一项存档 */
+/** 各视图共用的歌词整理与渲染参数 */
 function baseDisplay(value: LyricsDisplay) {
-  const { fontSize, autoSeek, overscan, backgroundLast, maskMode, maskChar, optimize } = value;
+  const { autoSeek, overscan, maskMode, maskChar, optimize } = value;
   return {
-    fontSize,
     autoSeek,
     overscan,
-    backgroundLast,
     maskMode,
     maskChar,
     optimize: { ...optimize },
@@ -159,24 +168,15 @@ export function lyricsFontFamily(family: string): string {
     : 'var(--fontFamilyBase)';
 }
 
-/** 歌词用的字体样式：字体加字重，选了字重就走别名让它连续生效 */
+/** 歌词的字体样式：字体与字重。设置了字重时改用 `@font-face` 别名，使字重连续变化 */
 export function lyricsFontStyle(family: string, weight: number | null) {
   return fontStyleOf(family, weight, lyricsFontFamily);
 }
 
-/** 沉浸视图实际用的字体与字重：自己没选字体时整个跟随正在播放面板 */
-export function immersiveFont(display: LyricsDisplay): {
-  readonly family: string;
-  readonly weight: number | null;
-} {
-  return display.immersiveFontFamily
-    ? { family: display.immersiveFontFamily, weight: display.immersiveFontWeight }
-    : { family: display.fontFamily, weight: display.fontWeight };
-}
-
 /**
- * 对齐都交给 AMLL 自己排：居左原样，对唱行靠右；居中清掉对唱标记，字的居中由样式做；居右把每行的标记取反，
- * 所有行按对唱规则靠右，原本的对唱行反过来靠左。返回独立副本，AMLL 收可变数组，不让它改到调用方的数据
+ * 对齐都交给 AMLL 排版：居左保持原样，对唱行靠右。居中时清除对唱标记，文字由样式居中。
+ * 居右时把每行的标记取反，所有行按对唱规则靠右，原本的对唱行改为靠左。
+ * 返回独立的副本：AMLL 接收可变数组，不能让它改动调用方的数据
  */
 export function alignLyricLines(lines: readonly LyricLine[], align: LyricsAlign): LyricLine[] {
   return lines.map((line) => ({
@@ -194,8 +194,18 @@ export function lyricsProcessConfig(display: LyricsDisplay): LyricDataConfig {
   };
 }
 
+export const LYRICS_DISPLAY_KEY = 'defaultTheme.lyrics.display';
+export const LYRICS_TYPOGRAPHY_KEY = 'defaultTheme.lyrics.typography';
+export const LYRICS_FONTS_KEY = 'defaultTheme.lyrics.fonts';
+export const LYRICS_ALIGN_KEY = 'defaultTheme.lyrics.align';
+export const LYRICS_PROCESSING_KEY = 'defaultTheme.lyrics.processing';
+export const LYRICS_VIEW_KEYS = {
+  main: 'defaultTheme.lyrics.mainView',
+  immersive: 'defaultTheme.lyrics.immersiveView',
+} as const;
+
 const DISPLAY_PREF = defineConfigPref(
-  'defaultTheme.lyrics.display',
+  LYRICS_PROCESSING_KEY,
   baseDisplay(DEFAULT_LYRICS_DISPLAY),
   (raw) => {
     if (!raw || typeof raw !== 'object') return undefined;
@@ -203,47 +213,47 @@ const DISPLAY_PREF = defineConfigPref(
     return baseDisplay(parsed);
   },
 );
-export const LYRICS_DISPLAY_KEY = DISPLAY_PREF.key;
 
-const TYPOGRAPHY_PREF = defineConfigPref(
-  'defaultTheme.lyrics.typography',
-  { ...DEFAULT_LYRICS_TYPOGRAPHY },
-  (raw) =>
-    raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...parseTypography(raw) } : undefined,
-);
-export const LYRICS_TYPOGRAPHY_KEY = TYPOGRAPHY_PREF.key;
-const IMMERSIVE_FIELDS = ['immersiveFontFamily', 'immersiveFontWeight'] as const;
-const TYPOGRAPHY_FIELDS = [
-  'fontFamily',
-  'fontWeight',
-  'translationFontSize',
-  'showTranslation',
-  'showRomanization',
-] as const;
+export function parseLyricsViewAppearance(raw: unknown, view: LyricsView): LyricsViewAppearance {
+  const display = parseLyricsDisplay(raw);
+  const source = field(raw, 'fontSource');
+  const anchor = field(raw, 'alignAnchor');
+  return {
+    ...parseTypography(raw),
+    fontSource:
+      source === 'custom' || source === 'interface'
+        ? source
+        : view === 'immersive'
+          ? 'main'
+          : 'interface',
+    fontSize: number(
+      field(raw, 'fontSize'),
+      DEFAULT_LYRICS_DISPLAY.fontSize,
+      view === 'immersive' ? (22 * LYRICS_SCALE_RANGE.min) / 100 : LYRICS_FONT_SIZE_RANGE.min,
+      view === 'immersive' ? (22 * LYRICS_SCALE_RANGE.max) / 100 : LYRICS_FONT_SIZE_RANGE.max,
+    ),
+    align: display.align,
+    backgroundLast: display.backgroundLast,
+    positionMode:
+      view === 'immersive' && field(raw, 'positionMode') !== 'custom' ? 'layout' : 'custom',
+    alignAnchor: LYRICS_ALIGN_ANCHORS.find((value) => value === anchor) ?? 'center',
+    alignPosition: number(field(raw, 'alignPosition'), 0.35, 0, 1),
+  };
+}
 
-/** 沉浸视图的歌词字体另存一项，不动正在播放面板那份已发布的排版存档 */
-const FONTS_PREF = defineConfigPref<{ immersive: { family: string; weight: number | null } }>(
-  'defaultTheme.lyrics.fonts',
-  { immersive: { family: '', weight: null } },
-  (raw) => {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
-    const immersive = field(raw, 'immersive');
-    return {
-      immersive: {
-        family: fontNameOf(field(immersive, 'family')),
-        weight: fontWeightOf(field(immersive, 'weight')),
-      },
-    };
-  },
-);
-export const LYRICS_FONTS_KEY = FONTS_PREF.key;
+function viewPref(view: LyricsView) {
+  return defineConfigPref(
+    LYRICS_VIEW_KEYS[view],
+    { ...parseLyricsViewAppearance(null, view) },
+    (raw) =>
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? { ...parseLyricsViewAppearance(raw, view) }
+        : undefined,
+  );
+}
 
-const ALIGN_PREF = defineConfigPref<LyricsAlign>(
-  'defaultTheme.lyrics.align',
-  DEFAULT_LYRICS_DISPLAY.align,
-  oneOf(LYRICS_ALIGNS),
-);
-export const LYRICS_ALIGN_KEY = ALIGN_PREF.key;
+const VIEW_PREFS = { main: viewPref('main'), immersive: viewPref('immersive') };
+const COMMON_FIELDS = ['autoSeek', 'overscan', 'maskMode', 'maskChar', 'optimize'] as const;
 
 export function startLyricsDisplay(
   store: Store,
@@ -252,40 +262,65 @@ export function startLyricsDisplay(
 ) {
   const prefs = startConfigPrefs(
     store,
-    [DISPLAY_PREF, TYPOGRAPHY_PREF, ALIGN_PREF, FONTS_PREF],
+    [DISPLAY_PREF, VIEW_PREFS.main, VIEW_PREFS.immersive],
     host,
     writer,
   );
-  const display = atom<LyricsDisplay>((get) => ({
-    ...get(DISPLAY_PREF.atom),
-    ...get(TYPOGRAPHY_PREF.atom),
-    align: get(ALIGN_PREF.atom),
-    immersiveFontFamily: get(FONTS_PREF.atom).immersive.family,
-    immersiveFontWeight: get(FONTS_PREF.atom).immersive.weight,
-  }));
+  const views = { main: VIEW_PREFS.main.atom, immersive: VIEW_PREFS.immersive.atom };
+  const displayFor = (view: LyricsView) =>
+    atom<LyricsDisplay>((get) => {
+      const main = get(views.main);
+      const appearance = get(views[view]);
+      const inherited = appearance.fontSource === 'main';
+      const family = inherited
+        ? main.fontSource === 'custom'
+          ? main.fontFamily
+          : ''
+        : appearance.fontSource === 'custom'
+          ? appearance.fontFamily
+          : '';
+      return {
+        ...DEFAULT_LYRICS_DISPLAY,
+        ...get(DISPLAY_PREF.atom),
+        fontSize: appearance.fontSize,
+        align: appearance.align,
+        backgroundLast: appearance.backgroundLast,
+        translationFontSize: appearance.translationFontSize,
+        showTranslation: appearance.showTranslation,
+        showRomanization: appearance.showRomanization,
+        fontFamily: family,
+        fontWeight: inherited ? (appearance.fontWeight ?? main.fontWeight) : appearance.fontWeight,
+      };
+    });
+  const display = displayFor('main');
+  const immersiveDisplay = displayFor('immersive');
+  function updateView(view: LyricsView, patch: Partial<LyricsViewAppearance>) {
+    return prefs.set(VIEW_PREFS[view], {
+      ...parseLyricsViewAppearance({ ...store.get(views[view]), ...patch }, view),
+    });
+  }
   return {
     ready: prefs.ready,
     display,
+    immersiveDisplay,
+    views,
+    updateView,
     persistence: prefs,
-    async update(patch: Partial<LyricsDisplay>) {
+    reset(view: LyricsView) {
+      return prefs.set(VIEW_PREFS[view], { ...parseLyricsViewAppearance(null, view) });
+    },
+    async update(patch: Partial<LyricsDisplay>, view: LyricsView = 'main') {
       const parsed = parseLyricsDisplay({ ...store.get(display), ...patch });
       const writes: Promise<boolean>[] = [];
-      if (
-        Object.keys(patch).some(
-          (key) =>
-            key !== 'align' &&
-            !IMMERSIVE_FIELDS.some((field) => field === key) &&
-            !TYPOGRAPHY_FIELDS.some((field) => field === key),
-        )
-      )
+      if (COMMON_FIELDS.some((key) => key in patch))
         writes.push(prefs.set(DISPLAY_PREF, baseDisplay(parsed)));
-      if (TYPOGRAPHY_FIELDS.some((key) => key in patch))
-        writes.push(prefs.set(TYPOGRAPHY_PREF, { ...parseTypography(parsed) }));
-      if ('align' in patch) writes.push(prefs.set(ALIGN_PREF, parsed.align));
-      if (IMMERSIVE_FIELDS.some((key) => key in patch))
+      if (Object.keys(store.get(views[view])).some((key) => key in patch))
         writes.push(
-          prefs.set(FONTS_PREF, {
-            immersive: { family: parsed.immersiveFontFamily, weight: parsed.immersiveFontWeight },
+          updateView(view, {
+            ...patch,
+            ...('fontFamily' in patch
+              ? ({ fontSource: patch.fontFamily ? 'custom' : 'interface' } as const)
+              : {}),
           }),
         );
       return (await Promise.all(writes)).every(Boolean);

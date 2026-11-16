@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatBadge,
+  isHiRes,
   kiloHertz,
   parseFormatDetail,
   type FormatReading,
@@ -61,5 +62,23 @@ describe('formatBadge', () => {
       detail: '',
     });
     expect(formatBadge({ ...flac, codec: ' ' }, lossless(16))).toBeNull();
+  });
+});
+
+describe('isHiRes', () => {
+  it('无损且位深大于 16 或采样率高于 48 kHz', () => {
+    expect(isHiRes(flac, lossless(24))).toBe(true);
+    expect(isHiRes({ sampleRate: 96000 }, lossless(16))).toBe(true);
+    expect(isHiRes({ sampleRate: 192000 }, lossless(null))).toBe(true);
+    expect(isHiRes({ sampleRate: 48000 }, lossless(16))).toBe(false);
+    expect(isHiRes(flac, lossless(16))).toBe(false);
+    expect(isHiRes(flac, lossless(null))).toBe(false);
+  });
+
+  it('有损、编码方式取不到、还在取或取失败时不算', () => {
+    expect(isHiRes({ sampleRate: 96000 }, { lossless: false, bits: 24 })).toBe(false);
+    expect(isHiRes({ sampleRate: 96000 }, { lossless: null, bits: 24 })).toBe(false);
+    expect(isHiRes({ sampleRate: 96000 }, 'pending')).toBe(false);
+    expect(isHiRes({ sampleRate: 96000 }, 'failed')).toBe(false);
   });
 });

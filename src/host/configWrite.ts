@@ -1,5 +1,5 @@
 import type { fb } from 'foo-webview-sdk/bridge';
-import type { DataWriter, DataWriteResult } from '../kit/dataWrite.ts';
+import type { DataWriter, DataWriteResult, DataWriteScope } from '../kit/dataWrite.ts';
 import { hostCommand } from './hostCall.ts';
 
 type ConfigValue = Parameters<typeof fb.config.set>[1];
@@ -13,7 +13,21 @@ export interface ConfigWriter {
   remove(key: string, signal?: AbortSignal): Promise<DataWriteResult<number>>;
 }
 
-/** 创建带排他写锁与代数记录的宿主配置写入助手。仅在宿主持久化成功后更新代数；若缺少写入互斥器则明确拒绝，严禁无保护并发写入 */
+/** 使用调用方已持有的写锁保存配置，并在宿主确认后记录代数 */
+export function setConfigInScope(
+  scope: Pick<DataWriteScope, 'write'>,
+  config: Pick<ConfigWriteFace['config'], 'set'>,
+  key: string,
+  value: ConfigValue,
+): Promise<number> {
+  return scope.write(`config:${key}`, () => hostCommand(() => config.set(key, value)));
+}
+
+/**
+ * 创建宿主配置的写入助手。每次写入都在排他写锁内执行，宿主保存成功后才记录代数
+ *
+ * 没有 `writer` 时，写入一律以 `unavailable` 失败，不在锁外执行
+ */
 export function createConfigWriter(
   host: ConfigWriteFace,
   writer: Pick<DataWriter, 'run'> | undefined,
@@ -30,7 +44,7 @@ export function createConfigWriter(
 
   return {
     async set(key, value, signal) {
-      // 快照防并发篡改：在等待获锁期间对象可能被外部异步修改，深拷贝保证持久化快照的一致性
+      // 先复制 value，使保存的内容是调用 set 时的值。等待写锁期间，调用方可能修改原对象
       let snapshot: ConfigValue;
       try {
         snapshot = structuredClone(value);

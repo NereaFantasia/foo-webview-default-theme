@@ -1,4 +1,4 @@
-/** 媒体库镜像的请求动作；页面与后端共用，路径是 `/library/<动作>` */
+/** 媒体库镜像的请求动作，页面与后端共用。请求路径为 `/library/<动作>` */
 export const LIBRARY_MIRROR_ACTIONS = [
   'status',
   'apply',
@@ -11,21 +11,27 @@ export const LIBRARY_MIRROR_ACTIONS = [
   'albums',
   'artists',
   'clear',
+  'stats-status',
+  'stats-page',
+  'stats-begin',
+  'stats-put',
+  'stats-commit',
+  'stats-apply',
 ] as const;
 export type LibraryMirrorAction = (typeof LIBRARY_MIRROR_ACTIONS)[number];
 
-/** 镜像文件的结构版本：字段变了就加一并换文件名，旧文件不迁移 */
+/** 镜像文件的结构版本。字段变化时加一并更换文件名，旧文件不迁移 */
 export const LIBRARY_MIRROR_SCHEMA = 1;
-/** 后端读一个镜像请求体的上限，字节；每批行约 1 MiB */
+/** 后端读取单个镜像请求体的上限（字节）。每批行约 1 MiB */
 export const LIBRARY_MIRROR_BODY_LIMIT = 8 * 1024 * 1024;
-/** 一次请求最多带的行数与句柄数 */
+/** 单次请求最多携带的行数与句柄数 */
 export const MIRROR_ITEMS_PER_REQUEST = 5000;
-/** 一次 `page` 最多取的行数 */
+/** 单次 `page` 最多读取的行数 */
 export const MIRROR_PAGE_LIMIT = 5000;
-/** 一次 `order` 最多取的条数：只带句柄（与路径），一页比整行小得多 */
+/** 单次 `order` 最多读取的条数。结果只含句柄（及路径），每页远小于整行 */
 export const MIRROR_ORDER_LIMIT = 20000;
 
-/** 镜像能排的列，与 `TRACK_SORT` 的列同名；`added`、`playCount`、`lastPlayed` 要播放统计，不在镜像里 */
+/** 镜像支持的排序列，与 `TRACK_SORT` 的列同名。`added`、`playCount`、`lastPlayed` 依赖播放统计，不在镜像中 */
 export const MIRROR_SORT_COLUMNS = [
   'number',
   'title',
@@ -49,7 +55,7 @@ export function isMirrorSortColumn(value: unknown): value is MirrorSortColumn {
   return MIRROR_SORT_COLUMNS.some((column) => column === value);
 }
 
-/** 宿主媒体库曲目行里镜像存的键，含义见 SDK 的 `Track`；`albumId` 只在专辑名或艺术家名不是合法 UTF-8 时有 */
+/** 镜像保存的宿主曲目行字段，含义见 SDK 的 `Track`。只有专辑名或艺人名不是合法 UTF-8 时才有 `albumId` */
 export interface MirrorTrack {
   readonly handle: string;
   readonly path: string;
@@ -75,7 +81,7 @@ export interface MirrorTrack {
   readonly rating: number;
 }
 
-/** 镜像读出的行；`index` 是库序，与宿主 `search` 的 ALL 查询里的行号同义 */
+/** 从镜像读出的行。`index` 是库序，与宿主 `search` 的 ALL 查询中的行号含义相同 */
 export interface MirrorRow extends MirrorTrack {
   readonly index: number;
 }
@@ -85,9 +91,9 @@ export interface MirrorStatus {
   readonly epoch: string;
   readonly revision: number;
   readonly count: number;
-  /** 还没有完整的镜像（从没建过，或重建没有收尾）时为假，此时不能读 */
+  /** 尚无完整镜像（从未建立或重建未收尾）时为假，此时不可读取 */
   readonly ready: boolean;
-  /** 镜像文件（含预写日志）占的磁盘字节数；内存库为 0，旧后端不报时读作 0 */
+  /** 镜像文件（含预写日志）占用的磁盘字节数。内存库为 0，旧版后端不报告时读作 0 */
   readonly bytes: number;
 }
 
@@ -99,31 +105,31 @@ export interface MirrorApplyRequest {
   readonly remove: readonly string[];
 }
 
-/** `stale`：镜像的纪元或修订号与请求不符，没有写入，页面要重新对账 */
+/** `stale` 为真表示镜像未就绪，或纪元、修订号与请求不符，没有写入，页面须重新对账 */
 export type MirrorApplyReply =
   { readonly stale: true } | { readonly stale: false; readonly count: number };
 
 export interface MirrorPageRequest {
   readonly sort: MirrorSortColumn;
   readonly descending: boolean;
-  /** 上一页答复里的 `next`；取第一页时为 null */
+  /** 上一页应答中的 `next`，读取第一页时为 null */
   readonly after: string | null;
   readonly limit: number;
 }
 
 export interface MirrorPage {
   readonly rows: readonly MirrorRow[];
-  /** 还有后续时是下一页要带的游标，到头为 null */
+  /** 还有后续时为读取下一页的游标，已到末尾时为 null */
   readonly next: string | null;
   readonly total: number;
 }
 
-/** 只要次序的翻页：`paths` 为真时再带每首的路径与 subsong（起播与发送要用），句柄之外的整行不带 */
+/** 只读取次序的翻页：结果不含整行，只有句柄。`paths` 为真时另带每首的路径与 subsong，供开始播放与发送使用 */
 export interface MirrorOrderRequest extends MirrorPageRequest {
   readonly paths: boolean;
 }
 
-/** 三个数组按下标对齐；`paths` 为假时 `paths` 与 `subsongs` 为空数组 */
+/** 三个数组按下标对应。请求的 `paths` 为假时，`paths` 与 `subsongs` 为空数组 */
 export interface MirrorOrder {
   readonly handles: readonly string[];
   readonly paths: readonly string[];
@@ -202,7 +208,7 @@ function parse<T>(read: () => T): T | null {
   }
 }
 
-/** 校验宿主的曲目行，缺键、类型不对或 `handle` 为空都答 null；多出来的键不要 */
+/** 校验宿主的曲目行。缺少键、类型不符或 `handle` 为空时返回 null，多余的键丢弃 */
 export function readMirrorTrack(raw: unknown): MirrorTrack | null {
   return parse(() => {
     const albumId = field(raw, 'albumId');
@@ -345,7 +351,7 @@ export function readMirrorArtists(raw: unknown): MirrorArtist[] | null {
   );
 }
 
-/** `rebuildBegin` 答的代次；之后的 `rebuildPut` 与 `rebuildCommit` 要带上 */
+/** 读取 `rebuildBegin` 返回的代次，之后的 `rebuildPut` 与 `rebuildCommit` 须带上它 */
 export function readMirrorGeneration(raw: unknown): number | null {
   return int(raw, 'generation');
 }

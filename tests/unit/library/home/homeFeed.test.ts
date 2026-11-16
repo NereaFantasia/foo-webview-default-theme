@@ -1,18 +1,43 @@
-import { createStore } from 'jotai/vanilla';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { atom, createStore } from 'jotai/vanilla';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { startAlbums } from '../../../../src/library/albums.ts';
 import { startLibraryTracks } from '../../../../src/library/libraryTracks.ts';
 import { HOME_STATS_BATCH, startHomeFeed } from '../../../../src/library/home/homeFeed.ts';
+import { createHomeStatsCache } from '../../../../src/library/home/homeStatsCache.ts';
 import { LIBRARY_COALESCE_MS, trackPathOf } from '../../../../src/host/libraryContract.ts';
 import { albumsAnswer } from '../../../fixtures/albumLibrary.ts';
 import { hostFailure, listParam } from '../../../fixtures/hostAnswers.ts';
 import { albumRow, albumTrackRow } from '../../../fixtures/libraryRows.ts';
 import { installFakeHost } from '../../../fixtures/unitHost.ts';
 import { wholeLibrary } from '../../../fixtures/wholeLibrary.ts';
+import { FakeLibrary } from '../../../fixtures/mirrorEnv.ts';
+import { startLibraryMirror } from '../../../../backend/library/libraryMirror.ts';
+import { LIBRARY_MIRROR_ACTIONS } from '../../../../src/server/libraryMirrorProtocol.ts';
+import { readLibraryStatsStatus } from '../../../../src/server/libraryStatsProtocol.ts';
 
 afterEach(() => vi.useRealTimers());
 afterEach(() => vi.restoreAllMocks());
-function setup(available = true, count = 2) {
+async function cacheBackend() {
+  const directory = await mkdtemp(join(tmpdir(), 'theme-home-stats-'));
+  const mirror = startLibraryMirror(directory);
+  onTestFinished(async () => {
+    mirror.dispose();
+    await rm(directory, { recursive: true, force: true });
+  });
+  return {
+    port: atom<number | null>(1),
+    request: async (path: string, body?: unknown): Promise<unknown> => {
+      const action = LIBRARY_MIRROR_ACTIONS.find((item) => `/library/${item}` === path);
+      if (!action) throw new Error('未知动作');
+      return mirror.request(action, body);
+    },
+  };
+}
+
+function setup(available = true, count = 2, backend?: Parameters<typeof startHomeFeed>[3]) {
   const host = installFakeHost();
   const album = albumRow('A', 'Artist');
   const rows = Array.from({ length: count }, (_, index) =>
@@ -44,16 +69,249 @@ function setup(available = true, count = 2) {
   const store = createStore();
   const catalog = startAlbums(store, host.fb);
   const tracks = startLibraryTracks(store, () => 0, host.fb);
-  const service = startHomeFeed(store, tracks, host.fb);
+  const service = startHomeFeed(store, tracks, host.fb, backend);
   onTestFinished(() => {
     service.dispose();
     tracks.dispose();
     catalog.dispose();
   });
-  return { host, service, catalog, rows, album, state: () => store.get(service.state) };
+  return {
+    host,
+    service,
+    catalog,
+    rows,
+    album,
+    store,
+    tracks,
+    state: () => store.get(service.state),
+  };
 }
 
 describe('首页统计服务', () => {
+  it('旧缓存分页晚到不能抹掉新一轮统计，最新修订号仍能持久保存', async () => {
+    const backend = await cacheBackend();
+    const env = setup(true, 1, backend);
+    const library = new FakeLibrary(env.rows);
+    env.host.answer('library.getChanges', (params) => library.changes(params));
+    env.service.activate();
+    await vi.waitFor(() => expect(env.state().status).toBe('ready'));
+    env.service.dispose();
+    const changed = env.rows[0]!;
+    library.edit([changed]);
+    let release: () => void = () => {};
+    let arrived: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    let firstPage = true;
+    const cache = createHomeStatsCache(
+      env.host.fb,
+      {
+        request: async (path, body) => {
+          const reply = await backend.request(path, body);
+          if (path === '/library/stats-page' && firstPage) {
+            firstPage = false;
+            arrived();
+            await held;
+          }
+          return reply;
+        },
+      },
+      () => true,
+    );
+    let current = true;
+    const oldRead = cache.read(env.rows, () => current);
+    await started;
+    current = false;
+    const next = await cache.read(env.rows, () => true);
+    next.rows.set(changed.handle, {
+      handle: changed.handle,
+      path: trackPathOf(changed),
+      success: true,
+      playCount: 9,
+    });
+    release();
+    await oldRead;
+    await cache.save(next, () => true);
+    expect(readLibraryStatsStatus(await backend.request('/library/stats-status'))).toMatchObject({
+      ready: true,
+      revision: 2,
+    });
+  });
+
+  it('等待缓存开关读回，关闭时只读宿主，重新开启后补存统计', async () => {
+    const backend = await cacheBackend();
+    const enabled = atom(false);
+    let loaded: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      loaded = resolve;
+    });
+    const env = setup(true, 2, { ...backend, enabled, ready });
+    const library = new FakeLibrary(env.rows);
+    env.host.answer('library.getChanges', (params) => library.changes(params));
+    env.service.activate();
+    await vi.waitFor(() => expect(env.state().status).toBe('loading'));
+    loaded();
+    await vi.waitFor(() => expect(env.state().status).toBe('ready'));
+    expect(env.state().statistics.mostPlayed.plays).toBe(2);
+    expect(readLibraryStatsStatus(await backend.request('/library/stats-status'))?.ready).toBe(
+      false,
+    );
+    vi.useFakeTimers();
+    env.store.set(enabled, true);
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
+    await vi.waitFor(async () =>
+      expect(readLibraryStatsStatus(await backend.request('/library/stats-status'))).toMatchObject({
+        ready: true,
+        revision: 1,
+      }),
+    );
+  });
+  it('冷读全库时批间允许交互，所有曲目的统计仍完整', async () => {
+    vi.useFakeTimers();
+    const { host, service, state } = setup(true, 41);
+    let inputHandled = false;
+    let lastReadAfterInput = false;
+    host.answer('playcount.getBatch', (params) => {
+      lastReadAfterInput = inputHandled;
+      setTimeout(() => {
+        inputHandled = true;
+      }, 0);
+      const paths = listParam(params, 'paths');
+      return {
+        success: true,
+        count: paths.length,
+        results: paths.map((path) => ({ path: String(path), success: true, playCount: 1 })),
+      };
+    });
+    service.activate();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(state()).toMatchObject({ status: 'ready', unreadCount: 0 });
+    expect(state().statistics.mostPlayed.tracks.played).toBe(41);
+    expect(lastReadAfterInput).toBe(true);
+  });
+
+  it('UNC 子曲目统计持久保存，重启同修订号时不重读宿主', async () => {
+    const backend = await cacheBackend();
+    const env = setup(true, 2, backend);
+    env.rows[0] = {
+      ...env.rows[0]!,
+      path: 'file://\\\\nas\\music\\album.cue',
+      handle: '\\\\nas\\music\\album.cue|subsong:2',
+      subsong: 2,
+    };
+    const library = new FakeLibrary(env.rows);
+    env.host.answer('library.getChanges', (params) => library.changes(params));
+    env.service.activate();
+    await vi.waitFor(() => expect(env.state().status).toBe('ready'));
+    expect(readLibraryStatsStatus(await backend.request('/library/stats-status'))).toMatchObject({
+      ready: true,
+      revision: 1,
+    });
+    const before = env.state().statistics;
+    env.service.dispose();
+    library.floor = library.revision;
+    env.host.answer('playcount.getBatch', hostFailure('OPERATION_FAILED'));
+    const restarted = startHomeFeed(env.store, env.tracks, env.host.fb, backend);
+    onTestFinished(() => restarted.dispose());
+    restarted.activate();
+    await vi.waitFor(() => expect(env.store.get(restarted.state).status).toBe('ready'));
+    expect(env.store.get(restarted.state).statistics).toEqual(before);
+    expect(env.store.get(restarted.state).unreadCount).toBe(0);
+  });
+
+  it('统计 hook 只补变化曲目，当前首页不换序，重启读取更新后的缓存', async () => {
+    const backend = await cacheBackend();
+    const env = setup(true, 3, backend);
+    const library = new FakeLibrary(env.rows);
+    env.host.answer('library.getChanges', (params) => library.changes(params));
+    env.service.activate();
+    await vi.waitFor(() => expect(env.state().status).toBe('ready'));
+    const previous = env.state().statistics;
+    const changed = env.rows[0]!;
+    library.edit([changed]);
+    env.host.answer('playcount.getBatch', (params) => {
+      const paths = listParam(params, 'paths');
+      if (paths.some((path) => path !== trackPathOf(changed)))
+        return hostFailure('OPERATION_FAILED');
+      return {
+        success: true,
+        count: 1,
+        results: [
+          {
+            path: trackPathOf(changed),
+            success: true,
+            playCount: 9,
+            lastPlayed: '2026-11-15 12:00:00',
+          },
+        ],
+      };
+    });
+    vi.useFakeTimers();
+    env.host.emit('library:itemsModified', {
+      count: 1,
+      handles: [changed.handle],
+      truncated: false,
+      fromHook: true,
+      timestamp: 1,
+    });
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
+    await vi.waitFor(async () =>
+      expect(readLibraryStatsStatus(await backend.request('/library/stats-status'))).toMatchObject({
+        revision: 2,
+      }),
+    );
+    expect(env.state().statistics).toBe(previous);
+    expect(env.state().dirty).toBe(true);
+    env.service.dispose();
+    library.floor = library.revision;
+    env.host.answer('playcount.getBatch', hostFailure('OPERATION_FAILED'));
+    const restarted = startHomeFeed(env.store, env.tracks, env.host.fb, backend);
+    onTestFinished(() => restarted.dispose());
+    restarted.activate();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.waitFor(() => expect(env.store.get(restarted.state).status).toBe('ready'));
+    expect(env.store.get(restarted.state).statistics.mostPlayed.plays).toBe(11);
+  });
+
+  it('初读遇到库变化保留已完成批次，只补变化与尚未读取的曲目', async () => {
+    vi.useFakeTimers();
+    const env = setup(true, HOME_STATS_BATCH + 1);
+    const library = new FakeLibrary(env.rows);
+    env.host.answer('library.getChanges', (params) => library.changes(params));
+    env.service.activate();
+    await vi.advanceTimersByTimeAsync(0);
+    const changed = env.rows[0]!;
+    library.edit([changed]);
+    env.host.answer('playcount.getBatch', (params) => {
+      const paths = listParam(params, 'paths');
+      if (
+        paths.some(
+          (path) => path !== trackPathOf(changed) && path !== trackPathOf(env.rows.at(-1)!),
+        )
+      )
+        return hostFailure('OPERATION_FAILED');
+      return {
+        success: true,
+        count: paths.length,
+        results: paths.map((path) => ({ path: String(path), success: true, playCount: 2 })),
+      };
+    });
+    env.host.emit('library:itemsModified', {
+      count: 1,
+      handles: [changed.handle],
+      truncated: false,
+      fromHook: true,
+      timestamp: 1,
+    });
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS + 100);
+    expect(env.state()).toMatchObject({ status: 'ready', unreadCount: 0 });
+    expect(env.state().statistics.mostPlayed.plays).toBe(HOME_STATS_BATCH + 3);
+  });
+
   it('单曲失败仍发布成功统计，失败曲目不当成从未播放', async () => {
     const { host, service, state, album } = setup();
     vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -2,6 +2,54 @@
 
 foo-webview-default-theme 每个版本的变化。主题里显示的更新日志和发行页正文都由这份文件生成，写法见 `src/update/changelogSource.ts` 开头的说明。
 
+## 0.4.1 - 2026-11-16
+
+### zh-CN
+
+#### Hi-Res 标记、分视图歌词设置与视频页快捷键
+
+高解析度无损曲目支持显示金色 Hi-Res 标识，主视图与沉浸视图提供独立的歌词外观设置，视频页补上快捷键与画面操作。
+
+- [player] **Hi-Res 标记** 对位深高于 16 位或采样率高于 48 kHz 的无损曲目，音质标记内新增金色 Hi-Res 标识，编码边框同步呈现金色。沉浸视图中音质标记固定于曲名行右端，不随曲名长度位移；窗口底部的播放栏与胶囊播放条也显示本地曲目的音质标记。
+- [lyrics] **歌词分视图设置** 「设置 > 歌词」为主视图与沉浸视图分别提供独立的设置卡片，字号、字体、对齐、译文与音译显示、动效及当前行位置均可按视图单独调整；升级后自动沿用既有配置，显示效果保持不变。
+- [player] **视频页快捷键与画面操作** 新增静音、回到开头、数字键 0-9 跳到 0%-90% 处、前后跳转 10 秒、Shift+P/N 切上一首下一首等键位；画面上单击播放或暂停、双击全屏、滚轮调音量。完整键位见「设置 > 快捷键」的「视频页」。
+- [library] **首页统计缓存** 首页播放统计在初次生成后缓存至本地，后续打开仅增量读取有变动的曲目，打开更快；若在常规设置中停用媒体库缓存，本缓存机制不使用。
+
+##### 改进与修复
+
+- 沉浸视图歌词字号调整为相对于基准大小的缩放比例（50% 至 225%），工具栏与设置页读数保持一致。
+- 高采样率曲目的频谱不再缩在左侧：横轴右端最高到 24 kHz。
+- 沉浸视图背景优先读取当前播放曲目的现有封面，避免等待远端下载延迟，亦不再残留上一首曲目的封面。
+- 沉浸视图的大封面超过 0.2 秒未取到时，先显示当前曲目封面，大图到了再换成大图。
+- 修复 Coverflow 切换选中封面时先变糊再变清的问题。
+- 修复长按空格键导致视频反复切换播放与暂停状态的问题。
+- 修复标题栏视频按钮点击无响应的问题；视频页内嵌时让出阅读面的细边框，不再盖住它。
+- 非本地文件（如网络流）时，视频页的「打开所在文件夹」置灰。
+- 「关于」页运行日志新增整轨分析、DR 与响度量表的失败和过慢记录（耗时达到 30 秒起记），记录不含曲目路径与标题。
+
+### en
+
+#### Hi-Res badge, per-view lyrics settings and video page shortcuts
+
+High-resolution lossless tracks feature a gold Hi-Res badge, the main and immersive views provide independent lyrics settings, and the video page gains keyboard shortcuts and mouse controls.
+
+- [player] **Hi-Res badge** Lossless tracks with bit depth exceeding 16 bits or sample rates above 48 kHz now display a gold Hi-Res tag inside the format badge, with a matching gold codec border. In immersive views, the badge is anchored to the right end of the title row regardless of title length; the bottom bar and capsule player also display the format badge for local tracks.
+- [lyrics] **Lyrics settings per view** Settings > Lyrics now offers dedicated cards for the main view and the immersive view, allowing independent configuration of font size, font family, alignment, translations and romanization, motion effects, and current-line positioning; existing preferences are preserved across upgrades.
+- [player] **Video page shortcuts and mouse controls** Adds mute, seeking to start (Home), digit keys 0–9 seeking to 0%–90%, 10-second jumps (J, L), and Shift+P/N for previous and next tracks. On the video surface, a click plays or pauses, a double click toggles full screen, and the wheel changes the volume. See Video page under Settings > Shortcuts.
+- [library] **Home statistics cache** Home play statistics are cached locally, and later opens read only the tracks that changed, making the page open faster. The cache is not used when the library cache is off in General settings.
+
+##### Improvements and fixes
+
+- The immersive lyrics font size is now represented as a scale percentage (50% to 225%), matching in the floating toolbar and in settings.
+- Refined the spectrum display at high sample rates: the axis now ends at 24 kHz at most.
+- The immersive background now prioritizes the current track's cached cover, eliminating download delays and preventing covers from previous tracks from lingering.
+- When the large cover in the immersive view takes longer than 0.2 seconds, the track's current cover shows first and is replaced once the large image arrives.
+- Fixed an issue where selected Coverflow artwork temporarily blurred before regaining sharpness.
+- Fixed repeated play/pause toggling when holding down the Space key during video playback.
+- Fixed an issue where the title bar video button did not respond to clicks; the embedded video page now leaves room for the thin border of the reading surface without overlapping it.
+- Open containing folder on the video page is dimmed for non-local tracks (such as network streams).
+- The runtime log in About records failed or slow whole-track analysis and DR and loudness meter runs (taking 30 seconds or longer), without track paths or titles.
+
 ## 0.4.0 - 2026-11-15
 
 ### zh-CN

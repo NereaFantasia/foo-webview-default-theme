@@ -40,6 +40,8 @@ export const BACKGROUND_LIMITS: Readonly<
 export const backgroundCoverAtom = atom<{
   readonly url: string;
   readonly profile: CoverProfile | null;
+  /** `url` 所属曲目的身份，口径同 `trackKeyOf`。没有地址时不设置 */
+  readonly key?: string;
 }>({
   url: '',
   profile: null,
@@ -60,7 +62,7 @@ function parameters(value: unknown, fallback: BackgroundParameters): BackgroundP
   return result;
 }
 
-/** 存档逐项校验，坏了哪一项补哪一项；不是 JSON 对象的整份按缺省 */
+/** 存档逐项校验，只替换不合法的项。存档不是 JSON 对象时整份使用缺省值 */
 const backgroundPref = defineLocalPref<BackgroundPreferences>({
   key: WINDOW_BACKGROUND_KEY,
   fallback: BACKGROUND_DEFAULTS,
@@ -83,7 +85,7 @@ export const backgroundParametersAtom = atom(
   (get) => get(backgroundPref.atom)[get(colorSchemeAtom)],
 );
 
-/** 在首帧之前调。读不了或存档坏了用缺省材质 */
+/** 读取窗口背景的存档，须在首帧之前调用。无法读取或存档损坏时使用缺省材质 */
 export function loadWindowBackground(store: Store, storage?: PrefStorage | null): void {
   backgroundPref.load(store, storage);
   loadBackgroundAppearance(store, storage);

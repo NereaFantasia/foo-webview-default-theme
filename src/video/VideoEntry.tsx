@@ -1,4 +1,4 @@
-import { Button, Tooltip } from '@fluentui/react-components';
+import { Button, Tooltip, mergeClasses } from '@fluentui/react-components';
 import { useViewControlStyles } from '../theme/controlStyles.ts';
 import { Video20Regular } from '@fluentui/react-icons';
 import { useAtomValueRawSync } from 'jotai/react';
@@ -6,6 +6,7 @@ import { useContext } from 'react';
 import { translateAtom } from '../i18n/locale.ts';
 import { historyAtom } from '../nav/navHistory.ts';
 import { VideoContext, type VideoBindings } from './videoContext.ts';
+import styles from './VideoEntry.module.css';
 
 function Entry({ bindings }: { readonly bindings: VideoBindings }) {
   const state = useAtomValueRawSync(bindings.service.state);
@@ -17,7 +18,7 @@ function Entry({ bindings }: { readonly bindings: VideoBindings }) {
     <Tooltip content={t('place.video')} relationship="label">
       <Button
         appearance={current ? 'primary' : 'subtle'}
-        className={current ? undefined : viewControls.icon}
+        className={mergeClasses(styles.entry, !current && viewControls.icon)}
         icon={<Video20Regular />}
         aria-label={t('place.video')}
         aria-pressed={current}

@@ -19,14 +19,14 @@ test('barAxisFor：8192 点、44.1 kHz 铺 200 根，约 190 Hz 以下一个频�
   for (let bar = 0; bar < 200; bar += 1) {
     expect(edges[bar + 1] ?? 0).toBeGreaterThan(edges[bar] ?? 0);
   }
-  // 线性段：第 0 根从 20 Hz 起，其余每根宽一个频点间隔，每根柱里恰好一个频点。
+  // 线性段：第 0 根从 20 Hz 开始，其余每根宽一个频点间隔，每根柱中恰好有一个频点
   for (let bar = 0; bar < binBars; bar += 1) {
     const low = edges[bar] ?? 0;
     const high = edges[bar + 1] ?? 0;
     if (bar > 0) near(high - low, BIN_HZ, 1e-9);
     expect(Math.ceil(high / BIN_HZ) - Math.ceil(low / BIN_HZ), `第 ${bar} 根`).toBe(1);
   }
-  // 对数段：相邻边界之比处处相同，第一根也不窄于一个频点。
+  // 对数段：相邻边界之比处处相同，第一根也不窄于一个频点
   const ratio = (edges[binBars + 1] ?? 0) / (edges[binBars] ?? 1);
   for (let bar = binBars; bar < 200; bar += 1) {
     near((edges[bar + 1] ?? 0) / (edges[bar] ?? 1), ratio, 1e-9);
@@ -46,6 +46,20 @@ test('barAxisFor：点数够大、20 Hz 处一根柱已不窄于一个频点时�
   expect(axis.binBars).toBe(0);
   const ratio = (RATE / 2 / 20) ** (1 / 200);
   near(axis.edges[1] ?? 0, 20 * ratio, 1e-9);
+});
+
+test('barAxisFor：maxHz 低于 Nyquist 时右端就是 maxHz，各采样率下 20 kHz 都落在轴的靠右处', () => {
+  for (const rate of [48000, 96000, 192000, 384000, 768000]) {
+    const axis = barAxisFor(rate, FFT, 200, 20, 24000);
+    expect(axis.edges[200], `${rate} Hz`).toBe(24000);
+    expect(axisFraction(axis, 20000), `${rate} Hz`).toBeGreaterThan(0.85);
+  }
+  // 不设上限时，同一个 20 kHz 随采样率升高而左移
+  expect(axisFraction(barAxisFor(192000, FFT, 200, 20), 20000)).toBeLessThan(0.8);
+});
+
+test('barAxisFor：maxHz 不低于 Nyquist 时右端仍是 Nyquist', () => {
+  expect(barAxisFor(RATE, FFT, 200, 20, 24000).edges[200]).toBe(RATE / 2);
 });
 
 test('axisFraction：边界落在 i / 柱数，线性段按频率插、对数段按对数插；两端夹住', () => {

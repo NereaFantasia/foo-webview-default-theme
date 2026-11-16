@@ -1,6 +1,7 @@
 import type { Track } from 'foo-webview-sdk';
 import { atom } from 'jotai/vanilla';
-import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
+import { entries, resetEventLog } from '../../../../src/diagnostics/eventLog.ts';
 import type { BeatTrack } from '../../../../src/immersive/tempo/beatTracker.ts';
 import type { PcmPiece } from '../../../../src/immersive/waveform/segmentedBands.ts';
 import {
@@ -16,11 +17,13 @@ import { flush, startPlayingTrack, type PlayingTrack } from '../../../fixtures/p
 import { makeTrack } from '../../../fixtures/tracks.ts';
 
 /**
- * 分频结果的取数门控、作废、中止与按曲目记忆：PCM 来源与分频都注入替身，不碰 Web Audio；曲目由真的播放服务给。
- * 替身来源给的每块都是 1 kHz 下的常数电平，分频替身原样当四条链的输出，结果里的电平就是来源给的那个数。
+ * 分频结果的取数条件、作废、中止与按曲目缓存。PCM 来源与分频都注入替身，不使用 Web Audio，曲目由真实的播放服务提供。
+ * 替身来源返回的每块都是 1 kHz 下的常数电平，分频替身把它原样作为四条链的输出，结果中的电平即来源给出的值
  */
 const RATE = 1000;
 const signalsOf = new Map<AudioBuffer, BandSignals>();
+
+beforeEach(resetEventLog);
 
 function pieceOf(level: number, range: { start: number; end: number }): PcmPiece {
   const samples = new Float32Array(Math.round((range.end - range.start) * RATE)).fill(level);
@@ -41,7 +44,7 @@ interface SourceCall {
   signal: AbortSignal;
 }
 
-/** 按调用顺序记账、由用例决定何时答的来源。 */
+/** 按调用顺序记录请求、由用例决定何时应答的来源 */
 function controlledSource() {
   const calls: SourceCall[] = [];
   const pending: ((level: number | null) => void)[] = [];
@@ -384,5 +387,60 @@ describe('startTrackAnalysis', () => {
     await flush();
     expect(source).toHaveBeenCalledTimes(1);
     expect(y.model().bands?.low[0]).toBe(0.25);
+  });
+
+  describe('运行日志', () => {
+    const logged = () => entries().map((entry) => ({ event: entry.event, ...entry.fields }));
+
+    test('取数失败：记错误码与采样率，不记消息里的曲目路径', async () => {
+      const { model } = await setup(async () => {
+        throw Object.assign(new Error('E:/Music/a.flac 解码失败'), { code: 'DECODE_FAILED' });
+      });
+      await flush();
+      expect(model().status).toBe('failed');
+      expect(logged()).toStrictEqual([
+        { event: 'analysis.failed', code: 'DECODE_FAILED', rate: 44100 },
+      ]);
+    });
+
+    test('整个页面取不了：记一次宿主给的原因，之后换曲不再取也不再记', async () => {
+      const reason = 'No resampler supports this sample rate conversion';
+      const { play } = await setup(async () => {
+        throw new PcmUnavailableError(reason);
+      });
+      await flush();
+      play(OTHER);
+      await flush();
+      expect(logged()).toStrictEqual([{ event: 'analysis.unavailable', rate: 44100, reason }]);
+    });
+
+    test('耗时到 30 s 记 analysis.slow，不到不记', async () => {
+      let clock = 0;
+      let step = 30_000;
+      const now = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+      onTestFinished(() => now.mockRestore());
+      const { play } = await setup(
+        async (_track, range) => {
+          clock += step;
+          return pieceOf(0.5, range);
+        },
+        { beats: async () => null },
+      );
+      await flush();
+      step = 29_999;
+      play(OTHER);
+      await flush();
+      expect(logged()).toStrictEqual([{ event: 'analysis.slow', ms: 30_000, rate: 44100 }]);
+    });
+
+    test('这首本来就不取（来源给 null）、中途换曲：不记', async () => {
+      const source = controlledSource();
+      const { play } = await setup(source.source);
+      play(OTHER);
+      source.answer(0, null);
+      source.answer(1, null);
+      await flush();
+      expect(logged()).toStrictEqual([]);
+    });
   });
 });

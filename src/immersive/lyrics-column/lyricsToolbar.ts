@@ -1,19 +1,19 @@
-import { LYRICS_FONT_SIZE_RANGE } from '../../lyrics/lyricsDisplay.ts';
+import { LYRICS_SCALE_RANGE } from '../../lyrics/lyricsDisplay.ts';
 import type { LyricsContent } from '../../lyrics/lyricsText.ts';
 
-/** 展开为双行工具块的宽度阈值（CSS 像素） */
+/** 工具条宽度达到该值（CSS 像素）时为宽档，控件显示为双行磁贴 */
 export const TOOLBAR_WIDE_MIN = 576;
-/** 单行展开与紧凑折叠的临界宽度阈值（CSS 像素） */
+/** 工具条宽度达到该值（CSS 像素）时为中档，低于该值为窄档 */
 export const TOOLBAR_MEDIUM_MIN = 258;
 
-/** 双行工具条高度（CSS 像素）；单行与搜索状态下高度为 40px */
+/** 宽档工具条的高度（CSS 像素）。中档、窄档与搜索时高度为 40 px */
 export const TOOLBAR_HEIGHT = 72;
 
-/** 搜索结果面板与工具条间隙及视口底部留白（CSS 像素） */
+/** 搜索结果面板与工具条的间距，以及面板与歌词栏底边的留白（CSS 像素） */
 const RESULTS_GAP = 4;
 const RESULTS_BOTTOM = 16;
 
-/** 计算搜索结果浮层可用最大高度 */
+/** 搜索结果面板可用的最大高度（CSS 像素），按宽档工具条的高度预留 */
 export function toolbarRoomOf(columnHeight: number, top: number): number {
   return Math.max(0, columnHeight - top - TOOLBAR_HEIGHT - RESULTS_GAP - RESULTS_BOTTOM);
 }
@@ -25,34 +25,30 @@ export function toolbarFormOf(width: number): ToolbarForm {
   return width >= TOOLBAR_MEDIUM_MIN ? 'medium' : 'narrow';
 }
 
-/** 歌词字号单步调节步长（CSS 像素） */
-export const FONT_SIZE_STEP = 2;
-
-/** 按步长增减字号并钳制在有效极值范围内 */
-export function stepFontSize(size: number, steps: number): number {
-  const { min, max } = LYRICS_FONT_SIZE_RANGE;
-  return Math.min(max, Math.max(min, size + steps * FONT_SIZE_STEP));
+/** 按缩放步长增减百分比，结果限制在 `LYRICS_SCALE_RANGE` 内 */
+export function stepScale(percent: number, steps: number): number {
+  const { min, max, step } = LYRICS_SCALE_RANGE;
+  return Math.min(max, Math.max(min, percent + steps * step));
 }
 
-/** 歌词时间轴校正上下限（秒），与存储约束对齐 */
+/** 时间校正值的上下限（秒），与存储允许的范围一致 */
 const OFFSET_LIMIT = 600;
 
-/** 步进调整时间轴校正值并四舍五入至 0.1 秒，避免浮点累积误差 */
+/** 步进调整时间校正值。结果四舍五入到 0.1 秒以免浮点误差累积，并限制在 `OFFSET_LIMIT` 内 */
 export function stepOffset(offset: number, delta: number): number {
   const next = Math.round((offset + delta) * 10) / 10;
   return Math.min(OFFSET_LIMIT, Math.max(-OFFSET_LIMIT, next));
 }
 
-/** 格式化时间轴校正偏移文案，显式标注正负符号并附带秒单位 */
+/** 时间校正值的显示文字：非零值带正负号，单位为秒，最多两位小数 */
 export function formatOffset(offset: number): string {
   const sign = offset > 0 ? '+' : offset < 0 ? '−' : '';
   return `${sign}${Number(Math.abs(offset).toFixed(2))} s`;
 }
 
 /**
- * 歌词工具栏各功能控件可用性目标
- *
- * 依据歌词形态（纯文本/逐行/逐字）及是否存在译文、音译轨道计算可用性；不可用控件置灰保留占位以保持布局稳定
+ * 工具条各控件是否可用，按当前歌词的形态及是否有译文、音译计算。
+ * 不可用的控件禁用但保留占位，布局保持稳定
  */
 export interface ToolbarSubjects {
   readonly font: boolean;

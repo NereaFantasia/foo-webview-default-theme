@@ -5,6 +5,7 @@ import { FULLSCREEN_KEYS } from '../nav/fullscreenCommand.ts';
 import { BACK_KEYS, FORWARD_KEYS } from '../nav/navCommands.ts';
 import { QUEUE_KEYS } from '../nav/queueKeys.ts';
 import { CLEAR_SELECTION_KEYS } from '../nav/selectionKeys.ts';
+import { VIDEO_KEYS } from '../nav/videoKeys.ts';
 import { PLAY_PAUSE_KEYS } from '../playback/playPauseCommand.ts';
 
 /** 一种按法：键盘上的一个组合，或鼠标的一个键（`mouse` 是这个键的名字的文案键） */
@@ -50,6 +51,35 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
   {
     title: 'settings.shortcutsImmersive',
     entries: [{ label: 'immersive.browse', inputs: chords(BROWSER_KEYS.toggle) }],
+  },
+  {
+    title: 'settings.shortcutsVideo',
+    entries: [
+      { label: 'tray.playPause', inputs: [{ mouse: 'settings.mouseClickVideo' }] },
+      {
+        label: 'settings.shortcutFullscreen',
+        inputs: [{ mouse: 'settings.mouseDoubleClickVideo' }],
+      },
+      { label: 'video.expand', inputs: chords(VIDEO_KEYS.window) },
+      {
+        label: 'settings.shortcutVolumeUp',
+        inputs: [...chords(VIDEO_KEYS.volumeUp), { mouse: 'settings.mouseWheelUpVideo' }],
+      },
+      {
+        label: 'settings.shortcutVolumeDown',
+        inputs: [...chords(VIDEO_KEYS.volumeDown), { mouse: 'settings.mouseWheelDownVideo' }],
+      },
+      { label: 'player.mute', inputs: chords(VIDEO_KEYS.mute) },
+      { label: 'video.back', inputs: chords(VIDEO_KEYS.back) },
+      { label: 'video.forward', inputs: chords(VIDEO_KEYS.forward) },
+      { label: 'video.backLong', inputs: chords(VIDEO_KEYS.backLong) },
+      { label: 'video.forwardLong', inputs: chords(VIDEO_KEYS.forwardLong) },
+      { label: 'video.jumpStart', inputs: chords(VIDEO_KEYS.start) },
+      // 十个数字键合写成一个键帽，只用于显示
+      { label: 'video.jumpPercent', inputs: [{ chord: { key: '0–9' } }] },
+      { label: 'player.previous', inputs: chords(VIDEO_KEYS.previous) },
+      { label: 'player.next', inputs: chords(VIDEO_KEYS.next) },
+    ],
   },
   {
     title: 'settings.shortcutsPlaylists',

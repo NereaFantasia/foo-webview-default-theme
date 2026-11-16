@@ -4,6 +4,7 @@ import { createStore } from 'jotai/vanilla';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import type { PrefStorage } from '../../../src/kit/localPref.ts';
 import { startPlayback } from '../../../src/playback/playback.ts';
+import { trackKeyOf } from '../../../src/playback/playbackContract.ts';
 import { tealBrand } from '../../../src/theme/brand.ts';
 import { rampFrom } from '../../../src/theme/brandRamp.ts';
 import {
@@ -33,7 +34,7 @@ const LUV = makeTrack({
   path: 'file://E:/Music/Nujabes/Modal Soul/04 Luv (sic).flac',
   title: 'Luv (sic) Part 3',
 });
-/** CUE 分轨：`handle` 带 `|subsong:N`，与 `path` 不同。 */
+/** CUE 分轨，`handle` 带 `|subsong:N`，与 `path` 不同 */
 const CUE_TRACK = makeTrack({ path: 'file://E:/Music/Live/live.cue', subsong: 3 });
 
 const BLUE: CoverSeed = { hue: 264, chroma: 48 };
@@ -63,7 +64,7 @@ function startCoverAccent(
   });
 }
 
-/** 按地址给种子色的替身，记下问过哪些地址；表里没有的地址答 `null`（判为灰）。 */
+/** 按地址返回种子色的替身，并记录查询过的地址。表中没有的地址返回 `null`，判为灰色 */
 function seedBy(seedOf: Record<string, CoverSeed | null> = {}) {
   const asked: string[] = [];
   const seed: Seeder = async (url) => {
@@ -73,10 +74,10 @@ function seedBy(seedOf: Record<string, CoverSeed | null> = {}) {
   return { seed, asked };
 }
 
-/** `FEATHER` 取到蓝色、`LUV` 取到红色。 */
+/** `FEATHER` 取得蓝色，`LUV` 取得红色 */
 const blueThenRed = () => seedBy({ [coverUrl(FEATHER.handle)]: BLUE, [coverUrl(LUV.handle)]: RED });
 
-/** 只存开关这一个键的存储，记下每次写入。 */
+/** 只保存开关这一个键的存储，记录每次写入 */
 function memoryStorage(initial: string | null = null) {
   const writes: string[] = [];
   let saved = initial;
@@ -92,7 +93,7 @@ function memoryStorage(initial: string | null = null) {
   return { storage, writes };
 }
 
-/** `count` 个 `rgb` 色的不透明像素。 */
+/** `count` 个颜色为 `rgb` 的不透明像素 */
 function solid(rgb: Rgb, count: number): Uint8ClampedArray {
   return Uint8ClampedArray.from({ length: count * 4 }, (_, at) =>
     at % 4 === 3 ? 255 : rgb[at % 4],
@@ -100,8 +101,8 @@ function solid(rgb: Rgb, count: number): Uint8ClampedArray {
 }
 
 /**
- * 换掉 `fetch`、`createImageBitmap` 与 `OffscreenCanvas`：取回的位图记着自己的地址，画布按画进来的那张
- * 答 `colorOf` 里的纯色，表里没有的答黑色。返回每次读像素时的地址与画布边长。
+ * 替换 `fetch`、`createImageBitmap` 与 `OffscreenCanvas`：取回的位图记录自己的地址，画布按绘入的位图
+ * 返回 `colorOf` 中的纯色，表中没有的返回黑色。返回每次读取像素时的地址与画布边长
  */
 function stubCovers(colorOf: Readonly<Partial<Record<string, Rgb>>>) {
   stubColorWorker();
@@ -135,12 +136,12 @@ function stubCovers(colorOf: Readonly<Partial<Record<string, Rgb>>>) {
   return sampled;
 }
 
-/** 每一首都拼得出地址，地址按 `handle` 拼。 */
+/** 每首曲目都能得到地址，地址按 `handle` 拼接 */
 function answerByPath(host: UnitHost): void {
   host.answer('artwork.getFb2kUrlByPath', (params) => foundCover(String(params['path'])));
 }
 
-/** `seed` 给 `null` 时用服务缺省的 `seedFromUrl`。 */
+/** `seed` 为 `null` 时使用服务缺省的 `seedFromUrl` */
 async function start(
   host: UnitHost,
   seed: Seeder | null = seedBy().seed,
@@ -302,6 +303,19 @@ describe('播放封面跟随', () => {
     expect(store.get(backgroundCoverAtom).url).toBe(coverUrl(FEATHER.handle));
     expect(store.get(backgroundCoverAtom).profile).toBeNull();
     expect(ramp()).toBe(tealBrand);
+  });
+
+  test('窗口封面带着地址属于哪一首：换曲跟着换，没有封面地址时不写', async () => {
+    const host = installFakeHost();
+    answerByPath(host);
+    const { store, play } = await start(host, blueThenRed().seed);
+    await play(FEATHER);
+    expect(store.get(backgroundCoverAtom).key).toBe(trackKeyOf(FEATHER));
+    await play(LUV);
+    expect(store.get(backgroundCoverAtom).key).toBe(trackKeyOf(LUV));
+    host.answer('artwork.getFb2kUrlByPath', (params) => noCover(String(params['path'])));
+    await play(FEATHER);
+    expect(store.get(backgroundCoverAtom).key).toBeUndefined();
   });
 
   test.each([

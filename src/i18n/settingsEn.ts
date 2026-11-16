@@ -1,4 +1,4 @@
-/** 设置界面的英文文案，供主英文包合入 */
+/** 设置页的英文文案，合并进英文总包 */
 export const settingsEn = {
   'settings.nav': 'Settings sections',
   'settings.groupGeneral': 'General',
@@ -174,6 +174,7 @@ export const settingsEn = {
   'settings.shortcuts': 'Keyboard and mouse',
   'settings.shortcutsGlobal': 'Everywhere',
   'settings.shortcutsImmersive': 'Immersive view',
+  'settings.shortcutsVideo': 'Video page',
   'settings.shortcutsPlaylists': 'Playlists in the sidebar',
   'settings.shortcutBack': 'Back',
   'settings.shortcutForward': 'Forward',
@@ -181,9 +182,15 @@ export const settingsEn = {
   'settings.shortcutRename': 'Rename',
   'settings.shortcutMoveUp': 'Move up',
   'settings.shortcutMoveDown': 'Move down',
+  'settings.shortcutVolumeUp': 'Volume up',
+  'settings.shortcutVolumeDown': 'Volume down',
   'settings.shortcutOr': 'or',
   'settings.mouseBack': 'Mouse back button',
   'settings.mouseForward': 'Mouse forward button',
+  'settings.mouseClickVideo': 'Click the picture',
+  'settings.mouseDoubleClickVideo': 'Double-click the picture',
+  'settings.mouseWheelUpVideo': 'Wheel up over the picture',
+  'settings.mouseWheelDownVideo': 'Wheel down over the picture',
   'settings.version': 'Version',
   'settings.versionTheme': 'Default theme {version}',
   'settings.versionBuild': '{foobar} ({bits}-bit)',
@@ -246,6 +253,7 @@ export const settingsEn = {
   'settings.subVolume': 'Volume',
   'settings.subLyricsSources': 'Sources',
   'settings.subLyricsDisplay': 'Display',
+  'settings.subLyricsShared': 'Shared',
   'settings.subImmersiveView': 'View',
   'settings.subImmersiveBackdrop': 'Background and performance',
 };

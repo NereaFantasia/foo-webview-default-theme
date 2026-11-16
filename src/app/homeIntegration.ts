@@ -11,6 +11,7 @@ import { createQueryAutoplaylist, playByQuery } from '../library/libraryQueryFil
 import { CHANNEL_PREVIEW_LIMIT, startChannelQuery } from '../library/home/channelQuery.ts';
 import { CHANNEL_SORT_PATTERNS, startHomeChannels } from '../library/home/homeChannels.ts';
 import { startHomeFeed } from '../library/home/homeFeed.ts';
+import type { LibraryMirrorService } from '../library/mirror/libraryMirror.ts';
 import { startHomeOnline, type HomeOnlineDeps } from '../library/home/homeOnline.ts';
 import { startHomeOverview } from '../library/home/homeOverview.ts';
 import { startHomeRecent } from '../library/home/homeRecent.ts';
@@ -20,7 +21,7 @@ import { homeGemQuery } from '../library/home/homeModel.ts';
 import type { HomeServices } from '../library/home/homeContext.ts';
 import type { AppServices } from './services.ts';
 
-/** 播放过的曲目 */
+/** 匹配播放过的曲目的查询 */
 const PLAYED_QUERY = '%play_count% GREATER 0';
 
 export function startHomeIntegration(
@@ -36,13 +37,19 @@ export function startHomeIntegration(
     | 'history'
     | 'songs'
     | 'configWriter'
+    | 'backend'
   >,
-  /** 在线音乐的请求入口与状态，首页的在线行用 */
+  /** 在线音乐的请求入口与状态，供首页的在线行使用 */
   music: Omit<HomeOnlineDeps, 'now'>,
+  mirror: Pick<LibraryMirrorService, 'enabled' | 'ready'>,
 ): HomeServices {
   const { store, albums, trackActions, albumList, playbackSource, history, songs } = services;
   loadHomeSections(store);
-  const feed = startHomeFeed(store, albumList.tracks);
+  const feed = startHomeFeed(store, albumList.tracks, fb, {
+    ...services.backend,
+    enabled: mirror.enabled,
+    ready: mirror.ready,
+  });
   const recent = startHomeRecent(store);
   const overview = startHomeOverview(store);
   const online = startHomeOnline(store, music);

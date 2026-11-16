@@ -5,11 +5,14 @@ import {
   artworkTypesOf,
   immersiveCoverAtom,
   immersiveCoverKey,
+  QUICK_AFTER_MS,
   startImmersiveCover,
   type CoverProbe,
 } from '../../../src/covers/immersiveCover.ts';
 import { createLeaseRegistry, leaseBinding } from '../../../src/immersive/lease/leaseRegistry.ts';
 import { startPlayback } from '../../../src/playback/playback.ts';
+import { trackKeyOf } from '../../../src/playback/playbackContract.ts';
+import { backgroundCoverAtom } from '../../../src/theme/background/windowBackground.ts';
 import { coverUrl, defer, foundCover, listedArt, noCover } from '../../fixtures/coverArt.ts';
 import type { HostParams } from '../../fixtures/fakeHost.ts';
 import { hostFailure } from '../../fixtures/hostAnswers.ts';
@@ -24,15 +27,15 @@ const LUV = makeTrack({
   path: 'file://E:/Music/Nujabes/Modal Soul/04 Luv (sic).flac',
   title: 'Luv (sic) Part 3',
 });
-/** CUE 分轨：`handle` 带 `|subsong:N`，与 `path` 不同。 */
+/** CUE 分轨，`handle` 带 `|subsong:N`，与 `path` 不同 */
 const CUE_TRACK = makeTrack({ path: 'file://E:/Music/Live/live.cue', subsong: 3 });
 const RADIO = makeTrack({ path: 'http://radio.example/live', title: 'Live' });
 
-/** 按图类拼地址，front 与 back 的地址分得开。 */
+/** 按图类拼接地址，front 与 back 的地址互不相同 */
 const typedUrl = (params: HostParams) =>
   `fb2k://${String(params['type'])}/${String(params['path'])}`;
 
-/** 按地址给比对像素的替身，记下问过哪些地址；表里没有的地址答 `null`。 */
+/** 按地址返回比对像素的替身，并记录查询过的地址。表中没有的地址返回 `null` */
 function probeBy(pixelsOf: Record<string, number[] | null> = {}) {
   const asked: string[] = [];
   const probe: CoverProbe = async (url) => {
@@ -42,12 +45,12 @@ function probeBy(pixelsOf: Record<string, number[] | null> = {}) {
   return { probe, asked };
 }
 
-/** 每一首都拼得出地址，地址按 `handle` 拼。 */
+/** 每首曲目都能得到地址，地址按 `handle` 拼接 */
 function answerByPath(host: UnitHost): void {
   host.answer('artwork.getFb2kUrlByPath', (params) => foundCover(String(params['path'])));
 }
 
-/** 清单缺省只有 front；要别的清单在 `start` 之后另配。 */
+/** 清单缺省只有 front，需要其他清单时在 `start` 之后另行配置 */
 async function start(
   host: UnitHost,
   probe: CoverProbe = probeBy().probe,
@@ -75,7 +78,7 @@ async function start(
   return { store, cover, play, state: () => store.get(immersiveCoverAtom) };
 }
 
-/** 放 `FEATHER` 并让它的封面显示出来。 */
+/** 播放 `FEATHER`，并使它的封面显示 */
 async function showFeather(host: UnitHost, probe: CoverProbe) {
   answerByPath(host);
   const started = await start(host, probe);
@@ -423,8 +426,78 @@ describe('startImmersiveCover：按清单取哪一类图', () => {
   });
 });
 
+// 进入视图时，大图的地址要等取样下载完整张图后才发布，网络较差时封面迟迟不显示。
+// 此时先显示窗口取色已为同一曲目取得的封面
+describe('startImmersiveCover：大图迟迟不到时先垫窗口取色的图', () => {
+  const QUICK = 'fb2k://quick';
+  const afterWait = () => new Promise((resolve) => setTimeout(resolve, QUICK_AFTER_MS + 50));
+
+  /** 对 FEATHER 大图的取样在 `slow` 放行后才完成的探针。放行之前，大图的地址不会发布 */
+  function slowProbe() {
+    const slow = defer<number[] | null>();
+    const probe: CoverProbe = (url) =>
+      url === coverUrl(FEATHER.handle) ? slow.promise : Promise.resolve(null);
+    return { slow, probe };
+  }
+
+  test('什么都没显示：等过 QUICK_AFTER_MS 先显示它，大图的取样到了再换上', async () => {
+    const host = installFakeHost();
+    answerByPath(host);
+    const { slow, probe } = slowProbe();
+    const { store, cover, play, state } = await start(host, probe);
+    store.set(backgroundCoverAtom, { url: QUICK, profile: null, key: trackKeyOf(FEATHER) });
+    await play(FEATHER);
+    expect(state()).toStrictEqual({ url: null, status: 'loading', token: 0 });
+    await afterWait();
+    expect(state()).toStrictEqual({ url: QUICK, status: 'loading', token: 1 });
+    cover.markLoaded(1);
+    slow.resolve([1, 2, 3, 4]);
+    await flush();
+    expect(state(), '垫着的图已显示也照常换上大图，不按相同像素留着').toStrictEqual({
+      url: coverUrl(FEATHER.handle),
+      status: 'loading',
+      token: 2,
+    });
+    cover.markLoaded(2);
+    expect(state().status).toBe('shown');
+  });
+
+  test('大图在等待时间内到了：直接显示大图，不垫', async () => {
+    const host = installFakeHost();
+    answerByPath(host);
+    const { store, play, state } = await start(host);
+    store.set(backgroundCoverAtom, { url: QUICK, profile: null, key: trackKeyOf(FEATHER) });
+    await play(FEATHER);
+    await afterWait();
+    expect(state()).toStrictEqual({ url: coverUrl(FEATHER.handle), status: 'loading', token: 1 });
+  });
+
+  test('窗口取色的图属于别的曲目：不垫', async () => {
+    const host = installFakeHost();
+    answerByPath(host);
+    const { probe } = slowProbe();
+    const { store, play, state } = await start(host, probe);
+    store.set(backgroundCoverAtom, { url: QUICK, profile: null, key: trackKeyOf(LUV) });
+    await play(FEATHER);
+    await afterWait();
+    expect(state()).toStrictEqual({ url: null, status: 'loading', token: 0 });
+  });
+
+  test('正显示着上一首的图：留着它，不垫', async () => {
+    const host = installFakeHost();
+    const stalled = defer<number[] | null>();
+    const probe: CoverProbe = (url) =>
+      url === coverUrl(LUV.handle) ? stalled.promise : Promise.resolve([1, 2, 3, 4]);
+    const { store, play, state } = await showFeather(host, probe);
+    store.set(backgroundCoverAtom, { url: QUICK, profile: null, key: trackKeyOf(LUV) });
+    await play(LUV);
+    await afterWait();
+    expect(state()).toStrictEqual({ url: coverUrl(FEATHER.handle), status: 'shown', token: 1 });
+  });
+});
+
 describe('startImmersiveCover：视图关掉再进', () => {
-  /** 在同一个 store 上再起一份服务，像再进视图时借还登记处重新启动那样 */
+  /** 在同一个 store 上再启动一份服务，模拟再次进入视图时借还登记处重新启动服务 */
   function restart(store: ReturnType<typeof createStore>, host: UnitHost, probe: CoverProbe) {
     const again = startImmersiveCover(store, {
       artwork: hostArtwork(store, host.fb),

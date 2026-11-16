@@ -1,6 +1,6 @@
 /* 宽度充满外部容器，曲名与副标题行高固定。
-   文本与描边颜色继承外层上下文变量：曲名使用 `--text-primary`，副标题与格式标记使用 `--text-secondary`，描边使用 `--line`。
-   空间充裕时格式标记紧随文本，空间不足时文本截断省略，标记吸附于行尾 */
+   文本颜色继承外层上下文变量：曲名使用 `--text-primary`，副标题使用 `--text-secondary`。
+   音质标记贴曲名行的行尾，位置不随曲名长短移动；曲名放不下时截断省略，与标记保留间隔 */
 .root {
   display: flex;
   flex-direction: column;
@@ -45,6 +45,7 @@
 }
 
 .titleRow {
+  column-gap: var(--spacingHorizontalMNudge);
   height: var(--info-title-line);
 }
 
@@ -73,31 +74,12 @@
   line-height: var(--info-sub-line);
 }
 
-/* 曲名后面的格式标记：编码框，再跟位深与采样率。整个标记与曲名间隔 10px */
+/* 曲名行行尾的音质标记：`FormatBadge` 与在线音质键 */
 .badge {
   display: inline-flex;
   flex: none;
   align-items: center;
-  column-gap: var(--spacingHorizontalSNudge);
-  margin-inline-start: var(--spacingHorizontalMNudge);
-}
-
-.codec {
-  box-sizing: border-box;
-  height: 20px;
-  padding: 0 var(--spacingHorizontalSNudge);
-  border: var(--strokeWidthThin) solid var(--line);
-  border-radius: var(--borderRadiusMedium);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: var(--fontWeightSemibold);
-  line-height: 18px;
-}
-
-.detail {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: var(--fontWeightRegular);
+  margin-inline-start: auto;
 }
 
 /* 星级与艺人 · 专辑间隔 12px。没评分的星由评分组件按 `data-rating-host` 淡入淡出 */

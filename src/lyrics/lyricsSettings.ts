@@ -1,6 +1,8 @@
 import { serviceKey } from '../kit/serviceKey.ts';
 
-/** 跳转至设置页歌词分组的服务接口；由 app 装配注入，供沉浸视图等独立歌词组件导航 */
+export type LyricsView = 'main' | 'immersive';
+
+/** 打开设置页「歌词」分区的服务，由 `app/` 装配。沉浸视图等不在设置页中的歌词组件经它跳转 */
 export interface LyricsSettingsOpener {
   open(): void;
 }

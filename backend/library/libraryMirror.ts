@@ -10,6 +10,17 @@ import {
   type MirrorTrack,
 } from '../../src/server/libraryMirrorProtocol.ts';
 import { openMirrorStore } from './mirrorStore.ts';
+import { LIBRARY_STATS_PAGE, readLibraryStatsRow } from '../../src/server/libraryStatsProtocol.ts';
+
+function statistics(body: unknown) {
+  const rows = items(body, 'rows');
+  if (rows.length > LIBRARY_STATS_PAGE) throw new Error('播放统计行数超限');
+  return rows.map((raw) => {
+    const row = readLibraryStatsRow(raw);
+    if (!row) throw new Error('播放统计行无效');
+    return row;
+  });
+}
 
 function field(body: unknown, key: string): unknown {
   return typeof body === 'object' && body !== null ? Reflect.get(body, key) : undefined;
@@ -69,7 +80,7 @@ function readPage(body: unknown): MirrorPageRequest {
   return { sort, descending, after, limit: count(body, 'limit') };
 }
 
-/** 媒体库镜像的请求处理：状态目录里一个 SQLite 文件，请求体已由调用方限长并解析成 JSON */
+/** 处理媒体库镜像的请求。镜像是状态目录中的一个 SQLite 文件，请求体已由调用方限制长度并解析为 JSON */
 export function startLibraryMirror(state: string) {
   const store = openMirrorStore(
     join(state, `library-mirror.v${String(LIBRARY_MIRROR_SCHEMA)}.sqlite`),
@@ -77,6 +88,29 @@ export function startLibraryMirror(state: string) {
   return {
     request(action: LibraryMirrorAction, body: unknown): unknown {
       switch (action) {
+        case 'stats-status':
+          return store.stats.status();
+        case 'stats-page':
+          return store.stats.page(count(body, 'generation'), text(body, 'after'));
+        case 'stats-begin':
+          return store.stats.begin(count(body, 'generation'));
+        case 'stats-put':
+          store.stats.put(count(body, 'generation'), statistics(body));
+          return { success: true };
+        case 'stats-commit':
+          return store.stats.commit(
+            count(body, 'generation'),
+            text(body, 'epoch'),
+            count(body, 'revision'),
+          );
+        case 'stats-apply':
+          return store.stats.apply(
+            count(body, 'generation'),
+            text(body, 'epoch'),
+            count(body, 'revision'),
+            statistics(body),
+            handles(body, 'removed'),
+          );
         case 'status':
           return store.status();
         case 'apply':

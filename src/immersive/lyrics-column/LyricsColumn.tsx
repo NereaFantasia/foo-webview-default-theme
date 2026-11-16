@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProper
 import { translateAtom } from '../../i18n/locale.ts';
 import { useService } from '../../kit/useService.ts';
 import { lyricsClockKey } from '../../lyrics/lyricsClock.ts';
-import { immersiveFont, lyricsDisplayKey } from '../../lyrics/lyricsDisplay.ts';
+import { lyricsDisplayKey } from '../../lyrics/lyricsDisplay.ts';
 import { lyricsMotionKey } from '../../lyrics/lyricsMotion.ts';
 import { lyricsKey } from '../../lyrics/lyricsService.ts';
 import { LyricsPlainText } from '../../lyrics/LyricsPlainText.tsx';
@@ -25,17 +25,17 @@ import {
 import { toolbarRoomOf } from './lyricsToolbar.ts';
 
 export interface LyricsColumnProps {
-  /** 歌词字号档位，由预设模板按窗口高度映射分配 */
+  /** 歌词字号档位，由预设按窗口高度选定 */
   readonly size: LyricsSize;
-  /** 歌词栏激活与可见性标志；非激活时挂起逐帧驱动 */
+  /** 歌词栏是否处于活动状态。为假时暂停逐帧驱动 */
   readonly active?: boolean;
-  /** 无歌词时是否渲染状态提示与操作引导（仅在侧栏显式展开时开启） */
+  /** 没有歌词时是否显示状态提示与操作入口。调用方只在侧栏显式展开时传入真 */
   readonly showStatus?: boolean;
-  /** 工具条距容器顶部偏移量（CSS 像素） */
+  /** 工具条与容器顶部的距离（CSS 像素） */
   readonly toolbarTop: number;
 }
 
-/** 监听并返回歌词栏容器整块像素尺寸 */
+/** 歌词栏容器的尺寸（CSS 像素，取整），随容器大小变化更新 */
 function useColumnBox() {
   const [box, setBox] = useState({ width: 0, height: 0 });
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +47,7 @@ function useColumnBox() {
       const height = Math.round(element.clientHeight);
       setBox((last) => (last.width === width && last.height === height ? last : { width, height }));
     };
-    // 挂载时同步测量一次，避免 ResizeObserver 异步首帧 0×0 导致布局闪烁
+    // 挂载时先同步测量一次。ResizeObserver 的首次回调是异步的，不测量时首帧尺寸为 0×0，布局会闪动
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -57,11 +57,12 @@ function useColumnBox() {
 }
 
 /**
- * 沉浸模式歌词栏核心容器
+ * 沉浸视图的歌词栏，顶部是歌词工具条
  *
- * 承载逐行/逐字动态歌词播放器与纯文本降级渲染，遵循用户的字体、对齐、译文与动效偏好；
- * 采用自适应视心中轴比例与字号同比缩放，支持点击行寻道与滚轮悬停浏览，动画层对读屏器隐藏并提供专用可访问文本结构；
- * 无歌词时根据侧栏展开状态决定留白或展示空状态引导，顶部挂载统一歌词工具栏
+ * 有时间轴的歌词由歌词播放器显示，可以跳转播放位置时，点击歌词行即跳到该行。
+ * 播放器对读屏软件隐藏，读屏软件读取另一份纯文本，其中按偏好附上译文与音译。
+ * 没有时间轴的歌词按纯文本排版。两者都使用沉浸视图的显示偏好与动效，字号随栏宽缩放。
+ * 没有歌词时，`showStatus` 为真才显示空状态
  */
 export function LyricsColumn({
   size,
@@ -73,28 +74,31 @@ export function LyricsColumn({
   const lyrics = useService(lyricsKey);
   const state = useAtomValueRawSync(lyrics.state);
   const offset = useAtomValueRawSync(lyrics.offset);
-  const effects = useAtomValueRawSync(useService(lyricsMotionKey).motion);
-  const display = useAtomValueRawSync(useService(lyricsDisplayKey).display);
+  const displayService = useService(lyricsDisplayKey);
+  const effects = useAtomValueRawSync(useService(lyricsMotionKey).views.immersive.motion);
+  const display = useAtomValueRawSync(displayService.immersiveDisplay);
+  const { positionMode } = useAtomValueRawSync(displayService.views.immersive);
   const canSeek = useAtomValueRawSync(playbackCanSeekAtom);
   const reduced = useAtomValueRawSync(reducedMotionAtom);
   const { clock, seek } = useService(lyricsClockKey);
   const [box, ref] = useColumnBox();
   const ratio = anchorRatio(box.height);
+  // 位置方式为版式时，当前行位置按栏高计算。自定义位置沿用动效参数中已合成的锚点与比例
   const motion = useMemo(
-    () => ({ ...effects, alignAnchor: 'top' as const, alignPosition: ratio }),
-    [effects, ratio],
+    () =>
+      positionMode === 'layout'
+        ? { ...effects, alignAnchor: 'top' as const, alignPosition: ratio }
+        : effects,
+    [effects, positionMode, ratio],
   );
   const base = lyricsFontSize(size, box.width);
-  // 沉浸视图自己选的字体与字重；没选就跟随正在播放面板。播放器与纯文本都按这一份排
-  const { family, weight } = immersiveFont(display);
-  const scaled = useMemo(
-    () => scaleDisplay({ ...display, fontFamily: family, fontWeight: weight }, base),
-    [display, family, weight, base],
-  );
+  // 字体与字重已按沉浸视图的字体来源解析，播放器与纯文本使用同一份
+  const { fontFamily: family, fontWeight: weight } = display;
+  const scaled = useMemo(() => scaleDisplay(display, base), [display, base]);
   const ready = state.status === 'ready' ? state : null;
   const readyKey = ready?.key ?? null;
   const body = useRef<HTMLDivElement>(null);
-  // 歌词就绪或切歌：执行 83 ms 纯淡入过渡
+  // 歌词就绪或换曲时，正文以 83 ms 线性淡入
   useLayoutEffect(() => {
     if (readyKey === null) return;
     const animation = body.current?.animate([{ opacity: 0 }, { opacity: 1 }], {

@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { artworkRequestSize } from '../../host/artworkSize.ts';
 import { coverPathOf } from '../../covers/coverPath.ts';
 import { playingAudibleAtom } from '../../playback/playingTrack.ts';
-import { useQueueCover } from '../../playback/queue/useQueueCover.ts';
+import { useExactQueueCover, useQueueCover } from '../../playback/queue/useQueueCover.ts';
 import { useDisplayTrack } from '../../track/displayTrack.ts';
 import type { CoverflowItem } from '../scene/coverflowItems.ts';
 import styles from './Coverflow.module.css';
@@ -12,13 +12,13 @@ import { slotAt } from './slots.ts';
 
 /** 封面流各槽位的封面请求边长（物理像素） */
 export interface CoverRequestSizes {
-  /** 视心中轴选中卡片尺寸，匹配最大展示规格与清晰度 */
+  /** 选中卡片（位于正中）的请求边长 */
   readonly center: number;
-  /** 侧翼卡片尺寸，按槽位缩放比例请求较小尺寸以节省解码与传输开销 */
+  /** 侧翼卡片的请求边长，按第一个侧翼槽位的缩放比例缩小，以减少解码与传输开销 */
   readonly side: number;
 }
 
-/** 计算视心与侧翼卡片的封面请求规格，按设备像素比换算并对齐阶梯规格 */
+/** 按设备像素比换算两档请求边长，并对齐到宿主封面尺寸的阶梯（`artworkRequestSize`） */
 export function coverRequestSizes(cover: number, ratio: number): CoverRequestSizes {
   return {
     center: artworkRequestSize(cover, ratio),
@@ -27,14 +27,13 @@ export function coverRequestSizes(cover: number, ratio: number): CoverRequestSiz
 }
 
 /**
- * 已完成首次加载的封面地址集合
- *
- * 避免卡片随视口滚动重新挂载时重复触发淡入闪烁；已在内存缓存的图片直接展示，达到上限后清空重置
+ * 已加载过的封面地址。卡片随滚动重新挂载时，这些地址的图片直接显示，不再播放淡入。
+ * 集合达到 `LOADED_LIMIT` 时清空
  */
 const loadedUrls = new Set<string>();
 const LOADED_LIMIT = 400;
 
-/** 封面图片节点；已加载过的图片直接呈现，首次加载执行淡入 */
+/** 封面图片，首次加载时淡入 */
 function CoverImage({
   url,
   onError,
@@ -60,7 +59,7 @@ function CoverImage({
   );
 }
 
-/** 视心卡片悬停播放遮罩；当前播放曲目随播放状态切换播放与暂停图标 */
+/** 悬停在选中卡片上时显示的播放遮罩。正在播放的卡片按播放状态显示播放或暂停图标 */
 function PlayOverlay({ current }: { readonly current: boolean }) {
   const audible = useAtomValueRawSync(playingAudibleAtom);
   return (
@@ -75,23 +74,18 @@ export interface CoverflowCardProps {
   readonly id: string;
   readonly selected: boolean;
   readonly sizes: CoverRequestSizes;
-  /** 远端卡片排除读屏无障碍焦点序列 */
+  /** 远离选中项的卡片：对读屏软件隐藏，也不预先加载大图 */
   readonly distant: boolean;
-  /** 向舞台注册节点以便动效引擎逐帧直接更新内联样式 */
+  /** 向舞台登记卡片节点，舞台的动效逐帧直接改写它的内联样式 */
   readonly attach: (key: string, element: HTMLElement | null) => void;
-  /** 共享过渡命名申请句柄（仅针对正在播放曲目） */
+  /** 为视图过渡申请共享名称，只有正在播放的卡片传入 */
   readonly holder: ((element: HTMLElement | null) => (() => void) | void) | undefined;
   readonly onActivate: (key: string) => void;
-  /** 右键卡片回调；at 为光标视口坐标 */
+  /** 右键卡片时调用，`at` 是指针的视口坐标 */
   readonly onMenu: (key: string, at: { readonly x: number; readonly y: number }) => void;
 }
 
-/**
- * Coverflow 封面卡片单元
- *
- * 通过队列封面服务分级加载缩略图与大图，大图就绪前以小图占位平滑过渡，缺失时呈现占位图标；
- * 曲目元数据通过统一显示逻辑解析，空间位移、透视旋转与透明度由动效引擎逐帧直接更新内联样式
- */
+/** Coverflow 的封面卡片。位移、旋转与透明度由舞台的动效逐帧写入内联样式，不经 React 渲染 */
 export function CoverflowCard({
   item,
   id,
@@ -109,20 +103,24 @@ export function CoverflowCard({
   const [peak, setPeak] = useState(wanted);
   if (wanted > peak) setPeak(wanted);
   const path = coverPathOf(track);
-  const large = useQueueCover(path, peak);
-  // 请求大图期间以小图占位过渡；仅需侧翼规格时避免重复请求
-  const small = useQueueCover(peak > sizes.side ? path : '', sizes.side);
+  // 侧翼档的图作底层，尚未加载时使用行缩略图
+  const small = useQueueCover(path, sizes.side);
+  // 选中过的卡片在底层之上叠加大图。大图只使用这一档，尚未加载时不退回行缩略图：更模糊的缩略图会盖住侧翼档的图，
+  // 使卡片选中时先变模糊。
+  // 不在远处的卡片提前加载大图，以便选中时大图已经就绪
+  const raised = peak > sizes.side;
+  const large = useExactQueueCover(raised || !distant ? path : '', raised ? peak : sizes.center);
   const [failed, setFailed] = useState<readonly string[]>([]);
   const fail = useCallback(
     (url: string) => setFailed((list) => (list.includes(url) ? list : [...list, url])),
     [],
   );
-  // 小图垫底、大图覆盖其上淡入，避免替换源地址造成白屏闪烁
-  const images = [small, large].filter(
+  // 小图在下、大图在上淡入，不替换同一张图片的地址，切换时不会出现空白
+  const images = [small, raised ? large : null].filter(
     (url, at, all): url is string => !!url && !failed.includes(url) && all.indexOf(url) === at,
   );
   const { key } = item;
-  // 侧翼卡片无常驻文字标签，通过悬停原生提示展示曲目与艺人信息
+  // 侧翼卡片不显示文字，悬停时由原生提示显示曲名与艺人
   const hint = track ? [title, track.artist].filter(Boolean).join(' · ') : undefined;
   const playable = item.kind !== 'current' || track !== null;
   const setRef = useCallback(

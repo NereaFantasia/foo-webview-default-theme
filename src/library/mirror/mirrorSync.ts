@@ -5,6 +5,7 @@ import { settle } from '../../host/hostCall.ts';
 import {
   LIBRARY_COALESCE_MS,
   onLibraryChanged,
+  onLibraryStatsRefresh,
   type LibraryEventsFace,
 } from '../../host/libraryContract.ts';
 import { waitForHost, type HostReadyFace } from '../../host/waitForHost.ts';
@@ -12,57 +13,60 @@ import type { Store } from '../../kit/store.ts';
 import { readMirrorTrack, type MirrorTrack } from '../../server/libraryMirrorProtocol.ts';
 import type { MirrorClient } from './mirrorClient.ts';
 
-/** 整库重建时每页向宿主要的行数，同整库曲目的分页 */
+/** 整库重建时每页向宿主请求的行数，与整库曲目的分页相同 */
 const SEARCH_PAGE = 2000;
-/** 增量取行每批的句柄数：宿主取一个约 0.25 ms，200 个约 50 ms */
+/** 增量读取时每批的句柄数。宿主读取一个约需 0.25 ms，200 个约需 50 ms */
 const TRACK_BATCH = 200;
-/** 一次对账里变化的曲目超过这个数就整库重建，不再逐批取 */
+/** 一次对账中变化的曲目超过该数时整库重建，不再逐批读取 */
 const REBUILD_ABOVE = 3000;
-/** 一次同步里最多对账几轮；追不上说明库一直在变，稍后再来 */
+/** 一次同步最多对账的轮数。达到上限仍未追平，说明媒体库持续变化，稍后再同步 */
 const MAX_ROUNDS = 20;
 const PENDING_RETRY_MS = 2000;
 const FAILURE_RETRY_MS = 30000;
-/** 多个窗口里只有拿到这把锁的做同步 */
+/** 多个窗口中，只有持有这把锁的窗口执行同步 */
 const LOCK_NAME = 'default-theme.library-mirror';
 
 export interface MirrorSyncFace extends HostReadyFace, LibraryEventsFace {
   library: Pick<typeof fb.library, 'getChanges' | 'getTracks' | 'search'>;
 }
 
-/** `navigator.locks` 里同步用到的那一个方法 */
+/** 同步用到的 `navigator.locks` 方法 */
 export interface MirrorLocks {
   request(name: string, callback: () => Promise<void>): Promise<unknown>;
 }
 
 export interface MirrorSyncDeps {
   readonly client: MirrorClient;
-  /** 本地后端是否连着，来自 `BackendConnection.port` */
+  /** 本地后端是否已连接，取自 `BackendConnection.port` */
   readonly connected: Atom<boolean>;
   readonly host?: MirrorSyncFace;
-  /** 窗口间的锁；省略时用 `navigator.locks`，没有它（或传 null）就当自己是唯一的窗口 */
+  /** 窗口之间的锁，省略时使用 `navigator.locks`。没有可用的锁或传入 null 时，视为唯一的窗口 */
   readonly locks?: MirrorLocks | null;
 }
 
 /**
- * idle：还没有同步过，或在等宿主的媒体库加载完；syncing：对账或重建进行中；ready：上一次对账时镜像已追平宿主；
- * failed：最近一次同步出错，镜像不可信，稍后自动重试
+ * 同步阶段：
+ * - `idle`：尚未同步，或在等待宿主的媒体库加载完成
+ * - `syncing`：正在对账或重建
+ * - `ready`：上一次对账时镜像已与宿主一致
+ * - `failed`：最近一次同步出错，镜像不可信，稍后自动重试
  */
 export type MirrorSyncPhase = 'idle' | 'syncing' | 'ready' | 'failed';
 
 export interface MirrorSyncState {
   readonly phase: MirrorSyncPhase;
-  /** 本窗口是不是做同步的那一个 */
+  /** 本窗口是否负责同步 */
   readonly leader: boolean;
   readonly epoch: string;
   readonly revision: number;
   readonly count: number;
-  /** 镜像的内容每写入一次加一，读取方据此重读 */
+  /** 镜像内容每写入一次加一，读取方据此重新读取 */
   readonly generation: number;
 }
 
 export interface LibraryMirrorSync {
   readonly state: Atom<MirrorSyncState>;
-  /** 对账一次：追平宿主的修订号，必要时整库重建。同时来几次合并成一次；不是同步窗口或后端没连着时什么都不做 */
+  /** 对账一次：追平宿主的修订号，必要时整库重建。同时发起的多次调用合并为一次，本窗口不负责同步或后端未连接时不执行 */
   sync(): Promise<void>;
   dispose(): void;
 }
@@ -95,12 +99,12 @@ function validRow(raw: unknown): MirrorTrack {
 }
 
 /**
- * 把宿主的媒体库同步进本地后端的镜像。页面是唯一能问宿主的一方，所以同步在这里做；多个窗口靠 `navigator.locks`
- * 只留一个同步者。四个库事件按 1 秒合并后触发对账：
- * - 镜像已有且纪元对得上：`getChanges` 取差量，`getTracks` 逐批取变化的行，连同新修订号一个请求写入
- * - 否则（从没建过、纪元变了、修订号落出宿主的记录、变化过多）整库重建：`search` 翻页取行，再按 `resync`
- *   给的全部句柄补取翻页时漏掉的，最后用该应答的修订号收尾。重建期间镜像不可读，读取方照旧走宿主
- * 宿主的媒体库还在加载（`OPERATION_PENDING`）时稍后再试；出错记为 failed，隔一阵自动重试
+ * 把宿主的媒体库同步到本地后端的镜像。只有页面能访问宿主，因此同步在页面中执行。
+ * 多个窗口经 `navigator.locks` 只保留一个同步者。四种媒体库事件按 1 秒合并后触发对账：
+ * - 镜像已存在且纪元一致：`getChanges` 读取差量，`getTracks` 逐批读取变化的行，连同新修订号在一个请求中写入
+ * - 其他情况（从未建立、纪元变化、修订号超出宿主的记录范围、变化过多）整库重建：`search` 翻页读取行，
+ *   再按 `resync` 返回的全部句柄补读翻页时遗漏的行，最后用该应答的修订号收尾。重建期间镜像不可读，读取方照常读取宿主
+ * 宿主的媒体库仍在加载（`OPERATION_PENDING`）时稍后重试。出错时记为 `failed`，间隔一段时间后自动重试
  */
 export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirrorSync {
   const { client, connected } = deps;
@@ -114,6 +118,7 @@ export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirr
   let again = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let offLibrary: (() => void) | undefined;
+  let offStats: (() => void) | undefined;
   let releaseLock: (() => void) | undefined;
 
   const patch = (change: Partial<MirrorSyncState>) =>
@@ -158,7 +163,7 @@ export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirr
     const generation = await client.rebuildBegin();
     const seen = new Set<string>();
     let fetched = 0;
-    // 写入后端与取下一页并行，但同一时刻只有一批在写
+    // 写入后端与读取下一页并行进行，但同一时刻只有一批在写入
     let writing: Promise<void> = Promise.resolve();
     const write = async (rows: MirrorTrack[], indexFrom: number): Promise<void> => {
       await writing;
@@ -208,7 +213,7 @@ export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirr
       const changed = answer.changed ?? [];
       const removed = answer.removed ?? [];
       if (answer.resync || changed.length + removed.length > REBUILD_ABOVE) {
-        // 刚重建完宿主还要求重建（库被停用，或一直在大量变化），再重建下去没有意义
+        // 刚重建完宿主仍要求重建（媒体库被停用，或持续大量变化）时，继续重建没有意义
         if (rebuilt) throw new Error('宿主在重建之后仍要求重建');
         rebuilt = true;
         const resync = answer.resync ? answer : await changesSince({});
@@ -294,6 +299,8 @@ export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirr
   void waiter.done.then((arrived) => {
     if (!arrived || disposed) return;
     offLibrary = onLibraryChanged(host, () => schedule(LIBRARY_COALESCE_MS));
+    // 播放统计的刷新也会推进宿主修订号。及时追平，重启后才能继续增量同步
+    offStats = onLibraryStatsRefresh(host, () => schedule(LIBRARY_COALESCE_MS));
     schedule(0);
   });
 
@@ -305,6 +312,7 @@ export function startMirrorSync(store: Store, deps: MirrorSyncDeps): LibraryMirr
       if (timer !== undefined) clearTimeout(timer);
       timer = undefined;
       offLibrary?.();
+      offStats?.();
       offConnected();
       waiter.cancel();
       releaseLock?.();

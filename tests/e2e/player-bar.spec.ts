@@ -152,10 +152,10 @@ test('有损的曲目写比特率；位深取不到只写采样率', async ({ pa
   await host.emit('playback:trackChanged', mp3);
   await expect(badge).toHaveText('MP3320k');
   state.format = 'lossless|';
-  const flac = { ...PLAYING_TRACK, path: 'file://E:/Music/y.flac', sampleRate: 96000 };
+  const flac = { ...PLAYING_TRACK, path: 'file://E:/Music/y.flac', sampleRate: 48000 };
   state.track = flac;
   await host.emit('playback:trackChanged', flac);
-  await expect(badge).toHaveText('FLAC96');
+  await expect(badge).toHaveText('FLAC48');
   expect(errors).toEqual([]);
 });
 

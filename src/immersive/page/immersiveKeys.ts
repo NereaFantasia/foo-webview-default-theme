@@ -1,9 +1,9 @@
-import { atom } from 'jotai/vanilla';
 import { BROWSER_KEYS, type BrowserPanelService } from '../../nav/browserPanel.ts';
 import type { CommandRegistry, KeyChord } from '../../nav/commandRegistry.ts';
 import { FULLSCREEN_KEYS } from '../../nav/fullscreenCommand.ts';
-import { currentTrackAtom, playbackAtom } from '../../playback/playback.ts';
-import { trackKeyOf, type PlaybackService } from '../../playback/playbackContract.ts';
+import { playbackAtom } from '../../playback/playback.ts';
+import type { PlaybackService } from '../../playback/playbackContract.ts';
+import { createSeekStepper } from '../../playback/seekStepper.ts';
 import type { Store } from '../../kit/store.ts';
 import type { ImmersiveShell } from './immersiveShell.ts';
 import { focusKind, reclaimFocus, repeating } from './keyFocus.ts';
@@ -27,13 +27,9 @@ import { editOpenAtom, finishEdit } from './editSession.ts';
  *
  * Ctrl+Shift+P 依据 `event.key` 匹配（遵从命令登记处策略）而非物理键位，非拉丁键盘布局下该组合键可能无法匹配
  *
- * 连按方向键时从上一次的目标位置继续计算：宿主确认之前 `position` 仍是旧值
- * 目标位置落在 0 与时长之间。不能 seek 时忽略方向键
+ * 连按方向键的累加由 `createSeekStepper` 负责。不能 seek 时忽略方向键
  */
 export const SEEK_STEP_SECONDS = 5;
-/** 宿主播放位置进入目标容差范围即视为完成定位。超时未确认（如定位失败）则恢复使用宿主当前位置 */
-const CONFIRM_TOLERANCE_S = 1.5;
-const CONFIRM_TIMEOUT_MS = 1000;
 
 export interface ImmersiveKeysDeps {
   playback: Pick<PlaybackService, 'playOrPause' | 'seek' | 'stepVolume'>;
@@ -43,9 +39,6 @@ export interface ImmersiveKeysDeps {
   browser: Pick<BrowserPanelService, 'toggle' | 'open' | 'available'>;
 }
 
-const positionAtom = atom((get) => get(playbackAtom).position);
-const trackKeyAtom = atom((get) => trackKeyOf(get(currentTrackAtom)));
-
 const withShift = (key: string): KeyChord[] => [{ key }, { key, shift: true }];
 
 /** 注册沉浸视图中的按键命令，返回统一注销函数。在视图挂载时调用，生命周期与外壳保持一致 */
@@ -54,28 +47,11 @@ export function registerImmersiveCommands(
   deps: ImmersiveKeysDeps,
 ): () => void {
   const { playback, store, shell, browser } = deps;
-  // 连续触发方向键时的目标位置（秒）。宿主确认、超时或切换曲目后重置
-  let target: number | null = null;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  function release(): void {
-    clearTimeout(timer);
-    timer = undefined;
-    target = null;
-  }
+  const stepper = createSeekStepper(store, playback);
 
   function seekable(): boolean {
     const { status, canSeek, duration } = store.get(playbackAtom);
     return status === 'connected' && canSeek && duration > 0;
-  }
-
-  function seekBy(seconds: number): void {
-    const { position, duration } = store.get(playbackAtom);
-    const next = Math.min(Math.max((target ?? position) + seconds, 0), duration);
-    target = next;
-    clearTimeout(timer);
-    timer = setTimeout(release, CONFIRM_TIMEOUT_MS);
-    void playback.seek(next);
   }
 
   const notControl = () => {
@@ -123,13 +99,13 @@ export function registerImmersiveCommands(
       'seekBack',
       withShift('ArrowLeft'),
       () => notControl() && seekable(),
-      () => seekBy(-SEEK_STEP_SECONDS),
+      () => stepper.by(-SEEK_STEP_SECONDS),
     ),
     place(
       'seekForward',
       withShift('ArrowRight'),
       () => notControl() && seekable(),
-      () => seekBy(SEEK_STEP_SECONDS),
+      () => stepper.by(SEEK_STEP_SECONDS),
     ),
     place('volumeUp', withShift('ArrowUp'), notControl, () => void playback.stepVolume(true)),
     place('volumeDown', withShift('ArrowDown'), notControl, () => void playback.stepVolume(false)),
@@ -152,16 +128,10 @@ export function registerImmersiveCommands(
       () => !store.get(editOpenAtom) && store.get(browser.available),
       browser.toggle,
     ),
-    store.sub(positionAtom, () => {
-      if (target !== null && Math.abs(store.get(positionAtom) - target) < CONFIRM_TOLERANCE_S) {
-        release();
-      }
-    }),
-    store.sub(trackKeyAtom, release),
   ];
 
   return () => {
     for (const dispose of disposers) dispose();
-    release();
+    stepper.release();
   };
 }

@@ -1,5 +1,5 @@
-/* 设置编辑条：高 44、圆角 8；材质是 `useBarSurface` 的 Acrylic，这里只管排布与进退场。
-   出现时 167 ms 线性淡入，退出编辑时 83 ms 淡出 */
+/* 设置编辑条：高 44，圆角 8。材质是 `useBarSurface` 的 Acrylic，这里只负责排布与进退场。
+   出现时以 167 ms 线性淡入，退出编辑时以 83 ms 淡出 */
 .bar {
   display: flex;
   align-items: center;
@@ -10,6 +10,14 @@
   border-radius: var(--borderRadiusXLarge);
   white-space: nowrap;
   animation: bar-in var(--motion-fast) var(--curveLinear) backwards;
+}
+
+/* 视图过渡进行时整条具名，规则与圆角、叠放次序见 `sceneTransition.css`。
+   名称挂在带毛玻璃的条上，不挂在 `.editSlot` 上：具名的祖先是 `backdrop-filter` 的背景根，条里的模糊会失效。
+   退场中的条不具名：「取消」在过渡开始的同一刻退出编辑，条淡出后才卸载，具名时卸载会使过渡提前结束 */
+:global(html[data-scene-transition]) .bar:not([data-leaving]) {
+  view-transition-name: match-element;
+  view-transition-class: scene-top scene-edit-bar;
 }
 
 .bar[data-leaving] {
@@ -28,7 +36,7 @@
   }
 }
 
-/* 窄窗时整排页签换成菜单键；界限按六个分类的整排宽度加左右各 32 取 */
+/* 窗口较窄时，整排页签换成菜单键。界限取六个分类的整排宽度加左右各 32 */
 .menu {
   display: none;
 }

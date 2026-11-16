@@ -1,5 +1,5 @@
 import { useService } from '../../kit/useService.ts';
-import { immersiveFont, lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
+import { lyricsDisplayKey, lyricsFontStyle } from '../../lyrics/lyricsDisplay.ts';
 import { useAtomValueRawSync } from 'jotai/react';
 import { translateAtom } from '../../i18n/locale.ts';
 import {
@@ -13,12 +13,11 @@ import styles from './LyricLog.module.css';
 
 const SLOTS: readonly (keyof LyricRows)[] = ['prev', 'current', 'next'];
 
-/** 三行只随落到另一行、换了歌词时变，不跟每一拍进度重画 */
+/** 三行只在当前行变化或换歌词时重新渲染，不随每次进度更新重绘 */
 function SyncedRows() {
   const rows = useAtomValueRawSync(lyricRowsAtom);
   const service = useService(lyricsDisplayKey);
-  const display = useAtomValueRawSync(service.display);
-  const { family, weight } = immersiveFont(display);
+  const { fontFamily: family, fontWeight: weight } = useAtomValueRawSync(service.immersiveDisplay);
   return (
     <ol className={styles.rows}>
       {SLOTS.map((slot) => {
@@ -38,9 +37,12 @@ function SyncedRows() {
 }
 
 /**
- * 收缩档与竖版图纸底部的歌词日志：上一行 / 当前行 / 下一行，时间码在前。图纸是日志不是歌词页，换行直接换、不滚动
- * 无时间轴只出「纯文本 · n 行」一个标签，正文不放：三行没有时间轴的字等于随机抽
- * 无词时整段不出；段首横线画在这里，所以横线跟着一起收起，不留空标题
+ * 收缩档与竖版图纸底部的歌词日志：依次是上一行、当前行与下一行，时间码在前。
+ * 图纸上的歌词是日志而不是歌词页，换行时直接替换，不滚动
+ *
+ * 没有时间轴时只显示「纯文本 · n 行」一个标签，不显示正文，因为任取三行没有时间轴的文字没有意义。
+ * 其他状态显示对应的状态文字。没有歌词时整段不显示。
+ * 段首横线由这里绘制，因此横线随整段一起隐藏，不会留下空标题
  */
 export function LyricLog() {
   const t = useAtomValueRawSync(translateAtom);

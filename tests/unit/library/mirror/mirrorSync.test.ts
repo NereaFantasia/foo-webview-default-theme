@@ -176,7 +176,7 @@ describe('媒体库镜像的同步：时机与窗口', () => {
     await vi.waitFor(async () => expect(await env.client.status()).toMatchObject({ ready: true }));
   });
 
-  it('库事件连发合并成一次对账：等 1 秒的合并窗口后才取，hook 刷新不触发', async () => {
+  it('库事件连发合并成一次对账：统计 hook 与标签变化共用合并窗口', async () => {
     vi.useFakeTimers();
     const env = await setupMirror(THREE());
     await vi.advanceTimersByTimeAsync(0);
@@ -192,6 +192,30 @@ describe('媒体库镜像的同步：时机与窗口', () => {
     expect(asked()).toBe(before);
     await vi.advanceTimersByTimeAsync(1);
     await vi.waitFor(() => expect(asked()).toBe(before + 1));
+  });
+
+  it('统计 hook 后镜像追平，正常重启不因旧修订号重新取整库', async () => {
+    vi.useFakeTimers();
+    const env = await setupMirror(THREE());
+    await vi.advanceTimersByTimeAsync(0);
+    await env.service.sync();
+    const searches = env.host.callsTo('library.search').length;
+    const changed = row('Alpha', { rating: 5 });
+    env.library.edit([changed]);
+    env.host.emit('library:itemsModified', {
+      count: 1,
+      handles: [changed.handle],
+      truncated: false,
+      fromHook: true,
+      timestamp: 1,
+    });
+    await vi.advanceTimersByTimeAsync(LIBRARY_COALESCE_MS);
+    await vi.waitFor(async () => expect(await env.client.status()).toMatchObject({ revision: 2 }));
+    expect((await env.client.rows([changed.handle]))[0]?.rating).toBe(5);
+    env.library.floor = env.library.revision;
+    await env.service.sync();
+    expect(await env.client.status()).toMatchObject({ ready: true, revision: 2, count: 3 });
+    expect(env.host.callsTo('library.search')).toHaveLength(searches);
   });
 
   it('多个窗口只有拿到锁的那个同步，它关掉后下一个接手', async () => {

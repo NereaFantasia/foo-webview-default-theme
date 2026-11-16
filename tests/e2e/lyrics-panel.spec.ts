@@ -12,6 +12,11 @@ const LOCAL = '[00:01]前奏\n[00:40]第一句\n[00:40]第一句译文\n[00:45]�
 const panel = (page: Page) => page.locator('[data-lyrics-panel]');
 const key = (page: Page) => page.locator('[data-right-card-key="lyrics"]');
 const lyricsPlayer = (page: Page) => panel(page).locator('.amll-lyric-player');
+/** 设置页中主视图歌词的展开卡。沉浸视图有同名控件，因此按卡限定范围 */
+const mainView = (page: Page) =>
+  page
+    .locator('[data-settings-expander]')
+    .filter({ has: page.getByText('主视图歌词', { exact: true }) });
 
 async function openLyrics(page: Page, text: string | null = LOCAL, width = 1280) {
   const env = await openPlayer(page, { width });
@@ -330,13 +335,12 @@ test('设置键进入歌词栏目，两档动效与自定义即时生效，字�
       .getByRole('navigation', { name: '设置分类' })
       .getByRole('button', { name: '歌词', exact: true }),
   ).toBeVisible();
-  // 歌词栏目里桌面歌词那一块也有同名的「动效预设」，这里只管歌词播放器自己的，它排在前面
+  // 「歌词」分区中桌面歌词的部分也有同名的「动效预设」。这里只操作歌词播放器的预设，它排在前面
   const preset = settings.getByRole('combobox', { name: '动效预设' }).first();
   const choosePreset = async (name: string) => {
     await preset.click();
     await page.getByRole('option', { name, exact: true }).click();
   };
-  await expect(settings.getByRole('switch', { name: '远处歌词模糊' })).toHaveCount(0);
   await choosePreset('WinUI 3');
   await expect(lyricsPlayer(page).locator('..')).toHaveAttribute('data-spring', 'off');
   const transition = await lyricsPlayer(page)
@@ -353,20 +357,19 @@ test('设置键进入歌词栏目，两档动效与自定义即时生效，字�
   expect(transition.properties).toContain('opacity');
   expect(transition.duration).toBe('0.5s');
   await expect
-    .poll(() => env.host.config.get('defaultTheme.lyrics.motion'))
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainMotion'))
     .toMatchObject({ preset: 'winui' });
   const font = settings.getByRole('spinbutton', { name: '字号 (px)' });
   await font.fill('28');
   await font.press('Enter');
   await expect(lyricsPlayer(page)).toHaveCSS('font-size', '28px');
-  await settings.getByRole('button', { name: '动效预设', exact: true }).first().click();
-  await settings.getByRole('switch', { name: '远处歌词模糊' }).check();
+  await mainView(page).getByRole('switch', { name: '远处歌词模糊' }).check();
   await expect(preset).toHaveText('自定义');
   await choosePreset('AMLL');
   await expect(lyricsPlayer(page).locator('..')).toHaveAttribute('data-spring', 'on');
   await expect(lyricsPlayer(page)).toHaveCSS('font-size', '28px');
   await choosePreset('自定义');
-  await expect(settings.getByRole('switch', { name: '远处歌词模糊' })).toBeChecked();
+  await expect(mainView(page).getByRole('switch', { name: '远处歌词模糊' })).toBeChecked();
   await expect(lyricsPlayer(page).locator('..')).toHaveAttribute('data-spring', 'off');
   await panel(page).hover();
   await panel(page).getByRole('tab', { name: '预览', exact: true }).click();
@@ -396,15 +399,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const settings = page.locator('[data-lyrics-settings]');
     const font = settings.getByRole('spinbutton', { name: '字号 (px)' });
     await expect(font).toBeVisible();
-    for (const name of ['动效预设', '歌词整理', '渲染']) {
+    for (const name of ['歌词整理', '渲染']) {
       await expect(settings.getByRole('button', { name, exact: true })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
     }
-    await settings.getByRole('button', { name: '动效预设', exact: true }).click();
-    const control = settings.getByRole('switch', { name: '远处歌词模糊', exact: true });
-    const label = settings.getByText('远处歌词模糊', { exact: true });
+    const control = mainView(page).getByRole('switch', { name: '远处歌词模糊', exact: true });
+    const label = mainView(page).getByText('远处歌词模糊', { exact: true });
     for (const width of [1280, 900, 390]) {
       await page.setViewportSize({ width, height: 800 });
       await expect
@@ -444,16 +446,18 @@ test('全部整理与渲染参数落盘，保存失败保留当前值并可重�
   await settings.getByRole('textbox', { name: '替换字符' }).fill('#');
   await settings.getByText('渲染', { exact: true }).click();
   await settings.getByRole('switch', { name: '自动识别播放跳转' }).uncheck();
-  await settings.getByRole('switch', { name: '背景人声始终放在主唱下方' }).check();
+  await mainView(page).getByRole('switch', { name: '背景人声始终放在主唱下方' }).check();
   const overscan = settings.getByRole('spinbutton', { name: '屏外渲染距离 (px)' });
   await overscan.fill('500');
   await overscan.press('Enter');
   await expect
-    .poll(() => env.host.config.get('defaultTheme.lyrics.display'))
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainView'))
+    .toMatchObject({ backgroundLast: true });
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.processing'))
     .toMatchObject({
       autoSeek: false,
       overscan: 500,
-      backgroundLast: true,
       maskMode: 'partial-mask',
       maskChar: '#',
       optimize: {
@@ -465,11 +469,40 @@ test('全部整理与渲染参数落盘，保存失败保留当前值并可重�
       },
     });
   env.host.answer('config.set', hostFailure('OPERATION_FAILED'));
-  await settings.getByRole('switch', { name: '背景人声始终放在主唱下方' }).uncheck();
+  await mainView(page).getByRole('switch', { name: '背景人声始终放在主唱下方' }).uncheck();
   await expect(settings).toContainText('设置已生效，但未能保存');
   env.host.answer('config.set', (params) => ({ success: true, key: String(params['key']) }));
   await settings.getByRole('button', { name: '重试保存' }).click();
   await expect(settings).toContainText('已保存');
+  expect(env.errors).toEqual([]);
+});
+
+test('主视图与沉浸视图的显示设置各自保存，恢复默认只改所在视图', async ({ page }) => {
+  const env = await openLyrics(page);
+  await openLyricsSettings(page);
+  const immersive = page
+    .locator('[data-settings-expander]')
+    .filter({ has: page.getByText('沉浸视图歌词', { exact: true }) });
+  const size = mainView(page).getByRole('spinbutton', { name: '字号 (px)' });
+  await size.fill('30');
+  await size.press('Enter');
+  const zoom = immersive.getByRole('spinbutton', { name: '歌词缩放 (%)' });
+  await zoom.fill('150');
+  await zoom.press('Enter');
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainView'))
+    .toMatchObject({ fontSize: 30 });
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.immersiveView'))
+    .toMatchObject({ fontSize: 33 });
+  await immersive.getByRole('button', { name: '恢复', exact: true }).click();
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.immersiveView'))
+    .toMatchObject({ fontSize: 22 });
+  await expect(size).toHaveValue('30');
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainView'))
+    .toMatchObject({ fontSize: 30 });
   expect(env.errors).toEqual([]);
 });
 
@@ -531,7 +564,7 @@ test('搜索结果按格式筛选：筛掉的候选不显示，条数跟着变�
   await expect(word).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveText('歌词格式：1');
-  // 候选的正文读到之前内容类筛选先留着它，读到是逐行就筛掉
+  // 候选的正文读到之前，内容类筛选暂时保留它。读到正文且是逐行歌词后，筛选将其排除
   await expect(candidates).toHaveCount(0);
   await expect(bar).toContainText('0 / 1 条');
   await expect(search).toContainText('没有符合筛选条件的结果');
@@ -599,7 +632,7 @@ test('右卡历史独立，候选预览与使用分开', async ({ page }) => {
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(search).toBeVisible();
   await expect(search.getByRole('textbox')).not.toHaveValue('');
-  // 前进键只认焦点在右侧卡里；后退换页后焦点落回页面，先放回卡里
+  // 前进键只在焦点位于右侧卡内时生效。后退换页后焦点回到页面，因此先把焦点移回卡内
   await search.getByRole('textbox').focus();
   await page.keyboard.press('Alt+ArrowRight');
   await expect(panel(page).locator('[data-lyrics-candidate-preview]')).toBeVisible();
@@ -628,7 +661,7 @@ test('显示面板与设置同步，校正应用于句首跳转且返回不重�
   await expect(settings.getByRole('spinbutton', { name: '字号 (px)', exact: true })).toHaveValue(
     '30',
   );
-  // 点「歌词设置」时显示浮层自己收起，不留在歌词栏上
+  // 点击「歌词设置」时显示浮层自行关闭，不留在歌词栏上
   await expect(surface).toHaveCount(0);
   await panel(page).hover();
   await panel(page).getByRole('button', { name: '更多歌词操作' }).click();
@@ -764,20 +797,19 @@ test('含空格字体名与字号保存，预览按比例跟随', async ({ page 
   const env = await openLyrics(page);
   await openLyricsSettings(page);
   const settings = page.locator('[data-lyrics-settings]');
-  await settings.getByRole('button', { name: '字体与副行', exact: true }).click();
-  const family = settings.getByRole('combobox', { name: '正在播放面板歌词字体', exact: true });
+  const family = settings.getByRole('combobox', { name: '歌词字体', exact: true });
   await family.pressSequentially('Noto Sans');
-  // 字体名输完离开输入框才提交，输入过程中不逐键写 config
+  // 字体名输入完成并离开输入框后才提交，输入过程中不逐键写入 config
   await family.blur();
   await expect(family).toHaveValue('Noto Sans');
-  // 桌面歌词的展开卡里也有同名的行，这里要的是字体与副行里的那一行，排在前面
+  // 桌面歌词的展开卡中也有同名的行。这里需要主视图歌词中的那一行，它排在前面
   await settings.getByRole('combobox', { name: '译文字号', exact: true }).first().click();
   await page.getByRole('option', { name: '自定义', exact: true }).click();
   const size = settings.getByRole('spinbutton', { name: '译文字号 (px)', exact: true }).first();
   await size.fill('19');
   await size.press('Enter');
   await expect
-    .poll(() => env.host.config.get('defaultTheme.lyrics.typography'))
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainView'))
     .toMatchObject({ fontFamily: 'Noto Sans', translationFontSize: 19 });
   await expect(lyricsPlayer(page).getByText('第一句译文', { exact: true })).toHaveCSS(
     'font-size',
@@ -799,9 +831,9 @@ test('含空格字体名与字号保存，预览按比例跟随', async ({ page 
 test('文字对齐：居中与居右即时生效并单独保存，预览页签不跟随', async ({ page }) => {
   const env = await openLyrics(page);
   await openLyricsSettings(page);
-  // 歌词设置收在窄的栏目里时，对齐是单选，宽时是页签：按实际控件点与断言
-  const choose = (name: string) => chooseOption(page, '文字对齐', name);
-  const selected = (name: string) => expectOption(page, '文字对齐', name);
+  // 歌词设置所在的栏较窄时，对齐是单选，较宽时是页签。用例按实际出现的控件点击与断言
+  const choose = (name: string) => chooseOption(page, '文字对齐', name, mainView(page));
+  const selected = (name: string) => expectOption(page, '文字对齐', name, mainView(page));
   const root = lyricsPlayer(page).locator('..');
   const mainLine = lyricsPlayer(page).locator('[class*="lyricMainLine"]').first();
   const duet = lyricsPlayer(page).locator('[class*="lyricDuetLine"]');
@@ -820,7 +852,11 @@ test('文字对齐：居中与居右即时生效并单独保存，预览页签�
   await expect(plain).toHaveCount(0);
   await expect(duet.first()).toBeAttached();
   await expect(mainLine).toHaveCSS('text-align', 'right');
-  await expect.poll(() => env.host.config.get('defaultTheme.lyrics.align')).toBe('right');
+  await expect
+    .poll(() => env.host.config.get('defaultTheme.lyrics.mainView'))
+    .toMatchObject({
+      align: 'right',
+    });
   await panel(page).hover();
   await panel(page).getByRole('tab', { name: '预览', exact: true }).click();
   await expect(

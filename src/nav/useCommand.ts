@@ -28,8 +28,8 @@ export function useCommand(spec: CommandSpec): void {
       early,
       keys: chords,
       buttons: codes,
-      enabled: () => latest.current.enabled?.() ?? true,
-      run: () => latest.current.run(),
+      enabled: (input) => latest.current.enabled?.(input) ?? true,
+      run: (input) => latest.current.run(input),
     });
   }, [commands, id, layer, early, keys, buttons]);
 }

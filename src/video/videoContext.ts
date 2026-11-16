@@ -25,8 +25,11 @@ export interface VideoBindings {
   toggle(): void;
   previous(): void;
   next(): void;
-  seek(seconds: number): void;
+  /** 相对位置跳转；连按时从上一次要去的位置接着算 */
+  seekBy(seconds: number): void;
+  seekTo(seconds: number): void;
   stepVolume(up: boolean): void;
+  toggleMute(): void;
   /** 打开正在播的文件所在的目录；没打开成功时答 false */
   reveal(): Promise<boolean>;
   /** 去文件夹页只看视频；正在播的文件在库里就落在它所在的目录 */
